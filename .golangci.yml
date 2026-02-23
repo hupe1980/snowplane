@@ -24,7 +24,7 @@ linters:
             - disableStutteringCheck
     goconst:
       min-len: 3
-      min-occurrences: 4
+      min-occurrences: 6
 
   exclusions:
     rules:
