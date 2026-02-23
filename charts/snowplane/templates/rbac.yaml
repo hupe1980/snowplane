@@ -5,7 +5,8 @@ metadata:
   labels:
     {{- include "snowplane.labels" . | nindent 4 }}
 rules:
-# Core resources — Secrets (read + write for FieldExport target management).
+{{- if .Values.rbac.secrets.read }}
+# Secrets — read-only for ProviderConfig credential resolution and User secret refs.
 - apiGroups:
   - ""
   resources:
@@ -14,11 +15,19 @@ rules:
   - get
   - list
   - watch
+{{- end }}
+{{- if .Values.rbac.secrets.write }}
+# Secrets — write access for FieldExport target management.
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
   - create
-  - update
   - patch
   - delete
-# Core resources — ConfigMaps (read + write for leader election and FieldExport).
+{{- end }}
+# ConfigMaps — read access for controller-runtime caches.
 - apiGroups:
   - ""
   resources:
@@ -27,10 +36,12 @@ rules:
   - get
   - list
   - watch
+{{- if .Values.rbac.configMaps.write }}
   - create
-  - update
   - patch
   - delete
+{{- end }}
+# Events — emit Kubernetes events on reconciliation.
 - apiGroups:
   - ""
   resources:
@@ -38,16 +49,7 @@ rules:
   verbs:
   - create
   - patch
-# Leader election.
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - get
-  - create
-  - update
-# Snowplane CRDs - full lifecycle.
+# Snowplane CRDs — full lifecycle.
 - apiGroups:
   - snowplane.hupe1980.github.io
   resources:
@@ -148,6 +150,40 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: {{ include "snowplane.fullname" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "snowplane.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+---
+# Leader election — namespace-scoped (leases only needed in controller namespace).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "snowplane.fullname" . }}-leader-election
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - create
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "snowplane.fullname" . }}-leader-election
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "snowplane.fullname" . }}-leader-election
 subjects:
 - kind: ServiceAccount
   name: {{ include "snowplane.serviceAccountName" . }}

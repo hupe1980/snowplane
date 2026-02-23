@@ -178,6 +178,24 @@ topologySpreadConstraints: []
 # -- Comma-separated list of namespaces to watch. Empty means all namespaces.
 watchNamespaces: ""
 
+rbac:
+  secrets:
+    # -- Grant read access (get, list, watch) to Secrets cluster-wide.
+    # Required when ProviderConfig uses key-pair or username/password authentication.
+    # Can be set to false when all ProviderConfigs use Workload Identity Federation
+    # and no FieldExport targets a Secret.
+    read: true
+    # -- Grant write access (create, patch, delete) to Secrets cluster-wide.
+    # Required only when FieldExport resources target Secrets.
+    # Disabled by default to follow least-privilege principles.
+    write: false
+  configMaps:
+    # -- Grant write access (create, patch, delete) to ConfigMaps cluster-wide.
+    # Required only when FieldExport resources target ConfigMaps.
+    # Read access (get, list, watch) is always granted for leader election.
+    # Disabled by default to follow least-privilege principles.
+    write: false
+
 # -- Leader election identity. Override when running multiple Snowplane instances
 # in the same cluster to prevent leader election conflicts.
 leaderElectionID: "snowplane-leader-election"
