@@ -25,7 +25,6 @@ linters:
     goconst:
       min-len: 3
       min-occurrences: 4
-      ignore-tests: true
 
   exclusions:
     rules:
