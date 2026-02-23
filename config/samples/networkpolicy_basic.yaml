@@ -1,0 +1,14 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: NetworkPolicy
+metadata:
+  name: office-network
+spec:
+  providerRef:
+    name: default
+  name: OFFICE_NETWORK_POLICY
+  allowedIPList:
+    - "10.0.0.0/8"
+    - "192.168.1.0/24"
+  blockedIPList:
+    - "10.0.0.1"
+  comment: "Office network access policy"

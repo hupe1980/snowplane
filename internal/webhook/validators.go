@@ -535,6 +535,297 @@ func NewStageValidator(scheme *runtime.Scheme) admission.Handler {
 	)
 }
 
+// NewTaskValidator creates a validating admission handler for Task resources.
+func NewTaskValidator(scheme *runtime.Scheme) admission.Handler {
+	return newResourceValidator[snowplanev1alpha1.Task](scheme,
+		func(old, cur *snowplanev1alpha1.Task) []error {
+			var errs []error
+
+			if old.Spec.Name != cur.Spec.Name {
+				errs = append(errs, fmt.Errorf(
+					"spec.name is immutable after creation (current: %q, desired: %q)",
+					old.Spec.Name, cur.Spec.Name,
+				))
+			}
+
+			errs = append(errs, validateImmutableRef(
+				"spec.databaseRef", old.Spec.DatabaseRef, cur.Spec.DatabaseRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.databaseName", old.Spec.DatabaseName, cur.Spec.DatabaseName,
+			)...)
+			errs = append(errs, validateImmutableRef(
+				"spec.schemaRef", old.Spec.SchemaRef, cur.Spec.SchemaRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.schemaName", old.Spec.SchemaName, cur.Spec.SchemaName,
+			)...)
+
+			errs = append(errs, validateImmutablePointer(
+				"spec.useRole", old.Spec.UseRole, cur.Spec.UseRole,
+			)...)
+
+			return errs
+		},
+	)
+}
+
+// NewStreamValidator creates a validating admission handler for Stream resources.
+func NewStreamValidator(scheme *runtime.Scheme) admission.Handler {
+	return newResourceValidator[snowplanev1alpha1.Stream](scheme,
+		func(old, cur *snowplanev1alpha1.Stream) []error {
+			var errs []error
+
+			if old.Spec.Name != cur.Spec.Name {
+				errs = append(errs, fmt.Errorf(
+					"spec.name is immutable after creation (current: %q, desired: %q)",
+					old.Spec.Name, cur.Spec.Name,
+				))
+			}
+
+			errs = append(errs, validateImmutableRef(
+				"spec.databaseRef", old.Spec.DatabaseRef, cur.Spec.DatabaseRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.databaseName", old.Spec.DatabaseName, cur.Spec.DatabaseName,
+			)...)
+			errs = append(errs, validateImmutableRef(
+				"spec.schemaRef", old.Spec.SchemaRef, cur.Spec.SchemaRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.schemaName", old.Spec.SchemaName, cur.Spec.SchemaName,
+			)...)
+
+			if string(old.Spec.SourceType) != string(cur.Spec.SourceType) {
+				errs = append(errs, fmt.Errorf(
+					"spec.sourceType is immutable after creation (current: %q, desired: %q)",
+					old.Spec.SourceType, cur.Spec.SourceType,
+				))
+			}
+
+			if old.Spec.SourceName != cur.Spec.SourceName {
+				errs = append(errs, fmt.Errorf(
+					"spec.sourceName is immutable after creation (current: %q, desired: %q)",
+					old.Spec.SourceName, cur.Spec.SourceName,
+				))
+			}
+
+			errs = append(errs, validateImmutablePointer(
+				"spec.useRole", old.Spec.UseRole, cur.Spec.UseRole,
+			)...)
+
+			return errs
+		},
+	)
+}
+
+// NewTagValidator creates a validating admission handler for Tag resources.
+func NewTagValidator(scheme *runtime.Scheme) admission.Handler {
+	return newResourceValidator[snowplanev1alpha1.Tag](scheme,
+		func(old, cur *snowplanev1alpha1.Tag) []error {
+			var errs []error
+
+			if old.Spec.Name != cur.Spec.Name {
+				errs = append(errs, fmt.Errorf(
+					"spec.name is immutable after creation (current: %q, desired: %q)",
+					old.Spec.Name, cur.Spec.Name,
+				))
+			}
+
+			errs = append(errs, validateImmutableRef(
+				"spec.databaseRef", old.Spec.DatabaseRef, cur.Spec.DatabaseRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.databaseName", old.Spec.DatabaseName, cur.Spec.DatabaseName,
+			)...)
+			errs = append(errs, validateImmutableRef(
+				"spec.schemaRef", old.Spec.SchemaRef, cur.Spec.SchemaRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.schemaName", old.Spec.SchemaName, cur.Spec.SchemaName,
+			)...)
+
+			errs = append(errs, validateImmutablePointer(
+				"spec.useRole", old.Spec.UseRole, cur.Spec.UseRole,
+			)...)
+
+			return errs
+		},
+	)
+}
+
+// NewNetworkPolicyValidator creates a validating admission handler for NetworkPolicy resources.
+func NewNetworkPolicyValidator(scheme *runtime.Scheme) admission.Handler {
+	return newResourceValidator[snowplanev1alpha1.NetworkPolicy](scheme,
+		func(old, cur *snowplanev1alpha1.NetworkPolicy) []error {
+			var errs []error
+
+			if old.Spec.Name != cur.Spec.Name {
+				errs = append(errs, fmt.Errorf(
+					"spec.name is immutable after creation (current: %q, desired: %q)",
+					old.Spec.Name, cur.Spec.Name,
+				))
+			}
+
+			errs = append(errs, validateImmutablePointer(
+				"spec.useRole", old.Spec.UseRole, cur.Spec.UseRole,
+			)...)
+
+			return errs
+		},
+	)
+}
+
+// NewResourceMonitorValidator creates a validating admission handler for ResourceMonitor resources.
+func NewResourceMonitorValidator(scheme *runtime.Scheme) admission.Handler {
+	return newResourceValidator[snowplanev1alpha1.ResourceMonitor](scheme,
+		func(old, cur *snowplanev1alpha1.ResourceMonitor) []error {
+			var errs []error
+
+			if old.Spec.Name != cur.Spec.Name {
+				errs = append(errs, fmt.Errorf(
+					"spec.name is immutable after creation (current: %q, desired: %q)",
+					old.Spec.Name, cur.Spec.Name,
+				))
+			}
+
+			errs = append(errs, validateImmutablePointer(
+				"spec.useRole", old.Spec.UseRole, cur.Spec.UseRole,
+			)...)
+
+			return errs
+		},
+	)
+}
+
+// NewMaskingPolicyValidator creates a validating admission handler for MaskingPolicy resources.
+func NewMaskingPolicyValidator(scheme *runtime.Scheme) admission.Handler {
+	return newResourceValidator[snowplanev1alpha1.MaskingPolicy](scheme,
+		func(old, cur *snowplanev1alpha1.MaskingPolicy) []error {
+			var errs []error
+
+			if old.Spec.Name != cur.Spec.Name {
+				errs = append(errs, fmt.Errorf(
+					"spec.name is immutable after creation (current: %q, desired: %q)",
+					old.Spec.Name, cur.Spec.Name,
+				))
+			}
+
+			errs = append(errs, validateImmutableRef(
+				"spec.databaseRef", old.Spec.DatabaseRef, cur.Spec.DatabaseRef,
+			)...)
+
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.databaseName", old.Spec.DatabaseName, cur.Spec.DatabaseName,
+			)...)
+
+			errs = append(errs, validateImmutableRef(
+				"spec.schemaRef", old.Spec.SchemaRef, cur.Spec.SchemaRef,
+			)...)
+
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.schemaName", old.Spec.SchemaName, cur.Spec.SchemaName,
+			)...)
+
+			errs = append(errs, validateImmutablePointer(
+				"spec.useRole", old.Spec.UseRole, cur.Spec.UseRole,
+			)...)
+
+			return errs
+		},
+	)
+}
+
+// NewRowAccessPolicyValidator creates a validating admission handler for RowAccessPolicy resources.
+func NewRowAccessPolicyValidator(scheme *runtime.Scheme) admission.Handler {
+	return newResourceValidator[snowplanev1alpha1.RowAccessPolicy](scheme,
+		func(old, cur *snowplanev1alpha1.RowAccessPolicy) []error {
+			var errs []error
+
+			if old.Spec.Name != cur.Spec.Name {
+				errs = append(errs, fmt.Errorf(
+					"spec.name is immutable after creation (current: %q, desired: %q)",
+					old.Spec.Name, cur.Spec.Name,
+				))
+			}
+
+			errs = append(errs, validateImmutableRef(
+				"spec.databaseRef", old.Spec.DatabaseRef, cur.Spec.DatabaseRef,
+			)...)
+
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.databaseName", old.Spec.DatabaseName, cur.Spec.DatabaseName,
+			)...)
+
+			errs = append(errs, validateImmutableRef(
+				"spec.schemaRef", old.Spec.SchemaRef, cur.Spec.SchemaRef,
+			)...)
+
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.schemaName", old.Spec.SchemaName, cur.Spec.SchemaName,
+			)...)
+
+			errs = append(errs, validateImmutablePointer(
+				"spec.useRole", old.Spec.UseRole, cur.Spec.UseRole,
+			)...)
+
+			return errs
+		},
+	)
+}
+
+// NewGrantOwnershipValidator creates a validating admission handler for GrantOwnership resources.
+// All fields are immutable after creation — ownership transfers cannot be modified.
+func NewGrantOwnershipValidator(scheme *runtime.Scheme) admission.Handler {
+	return newResourceValidator[snowplanev1alpha1.GrantOwnership](scheme,
+		func(old, cur *snowplanev1alpha1.GrantOwnership) []error {
+			var errs []error
+
+			if old.Spec.ObjectType != cur.Spec.ObjectType {
+				errs = append(errs, fmt.Errorf(
+					"spec.objectType is immutable after creation (current: %q, desired: %q)",
+					old.Spec.ObjectType, cur.Spec.ObjectType,
+				))
+			}
+
+			if old.Spec.ObjectName != cur.Spec.ObjectName {
+				errs = append(errs, fmt.Errorf(
+					"spec.objectName is immutable after creation (current: %q, desired: %q)",
+					old.Spec.ObjectName, cur.Spec.ObjectName,
+				))
+			}
+
+			if old.Spec.AccountRole != cur.Spec.AccountRole {
+				errs = append(errs, fmt.Errorf(
+					"spec.accountRole is immutable after creation (current: %q, desired: %q)",
+					old.Spec.AccountRole, cur.Spec.AccountRole,
+				))
+			}
+
+			errs = append(errs, validateImmutableRef(
+				"spec.accountRoleRef", old.Spec.AccountRoleRef, cur.Spec.AccountRoleRef,
+			)...)
+
+			if old.Spec.DatabaseRole != cur.Spec.DatabaseRole {
+				errs = append(errs, fmt.Errorf(
+					"spec.databaseRole is immutable after creation (current: %q, desired: %q)",
+					old.Spec.DatabaseRole, cur.Spec.DatabaseRole,
+				))
+			}
+
+			errs = append(errs, validateImmutableRef(
+				"spec.databaseRoleRef", old.Spec.DatabaseRoleRef, cur.Spec.DatabaseRoleRef,
+			)...)
+
+			errs = append(errs, validateImmutablePointer(
+				"spec.useRole", old.Spec.UseRole, cur.Spec.UseRole,
+			)...)
+
+			return errs
+		},
+	)
+}
+
 // --------------------------------------------------------------------------
 // Helpers
 // --------------------------------------------------------------------------
@@ -558,6 +849,56 @@ func validateImmutablePointer[T comparable](field string, oldVal, newVal *T) []e
 	case oldVal != nil && newVal != nil && *oldVal != *newVal:
 		errs = append(errs, fmt.Errorf(
 			"%s is immutable after creation (current: %v, desired: %v)",
+			field, *oldVal, *newVal,
+		))
+	}
+
+	return errs
+}
+
+// validateImmutableRef checks that a LocalObjectReference pointer has not changed.
+func validateImmutableRef(field string, oldVal, newVal *snowplanev1alpha1.LocalObjectReference) []error {
+	var errs []error
+
+	switch {
+	case oldVal == nil && newVal != nil:
+		errs = append(errs, fmt.Errorf(
+			"%s is immutable after creation (was unset, desired: %q)",
+			field, newVal.Name,
+		))
+	case oldVal != nil && newVal == nil:
+		errs = append(errs, fmt.Errorf(
+			"%s is immutable after creation (current: %q, cannot unset)",
+			field, oldVal.Name,
+		))
+	case oldVal != nil && newVal != nil && oldVal.Name != newVal.Name:
+		errs = append(errs, fmt.Errorf(
+			"%s is immutable after creation (current: %q, desired: %q)",
+			field, oldVal.Name, newVal.Name,
+		))
+	}
+
+	return errs
+}
+
+// validateImmutableStringPtr checks that a string pointer has not changed.
+func validateImmutableStringPtr(field string, oldVal, newVal *string) []error {
+	var errs []error
+
+	switch {
+	case oldVal == nil && newVal != nil:
+		errs = append(errs, fmt.Errorf(
+			"%s is immutable after creation (was unset, desired: %q)",
+			field, *newVal,
+		))
+	case oldVal != nil && newVal == nil:
+		errs = append(errs, fmt.Errorf(
+			"%s is immutable after creation (current: %q, cannot unset)",
+			field, *oldVal,
+		))
+	case oldVal != nil && newVal != nil && *oldVal != *newVal:
+		errs = append(errs, fmt.Errorf(
+			"%s is immutable after creation (current: %q, desired: %q)",
 			field, *oldVal, *newVal,
 		))
 	}

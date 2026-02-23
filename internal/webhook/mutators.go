@@ -66,6 +66,30 @@ func (m *DefaultsMutator) Handle(_ context.Context, req admission.Request) admis
 	case "Stage":
 		stage := &snowplanev1alpha1.Stage{}
 		return m.mutate(req, stage, &stage.Spec.CommonSpec, "stage")
+	case "Task":
+		task := &snowplanev1alpha1.Task{}
+		return m.mutate(req, task, &task.Spec.CommonSpec, "task")
+	case "Stream":
+		stream := &snowplanev1alpha1.Stream{}
+		return m.mutate(req, stream, &stream.Spec.CommonSpec, "stream")
+	case "Tag":
+		tag := &snowplanev1alpha1.Tag{}
+		return m.mutate(req, tag, &tag.Spec.CommonSpec, "tag")
+	case "NetworkPolicy":
+		np := &snowplanev1alpha1.NetworkPolicy{}
+		return m.mutate(req, np, &np.Spec.CommonSpec, "networkpolicy")
+	case "ResourceMonitor":
+		rm := &snowplanev1alpha1.ResourceMonitor{}
+		return m.mutate(req, rm, &rm.Spec.CommonSpec, "resourcemonitor")
+	case "MaskingPolicy":
+		mp := &snowplanev1alpha1.MaskingPolicy{}
+		return m.mutate(req, mp, &mp.Spec.CommonSpec, "maskingpolicy")
+	case "RowAccessPolicy":
+		rap := &snowplanev1alpha1.RowAccessPolicy{}
+		return m.mutate(req, rap, &rap.Spec.CommonSpec, "rowaccesspolicy")
+	case "GrantOwnership":
+		gow := &snowplanev1alpha1.GrantOwnership{}
+		return m.mutate(req, gow, &gow.Spec.CommonSpec, "grantownership")
 	case "ProviderConfig":
 		// ProviderConfig has no CommonSpec defaults to inject; allow as-is.
 		return admission.Allowed("")

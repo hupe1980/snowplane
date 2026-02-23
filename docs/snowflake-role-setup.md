@@ -79,6 +79,39 @@ Table and view creation requires schema-level privileges:
 
     GRANT CREATE STAGE ON SCHEMA <database_name>.<schema_name> TO ROLE SNOWPLANE_ROLE;
 
+### Task Management
+
+    GRANT CREATE TASK ON SCHEMA <database_name>.<schema_name> TO ROLE SNOWPLANE_ROLE;
+    GRANT EXECUTE TASK ON ACCOUNT TO ROLE SNOWPLANE_ROLE;
+
+The `EXECUTE TASK` privilege is required to resume (unsuspend) tasks.
+
+### Stream Management
+
+    GRANT CREATE STREAM ON SCHEMA <database_name>.<schema_name> TO ROLE SNOWPLANE_ROLE;
+
+### Tag Management
+
+    GRANT CREATE TAG ON SCHEMA <database_name>.<schema_name> TO ROLE SNOWPLANE_ROLE;
+
+### Network Policy Management
+
+    GRANT CREATE NETWORK POLICY ON ACCOUNT TO ROLE SNOWPLANE_ROLE;
+
+### Resource Monitor Management
+
+    GRANT CREATE RESOURCE MONITOR ON ACCOUNT TO ROLE SNOWPLANE_ROLE;
+
+**Note:** Resource monitor management typically requires the ACCOUNTADMIN role. Consider using `spec.useRole: ACCOUNTADMIN` on the ResourceMonitor CR.
+
+### Masking Policy Management
+
+    GRANT CREATE MASKING POLICY ON SCHEMA <database_name>.<schema_name> TO ROLE SNOWPLANE_ROLE;
+
+### Row Access Policy Management
+
+    GRANT CREATE ROW ACCESS POLICY ON SCHEMA <database_name>.<schema_name> TO ROLE SNOWPLANE_ROLE;
+
 ## Step 5: Set RSA Public Key (Key-Pair Auth)
 
     ALTER USER SNOWPLANE_USER SET RSA_PUBLIC_KEY = '<your-public-key>';
@@ -119,11 +152,19 @@ See [Workload Identity Guide](workload-identity.md) for cloud-specific setup.
 | `CREATE WAREHOUSE ON ACCOUNT` | Warehouse CRD | No (if using Warehouse) |
 | `CREATE USER ON ACCOUNT` | User CRD | No (if using User) |
 | `CREATE ROLE ON ACCOUNT` | AccountRole CRD | No (if using AccountRole) |
-| `MANAGE GRANTS ON ACCOUNT` | Grant CRD | Yes — powerful, only if needed |
+| `MANAGE GRANTS ON ACCOUNT` | Grant / GrantOwnership CRDs | Yes — powerful, only if needed |
 | `CREATE SCHEMA ON DATABASE` | Schema CRD | Per-database |
 | `CREATE TABLE ON SCHEMA` | Table CRD | Per-schema |
 | `CREATE VIEW ON SCHEMA` | View CRD | Per-schema |
 | `CREATE STAGE ON SCHEMA` | Stage CRD | Per-schema |
+| `CREATE TASK ON SCHEMA` | Task CRD | Per-schema |
+| `EXECUTE TASK ON ACCOUNT` | Task CRD (resume) | If using Task |
+| `CREATE STREAM ON SCHEMA` | Stream CRD | Per-schema |
+| `CREATE TAG ON SCHEMA` | Tag CRD | Per-schema |
+| `CREATE NETWORK POLICY ON ACCOUNT` | NetworkPolicy CRD | If using NetworkPolicy |
+| `CREATE RESOURCE MONITOR ON ACCOUNT` | ResourceMonitor CRD | If using ResourceMonitor |
+| `CREATE MASKING POLICY ON SCHEMA` | MaskingPolicy CRD | Per-schema |
+| `CREATE ROW ACCESS POLICY ON SCHEMA` | RowAccessPolicy CRD | Per-schema |
 
 ## Using `useRole` for Role Switching
 

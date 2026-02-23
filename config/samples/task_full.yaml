@@ -1,0 +1,27 @@
+# Task with full configuration — serverless DAG task with WHEN condition.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Task
+metadata:
+  name: my-task-full
+  namespace: snowplane-system
+spec:
+  name: PROCESS_EVENTS
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  userTaskManagedInitialWarehouseSize: SMALL
+  schedule: "USING CRON 0 9-17 * * MON-FRI America/Los_Angeles"
+  sqlStatement: |
+    INSERT INTO EVENTS_PROCESSED
+    SELECT * FROM EVENTS_STREAM
+    WHERE METADATA$ACTION = 'INSERT'
+  when: "SYSTEM$STREAM_HAS_DATA('EVENTS_STREAM')"
+  comment: "Process events from stream every hour during business hours"
+  allowOverlappingExecution: false
+  userTaskTimeoutMs: 3600000
+  suspendTaskAfterNumFailures: 5
+  taskAutoRetryAttempts: 3
+  suspend: false
+  providerRef:
+    name: default

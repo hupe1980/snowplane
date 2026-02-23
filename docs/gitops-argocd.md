@@ -145,7 +145,7 @@ spec:
 ---
 # Wave 4: Grants and field exports
 apiVersion: snowplane.hupe1980.github.io/v1alpha1
-kind: Grant
+kind: AccountRoleGrant
 metadata:
   name: analyst-usage
   annotations:
@@ -156,8 +156,7 @@ spec:
     accountObject:
       objectType: DATABASE
       objectName: ANALYTICS_DB
-  to:
-    accountRole: ANALYST_ROLE
+  accountRole: ANALYST_ROLE
   providerRef:
     name: default
 ---

@@ -26,17 +26,28 @@ This guide explains the project layout, conventions, and workflow for contributi
 │   ├── accountrole_types.go   # AccountRole spec, status, show output
 │   ├── databaserole_types.go  # DatabaseRole spec, status, show output (databaseRef)
 │   ├── user_types.go          # User spec, status, show output (secret-referenced credentials)
-│   ├── grant_types.go         # Grant spec, status, show output (privilege grants)
+│   ├── accountrolegrant_types.go # AccountRoleGrant spec, status (privilege grants to account roles)
+│   ├── databaserolegrant_types.go # DatabaseRoleGrant spec, status (privilege grants to database roles)
+│   ├── sharegrant_types.go    # ShareGrant spec, status (privilege grants to shares)
+│   ├── grantownership_types.go # GrantOwnership spec, status (ownership transfer)
 │   ├── table_types.go         # Table spec, status, show output (columns, clustering)
 │   ├── view_types.go          # View spec, status, show output (AS query, secure)
 │   ├── stage_types.go         # Stage spec, status, show output (internal/external stages)
+│   ├── task_types.go          # Task spec, status, show output (scheduled SQL, DAG)
+│   ├── stream_types.go        # Stream spec, status, show output (CDC)
+│   ├── tag_types.go           # Tag spec, status, show output (data governance)
+│   ├── networkpolicy_types.go # NetworkPolicy spec, status, show output (IP allow/block)
+│   ├── resourcemonitor_types.go # ResourceMonitor spec, status, show output (credit quotas)
+│   ├── maskingpolicy_types.go # MaskingPolicy spec, status, show output (dynamic masking)
+│   ├── rowaccesspolicy_types.go # RowAccessPolicy spec, status, show output (row-level security)
+│   ├── fieldexport_types.go   # FieldExport spec, status (cross-resource data export)
 │   ├── providerconfig_types.go # ProviderConfig spec & status (incl. WorkloadIdentity, WIF providers)
 │   ├── groupversion_info.go   # API group registration + kubebuilder markers
 │   ├── deepcopy_test.go       # Mutation-based DeepCopy correctness tests
 │   └── zz_generated.deepcopy.go # Auto-generated DeepCopy (controller-gen)
 ├── cmd/manager/               # Controller manager entrypoint
 ├── config/
-│   ├── crd/bases/             # CRD YAML manifests (Database, Schema, Warehouse, AccountRole, DatabaseRole, User, Grant, Table, View, Stage, ProviderConfig)
+│   ├── crd/bases/             # CRD YAML manifests (22 resource types including all managed resources, ProviderConfig, FieldExport)
 │   ├── manager/               # Controller Deployment, PDB, NetworkPolicy
 │   ├── rbac/                  # RBAC roles and bindings
 │   ├── samples/               # Example CR YAML files (incl. WIF, OAuth, detect-only examples)
@@ -45,18 +56,26 @@ This guide explains the project layout, conventions, and workflow for contributi
 ├── internal/
 │   ├── clients/
 │   │   ├── clientfactory/     # Snowflake client cache with SHA-256 hash-based rotation
-│   │   └── snowflake/         # Snowflake SDK wrapper (client, database/schema/warehouse/accountrole/databaserole/user/grant/table/view/stage ops, identifiers, errors)
+│   │   └── snowflake/         # Snowflake SDK wrapper (client, all resource ops, identifiers, errors)
 │   ├── controller/
 │   │   ├── reconciler/        # Generic reconciler framework (GenericReconciler[T], ResourceAdapter[T])
 │   │   ├── accountrole/       # AccountRole reconciler (adapter + helpers)
 │   │   ├── database/          # Database reconciler (adapter + helpers)
 │   │   ├── databaserole/      # DatabaseRole reconciler with databaseRef resolution (adapter + helpers)
-│   │   ├── grant/             # Grant reconciler — immutable grant/revoke lifecycle (adapter + helpers)
+│   │   ├── grant/             # Grant reconciler — AccountRoleGrant, DatabaseRoleGrant, ShareGrant (immutable grant/revoke lifecycle)
+│   │   ├── grantownership/    # GrantOwnership reconciler — ownership transfer, no-op on delete
+│   │   ├── maskingpolicy/     # MaskingPolicy reconciler with signature + body management
+│   │   ├── networkpolicy/     # NetworkPolicy reconciler — IP allow/block lists
 │   │   ├── providerconfig/    # ProviderConfig reconciler
 │   │   ├── refresolver/       # Cross-resource reference resolver
+│   │   ├── resourcemonitor/   # ResourceMonitor reconciler — credit quotas + triggers
+│   │   ├── rowaccesspolicy/   # RowAccessPolicy reconciler — row-level security
 │   │   ├── schema/            # Schema reconciler with dependency resolution (adapter + helpers)
 │   │   ├── stage/             # Stage reconciler with schema/database ref resolution (adapter + helpers)
+│   │   ├── stream/            # Stream reconciler — CDC on tables/views/stages
 │   │   ├── table/             # Table reconciler with column management (adapter + helpers)
+│   │   ├── tag/               # Tag reconciler — data governance tags
+│   │   ├── task/              # Task reconciler — scheduled SQL + DAG scheduling
 │   │   ├── user/              # User reconciler with secret-referenced credentials (adapter + helpers)
 │   │   ├── view/              # View reconciler with AS query management (adapter + helpers)
 │   │   └── warehouse/         # Warehouse reconciler with drift detection (adapter + helpers)
@@ -71,7 +90,7 @@ This guide explains the project layout, conventions, and workflow for contributi
 │   │   ├── conditions/        # Kubernetes condition helpers
 │   │   ├── finalizers/        # Finalizer management helpers
 │   │   └── sanitize/          # SafeRecorder — strips SQL/DSN from Kubernetes event messages
-│   └── webhook/               # Validating & mutating admission webhook handlers (all 11 resource kinds)
+│   └── webhook/               # Validating & mutating admission webhook handlers (all 22 resource kinds)
 ├── test/
 │   ├── e2e/                   # End-to-end tests (k3s testcontainer + real Snowflake, build tag: e2e)
 │   └── integration/           # envtest integration tests (build tag: integration)
@@ -143,7 +162,7 @@ This minimises Snowflake API calls and avoids unnecessary mutations.
 
 ### Generic Reconciler Framework
 
-All ten Snowflake resource reconcilers (AccountRole, Database, DatabaseRole, Grant, Schema, Stage, Table, User, View, Warehouse) share the same Observe-Diff-Apply state machine. To eliminate ~80% code duplication, the shared logic lives in `internal/controller/reconciler/`:
+All twenty Snowflake resource reconcilers (AccountRole, Database, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, GrantOwnership, Schema, Stage, Stream, Table, Tag, Task, User, View, Warehouse, NetworkPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy) share the same Observe-Diff-Apply state machine. To eliminate ~80% code duplication, the shared logic lives in `internal/controller/reconciler/`:
 
 - **`GenericReconciler[T ManagedResource]`** — A type-parameterised reconciler that implements the full lifecycle: finalizer management, ProviderConfig resolution, client caching, service creation, status patching (with conflict retry via `retry.RetryOnConflict`), condition management, rate limiting, retry, metrics, and drift detection.
 - **`ResourceAdapter[T ManagedResource]`** — An interface that each resource package implements to provide resource-specific behaviour: `Observe`, `Create`, `Alter`, `Drop`, `BuildAlterOptions`, `ValidateImmutableFields`, `ApplyObservation`, `DetectDrift`, `ComputeTrackedParameters`, `PreReconcile`, `PostCreate`, `PostUpdate`, `SetupWatches`, `ServiceFromClient`, `BuildIdentifier`, `NewObject`, `ResourceName`, `FinalizerName`.
@@ -265,7 +284,7 @@ When a parent resource (Database CR or ProviderConfig) is deleted before its dep
 
 - **Schema → Database deleted:** The schema reconciler falls back to `status.databaseName` (cached from the last successful observe) instead of requiring `databaseRef` resolution. This allows the Snowflake DROP to proceed.
 - **Any resource → ProviderConfig deleted:** If `resolveClient` fails during deletion, the reconciler removes the finalizer and lets Kubernetes garbage-collect the CR, since the Snowflake resource is already inaccessible.
-- **ProviderConfig in-use guard:** ProviderConfig uses a `providerconfig.snowplane.hupe1980.github.io/in-use` finalizer. On deletion, the reconciler checks all 10 resource types for references. If any managed resource still references the ProviderConfig, deletion is blocked with an `InUse` warning event and the ProviderConfig is requeued after 30s. Once all references are removed, the finalizer is cleared and the ProviderConfig is deleted.
+- **ProviderConfig in-use guard:** ProviderConfig uses a `providerconfig.snowplane.hupe1980.github.io/in-use` finalizer. On deletion, the reconciler checks all 20 resource types for references. If any managed resource still references the ProviderConfig, deletion is blocked with an `InUse` warning event and the ProviderConfig is requeued after 30s. Once all references are removed, the finalizer is cleared and the ProviderConfig is deleted.
 
 This prevents finalizer deadlocks in cascading delete scenarios.
 
@@ -357,7 +376,7 @@ Internally `GenericReconciler` has a `requeueOverride` field set via the `WithRe
 
 ### Validating & Mutating Admission Webhooks
 
-`internal/webhook/` implements `admission.Handler` for all eleven resource kinds (Database, Schema, Warehouse, AccountRole, DatabaseRole, User, Grant, Table, View, Stage, ProviderConfig):
+`internal/webhook/` implements `admission.Handler` for all 22 resource kinds (Database, Schema, Warehouse, AccountRole, DatabaseRole, User, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, GrantOwnership, Table, View, Stage, Task, Stream, Tag, NetworkPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, ProviderConfig, FieldExport):
 
 **Mutating webhook** (`DefaultsMutator`):
 - Injects `deletionPolicy: Delete` and `providerRef.name: default` when unset.
@@ -368,7 +387,7 @@ Internally `GenericReconciler` has a `requeueOverride` field set via the `WithRe
 - Each validator calls `spec.Validate()` for field-level validation (required fields, enum values, range bounds).
 - On UPDATE, checks immutable fields unless the `force-new` annotation is set.
 - Uses `errors.Join` to aggregate all violations into a single denial response.
-- **Database:** `name`, `transient`, `useRole` are immutable. **Schema:** `name`, `databaseRef`, `transient`, `useRole` are immutable. **Warehouse:** `name`, `useRole` are immutable. **AccountRole:** `name`, `useRole` are immutable. **DatabaseRole:** `name`, `databaseRef`, `useRole` are immutable. **User:** `name`, `type`, `useRole` are immutable. **Grant:** all spec fields are immutable (grants are immutable — revoke and re-grant). **Table:** `name`, `databaseRef`, `schemaRef`, `useRole` are immutable. **View:** `name`, `databaseRef`, `schemaRef`, `useRole` are immutable. **Stage:** `name`, `databaseRef`, `schemaRef`, `stageType`, `useRole` are immutable. **ProviderConfig:** `account`, `user` are immutable (guarded by `ObservedGeneration > 0`, consistent with all other validators).
+- **Database:** `name`, `transient`, `useRole` are immutable. **Schema:** `name`, `databaseRef`, `transient`, `useRole` are immutable. **Warehouse:** `name`, `useRole` are immutable. **AccountRole:** `name`, `useRole` are immutable. **DatabaseRole:** `name`, `databaseRef`, `useRole` are immutable. **User:** `name`, `type`, `useRole` are immutable. **AccountRoleGrant / DatabaseRoleGrant / ShareGrant:** all spec fields are immutable (grants are immutable — revoke and re-grant). **GrantOwnership:** all spec fields are immutable. **Table:** `name`, `databaseRef`, `schemaRef`, `useRole` are immutable. **View:** `name`, `databaseRef`, `schemaRef`, `useRole` are immutable. **Stage:** `name`, `databaseRef`, `schemaRef`, `stageType`, `useRole` are immutable. **Task:** `name`, `databaseRef`, `schemaRef` are immutable. **Stream:** `name`, `databaseRef`, `schemaRef`, `sourceType`, `sourceName` are immutable. **Tag:** `name`, `databaseRef`, `schemaRef` are immutable. **NetworkPolicy:** `name` is immutable. **ResourceMonitor:** `name` is immutable. **MaskingPolicy:** `name`, `databaseRef`, `schemaRef`, `signature` are immutable. **RowAccessPolicy:** `name`, `databaseRef`, `schemaRef`, `signature` are immutable. **ProviderConfig:** `account`, `user` are immutable (guarded by `ObservedGeneration > 0`, consistent with all other validators).
 - ForceNew annotation (`snowplane.hupe1980.github.io/force-new: "true"`) bypasses immutability checks, allowing the reconciler to handle delete+recreate.
 - Webhooks are optional — enabled via `--enable-webhooks` flag in the controller.
 - Webhook configuration YAML is in `config/webhook/`.
@@ -441,7 +460,7 @@ KUBEBUILDER_ASSETS="$(setup-envtest use -p path)" go test -tags integration -v -
 
 Integration tests use the `//go:build integration` build tag and are excluded from `just test`.
 
-**Test coverage (55 tests across 10 resources):**
+**Test coverage (59 tests across 11 resources):**
 
 | Resource | Tests | What they validate |
 |----------|-------|--------------------|
@@ -451,10 +470,11 @@ Integration tests use the `//go:build integration` build tag and are excluded fr
 | **User** (3) | `CreateLifecycle`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy` | Account-level lifecycle, secret-referenced credentials |
 | **AccountRole** (4) | `CreateLifecycle`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy`, `DriftDetection` | Simplest resource lifecycle, comment-only drift |
 | **DatabaseRole** (5) | `CreateLifecycle`, `WaitForDatabaseReady`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy`, `DriftDetection` | Two-part identifier, parent Database dependency, drift correction |
-| **Grant** (3) | `CreateLifecycle`, `WithGrantOption`, `DeleteWithOrphanPolicy` | Grant/Revoke lifecycle (no ALTER), grant option flag, immutable spec |
+| **Grant** (3) | `CreateLifecycle`, `WithGrantOption`, `DeleteWithOrphanPolicy` | AccountRoleGrant/DatabaseRoleGrant/ShareGrant lifecycle (no ALTER), grant option flag, immutable spec |
 | **Table** (5) | `CreateLifecycle`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy`, `DriftDetection`, `WaitForSchemaReady` | Column management, schema-level ref resolution, drift correction |
 | **View** (5) | `CreateLifecycle`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy`, `DriftDetection`, `WaitForSchemaReady` | AS query management (CREATE OR REPLACE on statement change), secure views, schema-level ref resolution |
 | **Stage** (6) | `CreateLifecycle`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy`, `DriftDetection`, `WaitForSchemaReady`, `ImmutableStageType` | Internal/external stages, stage type immutability, file format options |
+| **FieldExport** (3) | `CreateLifecycle`, `ExportToConfigMap`, `ExportToSecret` | FieldExport lifecycle, cross-resource data export |
 
 ### Webhook Integration Tests (envtest + WebhookInstallOptions)
 
@@ -463,7 +483,7 @@ The `internal/webhook/integration_test.go` file contains integration tests that 
 - **Validating webhooks:** CREATE rejection for invalid specs, UPDATE immutability enforcement, force-new bypass
 - **Mutating webhooks:** Default injection (e.g., `deletionPolicy: Delete`)
 - **DELETE passthrough:** Deletion always allowed regardless of validation rules
-- **All 11 resource types** covered (Database, Schema, Warehouse, AccountRole, DatabaseRole, User, Grant, Table, View, Stage, ProviderConfig)
+- **All 22 resource types** covered (Database, Schema, Warehouse, AccountRole, DatabaseRole, User, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, GrantOwnership, Table, View, Stage, Task, Stream, Tag, NetworkPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, ProviderConfig, FieldExport)
 
 ```bash
 # Run webhook integration tests
@@ -559,9 +579,11 @@ For fine-grained per-controller control, the `--disable-controllers` flag accept
 
 ```bash
 # Disable specific controllers
---disable-controllers=grant,stage,view
+--disable-controllers=accountrolegrant,stage,view
 
-# Valid controller names: database, schema, warehouse, accountrole, databaserole, grant, user, table, view, stage
+# Valid controller names: database, schema, warehouse, accountrole, databaserole, user, table, view, stage,
+#   accountrolegrant, databaserolegrant, sharegrant, grantownership, task, stream, tag,
+#   networkpolicy, resourcemonitor, maskingpolicy, rowaccesspolicy, fieldexport
 ```
 
 The `WithDisabled(true)` setting takes precedence over maturity — a disabled stable controller is still skipped.

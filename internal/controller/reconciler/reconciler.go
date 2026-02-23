@@ -752,7 +752,7 @@ func (r *GenericReconciler[T, S]) reconcileDelete(ctx context.Context, obj T, sv
 				return r.Adapter.Drop(opCtx, svc, id)
 			})
 		}); err != nil {
-			if !snowflake.IsObjectNotFound(err) {
+			if !snowflake.IsObjectNotFound(err) && !snowflake.IsObjectNotExistOrNotAuthorized(err) {
 				conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDeleting, fmt.Sprintf("failed to drop %s: %v", resName, err))
 				r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonReconcileError, fmt.Sprintf("Failed to drop %s %q: %v", resName, obj.GetSpecName(), err))
 				r.bestEffortPatchStatus(ctx, obj)

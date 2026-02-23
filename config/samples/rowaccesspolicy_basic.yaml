@@ -1,0 +1,25 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: RowAccessPolicy
+metadata:
+  name: restrict-sales-data
+  namespace: snowplane-system
+spec:
+  name: RESTRICT_SALES_DATA
+  providerRef:
+    name: default
+  databaseRef:
+    name: analytics-db
+  schemaRef:
+    name: public-schema
+  signature:
+    - name: sales_region
+      type: VARCHAR
+    - name: visible_to
+      type: VARCHAR
+  body: |
+    CASE
+      WHEN CURRENT_ROLE() IN ('SALES_ADMIN', 'SYSADMIN') THEN TRUE
+      WHEN sales_region = visible_to THEN TRUE
+      ELSE FALSE
+    END
+  comment: "Restrict access to sales data based on region"

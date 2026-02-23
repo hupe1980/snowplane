@@ -1,0 +1,373 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: tasks.snowplane.hupe1980.github.io
+spec:
+  group: snowplane.hupe1980.github.io
+  names:
+    categories:
+    - snowplane
+    kind: Task
+    listKind: TaskList
+    plural: tasks
+    singular: task
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: SYNCED
+      type: string
+    - jsonPath: .spec.name
+      name: SNOWFLAKE-NAME
+      type: string
+    - jsonPath: .status.databaseName
+      name: DATABASE
+      type: string
+    - jsonPath: .status.schemaName
+      name: SCHEMA
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Task is the Schema for the tasks API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: TaskSpec defines the desired state of a Snowflake Task.
+            properties:
+              after:
+                description: After specifies predecessor task names for DAG scheduling.
+                items:
+                  type: string
+                type: array
+              allowOverlappingExecution:
+                description: AllowOverlappingExecution allows multiple instances of
+                  the task graph to run concurrently.
+                type: boolean
+              comment:
+                description: Comment is an optional description for the task.
+                type: string
+              databaseName:
+                description: |-
+                  DatabaseName is the raw Snowflake database identifier.
+                  Mutually exclusive with DatabaseRef. Immutable after creation.
+                minLength: 1
+                type: string
+              databaseRef:
+                description: |-
+                  DatabaseRef references a Database CR in the same namespace.
+                  Mutually exclusive with DatabaseName. Immutable after creation.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy specifies what happens to the Snowflake resource when the CR is deleted.
+                  Defaults to "Delete".
+                enum:
+                - Delete
+                - Orphan
+                type: string
+              errorIntegration:
+                description: ErrorIntegration is the notification integration for
+                  error notifications.
+                type: string
+              name:
+                description: Name is the Snowflake task name. Immutable after creation.
+                minLength: 1
+                type: string
+              providerRef:
+                description: ProviderRef references the ProviderConfig to use for
+                  Snowflake connectivity.
+                properties:
+                  name:
+                    description: Name of the ProviderConfig to use.
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the ProviderConfig. Defaults to the namespace of the
+                      referring resource. Set this to reference a ProviderConfig in a
+                      different namespace (e.g. a shared system namespace).
+                    type: string
+                required:
+                - name
+                type: object
+              schedule:
+                description: |-
+                  Schedule defines when the task runs. Required for standalone and root tasks.
+                  Examples: "5 MINUTES", "USING CRON 0 9-17 * * SUN America/Los_Angeles"
+                type: string
+              schemaName:
+                description: |-
+                  SchemaName is the raw Snowflake schema FQN.
+                  Mutually exclusive with SchemaRef. Immutable after creation.
+                minLength: 1
+                type: string
+              schemaRef:
+                description: |-
+                  SchemaRef references a Schema CR in the same namespace.
+                  Mutually exclusive with SchemaName. Immutable after creation.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              sqlStatement:
+                description: SQLStatement is the SQL code executed when the task runs.
+                minLength: 1
+                type: string
+              successIntegration:
+                description: SuccessIntegration is the notification integration for
+                  success notifications.
+                type: string
+              suspend:
+                default: true
+                description: |-
+                  Suspend indicates whether the task should be suspended. Default is true
+                  (tasks are created in suspended state).
+                type: boolean
+              suspendTaskAfterNumFailures:
+                description: |-
+                  SuspendTaskAfterNumFailures specifies the number of consecutive failed runs
+                  before the task is automatically suspended.
+                format: int32
+                minimum: 0
+                type: integer
+              taskAutoRetryAttempts:
+                description: TaskAutoRetryAttempts specifies the number of automatic
+                  retry attempts (0-30).
+                format: int32
+                maximum: 30
+                minimum: 0
+                type: integer
+              useRole:
+                description: |-
+                  UseRole specifies the Snowflake role to activate via USE ROLE before
+                  CREATE/ALTER/DROP operations. In Snowflake's DAC model the role active
+                  at CREATE time becomes the object owner, so this field indirectly
+                  controls initial ownership.
+                  This field is immutable after the resource has been created in Snowflake.
+                type: string
+              userTaskManagedInitialWarehouseSize:
+                description: |-
+                  UserTaskManagedInitialWarehouseSize sets the initial size for serverless tasks.
+                  Mutually exclusive with Warehouse.
+                enum:
+                - XSMALL
+                - SMALL
+                - MEDIUM
+                - LARGE
+                - XLARGE
+                - XXLARGE
+                type: string
+              userTaskTimeoutMs:
+                description: UserTaskTimeoutMs specifies the time limit on a single
+                  run in milliseconds (0-604800000).
+                format: int32
+                maximum: 604800000
+                minimum: 0
+                type: integer
+              warehouse:
+                description: |-
+                  Warehouse specifies the virtual warehouse for task runs.
+                  Mutually exclusive with UserTaskManagedInitialWarehouseSize.
+                type: string
+              when:
+                description: When specifies a boolean SQL expression that determines
+                  whether the task runs.
+                type: string
+            required:
+            - name
+            - providerRef
+            - sqlStatement
+            type: object
+            x-kubernetes-validations:
+            - message: exactly one of spec.databaseRef or spec.databaseName must be
+                set
+              rule: (has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef)
+                && has(self.databaseName))
+            - message: exactly one of spec.schemaRef or spec.schemaName must be set
+              rule: (has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef)
+                && has(self.schemaName))
+            - message: spec.warehouse and spec.userTaskManagedInitialWarehouseSize
+                are mutually exclusive
+              rule: '!(has(self.warehouse) && has(self.userTaskManagedInitialWarehouseSize))'
+          status:
+            description: TaskStatus defines the observed state of a Task.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the resource's state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              databaseName:
+                description: DatabaseName is the parent Snowflake database name.
+                type: string
+              fullyQualifiedName:
+                description: FullyQualifiedName is the Snowflake fully qualified identifier
+                  for this resource.
+                type: string
+              lastAppliedSpecHash:
+                description: |-
+                  LastAppliedSpecHash is the SHA-256 hash of the spec as of the last
+                  successful reconciliation. The reconciler uses this to distinguish
+                  spec changes (user edited the CR) from external drift (Snowflake
+                  state diverged without a spec change). This is more reliable than
+                  comparing ObservedGeneration vs Generation because metadata-only
+                  changes (labels, annotations) increment Generation without changing
+                  the spec.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              schemaName:
+                description: SchemaName is the parent Snowflake schema name.
+                type: string
+              showOutput:
+                description: ShowOutput contains the raw SHOW TASKS output for this
+                  task.
+                properties:
+                  comment:
+                    description: Comment is the task description.
+                    type: string
+                  condition:
+                    description: Condition is the WHEN clause.
+                    type: string
+                  createdOn:
+                    description: CreatedOn is the timestamp when the task was created.
+                    type: string
+                  databaseName:
+                    description: DatabaseName is the parent database name.
+                    type: string
+                  definition:
+                    description: Definition is the SQL statement body.
+                    type: string
+                  errorIntegration:
+                    description: ErrorIntegration is the error notification integration.
+                    type: string
+                  name:
+                    description: Name is the task name as returned by Snowflake.
+                    type: string
+                  owner:
+                    description: Owner is the role that owns the task.
+                    type: string
+                  predecessors:
+                    description: Predecessors is a comma-separated list of predecessor
+                      task names.
+                    type: string
+                  schedule:
+                    description: Schedule is the task schedule expression.
+                    type: string
+                  schemaName:
+                    description: SchemaName is the parent schema name.
+                    type: string
+                  state:
+                    description: State is the task state (started or suspended).
+                    type: string
+                  warehouse:
+                    description: Warehouse is the warehouse used by the task.
+                    type: string
+                type: object
+              trackedParameters:
+                description: |-
+                  TrackedParameters tracks which optional spec fields have been actively SET
+                  in Snowflake.
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

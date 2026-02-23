@@ -28,11 +28,19 @@ import (
 	databaserolectl "github.com/hupe1980/snowplane/internal/controller/databaserole"
 	fieldexportctl "github.com/hupe1980/snowplane/internal/controller/fieldexport"
 	grantctl "github.com/hupe1980/snowplane/internal/controller/grant"
+	grantownershipctl "github.com/hupe1980/snowplane/internal/controller/grantownership"
+	maskingpolicyctl "github.com/hupe1980/snowplane/internal/controller/maskingpolicy"
+	networkpolicyctl "github.com/hupe1980/snowplane/internal/controller/networkpolicy"
 	providerconfig "github.com/hupe1980/snowplane/internal/controller/providerconfig"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	resourcemonitorctl "github.com/hupe1980/snowplane/internal/controller/resourcemonitor"
+	rowaccesspolicyctl "github.com/hupe1980/snowplane/internal/controller/rowaccesspolicy"
 	schemactl "github.com/hupe1980/snowplane/internal/controller/schema"
 	stagectl "github.com/hupe1980/snowplane/internal/controller/stage"
+	streamctl "github.com/hupe1980/snowplane/internal/controller/stream"
 	tablectl "github.com/hupe1980/snowplane/internal/controller/table"
+	tagctl "github.com/hupe1980/snowplane/internal/controller/tag"
+	taskctl "github.com/hupe1980/snowplane/internal/controller/task"
 	userctl "github.com/hupe1980/snowplane/internal/controller/user"
 	viewctl "github.com/hupe1980/snowplane/internal/controller/view"
 	warehousectl "github.com/hupe1980/snowplane/internal/controller/warehouse"
@@ -68,6 +76,14 @@ var validControllerNames = map[string]bool{
 	"table":             true,
 	"view":              true,
 	"stage":             true,
+	"task":              true,
+	"stream":            true,
+	"tag":               true,
+	"networkpolicy":     true,
+	"resourcemonitor":   true,
+	"maskingpolicy":     true,
+	"rowaccesspolicy":   true,
+	"grantownership":    true,
 	"fieldexport":       true,
 }
 
@@ -136,7 +152,7 @@ func main() {
 		"Enable controllers for alpha-maturity CRDs. Set to false to skip alpha resources.")
 	flag.StringVar(&disableControllers, "disable-controllers", "",
 		"Comma-separated list of controller names to disable (e.g. \"accountrolegrant,stage,view\"). "+
-			"Valid names: database, schema, warehouse, accountrole, databaserole, accountrolegrant, databaserolegrant, sharegrant, user, table, view, stage, fieldexport.")
+			"Valid names: database, schema, warehouse, accountrole, databaserole, accountrolegrant, databaserolegrant, sharegrant, user, table, view, stage, task, stream, tag, networkpolicy, resourcemonitor, maskingpolicy, rowaccesspolicy, grantownership, fieldexport.")
 	flag.StringVar(&watchNamespaces, "watch-namespaces", "",
 		"Comma-separated list of namespaces to watch. If empty, all namespaces are watched.")
 	flag.StringVar(&leaderElectionID, "leader-election-id", "snowplane-leader-election",
@@ -258,6 +274,14 @@ func main() {
 		{"table", tablectl.NewReconciler(kc, factory, controllerRec("table"), rl)},
 		{"view", viewctl.NewReconciler(kc, factory, controllerRec("view"), rl)},
 		{"stage", stagectl.NewReconciler(kc, factory, controllerRec("stage"), rl)},
+		{"task", taskctl.NewReconciler(kc, factory, controllerRec("task"), rl)},
+		{"stream", streamctl.NewReconciler(kc, factory, controllerRec("stream"), rl)},
+		{"tag", tagctl.NewReconciler(kc, factory, controllerRec("tag"), rl)},
+		{"networkpolicy", networkpolicyctl.NewReconciler(kc, factory, controllerRec("networkpolicy"), rl)},
+		{"resourcemonitor", resourcemonitorctl.NewReconciler(kc, factory, controllerRec("resourcemonitor"), rl)},
+		{"maskingpolicy", maskingpolicyctl.NewReconciler(kc, factory, controllerRec("maskingpolicy"), rl)},
+		{"rowaccesspolicy", rowaccesspolicyctl.NewReconciler(kc, factory, controllerRec("rowaccesspolicy"), rl)},
+		{"grantownership", grantownershipctl.NewReconciler(kc, factory, controllerRec("grantownership"), rl)},
 	}
 
 	for _, entry := range controllers {
@@ -287,7 +311,7 @@ func main() {
 
 		// Mutating webhooks (defaults injection).
 		defaultsMutator := webhook.NewDefaultsMutator(scheme)
-		for _, res := range []string{"database", "schema", "warehouse", "accountrole", "databaserole", "accountrolegrant", "databaserolegrant", "sharegrant", "user", "table", "view", "stage"} {
+		for _, res := range []string{"database", "schema", "warehouse", "accountrole", "databaserole", "accountrolegrant", "databaserolegrant", "sharegrant", "user", "table", "view", "stage", "task", "stream", "tag", "networkpolicy", "resourcemonitor", "maskingpolicy", "rowaccesspolicy", "grantownership"} {
 			hookServer.Register(
 				"/mutate-snowplane-v1alpha1-"+res,
 				&ctrlwebhook.Admission{Handler: defaultsMutator},
@@ -311,6 +335,14 @@ func main() {
 			{"table", webhook.NewTableValidator(scheme)},
 			{"view", webhook.NewViewValidator(scheme)},
 			{"stage", webhook.NewStageValidator(scheme)},
+			{"task", webhook.NewTaskValidator(scheme)},
+			{"stream", webhook.NewStreamValidator(scheme)},
+			{"tag", webhook.NewTagValidator(scheme)},
+			{"networkpolicy", webhook.NewNetworkPolicyValidator(scheme)},
+			{"resourcemonitor", webhook.NewResourceMonitorValidator(scheme)},
+			{"maskingpolicy", webhook.NewMaskingPolicyValidator(scheme)},
+			{"rowaccesspolicy", webhook.NewRowAccessPolicyValidator(scheme)},
+			{"grantownership", webhook.NewGrantOwnershipValidator(scheme)},
 			{"providerconfig", webhook.NewProviderConfigValidator(scheme)},
 			{"fieldexport", webhook.NewFieldExportValidator(scheme)},
 		}

@@ -1,0 +1,300 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: resourcemonitors.snowplane.hupe1980.github.io
+spec:
+  group: snowplane.hupe1980.github.io
+  names:
+    categories:
+    - snowplane
+    kind: ResourceMonitor
+    listKind: ResourceMonitorList
+    plural: resourcemonitors
+    singular: resourcemonitor
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: SYNCED
+      type: string
+    - jsonPath: .spec.name
+      name: SNOWFLAKE-NAME
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ResourceMonitor is the Schema for the resourcemonitors API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ResourceMonitorSpec defines the desired state of a Snowflake
+              Resource Monitor.
+            properties:
+              creditQuota:
+                description: CreditQuota is the number of credits allocated per frequency
+                  interval.
+                format: int32
+                type: integer
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy specifies what happens to the Snowflake resource when the CR is deleted.
+                  Defaults to "Delete".
+                enum:
+                - Delete
+                - Orphan
+                type: string
+              endTimestamp:
+                description: EndTimestamp is the date/time when the monitor suspends
+                  assigned warehouses.
+                type: string
+              frequency:
+                description: |-
+                  Frequency is the interval at which credit usage resets to 0.
+                  If set, startTimestamp must also be set.
+                enum:
+                - MONTHLY
+                - DAILY
+                - WEEKLY
+                - YEARLY
+                - NEVER
+                type: string
+              name:
+                description: Name is the Snowflake resource monitor name. Immutable
+                  after creation.
+                minLength: 1
+                type: string
+              notifyUsers:
+                description: NotifyUsers is the list of users to receive email notifications.
+                items:
+                  type: string
+                type: array
+              providerRef:
+                description: ProviderRef references the ProviderConfig to use for
+                  Snowflake connectivity.
+                properties:
+                  name:
+                    description: Name of the ProviderConfig to use.
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the ProviderConfig. Defaults to the namespace of the
+                      referring resource. Set this to reference a ProviderConfig in a
+                      different namespace (e.g. a shared system namespace).
+                    type: string
+                required:
+                - name
+                type: object
+              startTimestamp:
+                description: |-
+                  StartTimestamp is the date/time when monitoring begins. Use "IMMEDIATELY" for now.
+                  If set, frequency must also be set.
+                type: string
+              triggers:
+                description: |-
+                  Triggers defines the trigger thresholds and actions for the resource monitor.
+                  Each resource monitor supports up to 5 NOTIFY triggers.
+                items:
+                  description: ResourceMonitorTrigger defines a trigger for the resource
+                    monitor.
+                  properties:
+                    action:
+                      description: Action is the action to perform when the threshold
+                        is reached.
+                      enum:
+                      - SUSPEND
+                      - SUSPEND_IMMEDIATE
+                      - NOTIFY
+                      type: string
+                    threshold:
+                      description: |-
+                        Threshold is the percentage of the credit quota that triggers the action.
+                        Values larger than 100 are supported.
+                      format: int32
+                      minimum: 1
+                      type: integer
+                  required:
+                  - action
+                  - threshold
+                  type: object
+                type: array
+              useRole:
+                description: |-
+                  UseRole specifies the Snowflake role to activate via USE ROLE before
+                  CREATE/ALTER/DROP operations. In Snowflake's DAC model the role active
+                  at CREATE time becomes the object owner, so this field indirectly
+                  controls initial ownership.
+                  This field is immutable after the resource has been created in Snowflake.
+                type: string
+            required:
+            - name
+            - providerRef
+            type: object
+          status:
+            description: ResourceMonitorStatus defines the observed state of a ResourceMonitor.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the resource's state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              fullyQualifiedName:
+                description: FullyQualifiedName is the Snowflake fully qualified identifier
+                  for this resource.
+                type: string
+              lastAppliedSpecHash:
+                description: |-
+                  LastAppliedSpecHash is the SHA-256 hash of the spec as of the last
+                  successful reconciliation. The reconciler uses this to distinguish
+                  spec changes (user edited the CR) from external drift (Snowflake
+                  state diverged without a spec change). This is more reliable than
+                  comparing ObservedGeneration vs Generation because metadata-only
+                  changes (labels, annotations) increment Generation without changing
+                  the spec.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              showOutput:
+                description: ShowOutput contains the raw SHOW RESOURCE MONITORS output
+                  for this monitor.
+                properties:
+                  createdOn:
+                    description: CreatedOn is the timestamp when the resource monitor
+                      was created.
+                    type: string
+                  creditQuota:
+                    description: CreditQuota is the credit quota.
+                    type: string
+                  endTime:
+                    description: EndTime is the monitoring end time.
+                    type: string
+                  frequency:
+                    description: Frequency is the reset frequency.
+                    type: string
+                  level:
+                    description: Level is the assignment level (ACCOUNT, WAREHOUSE,
+                      or null).
+                    type: string
+                  name:
+                    description: Name is the resource monitor name as returned by
+                      Snowflake.
+                    type: string
+                  notifyAt:
+                    description: NotifyAt is the notify trigger percentages (comma-separated).
+                    type: string
+                  notifyUsers:
+                    description: NotifyUsers is the comma-separated list of notification
+                      users.
+                    type: string
+                  remainingCredits:
+                    description: RemainingCredits is the credits remaining in the
+                      current interval.
+                    type: string
+                  startTime:
+                    description: StartTime is the monitoring start time.
+                    type: string
+                  suspendAt:
+                    description: SuspendAt is the suspend trigger percentage.
+                    type: string
+                  suspendImmediatelyAt:
+                    description: SuspendImmediatelyAt is the suspend-immediately trigger
+                      percentage.
+                    type: string
+                  usedCredits:
+                    description: UsedCredits is the credits used in the current interval.
+                    type: string
+                type: object
+              trackedParameters:
+                description: TrackedParameters tracks which optional spec fields have
+                  been actively SET.
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -12,27 +12,22 @@
 
 ---
 
-**Snowplane** manages Snowflake resources declaratively as Kubernetes custom resources — similar in spirit to [AWS ACK](https://aws-controllers-k8s.github.io/community/) and [Crossplane](https://crossplane.io). Define databases, schemas, warehouses, tables, views, stages, roles, users, and grants as CRDs and let the operator reconcile them.
+**Snowplane** manages Snowflake resources declaratively as Kubernetes custom resources — similar in spirit to [AWS ACK](https://aws-controllers-k8s.github.io/community/) and [Crossplane](https://crossplane.io). Define your Snowflake infrastructure as CRDs and let the operator reconcile them.
 
 ## ✨ Features
 
-### 🏗️ Resource Management
+### 🏗️ Resource Management (21 CRDs)
 
-| Resource | Capabilities |
-|----------|-------------|
-| 🗄️ **Database** | Create, alter, drop with full drift detection, transient & Iceberg support |
-| 📂 **Schema** | Managed access, dependency resolution to parent database |
-| ⚡ **Warehouse** | Full lifecycle — create, alter, suspend, resume, drop, multi-cluster |
-| 👤 **User** | PERSON / SERVICE / LEGACY_SERVICE types, secret-referenced passwords & RSA keys |
-| 🎭 **AccountRole** | Account-level roles with role-based access |
-| 🎭 **DatabaseRole** | Database-scoped roles with automatic database reference resolution |
-| 📊 **Table** | Column definitions, clustering keys, change tracking, schema evolution, transient tables |
-| 👁️ **View** | Secure views, CREATE OR REPLACE on statement changes, change tracking |
-| 📦 **Stage** | Internal & external stages, encryption, directory tables, storage integration |
-| 🔑 **AccountRoleGrant** | Declarative GRANT/REVOKE to account roles, dangerous-grant protection |
-| 🔑 **DatabaseRoleGrant** | Declarative GRANT/REVOKE to database roles |
-| 🔑 **ShareGrant** | Declarative GRANT/REVOKE to shares |
-| 📤 **FieldExport** | Copy status fields into ConfigMaps/Secrets via dot-notation paths |
+| Category | Resources |
+|----------|-----------|
+| 🗄️ **Core Infrastructure** | Database, Schema, Warehouse |
+| 📊 **Data Objects** | Table, View, Stage, Stream |
+| 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, GrantOwnership |
+| ⏰ **Orchestration** | Task (DAG scheduling, serverless or warehouse-backed) |
+| 🛡️ **Security & Governance** | NetworkPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
+| 📤 **Utilities** | FieldExport (copy status fields into ConfigMaps/Secrets) |
+
+Every resource supports full lifecycle management (create, alter, drop), drift detection, adoption of pre-existing objects, and deletion policies. See the [API Reference](#-api-reference) below for detailed field documentation.
 
 ### 🔧 Operator Capabilities
 
@@ -72,8 +67,8 @@
 │                Kubernetes Cluster                 │
 │                                                   │
 │  ┌──────────────┐   ┌────────────────────────┐   │
-│  │ ProviderConfig│   │ Database / Schema /    │   │
-│  │      CR       │   │ Warehouse / Role CRs  │   │
+│  │ ProviderConfig│   │   Snowflake Resource   │   │
+│  │      CR       │   │     Custom Resources   │   │
 │  └──────┬────────┘   └────────┬───────────────┘   │
 │         │                     │                    │
 │  ┌──────▼─────────────────────▼──────────────────┐│
@@ -85,15 +80,11 @@
 │  │  │  Waits for dependency readiness          │  ││
 │  │  └──────────────────────────────────────────┘  ││
 │  │                                                ││
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐         ││
-│  │  │ 🗄️ DB  │ │ 📂 Sch │ │ ⚡ WH  │         ││
-│  │  └─────────┘ └─────────┘ └─────────┘         ││
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐         ││
-│  │  │ 🎭 Role│ │ 👤 User│ │ 🔑 Grants│        ││
-│  │  └─────────┘ └─────────┘ └─────────┘         ││
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐         ││
-│  │  │ 📊 Tbl │ │ 👁️ View│ │ 📦 Stg │         ││
-│  │  └─────────┘ └─────────┘ └─────────┘         ││
+│  │  ┌──────────────────────────────────────────┐  ││
+│  │  │  21 Resource Controllers (see above)     │  ││
+│  │  │  Observe → Diff → Apply reconciliation   │  ││
+│  │  └──────────────────────────────────────────┘  ││
+│  │                                                ││
 │  │  ┌──────────────────┐ ┌───────────────────┐   ││
 │  │  │ 📤 FieldExport  │ │ 🔍 Drift Engine  │   ││
 │  │  └──────────────────┘ └───────────────────┘   ││
@@ -216,13 +207,13 @@ kubectl get databases
 
 ### 🏷️ Annotations Reference
 
-| Annotation | Values | Description |
-|------------|--------|-------------|
-| `snowplane.hupe1980.github.io/force-new` | `true` | Delete + recreate on immutable field change |
-| `snowplane.hupe1980.github.io/adoption-policy` | `adopt` / `fail-if-exists` | Control adoption of pre-existing resources |
-| `snowplane.hupe1980.github.io/drift-policy` | `detect-only` | Report drift without correcting it |
-| `snowplane.hupe1980.github.io/use-create-or-alter` | `true` | Atomic `CREATE OR ALTER` (Database, Warehouse) |
-| `snowplane.hupe1980.github.io/allow-dangerous-grant` | `true` | Allow grants to system roles / dangerous privileges |
+| Annotation | Default | Values | Description |
+|------------|---------|--------|-------------|
+| `snowplane.hupe1980.github.io/force-new` | `false` | `true` / `false` | Delete + recreate on immutable field change |
+| `snowplane.hupe1980.github.io/adoption-policy` | `fail-if-exists` | `adopt` / `fail-if-exists` | Control adoption of pre-existing resources |
+| `snowplane.hupe1980.github.io/drift-policy` | correct | `detect-only` | Report drift without correcting it |
+| `snowplane.hupe1980.github.io/use-create-or-alter` | `true` | `true` / `false` | Atomic `CREATE OR ALTER` (Database, Warehouse) |
+| `snowplane.hupe1980.github.io/allow-dangerous-grant` | `false` | `true` / `false` | Allow grants to system roles / dangerous privileges |
 
 ### 🏷️ CRD Labels
 
@@ -527,6 +518,149 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 
 </details>
 
+<details>
+<summary>⏰ <strong>Task</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Task name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.sqlStatement` | `string` | SQL code executed when the task runs |
+| `spec.schedule` | `*string` | Cron or interval schedule (e.g. `5 MINUTES`) |
+| `spec.warehouse` | `*string` | Warehouse for task execution *(mutually exclusive with serverless size)* |
+| `spec.userTaskManagedInitialWarehouseSize` | `*enum` | Serverless warehouse size: `XSMALL`…`XXLARGE` |
+| `spec.after` | `[]string` | Predecessor task names for DAG scheduling |
+| `spec.when` | `*string` | Boolean SQL condition for conditional execution |
+| `spec.suspend` | `*bool` | Whether the task is suspended (default: `true`) |
+| `spec.comment` | `*string` | Optional description |
+| `spec.allowOverlappingExecution` | `*bool` | Allow concurrent graph executions |
+| `spec.userTaskTimeoutMs` | `*int32` | Single-run timeout in milliseconds (0–604800000) |
+| `spec.suspendTaskAfterNumFailures` | `*int32` | Auto-suspend after N consecutive failures |
+| `spec.errorIntegration` | `*string` | Notification integration for errors |
+| `spec.taskAutoRetryAttempts` | `*int32` | Automatic retry attempts (0–30) |
+
+> ⏰ **DAG Scheduling:** Use `after` to chain tasks into directed acyclic graphs. Root tasks require a `schedule`; child tasks inherit it from the root.
+
+</details>
+
+<details>
+<summary>🔄 <strong>Stream</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Stream name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.sourceType` | `enum` | Source type: `TABLE` / `VIEW` / `EXTERNAL_TABLE` / `STAGE` / `DYNAMIC_TABLE` *(immutable)* |
+| `spec.sourceName` | `string` | Fully qualified source object name *(immutable)* |
+| `spec.appendOnly` | `*bool` | Track row inserts only (TABLE/VIEW) |
+| `spec.insertOnly` | `*bool` | Track inserts only (EXTERNAL_TABLE) |
+| `spec.showInitialRows` | `*bool` | Include existing rows on first consume |
+| `spec.comment` | `*string` | Optional description |
+
+> 🔄 **Change Data Capture:** Streams track DML changes on source objects. Use with Tasks to build real-time data pipelines.
+
+</details>
+
+<details>
+<summary>🏷️ <strong>Tag</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Tag name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.allowedValues` | `[]string` | Valid values when assigning the tag (max 5000) |
+| `spec.comment` | `*string` | Optional description |
+
+> 🏷️ **Data Governance:** Tags enable metadata classification for compliance, cost allocation, and access control. Assign tags to databases, schemas, tables, columns, and other objects.
+
+</details>
+
+<details>
+<summary>🛡️ <strong>NetworkPolicy</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Network policy name *(immutable)* |
+| `spec.allowedIPList` | `[]string` | IPv4 addresses or CIDR ranges allowed access |
+| `spec.blockedIPList` | `[]string` | IPv4 addresses or CIDR ranges denied access |
+| `spec.allowedNetworkRuleList` | `[]string` | Network rules that allow access |
+| `spec.blockedNetworkRuleList` | `[]string` | Network rules that deny access |
+| `spec.comment` | `*string` | Optional description |
+
+> 🛡️ **Security Perimeter:** Network policies control which IP addresses and network rules can access your Snowflake account.
+
+</details>
+
+<details>
+<summary>📈 <strong>ResourceMonitor</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Resource monitor name *(immutable)* |
+| `spec.creditQuota` | `*int32` | Credits allocated per frequency interval |
+| `spec.frequency` | `*enum` | Reset interval: `MONTHLY` / `DAILY` / `WEEKLY` / `YEARLY` / `NEVER` |
+| `spec.startTimestamp` | `*string` | When monitoring begins (use `IMMEDIATELY` for now) |
+| `spec.endTimestamp` | `*string` | When the monitor suspends assigned warehouses |
+| `spec.notifyUsers` | `[]string` | Users to receive email notifications |
+| `spec.triggers` | `[]Trigger` | Threshold triggers with actions (`SUSPEND` / `SUSPEND_IMMEDIATE` / `NOTIFY`) |
+
+> 📈 **Cost Management:** Resource monitors prevent runaway credit usage by suspending warehouses or sending notifications when credit thresholds are reached.
+
+</details>
+
+<details>
+<summary>🎭 <strong>MaskingPolicy</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Masking policy name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.signature` | `[]Argument` | Column arguments (name + type) *(immutable)* |
+| `spec.body` | `string` | SQL expression that transforms the data |
+| `spec.exemptOtherPolicies` | `*bool` | Whether other policies can reference a masked column |
+| `spec.comment` | `*string` | Optional description |
+
+> 🎭 **PII/PCI Compliance:** Masking policies dynamically mask sensitive data at query time based on the executing role.
+
+</details>
+
+<details>
+<summary>🔐 <strong>RowAccessPolicy</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Row access policy name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.signature` | `[]Argument` | Row arguments (name + type) *(immutable)* |
+| `spec.body` | `string` | SQL expression returning BOOLEAN for row visibility |
+| `spec.comment` | `*string` | Optional description |
+
+> 🔐 **Row-Level Security:** Row access policies filter rows at query time based on the executing role, enabling multi-tenant data isolation.
+
+</details>
+
+<details>
+<summary>🔑 <strong>GrantOwnership</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.objectType` | `string` | Object type (e.g. DATABASE, TABLE, SCHEMA) *(immutable)* |
+| `spec.objectName` | `string` | Fully qualified object name *(immutable)* |
+| `spec.accountRole` | `string` | Target account role *(immutable, mutually exclusive with refs)* |
+| `spec.accountRoleRef` | `LocalObjectReference` | AccountRole CR reference *(immutable)* |
+| `spec.databaseRole` | `string` | Target database role *(immutable, mutually exclusive with refs)* |
+| `spec.databaseRoleRef` | `LocalObjectReference` | DatabaseRole CR reference *(immutable)* |
+| `spec.currentGrantsBehavior` | `*enum` | `COPY` / `REVOKE` — how existing privileges are handled |
+
+> ⚠️ **Ownership Immutability:** All spec fields are immutable after creation. Ownership cannot be revoked — deleting the CR leaves ownership intact (no-op on delete).
+
+</details>
+
 ## 🔍 Drift Detection
 
 All controllers include field-level drift detection on each reconciliation cycle:
@@ -595,6 +729,13 @@ kubectl apply -f manifests.yaml
 | `snowflake_warehouse` | Warehouse |
 | `snowflake_user` | User |
 | `snowflake_account_role` / `snowflake_role` | AccountRole |
+| `snowflake_database_role` | DatabaseRole |
+| `snowflake_grant_privileges_to_account_role` | AccountRoleGrant |
+| `snowflake_grant_privileges_to_database_role` | DatabaseRoleGrant |
+| `snowflake_grant_privileges_to_share` | ShareGrant |
+| `snowflake_table` | Table |
+| `snowflake_view` | View |
+| `snowflake_stage` | Stage |
 
 Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped and must be configured manually.
 
@@ -620,7 +761,7 @@ Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped a
 │   ├── clients/
 │   │   ├── clientfactory/  # Client cache with hash-based rotation
 │   │   └── snowflake/      # Snowflake SDK wrapper & SQL builder
-│   ├── controller/         # All reconcilers (10 resources + FieldExport + ProviderConfig)
+│   ├── controller/         # All reconcilers (20 managed resources + FieldExport + ProviderConfig)
 │   ├── drift/              # Field-level drift detection engine
 │   ├── metrics/            # Custom Prometheus metrics
 │   ├── provider/           # Provider config builder & client resolution
@@ -647,6 +788,7 @@ Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped a
 | 🔐 [Snowflake Role Setup](docs/snowflake-role-setup.md) | Required Snowflake roles and permissions |
 | 🚀 [GitOps with Argo CD](docs/gitops-argocd.md) | Health checks, sync waves, ArgoCD setup |
 | 🚀 [GitOps with Flux](docs/gitops-flux.md) | Kustomization dependencies, health checks, Flux setup |
+| 🧩 [Adding a Resource](docs/adding-a-resource.md) | Guide for adding new Snowflake resource types |
 
 ## 🤝 Contributing
 

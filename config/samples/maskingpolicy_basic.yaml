@@ -1,0 +1,19 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: MaskingPolicy
+metadata:
+  name: maskingpolicy-basic
+spec:
+  providerRef:
+    name: default
+  name: EMAIL_MASK
+  databaseName: MY_DB
+  schemaName: MY_SCHEMA
+  signature:
+    - name: val
+      type: VARCHAR
+  body: |
+    CASE
+      WHEN current_role() IN ('ANALYST') THEN val
+      ELSE '*********'
+    END
+  comment: "Masks email addresses for non-analyst roles"

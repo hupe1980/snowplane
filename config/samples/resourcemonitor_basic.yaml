@@ -1,0 +1,20 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ResourceMonitor
+metadata:
+  name: resourcemonitor-basic
+spec:
+  providerRef:
+    name: default
+  name: MY_RESOURCE_MONITOR
+  creditQuota: 5000
+  frequency: MONTHLY
+  startTimestamp: "IMMEDIATELY"
+  notifyUsers:
+    - JDOE
+  triggers:
+    - threshold: 75
+      action: NOTIFY
+    - threshold: 100
+      action: SUSPEND
+    - threshold: 110
+      action: SUSPEND_IMMEDIATE

@@ -148,8 +148,8 @@ The chart includes the following templates:
 | `networkpolicy.yaml` | NetworkPolicy restricting traffic (optional) |
 | `webhook-service.yaml` | Service routing HTTPS to webhook port (when webhooks enabled) |
 | `webhook-cert.yaml` | cert-manager Certificate and Issuer for webhook TLS (when webhooks enabled) |
-| `webhook-validating.yaml` | ValidatingWebhookConfiguration for all 11 resources (when webhooks enabled) |
-| `webhook-mutating.yaml` | MutatingWebhookConfiguration for all 11 resources (when webhooks enabled) |
+| `webhook-validating.yaml` | ValidatingWebhookConfiguration for all 22 resources (when webhooks enabled) |
+| `webhook-mutating.yaml` | MutatingWebhookConfiguration for all 22 resources (when webhooks enabled) |
 | `grafana-dashboard.yaml` | ConfigMap with Grafana dashboard JSON for sidecar provisioning (optional) |
 | `NOTES.txt` | Post-install instructions |
 
@@ -161,7 +161,7 @@ The chart creates three ClusterRoles:
 
 Full permissions required by the operator:
 
-- **CRDs:** get/list/watch/create/update/patch/delete on all 11 Snowplane resource types
+- **CRDs:** get/list/watch/create/update/patch/delete on all 22 Snowplane resource types
 - **Status/Finalizers:** get/patch/update on status subresources; update on finalizer subresources
 - **Secrets:** get/list/watch (read-only access for ProviderConfig credential resolution)
 - **ConfigMaps:** get/list/watch/create/update/patch

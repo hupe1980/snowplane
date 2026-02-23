@@ -29,6 +29,13 @@ Drift detection is supported on all resource types:
 | Table    | ✅ | ✅ | `name`, `database`, `schema`, `transient` |
 | View     | ✅ | ✅ | `name`, `database`, `schema` |
 | Stage    | ✅ | ✅ | `name`, `database`, `schema`, `stageType` |
+| Task     | ✅ | ✅ | `name`, `database`, `schema` |
+| Stream   | ✅ | ✅ | `name`, `database`, `schema`, `sourceType`, `sourceName` |
+| Tag      | ✅ | ✅ | `name`, `database`, `schema` |
+| NetworkPolicy | ✅ | ✅ | `name` |
+| ResourceMonitor | ✅ | ✅ | `name` |
+| MaskingPolicy | ✅ | ✅ | `name`, `database`, `schema`, `signature` |
+| RowAccessPolicy | ✅ | ✅ | `name`, `database`, `schema`, `signature` |
 
 ### Immutable Field Violations
 

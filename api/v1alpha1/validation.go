@@ -998,6 +998,149 @@ func (s *TableSpec) Validate() error {
 	return errors.Join(errs...)
 }
 
+// Validate checks the TaskSpec for configuration errors.
+func (s *TaskSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	// Exactly one of databaseRef or databaseName must be set.
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Exactly one of schemaRef or schemaName must be set.
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.SQLStatement == "" {
+		errs = append(errs, errors.New("spec.sqlStatement is required"))
+	}
+
+	// Warehouse and UserTaskManagedInitialWarehouseSize are mutually exclusive.
+	if s.Warehouse != nil && s.UserTaskManagedInitialWarehouseSize != nil {
+		errs = append(errs, errors.New("spec.warehouse and spec.userTaskManagedInitialWarehouseSize are mutually exclusive"))
+	}
+
+	if s.UserTaskTimeoutMs != nil {
+		v := *s.UserTaskTimeoutMs
+		if v < 0 || v > 604800000 {
+			errs = append(errs, fmt.Errorf("spec.userTaskTimeoutMs must be between 0 and 604800000 (got: %d)", v))
+		}
+	}
+
+	if s.TaskAutoRetryAttempts != nil {
+		v := *s.TaskAutoRetryAttempts
+		if v < 0 || v > 30 {
+			errs = append(errs, fmt.Errorf("spec.taskAutoRetryAttempts must be between 0 and 30 (got: %d)", v))
+		}
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the StreamSpec for configuration errors.
+func (s *StreamSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	// Exactly one of databaseRef or databaseName must be set.
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Exactly one of schemaRef or schemaName must be set.
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.SourceName == "" {
+		errs = append(errs, errors.New("spec.sourceName is required"))
+	}
+
+	// appendOnly is only valid for TABLE/VIEW streams.
+	if s.AppendOnly != nil && *s.AppendOnly {
+		if s.SourceType != StreamSourceTable && s.SourceType != StreamSourceView {
+			errs = append(errs, errors.New("spec.appendOnly is only valid for TABLE or VIEW streams"))
+		}
+	}
+
+	// insertOnly is only valid for EXTERNAL_TABLE streams.
+	if s.InsertOnly != nil && *s.InsertOnly {
+		if s.SourceType != StreamSourceExternalTable {
+			errs = append(errs, errors.New("spec.insertOnly is only valid for EXTERNAL_TABLE streams"))
+		}
+	}
+
+	// showInitialRows is only valid for TABLE/VIEW streams.
+	if s.ShowInitialRows != nil && *s.ShowInitialRows {
+		if s.SourceType != StreamSourceTable && s.SourceType != StreamSourceView {
+			errs = append(errs, errors.New("spec.showInitialRows is only valid for TABLE or VIEW streams"))
+		}
+	}
+
+	// appendOnly and insertOnly are mutually exclusive.
+	if s.AppendOnly != nil && *s.AppendOnly && s.InsertOnly != nil && *s.InsertOnly {
+		errs = append(errs, errors.New("spec.appendOnly and spec.insertOnly are mutually exclusive"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the TagSpec for configuration errors.
+func (s *TagSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	// Exactly one of databaseRef or databaseName must be set.
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Exactly one of schemaRef or schemaName must be set.
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the NetworkPolicySpec for configuration errors.
+func (s *NetworkPolicySpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
 // Validate checks the ViewSpec for configuration errors.
 func (s *ViewSpec) Validate() error {
 	var errs []error
@@ -1090,6 +1233,14 @@ var ValidFieldExportSourceKinds = map[string]struct{}{
 	"Table":             {},
 	"View":              {},
 	"Stage":             {},
+	"Task":              {},
+	"Stream":            {},
+	"Tag":               {},
+	"NetworkPolicy":     {},
+	"ResourceMonitor":   {},
+	"MaskingPolicy":     {},
+	"RowAccessPolicy":   {},
+	"GrantOwnership":    {},
 }
 
 // Validate checks that the FieldExport spec fields are semantically valid.

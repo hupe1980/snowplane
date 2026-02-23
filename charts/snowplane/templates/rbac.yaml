@@ -63,6 +63,14 @@ rules:
   - tables
   - views
   - stages
+  - tasks
+  - streams
+  - tags
+  - networkpolicies
+  - resourcemonitors
+  - maskingpolicies
+  - rowaccesspolicies
+  - grantownerships
   - fieldexports
   - providerconfigs
   verbs:
@@ -88,6 +96,14 @@ rules:
   - tables/status
   - views/status
   - stages/status
+  - tasks/status
+  - streams/status
+  - tags/status
+  - networkpolicies/status
+  - resourcemonitors/status
+  - maskingpolicies/status
+  - rowaccesspolicies/status
+  - grantownerships/status
   - fieldexports/status
   - providerconfigs/status
   verbs:
@@ -109,6 +125,14 @@ rules:
   - tables/finalizers
   - views/finalizers
   - stages/finalizers
+  - tasks/finalizers
+  - streams/finalizers
+  - tags/finalizers
+  - networkpolicies/finalizers
+  - resourcemonitors/finalizers
+  - maskingpolicies/finalizers
+  - rowaccesspolicies/finalizers
+  - grantownerships/finalizers
   - fieldexports/finalizers
   - providerconfigs/finalizers
   verbs:
@@ -153,6 +177,14 @@ rules:
   - tables
   - views
   - stages
+  - tasks
+  - streams
+  - tags
+  - networkpolicies
+  - resourcemonitors
+  - maskingpolicies
+  - rowaccesspolicies
+  - grantownerships
   - fieldexports
   - providerconfigs
   verbs:
@@ -174,6 +206,14 @@ rules:
   - tables/status
   - views/status
   - stages/status
+  - tasks/status
+  - streams/status
+  - tags/status
+  - networkpolicies/status
+  - resourcemonitors/status
+  - maskingpolicies/status
+  - rowaccesspolicies/status
+  - grantownerships/status
   - fieldexports/status
   - providerconfigs/status
   verbs:
@@ -203,6 +243,14 @@ rules:
   - tables
   - views
   - stages
+  - tasks
+  - streams
+  - tags
+  - networkpolicies
+  - resourcemonitors
+  - maskingpolicies
+  - rowaccesspolicies
+  - grantownerships
   - fieldexports
   - providerconfigs
   verbs:
@@ -228,6 +276,14 @@ rules:
   - tables/status
   - views/status
   - stages/status
+  - tasks/status
+  - streams/status
+  - tags/status
+  - networkpolicies/status
+  - resourcemonitors/status
+  - maskingpolicies/status
+  - rowaccesspolicies/status
+  - grantownerships/status
   - fieldexports/status
   - providerconfigs/status
   verbs:

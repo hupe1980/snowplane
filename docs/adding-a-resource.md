@@ -29,9 +29,10 @@ Snowflake objects live at different scopes. The scope determines which parent re
 
 | Level | Parent References | Examples |
 |-------|-------------------|----------|
-| **Account** | None | Database, Warehouse, AccountRole, User |
+| **Account** | None | Database, Warehouse, AccountRole, User, NetworkPolicy, ResourceMonitor |
 | **Database** | `databaseRef` / `databaseName` | Schema, DatabaseRole |
-| **Schema** | `databaseRef` / `databaseName` + `schemaRef` / `schemaName` | Table, View, Stage |
+| **Schema** | `databaseRef` / `databaseName` + `schemaRef` / `schemaName` | Table, View, Stage, Task, Stream, Tag, MaskingPolicy, RowAccessPolicy |
+| **Grant** | Role ref or inline | AccountRoleGrant, DatabaseRoleGrant, ShareGrant, GrantOwnership |
 
 Account-level resources are the simplest — they have no parent dependencies. Database-level and schema-level resources require reference resolution (see [Step 2](#2-define-crd-types)).
 

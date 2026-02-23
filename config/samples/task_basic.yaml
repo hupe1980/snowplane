@@ -1,0 +1,19 @@
+# Task with minimal configuration.
+# References Database and Schema CRs by name; the Snowflake task
+# will be created once both parent resources are Ready.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Task
+metadata:
+  name: my-task
+  namespace: snowplane-system
+spec:
+  name: LOAD_DATA
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  warehouse: COMPUTE_WH
+  schedule: "60 MINUTES"
+  sqlStatement: "INSERT INTO TARGET_TABLE SELECT * FROM SOURCE_TABLE"
+  providerRef:
+    name: default

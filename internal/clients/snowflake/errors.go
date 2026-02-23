@@ -124,6 +124,14 @@ func IsObjectNotFound(err error) bool {
 	return err != nil && errors.Is(err, ErrObjectNotFound)
 }
 
+// IsObjectNotExistOrNotAuthorized reports whether err (or any error in its chain)
+// is ErrObjectNotExistOrNotAuthorized (SQL state 02000, code 2003).
+// This is commonly returned when a parent object (database/schema) has already
+// been dropped, making child objects implicitly gone.
+func IsObjectNotExistOrNotAuthorized(err error) bool {
+	return err != nil && errors.Is(err, ErrObjectNotExistOrNotAuthorized)
+}
+
 // IsObjectAlreadyExists reports whether err (or any error in its chain) is ErrObjectAlreadyExists.
 func IsObjectAlreadyExists(err error) bool {
 	return err != nil && errors.Is(err, ErrObjectAlreadyExists)

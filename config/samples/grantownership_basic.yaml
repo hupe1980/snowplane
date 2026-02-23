@@ -1,0 +1,13 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: GrantOwnership
+metadata:
+  name: analytics-db-to-analyst
+  namespace: snowplane-system
+spec:
+  providerRef:
+    name: default
+  objectType: DATABASE
+  objectName: '"ANALYTICS"'
+  accountRoleRef:
+    name: analyst-role
+  currentGrantsBehavior: COPY

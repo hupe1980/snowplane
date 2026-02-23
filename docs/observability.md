@@ -22,6 +22,8 @@ All metrics use the `snowplane_` namespace and are exposed on the controller's m
 | `snowplane_client_pool_size` | Gauge | — | Active Snowflake clients in the connection pool (LRU-evicted when configurable max size is reached) |
 | `snowplane_rate_limit_waits_total` | Counter | `controller` | Number of times a reconciler waited for the rate limiter |
 
+> **Cardinality Bounds:** The `operation` label is bounded to a fixed set of values: `observe`, `create`, `alter`, `drop`, `create_or_alter`, and `ping`. The `controller` label is bounded by the number of registered controllers (currently 22). The `result` label is bounded to `success` and `error`. Total cardinality for operation metrics is at most ~264 series (22 controllers × 6 operations × 2 results), well within Prometheus best practices.
+
 ### Resource Management
 
 | Metric | Type | Labels | Description |

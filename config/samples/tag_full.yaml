@@ -1,0 +1,15 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Tag
+metadata:
+  name: environment
+spec:
+  providerRef:
+    name: default
+  name: ENVIRONMENT
+  databaseName: MY_DB
+  schemaName: MY_DB.MY_SCHEMA
+  allowedValues:
+    - development
+    - staging
+    - production
+  comment: "Environment classification tag"

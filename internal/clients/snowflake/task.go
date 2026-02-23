@@ -1,0 +1,447 @@
+package snowflake
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
+)
+
+// TaskObservation holds the result of observing a Snowflake task.
+type TaskObservation struct {
+	// Exists indicates whether the task was found.
+	Exists bool
+
+	// ShowOutput contains the SHOW TASKS row.
+	ShowOutput *TaskShowOutput
+}
+
+// TaskShowOutput contains the fields from SHOW TASKS.
+type TaskShowOutput struct {
+	CreatedOn        string
+	Name             string
+	DatabaseName     string
+	SchemaName       string
+	Owner            string
+	Comment          string
+	Warehouse        string
+	Schedule         string
+	State            string // started, suspended
+	Definition       string
+	Condition        string
+	Predecessors     string
+	ErrorIntegration string
+}
+
+// CreateTaskOptions holds the parameters for creating a task.
+type CreateTaskOptions struct {
+	Name                                SchemaObjectIdentifier
+	Warehouse                           *string
+	UserTaskManagedInitialWarehouseSize *string
+	Schedule                            *string
+	SQLStatement                        string
+	After                               []string
+	When                                *string
+	Comment                             *string
+	AllowOverlappingExecution           *bool
+	UserTaskTimeoutMs                   *int32
+	SuspendTaskAfterNumFailures         *int32
+	ErrorIntegration                    *string
+	SuccessIntegration                  *string
+	TaskAutoRetryAttempts               *int32
+
+	// UseCreateOrAlter emits CREATE OR ALTER TASK instead of CREATE TASK IF NOT EXISTS.
+	UseCreateOrAlter bool
+}
+
+// Validate checks the CreateTaskOptions for validity.
+func (o *CreateTaskOptions) Validate() error {
+	var errs []error
+
+	if !ValidObjectIdentifier(o.Name) {
+		errs = append(errs, fmt.Errorf("task name is required"))
+	}
+
+	if o.SQLStatement == "" {
+		errs = append(errs, fmt.Errorf("SQL statement is required"))
+	}
+
+	if o.Warehouse != nil && o.UserTaskManagedInitialWarehouseSize != nil {
+		errs = append(errs, fmt.Errorf("warehouse and userTaskManagedInitialWarehouseSize are mutually exclusive"))
+	}
+
+	if o.UserTaskTimeoutMs != nil {
+		v := *o.UserTaskTimeoutMs
+		if v < 0 || v > 604800000 {
+			errs = append(errs, fmt.Errorf("userTaskTimeoutMs must be between 0 and 604800000 (got: %d)", v))
+		}
+	}
+
+	if o.TaskAutoRetryAttempts != nil {
+		v := *o.TaskAutoRetryAttempts
+		if v < 0 || v > 30 {
+			errs = append(errs, fmt.Errorf("taskAutoRetryAttempts must be between 0 and 30 (got: %d)", v))
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+// AlterTaskOptions holds the parameters for altering a task.
+type AlterTaskOptions struct {
+	Name                                SchemaObjectIdentifier
+	Warehouse                           *string
+	UserTaskManagedInitialWarehouseSize *string
+	Schedule                            *string
+	SQLStatement                        *string
+	When                                *string
+	Comment                             *string
+	AllowOverlappingExecution           *bool
+	UserTaskTimeoutMs                   *int32
+	SuspendTaskAfterNumFailures         *int32
+	ErrorIntegration                    *string
+	SuccessIntegration                  *string
+	TaskAutoRetryAttempts               *int32
+	Suspend                             *bool
+
+	// SetAfter replaces the predecessor list.
+	SetAfter []string
+	// RemoveAfter removes specific predecessors.
+	RemoveAfter []string
+
+	// UnsetFields lists Snowflake parameter names to revert to defaults.
+	UnsetFields []string
+}
+
+// Validate checks the AlterTaskOptions for validity.
+func (o *AlterTaskOptions) Validate() error {
+	var errs []error
+
+	if !ValidObjectIdentifier(o.Name) {
+		errs = append(errs, fmt.Errorf("task name is required"))
+	}
+
+	if o.Warehouse != nil && o.UserTaskManagedInitialWarehouseSize != nil {
+		errs = append(errs, fmt.Errorf("warehouse and userTaskManagedInitialWarehouseSize are mutually exclusive"))
+	}
+
+	return errors.Join(errs...)
+}
+
+// HasChanges reports whether any fields are set for alteration.
+func (o *AlterTaskOptions) HasChanges() bool {
+	return o.Warehouse != nil ||
+		o.UserTaskManagedInitialWarehouseSize != nil ||
+		o.Schedule != nil ||
+		o.SQLStatement != nil ||
+		o.When != nil ||
+		o.Comment != nil ||
+		o.AllowOverlappingExecution != nil ||
+		o.UserTaskTimeoutMs != nil ||
+		o.SuspendTaskAfterNumFailures != nil ||
+		o.ErrorIntegration != nil ||
+		o.SuccessIntegration != nil ||
+		o.TaskAutoRetryAttempts != nil ||
+		o.Suspend != nil ||
+		len(o.SetAfter) > 0 ||
+		len(o.RemoveAfter) > 0 ||
+		len(o.UnsetFields) > 0
+}
+
+// TaskClient provides operations against Snowflake tasks.
+type TaskClient struct {
+	client SQLExecutor
+}
+
+// NewTaskClient creates a new TaskClient backed by the given SQLExecutor.
+func NewTaskClient(c SQLExecutor) *TaskClient {
+	return &TaskClient{client: c}
+}
+
+// buildCreateTaskSQL builds the CREATE TASK SQL statement.
+func buildCreateTaskSQL(opts CreateTaskOptions) string {
+	var b sqlbuilder.Builder
+
+	if opts.UseCreateOrAlter {
+		b.WriteString("CREATE OR ALTER TASK ")
+	} else {
+		b.WriteString("CREATE TASK IF NOT EXISTS ")
+	}
+
+	b.WriteString(opts.Name.FullyQualifiedName())
+
+	if opts.Warehouse != nil {
+		fmt.Fprintf(&b.Builder, " WAREHOUSE = %s", sqlbuilder.QuoteIdentifier(*opts.Warehouse))
+	}
+
+	if opts.UserTaskManagedInitialWarehouseSize != nil {
+		fmt.Fprintf(&b.Builder, " USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE = '%s'", *opts.UserTaskManagedInitialWarehouseSize)
+	}
+
+	if opts.Schedule != nil {
+		fmt.Fprintf(&b.Builder, " SCHEDULE = '%s'", sqlbuilder.EscapeString(*opts.Schedule))
+	}
+
+	b.SetBool("ALLOW_OVERLAPPING_EXECUTION", opts.AllowOverlappingExecution)
+	b.SetInt32("USER_TASK_TIMEOUT_MS", opts.UserTaskTimeoutMs)
+	b.SetInt32("SUSPEND_TASK_AFTER_NUM_FAILURES", opts.SuspendTaskAfterNumFailures)
+	b.SetInt32("TASK_AUTO_RETRY_ATTEMPTS", opts.TaskAutoRetryAttempts)
+
+	if opts.ErrorIntegration != nil {
+		fmt.Fprintf(&b.Builder, " ERROR_INTEGRATION = %s", sqlbuilder.QuoteIdentifier(*opts.ErrorIntegration))
+	}
+
+	if opts.SuccessIntegration != nil {
+		fmt.Fprintf(&b.Builder, " SUCCESS_INTEGRATION = %s", sqlbuilder.QuoteIdentifier(*opts.SuccessIntegration))
+	}
+
+	b.SetString("COMMENT", opts.Comment)
+
+	if len(opts.After) > 0 {
+		quoted := make([]string, len(opts.After))
+		for i, a := range opts.After {
+			quoted[i] = sqlbuilder.QuoteIdentifier(a)
+		}
+
+		fmt.Fprintf(&b.Builder, " AFTER %s", strings.Join(quoted, ", "))
+	}
+
+	if opts.When != nil {
+		fmt.Fprintf(&b.Builder, " WHEN %s", *opts.When)
+	}
+
+	fmt.Fprintf(&b.Builder, " AS %s", opts.SQLStatement)
+
+	return b.String()
+}
+
+// Create creates a task in Snowflake.
+func (t *TaskClient) Create(ctx context.Context, opts CreateTaskOptions) error {
+	if err := opts.Validate(); err != nil {
+		return NewTerminalError(fmt.Errorf("invalid create task options: %w", err))
+	}
+
+	if _, err := t.client.Exec(ctx, buildCreateTaskSQL(opts)); err != nil {
+		return fmt.Errorf("creating task %s: %w", opts.Name, err)
+	}
+
+	return nil
+}
+
+// buildAlterTaskStatements builds the ALTER TASK SQL statements.
+func buildAlterTaskStatements(opts AlterTaskOptions) (statements []string, err error) {
+
+	// Suspend/resume must be separate statements.
+	if opts.Suspend != nil {
+		if *opts.Suspend {
+			statements = append(statements, fmt.Sprintf("ALTER TASK %s SUSPEND", opts.Name.FullyQualifiedName()))
+		} else {
+			// Resume is appended last to ensure other changes are applied first.
+			defer func() {
+				statements = append(statements, fmt.Sprintf("ALTER TASK %s RESUME", opts.Name.FullyQualifiedName()))
+			}()
+		}
+	}
+
+	// Modify SQL statement.
+	if opts.SQLStatement != nil {
+		statements = append(statements, fmt.Sprintf("ALTER TASK %s MODIFY AS %s",
+			opts.Name.FullyQualifiedName(), *opts.SQLStatement))
+	}
+
+	// Modify WHEN condition.
+	if opts.When != nil {
+		if *opts.When == "" {
+			statements = append(statements, fmt.Sprintf("ALTER TASK %s MODIFY WHEN %s",
+				opts.Name.FullyQualifiedName(), "TRUE"))
+		} else {
+			statements = append(statements, fmt.Sprintf("ALTER TASK %s MODIFY WHEN %s",
+				opts.Name.FullyQualifiedName(), *opts.When))
+		}
+	}
+
+	// Modify predecessors.
+	if len(opts.SetAfter) > 0 {
+		quoted := make([]string, len(opts.SetAfter))
+		for i, a := range opts.SetAfter {
+			quoted[i] = sqlbuilder.QuoteIdentifier(a)
+		}
+
+		statements = append(statements, fmt.Sprintf("ALTER TASK %s ADD AFTER %s",
+			opts.Name.FullyQualifiedName(), strings.Join(quoted, ", ")))
+	}
+
+	if len(opts.RemoveAfter) > 0 {
+		quoted := make([]string, len(opts.RemoveAfter))
+		for i, a := range opts.RemoveAfter {
+			quoted[i] = sqlbuilder.QuoteIdentifier(a)
+		}
+
+		statements = append(statements, fmt.Sprintf("ALTER TASK %s REMOVE AFTER %s",
+			opts.Name.FullyQualifiedName(), strings.Join(quoted, ", ")))
+	}
+
+	// Build SET clause for other parameters.
+	var sc sqlbuilder.SetClauses
+
+	sc.String("COMMENT", opts.Comment)
+	sc.Int32("USER_TASK_TIMEOUT_MS", opts.UserTaskTimeoutMs)
+	sc.Int32("SUSPEND_TASK_AFTER_NUM_FAILURES", opts.SuspendTaskAfterNumFailures)
+	sc.Int32("TASK_AUTO_RETRY_ATTEMPTS", opts.TaskAutoRetryAttempts)
+	sc.Bool("ALLOW_OVERLAPPING_EXECUTION", opts.AllowOverlappingExecution)
+
+	if opts.Warehouse != nil {
+		sc.Keyword("WAREHOUSE", opts.Warehouse)
+	}
+
+	if opts.Schedule != nil {
+		sc.String("SCHEDULE", opts.Schedule)
+	}
+
+	if opts.ErrorIntegration != nil {
+		sc.Keyword("ERROR_INTEGRATION", opts.ErrorIntegration)
+	}
+
+	if opts.SuccessIntegration != nil {
+		sc.Keyword("SUCCESS_INTEGRATION", opts.SuccessIntegration)
+	}
+
+	alterStmts, err := sqlbuilder.BuildAlterStatements("TASK", opts.Name.FullyQualifiedName(), &sc, opts.UnsetFields)
+	if err != nil {
+		return nil, err
+	}
+
+	statements = append(statements, alterStmts...)
+
+	return statements, nil
+}
+
+// Alter alters a task in Snowflake.
+func (t *TaskClient) Alter(ctx context.Context, opts AlterTaskOptions) error {
+	if err := opts.Validate(); err != nil {
+		return NewTerminalError(fmt.Errorf("invalid alter task options: %w", err))
+	}
+
+	stmts, err := buildAlterTaskStatements(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building alter task statements: %w", err))
+	}
+
+	for _, stmt := range stmts {
+		if _, err := t.client.Exec(ctx, stmt); err != nil {
+			return fmt.Errorf("altering task %s: %w", opts.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// Drop drops a task from Snowflake.
+func (t *TaskClient) Drop(ctx context.Context, name SchemaObjectIdentifier) error {
+	if !ValidObjectIdentifier(name) {
+		return NewTerminalError(fmt.Errorf("task name is required"))
+	}
+
+	if _, err := t.client.Exec(ctx, sqlbuilder.DropIfExists("TASK", name.FullyQualifiedName())); err != nil {
+		return fmt.Errorf("dropping task %s: %w", name, err)
+	}
+
+	return nil
+}
+
+// buildShowTaskByIDSQL builds the SHOW TASKS LIKE SQL statement scoped to a schema.
+func buildShowTaskByIDSQL(name SchemaObjectIdentifier) string {
+	scope := fmt.Sprintf("SCHEMA %s.%s",
+		sqlbuilder.QuoteIdentifier(name.DatabaseName()),
+		sqlbuilder.QuoteIdentifier(name.SchemaName()))
+	return sqlbuilder.ShowLikeIn("TASKS", name.Name(), scope)
+}
+
+// ShowByID queries SHOW TASKS for a specific task name within a schema.
+func (t *TaskClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*TaskShowOutput, error) {
+	if !ValidObjectIdentifier(name) {
+		return nil, NewTerminalError(fmt.Errorf("task name is required"))
+	}
+
+	rows, err := t.client.Query(ctx, buildShowTaskByIDSQL(name))
+	if err != nil {
+		return nil, fmt.Errorf("showing task %s: %w", name, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	return scanTaskShowOutput(rows, name.Name())
+}
+
+// Observe combines ShowByID into a TaskObservation.
+func (t *TaskClient) Observe(ctx context.Context, name SchemaObjectIdentifier) (*TaskObservation, error) {
+	show, err := t.ShowByID(ctx, name)
+	if err != nil {
+		if IsObjectNotFound(err) {
+			return &TaskObservation{Exists: false}, nil
+		}
+
+		return nil, err
+	}
+
+	return &TaskObservation{
+		Exists:     true,
+		ShowOutput: show,
+	}, nil
+}
+
+// scanTaskShowOutput scans SHOW TASKS results for a matching row.
+func scanTaskShowOutput(rows *sql.Rows, name string) (*TaskShowOutput, error) {
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("reading columns: %w", err)
+	}
+
+	for rows.Next() {
+		values := make([]sql.NullString, len(cols))
+		ptrs := make([]any, len(cols))
+
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, fmt.Errorf("scanning row: %w", err)
+		}
+
+		colMap := make(map[string]string, len(cols))
+		for i, col := range cols {
+			if values[i].Valid {
+				colMap[col] = values[i].String
+			}
+		}
+
+		if !strings.EqualFold(colMap["name"], name) {
+			continue
+		}
+
+		return &TaskShowOutput{
+			CreatedOn:        colMap["created_on"],
+			Name:             colMap["name"],
+			DatabaseName:     colMap["database_name"],
+			SchemaName:       colMap["schema_name"],
+			Owner:            colMap["owner"],
+			Comment:          colMap["comment"],
+			Warehouse:        colMap["warehouse"],
+			Schedule:         colMap["schedule"],
+			State:            colMap["state"],
+			Definition:       colMap["definition"],
+			Condition:        colMap["condition"],
+			Predecessors:     colMap["predecessors"],
+			ErrorIntegration: colMap["error_integration"],
+		}, nil
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating rows: %w", err)
+	}
+
+	return nil, ErrObjectNotFound
+}

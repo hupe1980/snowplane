@@ -29,9 +29,18 @@ Every Snowplane CRD carries a maturity label (`LabelMaturity` constant, key `sno
 | AccountRoleGrant | alpha | Grant/Revoke to account roles (no ALTER) |
 | DatabaseRoleGrant | alpha | Grant/Revoke to database roles (no ALTER) |
 | ShareGrant | alpha | Grant/Revoke to shares (no ALTER) |
+| GrantOwnership | alpha | Ownership transfer, no-op on delete |
 | Table | alpha | Column management, schema-level resource |
 | View | alpha | AS query management, secure views |
 | Stage | alpha | Internal/external stages, file format |
+| Task | alpha | Scheduled SQL, DAG scheduling, serverless |
+| Stream | alpha | Change data capture on tables, views, stages |
+| Tag | alpha | Data governance tags with allowed values |
+| NetworkPolicy | alpha | IP allow/block lists, network rules |
+| ResourceMonitor | alpha | Credit quota monitoring with triggers |
+| MaskingPolicy | alpha | Dynamic data masking for PII/PCI |
+| RowAccessPolicy | alpha | Row-level security policies |
+| FieldExport | alpha | Cross-resource data export to ConfigMaps/Secrets |
 | ProviderConfig | stable | Core infrastructure, always required |
 
 ## Graduation Criteria

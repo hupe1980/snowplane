@@ -52,5 +52,7 @@ func TestView_FullLifecycle(t *testing.T) {
 	}, defaultTimeout, defaultInterval, "view should be dropped")
 
 	deleteCR(t, gvrSchema, schemaName)
+	waitForCRDeleted(t, gvrSchema, schemaName)
+
 	deleteCR(t, gvrDatabase, dbName)
 }

@@ -443,11 +443,18 @@ Integrate with Prometheus using a `ServiceMonitor` or annotation-based scraping.
 
 ## What's Next
 
-- **Grant** — Manage privilege grants declaratively (AccountRoleGrant, DatabaseRoleGrant, ShareGrant)
-- **DatabaseRole** — Database-scoped roles for fine-grained access control
-- **Stage / Pipe / Task** — Additional Snowflake resources for data pipelines
+Snowplane now supports **22 managed resource types**. Beyond the resources covered in this guide, you can also manage:
 
-Each resource type follows the same pattern: define a CR spec referencing a ProviderConfig, apply it, and let the controller reconcile the desired state with Snowflake.
+- **Task** — Scheduled SQL tasks with DAG scheduling and serverless execution
+- **Stream** — Change data capture on tables, views, external tables, stages, and dynamic tables
+- **Tag** — Data governance tags with allowed value constraints
+- **NetworkPolicy** — IP allow/block lists and network rule enforcement
+- **ResourceMonitor** — Credit quota monitoring with suspend/notify triggers
+- **MaskingPolicy** — Dynamic data masking for PII/PCI compliance
+- **RowAccessPolicy** — Row-level security for multi-tenant access control
+- **GrantOwnership** — Ownership transfer between roles
+
+See the `config/samples/` directory for example CRs of every resource type.
 
 ## Step 6: Create a Schema
 
@@ -566,7 +573,7 @@ You can safely delete a Database CR even if dependent Schema CRs still exist. Th
 
 This means `kubectl delete database my-database` will not leave Schemas stuck in `Terminating` state.
 
-> **Note:** ProviderConfig itself is protected by an in-use finalizer. It cannot be deleted while any managed resource (Database, Schema, Warehouse, User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, Table, View, or Stage) still references it. The controller emits an `InUse` warning event and requeues until all references are removed.
+> **Note:** ProviderConfig itself is protected by an in-use finalizer. It cannot be deleted while any managed resource (Database, Schema, Warehouse, User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, Table, View, Stage, Task, Stream, Tag, NetworkPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, or GrantOwnership) still references it. The controller emits an `InUse` warning event and requeues until all references are removed.
 
 ### Immutable Fields
 

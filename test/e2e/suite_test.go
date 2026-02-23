@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -164,7 +165,13 @@ func TestMain(m *testing.M) {
 
 	// — Build the operator Docker image —
 	fmt.Println("==> Building operator Docker image")
-	if err := runCmd(repoRoot, "docker", "build", "-t", operatorImage, "."); err != nil {
+
+	// Detect the host architecture so the binary matches the k3s container.
+	arch := runtime.GOARCH
+	if err := runCmd(repoRoot, "docker", "build",
+		"--build-arg", "TARGETARCH="+arch,
+		"--no-cache",
+		"-t", operatorImage, "."); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to build Docker image: %v\n", err)
 		os.Exit(1)
 	}
@@ -287,6 +294,13 @@ func TestMain(m *testing.M) {
 
 	fmt.Println("==> Setup complete, running E2E tests")
 	code := m.Run()
+
+	// Dump controller logs for debugging on failure.
+	if code != 0 {
+		fmt.Println("==> Dumping controller pod logs (test failure)")
+		_ = runCmd(repoRoot, "kubectl", "--kubeconfig", kubeconfigPath,
+			"-n", testNamespace, "logs", "-l", "app.kubernetes.io/name=snowplane", "--tail=200")
+	}
 
 	cleanupK8sCRs()
 	cleanupSnowflake()
@@ -1042,10 +1056,9 @@ func newFieldExportCR(name, sourceKind, sourceName, path, targetKind, targetName
 			"spec": map[string]interface{}{
 				"from": map[string]interface{}{
 					"resource": map[string]interface{}{
-						"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
-						"kind":       sourceKind,
-						"name":       sourceName,
-						"namespace":  testNamespace,
+						"kind":      sourceKind,
+						"name":      sourceName,
+						"namespace": testNamespace,
 					},
 					"path": path,
 				},

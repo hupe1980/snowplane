@@ -1,0 +1,13 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Tag
+metadata:
+  name: cost-center
+spec:
+  providerRef:
+    name: default
+  name: COST_CENTER
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  comment: "Cost center tag for resource tracking"
