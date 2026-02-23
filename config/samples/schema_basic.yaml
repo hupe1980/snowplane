@@ -1,0 +1,14 @@
+# Schema with minimal configuration.
+# References a Database CR by name, Snowflake schema will be created
+# in the resolved database once the Database CR is Ready.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Schema
+metadata:
+  name: my-schema
+  namespace: snowplane-system
+spec:
+  name: PUBLIC
+  databaseRef:
+    name: my-database
+  providerRef:
+    name: default

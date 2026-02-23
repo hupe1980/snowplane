@@ -1,0 +1,24 @@
+# External stage pointing to an S3 bucket with all options.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Stage
+metadata:
+  name: s3-stage
+  namespace: snowplane-system
+spec:
+  name: S3_LANDING
+  databaseRef:
+    name: analytics-db
+  schemaRef:
+    name: public-schema
+  url: "s3://my-data-lake/landing/"
+  storageIntegration: MY_S3_INTEGRATION
+  encryption:
+    type: AWS_SSE_S3
+  directory:
+    enable: true
+    autoRefresh: true
+  fileFormat: "FORMAT_NAME = 'CSV_FORMAT'"
+  comment: "Landing zone for raw data ingestion"
+  useRole: DATA_ENGINEER
+  providerRef:
+    name: default

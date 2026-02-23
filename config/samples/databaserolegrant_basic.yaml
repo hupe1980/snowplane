@@ -1,0 +1,14 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: DatabaseRoleGrant
+metadata:
+  name: usage-to-dbrole
+  namespace: default
+spec:
+  privilege: USAGE
+  on:
+    accountObject:
+      objectType: DATABASE
+      objectName: MY_DB
+  databaseRole: '"MY_DB"."DATA_ANALYST"'
+  providerRef:
+    name: default

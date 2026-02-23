@@ -1,0 +1,24 @@
+# Schema with all available options.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Schema
+metadata:
+  name: analytics-staging
+  namespace: snowplane-system
+spec:
+  name: STAGING
+  databaseRef:
+    name: analytics-db
+  transient: true
+  managedAccess: true
+  comment: "Staging area for analytics pipelines"
+  dataRetentionTimeInDays: 7
+  maxDataExtensionTimeInDays: 14
+  replaceInvalidCharacters: true
+  defaultDdlCollation: "en-ci"
+  storageSerializationPolicy: OPTIMIZED
+  logLevel: INFO
+  metricLevel: ALL
+  traceLevel: ON_EVENT
+  deletionPolicy: Delete
+  providerRef:
+    name: default

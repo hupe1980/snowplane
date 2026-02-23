@@ -1,0 +1,20 @@
+# Database with all mutable fields populated.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Database
+metadata:
+  name: analytics-database
+  namespace: snowplane-system
+spec:
+  name: ANALYTICS_DB
+  comment: "Analytics data warehouse managed by Snowplane"
+  dataRetentionTimeInDays: 14
+  maxDataExtensionTimeInDays: 28
+  replaceInvalidCharacters: true
+  defaultDdlCollation: "en-ci"
+  storageSerializationPolicy: OPTIMIZED
+  logLevel: INFO
+  metricLevel: ALL
+  traceLevel: ON_EVENT
+  deletionPolicy: Delete
+  providerRef:
+    name: default

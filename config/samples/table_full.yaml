@@ -1,0 +1,40 @@
+# Table with all optional fields enabled.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Table
+metadata:
+  name: orders-table
+  namespace: snowplane-system
+spec:
+  name: ORDERS
+  databaseRef:
+    name: analytics-db
+  schemaRef:
+    name: public-schema
+  columns:
+    - name: ORDER_ID
+      type: NUMBER(38,0)
+      nullable: false
+    - name: CUSTOMER_ID
+      type: NUMBER(38,0)
+      nullable: false
+    - name: STATUS
+      type: VARCHAR(20)
+      default: "'PENDING'"
+      comment: "Order status"
+    - name: TOTAL
+      type: NUMBER(12,2)
+    - name: CREATED_AT
+      type: TIMESTAMP_NTZ
+  comment: "Customer orders table"
+  transient: true
+  dataRetentionTimeInDays: 7
+  maxDataExtensionTimeInDays: 14
+  changeTracking: true
+  enableSchemaEvolution: true
+  defaultDdlCollation: "en-ci"
+  clusterBy:
+    - CUSTOMER_ID
+    - CREATED_AT
+  useRole: DATA_ENGINEER
+  providerRef:
+    name: default

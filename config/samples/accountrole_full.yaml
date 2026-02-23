@@ -1,0 +1,13 @@
+# AccountRole with all available options.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: AccountRole
+metadata:
+  name: data-analyst-role
+  namespace: snowplane-system
+spec:
+  name: DATA_ANALYST
+  comment: "Role for data analysts with read access to analytics databases"
+  useRole: SECURITYADMIN
+  deletionPolicy: Delete
+  providerRef:
+    name: default

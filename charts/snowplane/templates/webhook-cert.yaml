@@ -1,0 +1,30 @@
+{{- if .Values.webhooks.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "snowplane.fullname" . }}-webhook-cert
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "snowplane.fullname" . }}-webhook-tls
+  dnsNames:
+    - {{ include "snowplane.fullname" . }}-webhook.{{ .Release.Namespace }}.svc
+    - {{ include "snowplane.fullname" . }}-webhook.{{ .Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    name: {{ .Values.webhooks.certManager.issuerRef.name | default (printf "%s-selfsigned-issuer" (include "snowplane.fullname" .)) }}
+    kind: {{ .Values.webhooks.certManager.issuerRef.kind | default "Issuer" }}
+    group: cert-manager.io
+  duration: {{ .Values.webhooks.certManager.duration | default "8760h" }}
+  renewBefore: {{ .Values.webhooks.certManager.renewBefore | default "720h" }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "snowplane.fullname" . }}-selfsigned-issuer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+{{- end }}

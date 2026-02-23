@@ -1,0 +1,44 @@
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - ineffassign
+    - unused
+    - misspell
+    - revive
+    - goconst
+    - prealloc
+
+  settings:
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - disableStutteringCheck
+    goconst:
+      min-len: 3
+      min-occurrences: 4
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - goconst
+          - revive
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/hupe1980/snowplane

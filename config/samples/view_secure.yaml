@@ -1,0 +1,25 @@
+# Secure view with all optional fields.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: View
+metadata:
+  name: secure-revenue-view
+  namespace: snowplane-system
+spec:
+  name: MONTHLY_REVENUE
+  databaseRef:
+    name: analytics-db
+  schemaRef:
+    name: public-schema
+  statement: |
+    SELECT
+      DATE_TRUNC('MONTH', order_date) AS month,
+      SUM(total) AS revenue
+    FROM orders
+    GROUP BY 1
+    ORDER BY 1
+  secure: true
+  comment: "Monthly revenue aggregation (secure)"
+  changeTracking: true
+  useRole: DATA_ANALYST
+  providerRef:
+    name: default

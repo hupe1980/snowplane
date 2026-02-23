@@ -1,0 +1,21 @@
+apiVersion: v2
+name: snowplane
+description: A Kubernetes-native control plane for Snowflake resources
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">= 1.26.0-0"
+home: https://github.com/hupe1980/snowplane
+sources:
+  - https://github.com/hupe1980/snowplane
+maintainers:
+  - name: hupe1980
+keywords:
+  - snowflake
+  - kubernetes
+  - operator
+  - control-plane
+annotations:
+  artifacthub.io/category: integration
+  artifacthub.io/operator: "true"
+  artifacthub.io/license: MIT

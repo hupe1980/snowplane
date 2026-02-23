@@ -1,0 +1,11 @@
+# Database with minimal configuration.
+# Only required fields: name and providerRef.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Database
+metadata:
+  name: my-database
+  namespace: snowplane-system
+spec:
+  name: MY_DATABASE
+  providerRef:
+    name: default

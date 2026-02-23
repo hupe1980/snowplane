@@ -1,0 +1,31 @@
+{{- if .Values.webhooks.enabled }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "snowplane.fullname" . }}-validating
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "snowplane.fullname" . }}-webhook-cert
+webhooks:
+  {{- $fullname := include "snowplane.fullname" . }}
+  {{- $namespace := .Release.Namespace }}
+  {{- $resources := list "database" "schema" "warehouse" "accountrole" "databaserole" "grant" "user" "table" "view" "stage" "providerconfig" }}
+  {{- range $resource := $resources }}
+  - name: validate-{{ $resource }}.snowplane.hupe1980.github.io
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: {{ $.Values.webhooks.failurePolicy | default "Fail" }}
+    clientConfig:
+      service:
+        name: {{ $fullname }}-webhook
+        namespace: {{ $namespace }}
+        path: /validate-snowplane-v1alpha1-{{ $resource }}
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["snowplane.hupe1980.github.io"]
+        apiVersions: ["v1alpha1"]
+        resources: ["{{ $resource }}s"]
+    matchPolicy: Equivalent
+  {{- end }}
+{{- end }}

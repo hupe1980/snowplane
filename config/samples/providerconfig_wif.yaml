@@ -1,0 +1,32 @@
+# Workload Identity Federation — passwordless authentication via projected
+# ServiceAccount tokens. This is the most secure authentication method.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: wif-provider
+spec:
+  account: "orgname-accountname"
+  user: "SNOWPLANE_SERVICE_USER"
+  role: "SYSADMIN"
+  warehouse: "COMPUTE_WH"
+  authenticationType: WorkloadIdentity
+  workloadIdentity:
+    # OIDC uses projected ServiceAccount tokens (works on any K8s cluster).
+    # Other options: AWS (IRSA/Pod Identity), GCP (GCE metadata), Azure (IMDS).
+    provider: OIDC
+    tokenFilePath: /var/run/secrets/snowflake/token
+    # audience should match the Snowflake security integration configuration.
+    # audience: "https://orgname-accountname.snowflakecomputing.com"
+---
+# ServiceAccount with projected token volume (example for EKS IRSA).
+# Adjust the audience to match your Snowflake security integration.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: snowplane-controller
+  namespace: snowplane-system
+  annotations:
+    # EKS IRSA example:
+    # eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/SnowplaneRole
+    # GKE Workload Identity example:
+    # iam.gke.io/gcp-service-account: snowplane@project.iam.gserviceaccount.com

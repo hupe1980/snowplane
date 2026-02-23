@@ -1,0 +1,20 @@
+# Adopt an existing Snowflake warehouse into Snowplane management.
+#
+# The adoption-policy annotation enables the reconciler to take over
+# management of a pre-existing warehouse. Status fields (size, state,
+# auto-suspend, etc.) are populated from the current Snowflake state
+# and the LateInitialized condition is set to True.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: adopted-warehouse
+  namespace: snowplane-system
+  annotations:
+    snowplane.hupe1980.github.io/adoption-policy: adopt
+spec:
+  name: EXISTING_WAREHOUSE
+  providerRef:
+    name: default
+  warehouseSize: XSMALL
+  autoSuspend: 300
+  autoResume: true

@@ -1,0 +1,13 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: snowplane-controller-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: snowplane-controller-role
+subjects:
+- kind: ServiceAccount
+  name: snowplane-controller
+  namespace: snowplane-system

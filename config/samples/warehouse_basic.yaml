@@ -1,0 +1,12 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: analytics-wh
+  namespace: default
+spec:
+  providerRef:
+    name: default-provider
+  name: ANALYTICS_WH
+  warehouseSize: XSMALL
+  autoSuspend: 300
+  autoResume: true

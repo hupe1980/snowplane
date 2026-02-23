@@ -1,0 +1,23 @@
+# Table with minimal configuration.
+# References Database and Schema CRs by name; the Snowflake table
+# will be created once both parent resources are Ready.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Table
+metadata:
+  name: my-table
+  namespace: snowplane-system
+spec:
+  name: EVENTS
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  columns:
+    - name: ID
+      type: NUMBER(38,0)
+    - name: CREATED_AT
+      type: TIMESTAMP_NTZ
+    - name: PAYLOAD
+      type: VARIANT
+  providerRef:
+    name: default

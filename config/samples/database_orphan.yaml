@@ -1,0 +1,14 @@
+# Database with Orphan deletion policy.
+# When this CR is deleted, the Snowflake database is NOT dropped — it is orphaned.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Database
+metadata:
+  name: production-database
+  namespace: snowplane-system
+spec:
+  name: PRODUCTION_DB
+  comment: "Production database — orphaned on CR deletion"
+  dataRetentionTimeInDays: 90
+  deletionPolicy: Orphan
+  providerRef:
+    name: default

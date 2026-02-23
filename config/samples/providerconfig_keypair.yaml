@@ -1,0 +1,18 @@
+# Key Pair authentication — uses an RSA private key stored in a Kubernetes Secret.
+# This sample demonstrates an alternative to username/password authentication.
+# For passwordless WIF authentication, see providerconfig_wif.yaml instead.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: keypair-provider
+spec:
+  account: "orgname-accountname"
+  user: "SNOWPLANE_SERVICE_USER"
+  role: "SYSADMIN"
+  warehouse: "COMPUTE_WH"
+  authenticationType: KeyPair
+  credentials:
+    secretRef:
+      name: snowflake-keypair
+      namespace: snowplane-system
+      key: rsa_key.p8

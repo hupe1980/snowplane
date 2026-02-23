@@ -1,0 +1,59 @@
+# Database and Schema deployed together.
+# The Schema controller will wait until the Database is Ready before
+# creating the Snowflake schema. If the Database transitions away from
+# Ready, the Schema controller is notified via a watch and will
+# requeue automatically.
+---
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Database
+metadata:
+  name: analytics-db
+  namespace: snowplane-system
+spec:
+  name: ANALYTICS
+  comment: "Analytics database"
+  dataRetentionTimeInDays: 30
+  providerRef:
+    name: default
+---
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Schema
+metadata:
+  name: raw-schema
+  namespace: snowplane-system
+spec:
+  name: RAW
+  databaseRef:
+    name: analytics-db
+  comment: "Raw data ingestion"
+  providerRef:
+    name: default
+---
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Schema
+metadata:
+  name: staging-schema
+  namespace: snowplane-system
+spec:
+  name: STAGING
+  databaseRef:
+    name: analytics-db
+  transient: true
+  comment: "Ephemeral staging area"
+  providerRef:
+    name: default
+---
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Schema
+metadata:
+  name: curated-schema
+  namespace: snowplane-system
+spec:
+  name: CURATED
+  databaseRef:
+    name: analytics-db
+  managedAccess: true
+  comment: "Curated datasets with managed access"
+  dataRetentionTimeInDays: 90
+  providerRef:
+    name: default

@@ -27,6 +27,17 @@ go.work.sum
 # env file
 .env
 
+# Integration test keys
+keys/
+snowplane_test_setup.sql
+
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Custom
+_prompts/
+BACKLOG*.md
+CONCEPT.md
+FINDINGS.md
+.DS_Store

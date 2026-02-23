@@ -1,0 +1,16 @@
+# View with minimal configuration.
+# The SQL statement defines the view; changing it triggers a CREATE OR REPLACE.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: View
+metadata:
+  name: my-view
+  namespace: snowplane-system
+spec:
+  name: ACTIVE_USERS
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  statement: "SELECT * FROM users WHERE is_active = TRUE"
+  providerRef:
+    name: default

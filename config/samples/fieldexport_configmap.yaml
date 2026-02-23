@@ -1,0 +1,21 @@
+# Export the database name from a Database resource into a ConfigMap.
+# Other resources can then mount or reference this ConfigMap.
+#
+# Optional fields:
+#   from.resource.namespace — source namespace (defaults to FieldExport's namespace)
+#   to.namespace — target namespace (defaults to FieldExport's namespace)
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: FieldExport
+metadata:
+  name: database-name-export
+  namespace: snowplane-system
+spec:
+  from:
+    resource:
+      kind: Database
+      name: analytics-database
+    path: ".status.showOutput.name"
+  to:
+    kind: ConfigMap
+    name: snowplane-exports
+    key: database-name

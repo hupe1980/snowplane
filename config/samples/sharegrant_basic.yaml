@@ -1,0 +1,12 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ShareGrant
+metadata:
+  name: usage-to-share
+  namespace: default
+spec:
+  privilege: USAGE
+  objectType: DATABASE
+  objectName: MY_DB
+  share: MY_SHARE
+  providerRef:
+    name: default

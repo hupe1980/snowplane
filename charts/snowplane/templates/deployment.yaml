@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "snowplane.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller-manager
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "snowplane.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controller-manager
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "snowplane.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: controller-manager
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "snowplane.serviceAccountName" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: manager
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            {{- if .Values.leaderElection.enabled }}
+            - --leader-elect
+            - --leader-election-id={{ .Values.leaderElectionID }}
+            {{- end }}
+            - --metrics-bind-address={{ .Values.metrics.bindAddress }}
+            - --health-probe-bind-address={{ .Values.healthProbes.bindAddress }}
+            - --max-concurrent-reconciles={{ .Values.controller.maxConcurrentReconciles }}
+            - --requeue-interval={{ .Values.controller.requeueInterval }}
+            - --rate-limit-qps={{ .Values.rateLimit.qps }}
+            - --rate-limit-burst={{ .Values.rateLimit.burst }}
+            {{- if not .Values.controller.enableAlphaResources }}
+            - --enable-alpha-resources=false
+            {{- end }}
+            {{- if .Values.webhooks.enabled }}
+            - --webhook-port={{ .Values.webhooks.port }}
+            {{- else }}
+            - --enable-webhooks=false
+            {{- end }}
+            {{- if .Values.logging.development }}
+            - --development
+            {{- end }}
+            {{- with .Values.watchNamespaces }}
+            - --watch-namespaces={{ . }}
+            {{- end }}
+            {{- with .Values.controller.disableControllers }}
+            - --disable-controllers={{ . }}
+            {{- end }}
+            - --zap-log-level={{ .Values.logging.level }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.metrics.containerPort }}
+              protocol: TCP
+            - name: health
+              containerPort: {{ .Values.healthProbes.containerPort }}
+              protocol: TCP
+            {{- if .Values.webhooks.enabled }}
+            - name: webhook
+              containerPort: {{ .Values.webhooks.port }}
+              protocol: TCP
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if or .Values.webhooks.enabled .Values.workloadIdentity.enabled }}
+          volumeMounts:
+          {{- if .Values.webhooks.enabled }}
+            - name: webhook-tls
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
+          {{- end }}
+          {{- if .Values.workloadIdentity.enabled }}
+            - name: snowflake-token
+              mountPath: {{ .Values.workloadIdentity.mountPath }}
+              readOnly: true
+          {{- end }}
+          {{- end }}
+      {{- if or .Values.webhooks.enabled .Values.workloadIdentity.enabled }}
+      volumes:
+      {{- if .Values.webhooks.enabled }}
+        - name: webhook-tls
+          secret:
+            secretName: {{ include "snowplane.fullname" . }}-webhook-tls
+      {{- end }}
+      {{- if .Values.workloadIdentity.enabled }}
+        - name: snowflake-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: {{ .Values.workloadIdentity.audience | quote }}
+                  expirationSeconds: {{ .Values.workloadIdentity.expirationSeconds }}
+                  path: {{ .Values.workloadIdentity.tokenFileName }}
+      {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}

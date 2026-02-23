@@ -1,0 +1,14 @@
+# Transient database — no Fail-safe storage, lower cost.
+# The "transient" field is immutable after creation.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Database
+metadata:
+  name: staging-database
+  namespace: snowplane-system
+spec:
+  name: STAGING_DB
+  comment: "Transient staging database — no Fail-safe"
+  transient: true
+  dataRetentionTimeInDays: 1
+  providerRef:
+    name: default

@@ -1,0 +1,15 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: User
+metadata:
+  name: etl-service
+  namespace: snowplane-system
+spec:
+  name: ETL_SERVICE_USER
+  type: SERVICE
+  defaultRole: ETL_ROLE
+  defaultWarehouse: ETL_WH
+  rsaPublicKey:
+    name: etl-service-keys
+    key: rsa-public-key
+  providerRef:
+    name: default

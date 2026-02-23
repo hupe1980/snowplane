@@ -1,0 +1,11 @@
+# AccountRole with minimal configuration.
+# Only required fields: name and providerRef.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: AccountRole
+metadata:
+  name: my-role
+  namespace: snowplane-system
+spec:
+  name: MY_ROLE
+  providerRef:
+    name: default

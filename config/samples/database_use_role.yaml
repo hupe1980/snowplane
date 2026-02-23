@@ -1,0 +1,14 @@
+# Database created with a specific use role.
+# The reconciler will USE ROLE DATA_ADMIN before executing CREATE/ALTER/DROP,
+# ensuring the database is owned by the DATA_ADMIN role.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Database
+metadata:
+  name: analytics-db
+  namespace: snowplane-system
+spec:
+  name: ANALYTICS
+  comment: "Analytics database owned by DATA_ADMIN"
+  useRole: DATA_ADMIN
+  providerRef:
+    name: default

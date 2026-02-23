@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install just
+        uses: extractions/setup-just@v2
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+      - name: Unit Tests
+        run: just test
+
+      - name: Install setup-envtest
+        run: go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+
+      - name: Integration Tests (envtest)
+        run: just test-integration
+
+      - name: Webhook Integration Tests (envtest)
+        run: just test-webhook-integration
+
+      - name: Build
+        run: just build
+
+      - name: Verify CRDs
+        run: just verify-crds
+
+      - name: Verify Helm chart
+        run: just verify-helm

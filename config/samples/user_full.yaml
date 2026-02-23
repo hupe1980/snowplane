@@ -1,0 +1,30 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: User
+metadata:
+  name: data-analyst
+  namespace: snowplane-system
+spec:
+  name: DATA_ANALYST
+  type: PERSON
+  loginName: data_analyst
+  displayName: "Data Analyst"
+  email: analyst@example.com
+  firstName: Data
+  lastName: Analyst
+  comment: "Analyst user for data team"
+  defaultRole: ANALYST_ROLE
+  defaultSecondaryRoles: ALL
+  defaultWarehouse: ANALYTICS_WH
+  defaultNamespace: ANALYTICS_DB.PUBLIC
+  mustChangePassword: true
+  disabled: false
+  password:
+    name: user-credentials
+    key: password
+  rsaPublicKey:
+    name: user-keys
+    key: rsa-public-key
+  useRole: SECURITYADMIN
+  deletionPolicy: Delete
+  providerRef:
+    name: default

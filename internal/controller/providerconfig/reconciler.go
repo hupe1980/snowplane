@@ -1,0 +1,470 @@
+// Package providerconfig implements the reconciler for ProviderConfig resources.
+package providerconfig
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
+	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
+	"github.com/hupe1980/snowplane/internal/metrics"
+	"github.com/hupe1980/snowplane/internal/provider"
+	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/utils/conditions"
+	"github.com/hupe1980/snowplane/internal/utils/finalizers"
+)
+
+const (
+	requeueInterval    = 5 * time.Minute
+	snowflakeOpTimeout = 60 * time.Second
+	finalizerName      = "providerconfig.snowplane.hupe1980.github.io/in-use"
+)
+
+// PingFunc abstracts the Ping call for testability.
+type PingFunc func(ctx context.Context, client clientfactory.SnowflakeClient) error
+
+// Reconciler reconciles a ProviderConfig object.
+type Reconciler struct {
+	client          client.Client
+	factory         *clientfactory.ClientFactory
+	recorder        record.EventRecorder
+	rateLimiter     *ratelimit.Limiter
+	pingFn          PingFunc
+	requeueOverride time.Duration
+}
+
+// WithRequeueInterval overrides the default periodic-resync interval.
+func (r *Reconciler) WithRequeueInterval(d time.Duration) *Reconciler {
+	r.requeueOverride = d
+	return r
+}
+
+func (r *Reconciler) getRequeueInterval() time.Duration {
+	if r.requeueOverride > 0 {
+		return r.requeueOverride
+	}
+
+	return requeueInterval
+}
+
+// NewReconciler returns a new ProviderConfig reconciler.
+func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *Reconciler {
+	return &Reconciler{
+		client:      c,
+		factory:     factory,
+		recorder:    recorder,
+		rateLimiter: rl,
+		pingFn: func(ctx context.Context, sfClient clientfactory.SnowflakeClient) error {
+			return sfClient.Ping(ctx)
+		},
+	}
+}
+
+// providerRefIndex is the virtual field path used by the field indexer for
+// .spec.providerRef.name across all managed resource types.
+const providerRefIndex = ".spec.providerRef.name"
+
+// secretRefIndex is the virtual field path used by the field indexer for
+// efficient Secret→ProviderConfig reverse lookups (R9-4).
+const secretRefIndex = ".spec.credentials.secretRef"
+
+// secretRefKey builds the composite index key "namespace/name" for a secret.
+func secretRefKey(namespace, name string) string {
+	return namespace + "/" + name
+}
+
+// secretRefExtractor returns the composite "namespace/name" key for a
+// ProviderConfig's credentials secret reference.
+func secretRefExtractor(o client.Object) []string {
+	pc, ok := o.(*snowplanev1alpha1.ProviderConfig)
+	if !ok || pc.Spec.Credentials.SecretRef == nil {
+		return nil
+	}
+
+	ns := pc.Spec.Credentials.SecretRef.Namespace
+	if ns == "" {
+		ns = pc.Namespace
+	}
+
+	return []string{secretRefKey(ns, pc.Spec.Credentials.SecretRef.Name)}
+}
+
+// managedResourceEntry pairs an Object prototype (for field-indexer
+// registration in SetupWithManager) with an ObjectList factory (for
+// indexed queries in isInUse). Keeping both in one struct ensures
+// they can never drift out of sync.
+type managedResourceEntry struct {
+	proto   client.Object
+	newList func() client.ObjectList
+}
+
+// managedResourceTypes returns all managed CRD types that carry a
+// .spec.providerRef field. Each entry provides both the singleton
+// prototype (for IndexField) and a factory for fresh ObjectList
+// allocations (for client.List).
+func managedResourceTypes() []managedResourceEntry {
+	return []managedResourceEntry{
+		{proto: &snowplanev1alpha1.Database{}, newList: func() client.ObjectList { return &snowplanev1alpha1.DatabaseList{} }},
+		{proto: &snowplanev1alpha1.Schema{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SchemaList{} }},
+		{proto: &snowplanev1alpha1.Warehouse{}, newList: func() client.ObjectList { return &snowplanev1alpha1.WarehouseList{} }},
+		{proto: &snowplanev1alpha1.User{}, newList: func() client.ObjectList { return &snowplanev1alpha1.UserList{} }},
+		{proto: &snowplanev1alpha1.AccountRole{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AccountRoleList{} }},
+		{proto: &snowplanev1alpha1.DatabaseRole{}, newList: func() client.ObjectList { return &snowplanev1alpha1.DatabaseRoleList{} }},
+		{proto: &snowplanev1alpha1.Table{}, newList: func() client.ObjectList { return &snowplanev1alpha1.TableList{} }},
+		{proto: &snowplanev1alpha1.View{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ViewList{} }},
+		{proto: &snowplanev1alpha1.Stage{}, newList: func() client.ObjectList { return &snowplanev1alpha1.StageList{} }},
+		{proto: &snowplanev1alpha1.AccountRoleGrant{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AccountRoleGrantList{} }},
+		{proto: &snowplanev1alpha1.DatabaseRoleGrant{}, newList: func() client.ObjectList { return &snowplanev1alpha1.DatabaseRoleGrantList{} }},
+		{proto: &snowplanev1alpha1.ShareGrant{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ShareGrantList{} }},
+	}
+}
+
+// providerRefExtractor is a field.IndexerFunc that extracts the
+// .spec.providerRef.name value from any ManagedResource.
+func providerRefExtractor(o client.Object) []string {
+	mr, ok := o.(interface {
+		GetProviderRef() snowplanev1alpha1.ProviderReference
+	})
+	if !ok {
+		return nil
+	}
+
+	if name := mr.GetProviderRef().Name; name != "" {
+		return []string{name}
+	}
+
+	return nil
+}
+
+// SetupWithManager sets up the reconciler with the Manager.
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrent int) error {
+	// Register a field indexer for .spec.providerRef.name on every managed
+	// resource type so that isInUse can perform efficient lookups.
+	for _, entry := range managedResourceTypes() {
+		if err := mgr.GetFieldIndexer().IndexField(
+			context.Background(), entry.proto, providerRefIndex, providerRefExtractor,
+		); err != nil {
+			return fmt.Errorf("creating field indexer for %T %s: %w", entry.proto, providerRefIndex, err)
+		}
+	}
+
+	// Register a field indexer for Secret→ProviderConfig reverse lookups
+	// so mapSecretToProviderConfigs uses O(1) indexed queries (R9-4).
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(), &snowplanev1alpha1.ProviderConfig{}, secretRefIndex, secretRefExtractor,
+	); err != nil {
+		return fmt.Errorf("creating field indexer for ProviderConfig %s: %w", secretRefIndex, err)
+	}
+
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&snowplanev1alpha1.ProviderConfig{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.mapSecretToProviderConfigs),
+		).
+		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrent}).
+		Named("providerconfig").
+		Complete(r)
+}
+
+// mapSecretToProviderConfigs enqueues all ProviderConfig CRs that reference
+// the changed Secret, so they re-reconcile when credentials are rotated.
+// Uses a field indexer for O(1) lookups instead of listing all ProviderConfigs (R9-4).
+func (r *Reconciler) mapSecretToProviderConfigs(ctx context.Context, obj client.Object) []reconcile.Request {
+	logger := log.FromContext(ctx)
+
+	pcs := &snowplanev1alpha1.ProviderConfigList{}
+	if err := r.client.List(ctx, pcs,
+		client.MatchingFields{secretRefIndex: secretRefKey(obj.GetNamespace(), obj.GetName())},
+	); err != nil {
+		logger.Error(err, "listing ProviderConfigs for secret watch")
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0, len(pcs.Items))
+
+	for i := range pcs.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: pcs.Items[i].Namespace,
+				Name:      pcs.Items[i].Name,
+			},
+		})
+	}
+
+	return requests
+}
+
+// Reconcile performs a single reconciliation loop for a ProviderConfig.
+//
+// Required RBAC:
+//   - providerconfigs: get, list, watch, create, update, patch, delete
+//   - providerconfigs/status: get, update, patch
+//   - secrets: get, list, watch
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
+	start := time.Now()
+
+	defer func() {
+		metrics.ReconcileDuration.With(prometheus.Labels{"controller": "providerconfig"}).Observe(time.Since(start).Seconds())
+		metrics.RecordReconcile("providerconfig", retErr)
+	}()
+
+	logger := log.FromContext(ctx)
+
+	// Fetch the ProviderConfig.
+	pc := &snowplanev1alpha1.ProviderConfig{}
+	if err := r.client.Get(ctx, req.NamespacedName, pc); err != nil {
+		if apierrors.IsNotFound(err) {
+			// CR deleted — evict any cached client and clean up metrics.
+			r.factory.Evict(req.Name)
+			metrics.DeleteProviderConfigHealthy(req.Name)
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, err
+	}
+
+	logger.Info("reconciling ProviderConfig", "name", pc.Name)
+
+	// Handle deletion with in-use guard (L-14).
+	if !pc.DeletionTimestamp.IsZero() {
+		return r.reconcileDelete(ctx, pc)
+	}
+
+	// Ensure finalizer is present.
+	if !finalizers.Has(pc, finalizerName) {
+		patchBase := pc.DeepCopy()
+		finalizers.Add(pc, finalizerName)
+
+		if err := r.client.Patch(ctx, pc, client.MergeFrom(patchBase)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("adding finalizer: %w", err)
+		}
+
+	}
+
+	// Resolve credentials: either from a Secret or from WIF (no Secret).
+	var secret *corev1.Secret
+
+	if pc.Spec.AuthenticationType == snowplanev1alpha1.AuthenticationTypeWorkloadIdentity {
+		// WorkloadIdentity: the gosnowflake driver reads the token file natively.
+		secret = nil
+	} else if pc.Spec.Credentials.SecretRef != nil {
+		secret = &corev1.Secret{}
+
+		secretNS := pc.Spec.Credentials.SecretRef.Namespace
+		if secretNS == "" {
+			secretNS = pc.Namespace
+		}
+
+		secretRef := types.NamespacedName{
+			Namespace: secretNS,
+			Name:      pc.Spec.Credentials.SecretRef.Name,
+		}
+
+		if err := r.client.Get(ctx, secretRef, secret); err != nil {
+			msg := fmt.Sprintf("credentials secret %q not found: %v", secretRef, err)
+			conditions.SetNotReady(pc, snowplanev1alpha1.ReasonSecretNotFound, msg)
+			conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonSecretNotFound, msg)
+			r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonSecretNotFound, msg)
+
+			r.bestEffortPatchStatus(ctx, pc)
+
+			return ctrl.Result{}, err
+		}
+	} else {
+		msg := "spec.credentials.secretRef is required"
+		conditions.SetNotReady(pc, snowplanev1alpha1.ReasonCredentialsError, msg)
+		conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonCredentialsError, msg)
+		r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonCredentialsError, msg)
+
+		r.bestEffortPatchStatus(ctx, pc)
+
+		return ctrl.Result{}, errors.New(msg)
+	}
+
+	// Build the Snowflake client config.
+	cfg, err := provider.BuildSnowflakeConfig(pc, secret)
+	if err != nil {
+		conditions.SetNotReady(pc, snowplanev1alpha1.ReasonInvalidConfig, err.Error())
+		conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonInvalidConfig, err.Error())
+		r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonInvalidConfig, err.Error())
+
+		metrics.SetProviderConfigHealthy(pc.Name, pc.Spec.Account, false)
+
+		r.bestEffortPatchStatus(ctx, pc)
+
+		return ctrl.Result{}, err
+	}
+
+	// Compute a hash of the config to detect changes.
+	hash := provider.ComputeHash(cfg)
+
+	// Detect credential rotation: if the factory has a cached client with a
+	// different hash, credentials have changed since the last reconciliation.
+	credentialsRotated := r.factory.HasStaleHash(pc.Name, hash)
+
+	// Get or create a cached Snowflake client.
+	sfClient, err := r.factory.GetOrCreate(pc.Name, hash, cfg)
+	if err != nil {
+		conditions.SetNotReady(pc, snowplanev1alpha1.ReasonClientFailed, err.Error())
+		conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonClientFailed, err.Error())
+		r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonClientFailed, err.Error())
+
+		metrics.SetProviderConfigHealthy(pc.Name, pc.Spec.Account, false)
+
+		r.bestEffortPatchStatus(ctx, pc)
+
+		return ctrl.Result{}, err
+	}
+
+	// Verify connectivity with timeout.
+	pingCtx, pingCancel := context.WithTimeout(ctx, snowflakeOpTimeout)
+	defer pingCancel()
+
+	if err := metrics.ObserveSnowflakeOp("providerconfig", "ping", func() error {
+		return r.pingFn(pingCtx, sfClient)
+	}); err != nil {
+		msg := fmt.Sprintf("failed to ping Snowflake: %v", err)
+		conditions.SetNotReady(pc, snowplanev1alpha1.ReasonPingFailed, msg)
+		conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonPingFailed, msg)
+		r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonPingFailed, msg)
+
+		metrics.SetProviderConfigHealthy(pc.Name, pc.Spec.Account, false)
+
+		r.bestEffortPatchStatus(ctx, pc)
+
+		return ctrl.Result{}, err
+	}
+
+	// Success.
+	conditions.SetReady(pc, "Snowflake connection verified")
+	conditions.SetSynced(pc, "Reconciliation complete")
+	pc.Status.ObservedGeneration = pc.Generation
+
+	metrics.SetProviderConfigHealthy(pc.Name, pc.Spec.Account, true)
+
+	if credentialsRotated {
+		r.recorder.Event(pc, corev1.EventTypeNormal, "CredentialsRotated", "Credentials rotated, reconnecting")
+	}
+
+	r.recorder.Event(pc, corev1.EventTypeNormal, snowplanev1alpha1.ReasonAvailable, "Snowflake connection verified")
+
+	if err := r.patchStatus(ctx, pc); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{RequeueAfter: r.getRequeueInterval()}, nil
+}
+
+// patchStatus uses Server-Side Apply (SSA) to update the status subresource.
+// SSA eliminates the need for ResourceVersion-based conflict detection —
+// the server resolves ownership via managedFields instead (B-2).
+func (r *Reconciler) patchStatus(ctx context.Context, pc *snowplanev1alpha1.ProviderConfig) error {
+	pc.SetGroupVersionKind(snowplanev1alpha1.GroupVersion.WithKind("ProviderConfig"))
+
+	// SSA patch objects must not contain managedFields.
+	pc.SetManagedFields(nil)
+
+	return r.client.Status().Patch(ctx, pc, client.Apply, //nolint:staticcheck // TODO: migrate to client.Client.SubResource().Apply()
+		client.FieldOwner("snowplane-controller"),
+		client.ForceOwnership,
+	)
+}
+
+// bestEffortPatchStatus patches status and logs a warning on failure.
+// Used in error paths where the primary error must be returned.
+func (r *Reconciler) bestEffortPatchStatus(ctx context.Context, pc *snowplanev1alpha1.ProviderConfig) {
+	if err := r.patchStatus(ctx, pc); err != nil {
+		log.FromContext(ctx).Error(err, "best-effort status patch failed")
+	}
+}
+
+// reconcileDelete handles ProviderConfig deletion with an in-use guard (L-14).
+// If any managed resource still references this ProviderConfig, the finalizer
+// is not removed and a warning event is emitted.
+func (r *Reconciler) reconcileDelete(ctx context.Context, pc *snowplanev1alpha1.ProviderConfig) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	if !finalizers.Has(pc, finalizerName) {
+		// No finalizer — nothing to do.
+		r.factory.Evict(pc.Name)
+		return ctrl.Result{}, nil
+	}
+
+	// Check if any managed resources still reference this ProviderConfig.
+	inUse, err := r.isInUse(ctx, pc.Name)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("checking in-use references: %w", err)
+	}
+
+	if inUse {
+		msg := fmt.Sprintf("ProviderConfig %q is still referenced by managed resources; cannot delete", pc.Name)
+		logger.Info(msg)
+		r.recorder.Event(pc, corev1.EventTypeWarning, "InUse", msg)
+		conditions.SetNotReady(pc, "InUse", msg)
+		r.bestEffortPatchStatus(ctx, pc)
+
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	// Safe to delete — remove finalizer.
+	patchBase := pc.DeepCopy()
+	finalizers.Remove(pc, finalizerName)
+	if err := r.client.Patch(ctx, pc, client.MergeFrom(patchBase)); err != nil {
+		return ctrl.Result{}, fmt.Errorf("removing finalizer: %w", err)
+	}
+
+	r.factory.Evict(pc.Name)
+	metrics.DeleteProviderConfigHealthy(pc.Name)
+	logger.Info("ProviderConfig deleted, client evicted", "name", pc.Name)
+
+	return ctrl.Result{}, nil
+}
+
+// isInUse checks if any managed resource in the cluster references the given
+// ProviderConfig by name, using the field indexer for O(1) lookups per type.
+func (r *Reconciler) isInUse(ctx context.Context, providerName string) (bool, error) {
+	for _, entry := range managedResourceTypes() {
+		list := entry.newList()
+		if err := r.client.List(ctx, list,
+			client.MatchingFields{providerRefIndex: providerName},
+			client.Limit(1),
+		); err != nil {
+			return false, err
+		}
+
+		if listLen(list) > 0 {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// listLen returns the number of items in an ObjectList using the generic
+// meta.ExtractList helper.  This avoids a type switch that silently returns 0
+// when new resource types are added without updating the switch.
+func listLen(list client.ObjectList) int {
+	items, err := meta.ExtractList(list)
+	if err != nil {
+		return 0
+	}
+
+	return len(items)
+}

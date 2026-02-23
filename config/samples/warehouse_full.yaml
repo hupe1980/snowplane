@@ -1,0 +1,24 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: etl-wh
+  namespace: default
+spec:
+  providerRef:
+    name: default-provider
+  name: ETL_WH
+  warehouseType: STANDARD
+  warehouseSize: LARGE
+  minClusterCount: 1
+  maxClusterCount: 3
+  scalingPolicy: ECONOMY
+  autoSuspend: 600
+  autoResume: true
+  resourceMonitor: ETL_MONITOR
+  comment: "ETL processing warehouse with auto-scaling"
+  enableQueryAcceleration: true
+  queryAccelerationMaxScaleFactor: 8
+  maxConcurrencyLevel: 12
+  statementQueuedTimeoutInSeconds: 300
+  statementTimeoutInSeconds: 7200
+  useRole: SYSADMIN

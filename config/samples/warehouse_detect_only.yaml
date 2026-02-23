@@ -1,0 +1,15 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: detect-only-wh
+  namespace: default
+  annotations:
+    snowplane.hupe1980.github.io/drift-policy: detect-only
+spec:
+  providerRef:
+    name: default-provider
+  name: MONITORED_WH
+  warehouseSize: MEDIUM
+  autoSuspend: 300
+  autoResume: true
+  comment: "Warehouse with detect-only drift policy — drift is reported but not corrected"

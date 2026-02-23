@@ -1,0 +1,436 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: databaserolegrants.snowplane.hupe1980.github.io
+spec:
+  group: snowplane.hupe1980.github.io
+  names:
+    categories:
+    - snowplane
+    kind: DatabaseRoleGrant
+    listKind: DatabaseRoleGrantList
+    plural: databaserolegrants
+    singular: databaserolegrant
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: SYNCED
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          DatabaseRoleGrant is the Schema for the databaserolegrants API.
+          It grants a Snowflake privilege to a database role.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              DatabaseRoleGrantSpec defines the desired state of a DatabaseRoleGrant.
+              All grant fields are immutable after creation — changing any field requires
+              a REVOKE + re-GRANT (use the force-new annotation to trigger recreation).
+            properties:
+              databaseRole:
+                description: |-
+                  DatabaseRole is the fully qualified database role name (e.g. MY_DB.MY_ROLE).
+                  Mutually exclusive with DatabaseRoleRef.
+                type: string
+              databaseRoleRef:
+                description: |-
+                  DatabaseRoleRef references a DatabaseRole CR in the same namespace.
+                  When set, the database role name is resolved from the CR's fullyQualifiedName.
+                  Mutually exclusive with DatabaseRole.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy specifies what happens to the Snowflake resource when the CR is deleted.
+                  Defaults to "Delete".
+                enum:
+                - Delete
+                - Orphan
+                type: string
+              "on":
+                description: |-
+                  On defines what the privilege is granted on.
+                  Exactly one variant must be set.
+                properties:
+                  account:
+                    description: |-
+                      Account grants a global account-level privilege (e.g. CREATE DATABASE, MANAGE GRANTS).
+                      Set to true for ON ACCOUNT.
+                    type: boolean
+                  accountObject:
+                    description: |-
+                      AccountObject grants a privilege on an account-level object
+                      (DATABASE, WAREHOUSE, USER, RESOURCE MONITOR, etc.).
+                    properties:
+                      objectName:
+                        description: ObjectName is the identifier of the object.
+                        type: string
+                      objectType:
+                        description: |-
+                          ObjectType is the type of the account object.
+                          Valid values: USER, RESOURCE MONITOR, WAREHOUSE, COMPUTE POOL, DATABASE,
+                          INTEGRATION, CONNECTION, FAILOVER GROUP, REPLICATION GROUP, EXTERNAL VOLUME.
+                        type: string
+                    required:
+                    - objectName
+                    - objectType
+                    type: object
+                  schema:
+                    description: Schema grants a privilege on a schema or on all/future
+                      schemas in a database.
+                    properties:
+                      allInDatabase:
+                        description: |-
+                          AllInDatabase grants on all existing schemas in the specified database.
+                          For: ON ALL SCHEMAS IN DATABASE <db_name>
+                        type: string
+                      allInDatabaseRef:
+                        description: |-
+                          AllInDatabaseRef references a Database CR for the ALL SCHEMAS IN DATABASE grant.
+                          Mutually exclusive with AllInDatabase.
+                        properties:
+                          name:
+                            description: Name of the referent.
+                            minLength: 1
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      futureInDatabase:
+                        description: |-
+                          FutureInDatabase grants on future schemas in the specified database.
+                          For: ON FUTURE SCHEMAS IN DATABASE <db_name>
+                        type: string
+                      futureInDatabaseRef:
+                        description: |-
+                          FutureInDatabaseRef references a Database CR for the FUTURE SCHEMAS IN DATABASE grant.
+                          Mutually exclusive with FutureInDatabase.
+                        properties:
+                          name:
+                            description: Name of the referent.
+                            minLength: 1
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      schemaName:
+                        description: |-
+                          SchemaName is the fully qualified schema name (e.g. "MY_DB"."PUBLIC").
+                          For: ON SCHEMA <schema_name>
+                        type: string
+                      schemaRef:
+                        description: |-
+                          SchemaRef references a Schema CR in the same namespace.
+                          When set, the schema FQN is resolved from the CR's fullyQualifiedName.
+                          Mutually exclusive with SchemaName.
+                        properties:
+                          name:
+                            description: Name of the referent.
+                            minLength: 1
+                            type: string
+                        required:
+                        - name
+                        type: object
+                    type: object
+                  schemaObject:
+                    description: |-
+                      SchemaObject grants a privilege on a specific schema object, or on
+                      all/future schema objects of a given type in a database or schema.
+                    properties:
+                      all:
+                        description: |-
+                          All specifies granting on all existing objects of a given type.
+                          For: ON ALL <type_plural> IN {DATABASE <db> | SCHEMA <schema>}
+                        properties:
+                          inDatabase:
+                            description: InDatabase scopes the grant to all objects
+                              of the type in the specified database.
+                            type: string
+                          inDatabaseRef:
+                            description: |-
+                              InDatabaseRef references a Database CR.
+                              Mutually exclusive with InDatabase.
+                            properties:
+                              name:
+                                description: Name of the referent.
+                                minLength: 1
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          inSchema:
+                            description: InSchema scopes the grant to all objects
+                              of the type in the specified schema.
+                            type: string
+                          inSchemaRef:
+                            description: |-
+                              InSchemaRef references a Schema CR.
+                              Mutually exclusive with InSchema.
+                            properties:
+                              name:
+                                description: Name of the referent.
+                                minLength: 1
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          objectTypePlural:
+                            description: ObjectTypePlural is the plural form of the
+                              object type (e.g. TABLES, VIEWS, STAGES).
+                            type: string
+                        required:
+                        - objectTypePlural
+                        type: object
+                      future:
+                        description: |-
+                          Future specifies granting on future objects of a given type.
+                          For: ON FUTURE <type_plural> IN {DATABASE <db> | SCHEMA <schema>}
+                        properties:
+                          inDatabase:
+                            description: InDatabase scopes the grant to all objects
+                              of the type in the specified database.
+                            type: string
+                          inDatabaseRef:
+                            description: |-
+                              InDatabaseRef references a Database CR.
+                              Mutually exclusive with InDatabase.
+                            properties:
+                              name:
+                                description: Name of the referent.
+                                minLength: 1
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          inSchema:
+                            description: InSchema scopes the grant to all objects
+                              of the type in the specified schema.
+                            type: string
+                          inSchemaRef:
+                            description: |-
+                              InSchemaRef references a Schema CR.
+                              Mutually exclusive with InSchema.
+                            properties:
+                              name:
+                                description: Name of the referent.
+                                minLength: 1
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          objectTypePlural:
+                            description: ObjectTypePlural is the plural form of the
+                              object type (e.g. TABLES, VIEWS, STAGES).
+                            type: string
+                        required:
+                        - objectTypePlural
+                        type: object
+                      objectName:
+                        description: |-
+                          ObjectName is the fully qualified name of the specific object.
+                          Required when granting on a specific object.
+                        type: string
+                      objectType:
+                        description: |-
+                          ObjectType is the schema object type (e.g. TABLE, VIEW, STAGE, FUNCTION, PROCEDURE, STREAM, TASK, PIPE).
+                          Required when granting on a specific object.
+                        type: string
+                    type: object
+                type: object
+              privilege:
+                description: Privilege is the Snowflake privilege to grant (e.g. USAGE,
+                  SELECT, CREATE TABLE).
+                minLength: 1
+                type: string
+              providerRef:
+                description: ProviderRef references the ProviderConfig to use for
+                  Snowflake connectivity.
+                properties:
+                  name:
+                    description: Name of the ProviderConfig to use.
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the ProviderConfig. Defaults to the namespace of the
+                      referring resource. Set this to reference a ProviderConfig in a
+                      different namespace (e.g. a shared system namespace).
+                    type: string
+                required:
+                - name
+                type: object
+              useRole:
+                description: |-
+                  UseRole specifies the Snowflake role to activate via USE ROLE before
+                  CREATE/ALTER/DROP operations. In Snowflake's DAC model the role active
+                  at CREATE time becomes the object owner, so this field indirectly
+                  controls initial ownership.
+                  This field is immutable after the resource has been created in Snowflake.
+                type: string
+              withGrantOption:
+                description: WithGrantOption allows the grantee to re-grant the privilege
+                  to other roles.
+                type: boolean
+            required:
+            - "on"
+            - privilege
+            - providerRef
+            type: object
+          status:
+            description: DatabaseRoleGrantStatus defines the observed state of a DatabaseRoleGrant.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the resource's state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              fullyQualifiedName:
+                description: FullyQualifiedName is the Snowflake fully qualified identifier
+                  for this resource.
+                type: string
+              kind:
+                description: Kind indicates the resolved grant kind (Regular, Future,
+                  All).
+                type: string
+              lastAppliedSpecHash:
+                description: |-
+                  LastAppliedSpecHash is the SHA-256 hash of the spec as of the last
+                  successful reconciliation. The reconciler uses this to distinguish
+                  spec changes (user edited the CR) from external drift (Snowflake
+                  state diverged without a spec change). This is more reliable than
+                  comparing ObservedGeneration vs Generation because metadata-only
+                  changes (labels, annotations) increment Generation without changing
+                  the spec.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              showOutput:
+                description: ShowOutput contains the raw SHOW GRANTS entry for this
+                  grant.
+                properties:
+                  createdOn:
+                    description: CreatedOn is the timestamp when the grant was created.
+                    type: string
+                  grantOption:
+                    description: GrantOption indicates whether WITH GRANT OPTION was
+                      used.
+                    type: boolean
+                  grantedBy:
+                    description: GrantedBy is the role that performed the grant.
+                    type: string
+                  grantedOn:
+                    description: 'GrantedOn is the object type (from SHOW GRANTS:
+                      "granted_on" or "grant_on" for future grants).'
+                    type: string
+                  grantedTo:
+                    description: GrantedTo is the grantee category (ROLE, DATABASE_ROLE,
+                      SHARE).
+                    type: string
+                  granteeName:
+                    description: GranteeName is the role or share name.
+                    type: string
+                  name:
+                    description: Name is the object name.
+                    type: string
+                  privilege:
+                    description: Privilege is the granted privilege name.
+                    type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

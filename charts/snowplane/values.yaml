@@ -1,0 +1,195 @@
+# Default values for snowplane.
+
+# -- Number of controller manager replicas
+replicaCount: 1
+
+image:
+  # -- Container image repository
+  repository: ghcr.io/hupe1980/snowplane
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+  # -- Overrides the image tag (defaults to chart appVersion)
+  tag: ""
+
+# -- Image pull secrets
+imagePullSecrets: []
+
+# -- Override the release name
+nameOverride: ""
+# -- Override the full release name
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Create a ServiceAccount
+  create: true
+  # -- Annotations to add to the ServiceAccount (e.g. for IRSA/Workload Identity)
+  annotations: {}
+  # -- Override the ServiceAccount name
+  name: ""
+
+# -- Workload Identity Federation configuration for passwordless Snowflake authentication.
+# When enabled, a projected ServiceAccount token volume is mounted into the controller pod.
+workloadIdentity:
+  # -- Enable projected ServiceAccount token volume for Workload Identity Federation
+  enabled: false
+  # -- Token audience (must match the Snowflake security integration configuration)
+  audience: ""
+  # -- Token expiration in seconds (kubelet refreshes before expiry)
+  expirationSeconds: 3600
+  # -- Mount path for the projected token volume
+  mountPath: /var/run/secrets/snowflake
+  # -- Token file name within the mount path
+  tokenFileName: token
+
+# -- Pod annotations
+podAnnotations: {}
+
+# -- Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: true
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# -- Node selector for pod scheduling
+nodeSelector: {}
+
+# -- Tolerations for pod scheduling
+tolerations: []
+
+# -- Affinity rules for pod scheduling
+affinity: {}
+
+# -- Termination grace period in seconds
+terminationGracePeriodSeconds: 30
+
+controller:
+  # -- Maximum concurrent reconciles per controller
+  maxConcurrentReconciles: 3
+  # -- Requeue interval for drift detection
+  requeueInterval: 5m
+  # -- Enable alpha-maturity resource controllers
+  enableAlphaResources: true
+  # -- Comma-separated list of controllers to disable (e.g. "grant,view")
+  disableControllers: ""
+
+leaderElection:
+  # -- Enable leader election
+  enabled: true
+
+metrics:
+  # -- Enable metrics endpoint
+  enabled: true
+  # -- Metrics bind address
+  bindAddress: ":8080"
+  # -- Container port for metrics endpoint (must match port in bindAddress)
+  containerPort: 8080
+  service:
+    # -- Create a Service for the metrics endpoint
+    enabled: true
+    # -- Metrics service port
+    port: 8080
+  serviceMonitor:
+    # -- Create a Prometheus ServiceMonitor
+    enabled: false
+    # -- Additional labels for the ServiceMonitor
+    additionalLabels: {}
+    # -- Scrape interval
+    interval: 30s
+
+healthProbes:
+  # -- Health probe bind address
+  bindAddress: ":8081"
+  # -- Container port for health probes (must match port in bindAddress)
+  containerPort: 8081
+
+webhooks:
+  # -- Enable admission webhooks (requires cert-manager).
+  # When enabled with failurePolicy=Fail, use replicaCount >= 2 for HA.
+  # Set to false only for development or environments without cert-manager.
+  enabled: true
+  # -- Webhook server port
+  port: 9443
+  # -- Failure policy for admission webhooks.
+  # "Fail" blocks mutations when the webhook is unavailable (safest but requires HA).
+  # "Ignore" allows mutations through when the webhook is unavailable (less safe but tolerates single-replica downtime).
+  failurePolicy: Fail
+  # -- cert-manager configuration for webhook TLS
+  certManager:
+    # -- Certificate duration (default: 1 year)
+    duration: 8760h
+    # -- Renew before expiry (default: 30 days)
+    renewBefore: 720h
+    # -- Issuer reference (defaults to self-signed issuer created by the chart)
+    issuerRef:
+      name: ""
+      kind: Issuer
+
+rateLimit:
+  # -- Maximum sustained queries per second to Snowflake per provider (0 = disabled)
+  qps: 10
+  # -- Maximum burst size for Snowflake API rate limiter
+  burst: 20
+
+logging:
+  # -- Log level (info, debug, error)
+  level: info
+  # -- Enable development mode (human-readable output)
+  development: false
+
+# -- PodDisruptionBudget configuration
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
+# -- NetworkPolicy configuration
+networkPolicy:
+  enabled: false
+
+# -- Priority class name for pod scheduling (e.g. system-cluster-critical for production)
+priorityClassName: ""
+
+# -- Topology spread constraints for pod scheduling.
+# When replicaCount > 1, this ensures pods are spread across failure domains.
+# Example:
+#   topologySpreadConstraints:
+#     - maxSkew: 1
+#       topologyKey: topology.kubernetes.io/zone
+#       whenUnsatisfiable: ScheduleAnyway
+#       labelSelector:
+#         matchLabels:
+#           app.kubernetes.io/name: snowplane
+topologySpreadConstraints: []
+
+# -- Comma-separated list of namespaces to watch. Empty means all namespaces.
+watchNamespaces: ""
+
+# -- Leader election identity. Override when running multiple Snowplane instances
+# in the same cluster to prevent leader election conflicts.
+leaderElectionID: "snowplane-leader-election"
+
+# -- Grafana dashboard provisioning
+grafana:
+  dashboard:
+    # -- Deploy a Grafana dashboard ConfigMap (requires Grafana sidecar provisioner)
+    enabled: false
+    # -- Namespace to deploy the dashboard ConfigMap (defaults to release namespace)
+    namespace: ""
+    # -- Additional labels for the dashboard ConfigMap (e.g. for sidecar discovery)
+    labels: {}
+    # -- Annotations for the dashboard ConfigMap
+    annotations: {}

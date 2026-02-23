@@ -1,0 +1,53 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: snowplane-editor
+  labels:
+    app.kubernetes.io/name: snowplane
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+- apiGroups:
+  - snowplane.hupe1980.github.io
+  resources:
+  - databases
+  - schemas
+  - warehouses
+  - accountroles
+  - databaseroles
+  - accountrolegrants
+  - databaserolegrants
+  - sharegrants
+  - users
+  - tables
+  - views
+  - stages
+  - fieldexports
+  - providerconfigs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - snowplane.hupe1980.github.io
+  resources:
+  - databases/status
+  - schemas/status
+  - warehouses/status
+  - accountroles/status
+  - databaseroles/status
+  - accountrolegrants/status
+  - databaserolegrants/status
+  - sharegrants/status
+  - users/status
+  - tables/status
+  - views/status
+  - stages/status
+  - fieldexports/status
+  - providerconfigs/status
+  verbs:
+  - get

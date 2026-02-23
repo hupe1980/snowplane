@@ -1,0 +1,17 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: AccountRoleGrant
+metadata:
+  name: select-on-table
+  namespace: default
+spec:
+  privilege: SELECT
+  on:
+    schemaObject:
+      objectType: TABLE
+      objectName: '"MY_DB"."PUBLIC"."MY_TABLE"'
+  accountRole: ANALYST
+  withGrantOption: true
+  useRole: SYSADMIN
+  deletionPolicy: Delete
+  providerRef:
+    name: default

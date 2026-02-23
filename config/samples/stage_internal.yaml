@@ -1,0 +1,15 @@
+# Internal stage with minimal configuration.
+# Internal stages store files within Snowflake's managed storage.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Stage
+metadata:
+  name: my-stage
+  namespace: snowplane-system
+spec:
+  name: DATA_LOAD
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  providerRef:
+    name: default

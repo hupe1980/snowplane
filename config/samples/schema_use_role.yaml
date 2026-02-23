@@ -1,0 +1,16 @@
+# Schema managed under a specific Snowflake role.
+# The controller executes USE ROLE before CREATE/ALTER/DROP,
+# ensuring the schema is owned by the specified role.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Schema
+metadata:
+  name: analytics-staging
+  namespace: snowplane-system
+spec:
+  name: STAGING
+  databaseRef:
+    name: analytics-db
+  comment: "Staging area for analytics pipelines"
+  useRole: SYSADMIN
+  providerRef:
+    name: default

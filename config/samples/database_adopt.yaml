@@ -1,0 +1,22 @@
+# Adopt an existing Snowflake database into Snowplane management.
+#
+# Use this when a database already exists in Snowflake and you want
+# the operator to take over lifecycle management. The adoption-policy
+# annotation tells the reconciler to populate status from the current
+# Snowflake state instead of returning a Terminal error.
+#
+# After adoption, the LateInitialized condition is set to True and
+# subsequent reconciliations behave identically to freshly created
+# resources (drift detection, update, delete).
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Database
+metadata:
+  name: adopted-database
+  namespace: snowplane-system
+  annotations:
+    # Required: tells the reconciler to adopt the existing resource.
+    snowplane.hupe1980.github.io/adoption-policy: adopt
+spec:
+  name: EXISTING_DATABASE
+  providerRef:
+    name: default

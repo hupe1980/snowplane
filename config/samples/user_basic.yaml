@@ -1,0 +1,9 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: User
+metadata:
+  name: my-user
+  namespace: snowplane-system
+spec:
+  name: MY_USER
+  providerRef:
+    name: default

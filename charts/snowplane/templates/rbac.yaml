@@ -1,0 +1,234 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "snowplane.fullname" . }}
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+rules:
+# Core resources — Secrets (read + write for FieldExport target management).
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+# Core resources — ConfigMaps (read + write for leader election and FieldExport).
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+# Leader election.
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - create
+  - update
+# Snowplane CRDs - full lifecycle.
+- apiGroups:
+  - snowplane.hupe1980.github.io
+  resources:
+  - databases
+  - schemas
+  - warehouses
+  - accountroles
+  - databaseroles
+  - accountrolegrants
+  - databaserolegrants
+  - sharegrants
+  - users
+  - tables
+  - views
+  - stages
+  - fieldexports
+  - providerconfigs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - snowplane.hupe1980.github.io
+  resources:
+  - databases/status
+  - schemas/status
+  - warehouses/status
+  - accountroles/status
+  - databaseroles/status
+  - accountrolegrants/status
+  - databaserolegrants/status
+  - sharegrants/status
+  - users/status
+  - tables/status
+  - views/status
+  - stages/status
+  - fieldexports/status
+  - providerconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - snowplane.hupe1980.github.io
+  resources:
+  - databases/finalizers
+  - schemas/finalizers
+  - warehouses/finalizers
+  - accountroles/finalizers
+  - databaseroles/finalizers
+  - accountrolegrants/finalizers
+  - databaserolegrants/finalizers
+  - sharegrants/finalizers
+  - users/finalizers
+  - tables/finalizers
+  - views/finalizers
+  - stages/finalizers
+  - fieldexports/finalizers
+  - providerconfigs/finalizers
+  verbs:
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "snowplane.fullname" . }}
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "snowplane.fullname" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "snowplane.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+---
+# Viewer ClusterRole — read-only access to all Snowplane CRDs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "snowplane.fullname" . }}-viewer
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+    rbac.snowplane.hupe1980.github.io/aggregate-to-viewer: "true"
+rules:
+- apiGroups:
+  - snowplane.hupe1980.github.io
+  resources:
+  - databases
+  - schemas
+  - warehouses
+  - accountroles
+  - databaseroles
+  - accountrolegrants
+  - databaserolegrants
+  - sharegrants
+  - users
+  - tables
+  - views
+  - stages
+  - fieldexports
+  - providerconfigs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - snowplane.hupe1980.github.io
+  resources:
+  - databases/status
+  - schemas/status
+  - warehouses/status
+  - accountroles/status
+  - databaseroles/status
+  - accountrolegrants/status
+  - databaserolegrants/status
+  - sharegrants/status
+  - users/status
+  - tables/status
+  - views/status
+  - stages/status
+  - fieldexports/status
+  - providerconfigs/status
+  verbs:
+  - get
+---
+# Editor ClusterRole — full CRUD on all Snowplane CRDs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "snowplane.fullname" . }}-editor
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+    rbac.snowplane.hupe1980.github.io/aggregate-to-editor: "true"
+rules:
+- apiGroups:
+  - snowplane.hupe1980.github.io
+  resources:
+  - databases
+  - schemas
+  - warehouses
+  - accountroles
+  - databaseroles
+  - accountrolegrants
+  - databaserolegrants
+  - sharegrants
+  - users
+  - tables
+  - views
+  - stages
+  - fieldexports
+  - providerconfigs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - snowplane.hupe1980.github.io
+  resources:
+  - databases/status
+  - schemas/status
+  - warehouses/status
+  - accountroles/status
+  - databaseroles/status
+  - accountrolegrants/status
+  - databaserolegrants/status
+  - sharegrants/status
+  - users/status
+  - tables/status
+  - views/status
+  - stages/status
+  - fieldexports/status
+  - providerconfigs/status
+  verbs:
+  - get

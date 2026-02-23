@@ -1,0 +1,14 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: snowplane-controller-manager
+  namespace: snowplane-system
+  labels:
+    app.kubernetes.io/name: snowplane
+    app.kubernetes.io/component: controller-manager
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: snowplane
+      app.kubernetes.io/component: controller-manager

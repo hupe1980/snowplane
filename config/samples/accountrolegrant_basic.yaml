@@ -1,0 +1,14 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: AccountRoleGrant
+metadata:
+  name: usage-on-my-db
+  namespace: default
+spec:
+  privilege: USAGE
+  on:
+    accountObject:
+      objectType: DATABASE
+      objectName: MY_DB
+  accountRole: DATA_READER
+  providerRef:
+    name: default
