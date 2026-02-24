@@ -15,8 +15,12 @@ import (
 
 // Default connection pool settings.
 const (
-	DefaultMaxOpenConns    = 10
-	DefaultMaxIdleConns    = 5
+	// DefaultMaxOpenConns is the maximum number of open connections per
+	// Snowflake provider. With maxConcurrentReconciles=3 across 22+
+	// controllers sharing the same pool via WithRole, the pool must
+	// accommodate concurrent pinned connections without starving.
+	DefaultMaxOpenConns    = 30
+	DefaultMaxIdleConns    = 10
 	DefaultConnMaxLifetime = 30 * time.Minute
 	DefaultPingTimeout     = 10 * time.Second
 )
@@ -253,6 +257,16 @@ func (c *Client) Close() error {
 // Account returns the Snowflake account identifier this client is connected to.
 func (c *Client) Account() string {
 	return c.account
+}
+
+// Stats returns the underlying sql.DB connection pool statistics.
+// Returns a zero value if the client has no pool (scoped client created via WithRole).
+func (c *Client) Stats() sql.DBStats {
+	if c.db != nil {
+		return c.db.Stats()
+	}
+
+	return sql.DBStats{}
 }
 
 // UseRole switches the session to the specified role.

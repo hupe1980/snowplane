@@ -727,6 +727,220 @@ func TestDetectDrift_CommentDrift(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
+// Tests: Column drift detection
+// --------------------------------------------------------------------------
+
+func TestDetectColumnDrift_NoDrift(t *testing.T) {
+	t.Parallel()
+
+	table := newTestTable("mytable", "default")
+	table.Spec.Columns = []snowplanev1alpha1.ColumnDefinition{
+		{Name: "ID", Type: "NUMBER(38,0)"},
+		{Name: "PAYLOAD", Type: "VARIANT"},
+	}
+
+	obs := &snowflake.TableObservation{
+		Exists:     true,
+		ShowOutput: &snowflake.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
+		Columns: []snowflake.ColumnInfo{
+			{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
+			{Name: "PAYLOAD", Type: "VARIANT", Kind: "COLUMN", Null: "Y"},
+		},
+	}
+
+	result := detectDrift(table, obs)
+	assert.False(t, result.HasDrift)
+}
+
+func TestDetectColumnDrift_MissingColumn(t *testing.T) {
+	t.Parallel()
+
+	table := newTestTable("mytable", "default")
+	table.Spec.Columns = []snowplanev1alpha1.ColumnDefinition{
+		{Name: "ID", Type: "NUMBER(38,0)"},
+		{Name: "NEW_COL", Type: "VARCHAR(100)"},
+	}
+
+	obs := &snowflake.TableObservation{
+		Exists:     true,
+		ShowOutput: &snowflake.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
+		Columns: []snowflake.ColumnInfo{
+			{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
+		},
+	}
+
+	result := detectDrift(table, obs)
+	assert.True(t, result.HasDrift)
+}
+
+func TestDetectColumnDrift_ExtraColumn(t *testing.T) {
+	t.Parallel()
+
+	table := newTestTable("mytable", "default")
+	table.Spec.Columns = []snowplanev1alpha1.ColumnDefinition{
+		{Name: "ID", Type: "NUMBER(38,0)"},
+	}
+
+	obs := &snowflake.TableObservation{
+		Exists:     true,
+		ShowOutput: &snowflake.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
+		Columns: []snowflake.ColumnInfo{
+			{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
+			{Name: "STALE_COL", Type: "VARCHAR", Kind: "COLUMN", Null: "Y"},
+		},
+	}
+
+	result := detectDrift(table, obs)
+	assert.True(t, result.HasDrift)
+}
+
+func TestDetectColumnDrift_TypeChange(t *testing.T) {
+	t.Parallel()
+
+	table := newTestTable("mytable", "default")
+	table.Spec.Columns = []snowplanev1alpha1.ColumnDefinition{
+		{Name: "ID", Type: "NUMBER(38,0)"},
+		{Name: "AMOUNT", Type: "NUMBER(18,2)"},
+	}
+
+	obs := &snowflake.TableObservation{
+		Exists:     true,
+		ShowOutput: &snowflake.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
+		Columns: []snowflake.ColumnInfo{
+			{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
+			{Name: "AMOUNT", Type: "NUMBER(10,0)", Kind: "COLUMN", Null: "Y"},
+		},
+	}
+
+	result := detectDrift(table, obs)
+	assert.True(t, result.HasDrift)
+}
+
+func TestDetectColumnDrift_NullableChange(t *testing.T) {
+	t.Parallel()
+
+	notNull := false
+	table := newTestTable("mytable", "default")
+	table.Spec.Columns = []snowplanev1alpha1.ColumnDefinition{
+		{Name: "ID", Type: "NUMBER(38,0)", Nullable: &notNull},
+	}
+
+	obs := &snowflake.TableObservation{
+		Exists:     true,
+		ShowOutput: &snowflake.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
+		Columns: []snowflake.ColumnInfo{
+			{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
+		},
+	}
+
+	result := detectDrift(table, obs)
+	assert.True(t, result.HasDrift)
+}
+
+// --------------------------------------------------------------------------
+// Tests: computeColumnChanges
+// --------------------------------------------------------------------------
+
+func TestComputeColumnChanges_AddColumn(t *testing.T) {
+	t.Parallel()
+
+	specCols := []snowplanev1alpha1.ColumnDefinition{
+		{Name: "ID", Type: "NUMBER(38,0)"},
+		{Name: "NEW_COL", Type: "VARCHAR(200)", Comment: testutil.PtrString("added")},
+	}
+	obsCols := []snowflake.ColumnInfo{
+		{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
+	}
+
+	add, drop, alter := computeColumnChanges(specCols, obsCols)
+	assert.Len(t, add, 1)
+	assert.Equal(t, "NEW_COL", add[0].Name)
+	assert.Equal(t, "VARCHAR(200)", add[0].Type)
+	assert.Empty(t, drop)
+	assert.Empty(t, alter)
+}
+
+func TestComputeColumnChanges_DropColumn(t *testing.T) {
+	t.Parallel()
+
+	specCols := []snowplanev1alpha1.ColumnDefinition{
+		{Name: "ID", Type: "NUMBER(38,0)"},
+	}
+	obsCols := []snowflake.ColumnInfo{
+		{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
+		{Name: "STALE", Type: "VARCHAR", Kind: "COLUMN", Null: "Y"},
+	}
+
+	add, drop, alter := computeColumnChanges(specCols, obsCols)
+	assert.Empty(t, add)
+	assert.Equal(t, []string{"STALE"}, drop)
+	assert.Empty(t, alter)
+}
+
+func TestComputeColumnChanges_AlterComment(t *testing.T) {
+	t.Parallel()
+
+	specCols := []snowplanev1alpha1.ColumnDefinition{
+		{Name: "ID", Type: "NUMBER(38,0)", Comment: testutil.PtrString("primary key")},
+	}
+	obsCols := []snowflake.ColumnInfo{
+		{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y", Comment: "old comment"},
+	}
+
+	add, drop, alter := computeColumnChanges(specCols, obsCols)
+	assert.Empty(t, add)
+	assert.Empty(t, drop)
+	require.Len(t, alter, 1)
+	assert.Equal(t, "ID", alter[0].Name)
+	require.NotNil(t, alter[0].SetComment)
+	assert.Equal(t, "primary key", *alter[0].SetComment)
+}
+
+func TestComputeColumnChanges_NoChanges(t *testing.T) {
+	t.Parallel()
+
+	specCols := []snowplanev1alpha1.ColumnDefinition{
+		{Name: "ID", Type: "NUMBER(38,0)"},
+	}
+	obsCols := []snowflake.ColumnInfo{
+		{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
+	}
+
+	add, drop, alter := computeColumnChanges(specCols, obsCols)
+	assert.Empty(t, add)
+	assert.Empty(t, drop)
+	assert.Empty(t, alter)
+}
+
+func TestComputeColumnChanges_TypeChange(t *testing.T) {
+	t.Parallel()
+
+	specCols := []snowplanev1alpha1.ColumnDefinition{
+		{Name: "AMOUNT", Type: "NUMBER(18,2)"},
+	}
+	obsCols := []snowflake.ColumnInfo{
+		{Name: "AMOUNT", Type: "NUMBER(10,0)", Kind: "COLUMN", Null: "Y"},
+	}
+
+	add, drop, alter := computeColumnChanges(specCols, obsCols)
+	assert.Empty(t, add)
+	assert.Empty(t, drop)
+	require.Len(t, alter, 1)
+	assert.Equal(t, "AMOUNT", alter[0].Name)
+	require.NotNil(t, alter[0].SetType)
+	assert.Equal(t, "NUMBER(18,2)", *alter[0].SetType)
+}
+
+func TestNormaliseType(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "NUMBER(38,0)", normaliseType("NUMBER(38,0)"))
+	assert.Equal(t, "NUMBER(38,0)", normaliseType("NUMBER (38,0)"))
+	assert.Equal(t, "NUMBER(38,0)", normaliseType(" NUMBER(38,0) "))
+	assert.Equal(t, "VARCHAR", normaliseType("VARCHAR"))
+}
+
+// --------------------------------------------------------------------------
 // Tests: Watch mapping
 // --------------------------------------------------------------------------
 

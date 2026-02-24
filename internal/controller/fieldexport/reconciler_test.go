@@ -857,54 +857,36 @@ func TestReconcile_ExportsMapValueAsJSON(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Cross-namespace tests
+// Same-namespace source resolution tests
 // ---------------------------------------------------------------------------
 
-func TestReconcile_CrossNamespaceSource(t *testing.T) {
+func TestReconcile_SameNamespaceSource(t *testing.T) {
 	scheme := testutil.TestScheme()
-
-	const sourceNS = "source-ns"
 
 	fe := &snowplanev1alpha1.FieldExport{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       "cross-ns-fe",
+			Name:       "same-ns-fe",
 			Namespace:  testNS,
 			Finalizers: []string{"snowplane.hupe1980.github.io/fieldexport"},
 		},
 		Spec: snowplanev1alpha1.FieldExportSpec{
 			From: snowplanev1alpha1.FieldExportSource{
 				Resource: snowplanev1alpha1.FieldExportResourceRef{
-					Kind:      "Database",
-					Name:      "remote-db",
-					Namespace: sourceNS,
+					Kind: "Database",
+					Name: "local-db",
 				},
 				Path: ".status.showOutput.name",
 			},
 			To: snowplanev1alpha1.FieldExportTarget{
 				Kind: snowplanev1alpha1.FieldExportTargetConfigMap,
-				Name: "cross-ns-cm",
+				Name: "same-ns-cm",
 				Key:  "db-name",
 			},
 		},
 	}
 
-	// Source in a different namespace.
-	source := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": snowplanev1alpha1.GroupVersion.String(),
-			"kind":       "Database",
-			"metadata": map[string]interface{}{
-				"name":      "remote-db",
-				"namespace": sourceNS,
-			},
-			"status": map[string]interface{}{
-				"showOutput": map[string]interface{}{"name": "REMOTE_DB"},
-				"conditions": []interface{}{
-					map[string]interface{}{"type": "Ready", "status": "True"},
-				},
-			},
-		},
-	}
+	// Source in the same namespace.
+	source := newSourceDatabase("local-db", true, map[string]interface{}{"name": "LOCAL_DB"})
 
 	c := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(fe).
@@ -914,56 +896,12 @@ func TestReconcile_CrossNamespaceSource(t *testing.T) {
 
 	rec := fieldexport.NewReconciler(c, record.NewFakeRecorder(10))
 
-	result := doReconcile(t, rec, "cross-ns-fe")
+	result := doReconcile(t, rec, "same-ns-fe")
 	assert.NotZero(t, result.RequeueAfter)
 
-	// Target ConfigMap should be in the FieldExport's namespace (default).
+	// Target ConfigMap should be in the FieldExport's namespace.
 	var cm corev1.ConfigMap
-	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "cross-ns-cm", Namespace: testNS}, &cm))
-	assert.Equal(t, "REMOTE_DB", cm.Data["db-name"])
-}
-
-func TestReconcile_CrossNamespaceTarget(t *testing.T) {
-	scheme := testutil.TestScheme()
-
-	const targetNS = "target-ns"
-
-	fe := &snowplanev1alpha1.FieldExport{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       "cross-target-fe",
-			Namespace:  testNS,
-			Finalizers: []string{"snowplane.hupe1980.github.io/fieldexport"},
-		},
-		Spec: snowplanev1alpha1.FieldExportSpec{
-			From: snowplanev1alpha1.FieldExportSource{
-				Resource: snowplanev1alpha1.FieldExportResourceRef{Kind: "Database", Name: "my-db"},
-				Path:     ".status.showOutput.name",
-			},
-			To: snowplanev1alpha1.FieldExportTarget{
-				Kind:      snowplanev1alpha1.FieldExportTargetConfigMap,
-				Name:      "remote-cm",
-				Namespace: targetNS,
-				Key:       "db-name",
-			},
-		},
-	}
-
-	source := newSourceDatabase("my-db", true, map[string]interface{}{"name": "LOCAL_DB"})
-
-	c := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(fe).
-		WithStatusSubresource(fe).
-		Build()
-	require.NoError(t, c.Create(context.Background(), source))
-
-	rec := fieldexport.NewReconciler(c, record.NewFakeRecorder(10))
-
-	result := doReconcile(t, rec, "cross-target-fe")
-	assert.NotZero(t, result.RequeueAfter)
-
-	// ConfigMap should be in the target namespace, not the FieldExport namespace.
-	var cm corev1.ConfigMap
-	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "remote-cm", Namespace: targetNS}, &cm))
+	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "same-ns-cm", Namespace: testNS}, &cm))
 	assert.Equal(t, "LOCAL_DB", cm.Data["db-name"])
 }
 

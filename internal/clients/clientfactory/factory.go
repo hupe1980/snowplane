@@ -3,6 +3,7 @@ package clientfactory
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"sync"
@@ -27,21 +28,33 @@ type SnowflakeClient interface {
 	WithRole(ctx context.Context, role string) (*snowflake.Client, func(context.Context), error)
 }
 
+// StatsProvider is an optional interface implemented by Snowflake clients
+// that expose sql.DB connection pool statistics.
+type StatsProvider interface {
+	Stats() sql.DBStats
+}
+
 // ClientFactory creates and caches Snowflake clients keyed by a provider name
 // and a config hash. When the hash changes, the old client is closed and a new
 // one is created. An optional MaxSize limits the number of cached clients; when
 // exceeded the least-recently-used client is evicted.
+//
+// An optional IdleTTL causes clients unused for longer than the TTL to be
+// closed and recreated on the next GetOrCreate call. This prevents holding
+// stale TCP connections or expired tokens indefinitely.
 type ClientFactory struct {
 	mu      sync.RWMutex
 	clients map[string]cachedClient
 	order   []string // insertion/access order for LRU eviction
 	newFn   func(cfg snowflake.Config) (SnowflakeClient, error)
-	maxSize int // 0 = unlimited
+	maxSize int           // 0 = unlimited
+	idleTTL time.Duration // 0 = disabled (default)
 }
 
 type cachedClient struct {
-	client SnowflakeClient
-	hash   string
+	client     SnowflakeClient
+	hash       string
+	lastAccess time.Time
 }
 
 // NewClientFactory creates a new ClientFactory with the default constructor.
@@ -62,6 +75,14 @@ func (f *ClientFactory) WithMaxSize(n int) *ClientFactory {
 	return f
 }
 
+// WithIdleTTL sets the idle time-to-live for cached clients. Clients not
+// accessed within this duration are closed and recreated on the next request.
+// 0 = disabled (default, clients live until config changes or LRU eviction).
+func (f *ClientFactory) WithIdleTTL(d time.Duration) *ClientFactory {
+	f.idleTTL = d
+	return f
+}
+
 // NewTestClientFactoryWithFn creates a ClientFactory with a custom constructor for testing.
 func NewTestClientFactoryWithFn(fn func(cfg snowflake.Config) (SnowflakeClient, error)) *ClientFactory {
 	return &ClientFactory{
@@ -71,15 +92,28 @@ func NewTestClientFactoryWithFn(fn func(cfg snowflake.Config) (SnowflakeClient, 
 }
 
 // GetOrCreate returns a cached client for the provider. If the config hash has
-// changed, the old client is closed and a new one is created.
+// changed or the client has exceeded the idle TTL, the old client is closed and
+// a new one is created.
 func (f *ClientFactory) GetOrCreate(provider string, hash string, cfg snowflake.Config) (SnowflakeClient, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	// Return cached client if hash matches.
+	now := time.Now()
+
+	// Return cached client if hash matches and TTL is not exceeded.
 	if cc, ok := f.clients[provider]; ok && cc.hash == hash {
-		f.touchOrder(provider)
-		return cc.client, nil
+		if f.idleTTL > 0 && now.Sub(cc.lastAccess) > f.idleTTL {
+			// Idle too long — evict and recreate below.
+			_ = cc.client.Close()
+			delete(f.clients, provider)
+			f.removeFromOrder(provider)
+		} else {
+			cc.lastAccess = now
+			f.clients[provider] = cc
+			f.touchOrder(provider)
+
+			return cc.client, nil
+		}
 	}
 
 	// Close stale client if it exists.
@@ -99,7 +133,7 @@ func (f *ClientFactory) GetOrCreate(provider string, hash string, cfg snowflake.
 		return nil, fmt.Errorf("creating snowflake client for provider %q: %w", provider, err)
 	}
 
-	f.clients[provider] = cachedClient{client: client, hash: hash}
+	f.clients[provider] = cachedClient{client: client, hash: hash, lastAccess: now}
 	f.order = append(f.order, provider)
 
 	metrics.ClientPoolSize.Set(float64(len(f.clients)))
@@ -223,4 +257,27 @@ func (f *ClientFactory) CheckHealth(r *http.Request) error {
 	}
 
 	return nil
+}
+
+// CollectDBStats publishes sql.DBStats metrics for all cached clients that
+// support the StatsProvider interface. This should be called periodically
+// (e.g., from a background ticker or alongside health checks).
+func (f *ClientFactory) CollectDBStats() {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	for provider, cc := range f.clients {
+		if sp, ok := cc.client.(StatsProvider); ok {
+			stats := sp.Stats()
+			metrics.RecordDBStats(
+				provider,
+				stats.MaxOpenConnections,
+				stats.OpenConnections,
+				stats.InUse,
+				stats.Idle,
+				stats.WaitCount,
+				stats.WaitDuration,
+			)
+		}
+	}
 }

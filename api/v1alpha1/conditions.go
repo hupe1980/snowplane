@@ -45,4 +45,6 @@ const (
 	ReasonLateInitialized     = "LateInitialized"
 	ReasonRecoverableError    = "RecoverableError"
 	ReasonNamespaceNotAllowed = "NamespaceNotAllowed"
+	ReasonOrphanedResource    = "OrphanedResource"
+	ReasonConflictDetected    = "ConflictDetected"
 )

@@ -272,7 +272,7 @@ func TestSchemaValidator_DeniesDatabaseRefChange(t *testing.T) {
 	resp := v.Handle(context.Background(), makeUpdateRequest(oldS, changedS))
 
 	require.False(t, resp.Allowed)
-	assert.Contains(t, resp.Result.Message, "spec.databaseRef.name is immutable")
+	assert.Contains(t, resp.Result.Message, "spec.databaseRef is immutable")
 }
 
 func TestSchemaValidator_DeniesTransientChange(t *testing.T) {

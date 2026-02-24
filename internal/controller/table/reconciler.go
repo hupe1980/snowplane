@@ -3,6 +3,7 @@ package table
 
 import (
 	"context"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -205,6 +206,12 @@ func buildAlterOptions(table *snowplanev1alpha1.Table, id snowflake.SchemaObject
 		opts.DefaultDDLCollation = table.Spec.DefaultDDLCollation
 	}
 
+	// Compute column changes (add/drop/alter).
+	add, drop, alter := computeColumnChanges(table.Spec.Columns, obs.Columns)
+	opts.AddColumns = add
+	opts.DropColumns = drop
+	opts.AlterColumns = alter
+
 	return opts
 }
 
@@ -220,6 +227,106 @@ func joinClusterBy(exprs []string) string {
 
 	return result
 }
+
+// computeColumnChanges compares spec columns against observed columns
+// and returns the add, drop, and alter actions needed.
+func computeColumnChanges(
+	specCols []snowplanev1alpha1.ColumnDefinition,
+	obsCols []snowflake.ColumnInfo,
+) ([]snowflake.CreateTableColumn, []string, []snowflake.AlterColumnAction) {
+	// Build observed lookup by uppercase name.
+	obsMap := make(map[string]snowflake.ColumnInfo, len(obsCols))
+	for _, c := range obsCols {
+		obsMap[strings.ToUpper(c.Name)] = c
+	}
+
+	specNames := make(map[string]bool, len(specCols))
+
+	var addCols []snowflake.CreateTableColumn
+	var alterCols []snowflake.AlterColumnAction
+
+	for _, sc := range specCols {
+		upperName := strings.ToUpper(sc.Name)
+		specNames[upperName] = true
+
+		oc, found := obsMap[upperName]
+		if !found {
+			// New column — ADD.
+			addCols = append(addCols, snowflake.CreateTableColumn{
+				Name:     sc.Name,
+				Type:     sc.Type,
+				Nullable: sc.Nullable,
+				Default:  sc.Default,
+				Comment:  sc.Comment,
+			})
+
+			continue
+		}
+
+		// Existing column — check for modifications.
+		action := snowflake.AlterColumnAction{Name: sc.Name}
+		hasChange := false
+
+		// Type change.
+		if !strings.EqualFold(normaliseType(sc.Type), normaliseType(oc.Type)) {
+			action.SetType = &sc.Type
+			hasChange = true
+		}
+
+		// Nullable change.
+		desiredNullable := sc.Nullable == nil || *sc.Nullable
+		observedNullable := oc.Null == "Y"
+
+		if desiredNullable != observedNullable {
+			action.SetNotNull = ptrBool(!desiredNullable)
+			hasChange = true
+		}
+
+		// Comment change.
+		desiredComment := ""
+		if sc.Comment != nil {
+			desiredComment = *sc.Comment
+		}
+
+		if desiredComment != oc.Comment {
+			action.SetComment = &desiredComment
+			hasChange = true
+		}
+
+		// Default change.
+		desiredDefault := ""
+		if sc.Default != nil {
+			desiredDefault = *sc.Default
+		}
+
+		if desiredDefault != oc.Default {
+			if sc.Default == nil && oc.Default != "" {
+				action.DropDefault = true
+				hasChange = true
+			} else if sc.Default != nil && *sc.Default != oc.Default {
+				action.SetDefault = sc.Default
+				hasChange = true
+			}
+		}
+
+		if hasChange {
+			alterCols = append(alterCols, action)
+		}
+	}
+
+	// Columns in Snowflake but not in spec — DROP.
+	var dropCols []string
+
+	for _, oc := range obsCols {
+		if !specNames[strings.ToUpper(oc.Name)] {
+			dropCols = append(dropCols, oc.Name)
+		}
+	}
+
+	return addCols, dropCols, alterCols
+}
+
+func ptrBool(b bool) *bool { return &b }
 
 func computeUnsetFields(table *snowplanev1alpha1.Table) []string {
 	if len(table.Status.TrackedParameters) == 0 {
@@ -314,5 +421,71 @@ func detectDrift(table *snowplanev1alpha1.Table, obs *snowflake.TableObservation
 		}
 	}
 
+	// Column drift detection.
+	detectColumnDrift(d, table.Spec.Columns, obs.Columns)
+
 	return d.Result()
+}
+
+// detectColumnDrift compares desired spec columns against observed DESCRIBE TABLE output.
+func detectColumnDrift(d *drift.Detector, specCols []snowplanev1alpha1.ColumnDefinition, obsCols []snowflake.ColumnInfo) {
+	// Build lookup from observed columns by uppercase name.
+	obsMap := make(map[string]snowflake.ColumnInfo, len(obsCols))
+	for _, c := range obsCols {
+		obsMap[strings.ToUpper(c.Name)] = c
+	}
+
+	specNames := make(map[string]bool, len(specCols))
+
+	for _, sc := range specCols {
+		upperName := strings.ToUpper(sc.Name)
+		specNames[upperName] = true
+
+		oc, found := obsMap[upperName]
+		if !found {
+			// Column exists in spec but not in Snowflake — drift (will be added).
+			d.CompareStringValue("COLUMN."+sc.Name, sc.Name, "<missing>", false)
+			continue
+		}
+
+		// Compare type — Snowflake normalises types, so use case-insensitive.
+		if !strings.EqualFold(normaliseType(sc.Type), normaliseType(oc.Type)) {
+			d.CompareStringValueFold("COLUMN."+sc.Name+".TYPE", sc.Type, oc.Type, false)
+		}
+
+		// Compare nullable.
+		desiredNullable := sc.Nullable == nil || *sc.Nullable // default true
+		observedNullable := oc.Null == "Y"
+
+		if desiredNullable != observedNullable {
+			d.CompareBoolValue("COLUMN."+sc.Name+".NULLABLE", desiredNullable, observedNullable, false)
+		}
+
+		// Compare comment.
+		desiredComment := ""
+		if sc.Comment != nil {
+			desiredComment = *sc.Comment
+		}
+
+		if desiredComment != oc.Comment {
+			d.CompareStringValue("COLUMN."+sc.Name+".COMMENT", desiredComment, oc.Comment, false)
+		}
+	}
+
+	// Columns that exist in Snowflake but not in the spec — drift (will be dropped).
+	for _, oc := range obsCols {
+		if !specNames[strings.ToUpper(oc.Name)] {
+			d.CompareStringValue("COLUMN."+oc.Name, "<removed>", oc.Name, false)
+		}
+	}
+}
+
+// normaliseType strips whitespace around parentheses for column type comparison.
+func normaliseType(t string) string {
+	t = strings.TrimSpace(t)
+	t = strings.ReplaceAll(t, " (", "(")
+	t = strings.ReplaceAll(t, "( ", "(")
+	t = strings.ReplaceAll(t, " )", ")")
+
+	return t
 }

@@ -31,6 +31,49 @@ func hasForceNew(annotations map[string]string) bool {
 	return annotations[snowplanev1alpha1.AnnotationForceNew] == "true"
 }
 
+// blockedPolicyPatterns lists case-insensitive patterns rejected in policy body fields.
+// These could be used for privilege escalation via SQL injection.
+var blockedPolicyPatterns = []string{
+	"SYSTEM$",
+	"EXECUTE IMMEDIATE",
+	"CALL ",
+	"CREATE ",
+	"ALTER ",
+	"DROP ",
+	"GRANT ",
+	"REVOKE ",
+	"INSERT ",
+	"UPDATE ",
+	"DELETE ",
+	"MERGE ",
+	"COPY INTO",
+	"PUT ",
+	"GET ",
+	"REMOVE ",
+}
+
+// validatePolicyBody checks a SQL policy body expression for dangerous patterns.
+// This is a best-effort blocklist — it does not replace proper RBAC controls
+// on the Snowflake role configured in the ProviderConfig.
+func validatePolicyBody(body string) []error {
+	upper := strings.ToUpper(body)
+
+	var errs []error
+
+	// Reject semicolons — multi-statement injection.
+	if strings.Contains(upper, ";") {
+		errs = append(errs, fmt.Errorf("spec.body must not contain semicolons"))
+	}
+
+	for _, pattern := range blockedPolicyPatterns {
+		if strings.Contains(upper, pattern) {
+			errs = append(errs, fmt.Errorf("spec.body must not contain %q (potential privilege escalation)", pattern))
+		}
+	}
+
+	return errs
+}
+
 // --------------------------------------------------------------------------
 // Generic resource validator
 // --------------------------------------------------------------------------
@@ -151,12 +194,12 @@ func NewSchemaValidator(scheme *runtime.Scheme) admission.Handler {
 				))
 			}
 
-			if old.Spec.DatabaseRef.Name != cur.Spec.DatabaseRef.Name {
-				errs = append(errs, fmt.Errorf(
-					"spec.databaseRef.name is immutable after creation (current: %q, desired: %q)",
-					old.Spec.DatabaseRef.Name, cur.Spec.DatabaseRef.Name,
-				))
-			}
+			errs = append(errs, validateImmutableRef(
+				"spec.databaseRef", old.Spec.DatabaseRef, cur.Spec.DatabaseRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.databaseName", old.Spec.DatabaseName, cur.Spec.DatabaseName,
+			)...)
 
 			if old.Spec.Transient != cur.Spec.Transient {
 				errs = append(errs, fmt.Errorf(
@@ -231,12 +274,12 @@ func NewDatabaseRoleValidator(scheme *runtime.Scheme) admission.Handler {
 				))
 			}
 
-			if old.Spec.DatabaseRef.Name != cur.Spec.DatabaseRef.Name {
-				errs = append(errs, fmt.Errorf(
-					"spec.databaseRef.name is immutable after creation (current: %q, desired: %q)",
-					old.Spec.DatabaseRef.Name, cur.Spec.DatabaseRef.Name,
-				))
-			}
+			errs = append(errs, validateImmutableRef(
+				"spec.databaseRef", old.Spec.DatabaseRef, cur.Spec.DatabaseRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.databaseName", old.Spec.DatabaseName, cur.Spec.DatabaseName,
+			)...)
 
 			errs = append(errs, validateImmutablePointer(
 				"spec.useRole", old.Spec.UseRole, cur.Spec.UseRole,
@@ -425,19 +468,18 @@ func NewTableValidator(scheme *runtime.Scheme) admission.Handler {
 				))
 			}
 
-			if old.Spec.DatabaseRef.Name != cur.Spec.DatabaseRef.Name {
-				errs = append(errs, fmt.Errorf(
-					"spec.databaseRef.name is immutable after creation (current: %q, desired: %q)",
-					old.Spec.DatabaseRef.Name, cur.Spec.DatabaseRef.Name,
-				))
-			}
-
-			if old.Spec.SchemaRef.Name != cur.Spec.SchemaRef.Name {
-				errs = append(errs, fmt.Errorf(
-					"spec.schemaRef.name is immutable after creation (current: %q, desired: %q)",
-					old.Spec.SchemaRef.Name, cur.Spec.SchemaRef.Name,
-				))
-			}
+			errs = append(errs, validateImmutableRef(
+				"spec.databaseRef", old.Spec.DatabaseRef, cur.Spec.DatabaseRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.databaseName", old.Spec.DatabaseName, cur.Spec.DatabaseName,
+			)...)
+			errs = append(errs, validateImmutableRef(
+				"spec.schemaRef", old.Spec.SchemaRef, cur.Spec.SchemaRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.schemaName", old.Spec.SchemaName, cur.Spec.SchemaName,
+			)...)
 
 			if old.Spec.Transient != cur.Spec.Transient {
 				errs = append(errs, fmt.Errorf(
@@ -468,19 +510,18 @@ func NewViewValidator(scheme *runtime.Scheme) admission.Handler {
 				))
 			}
 
-			if old.Spec.DatabaseRef.Name != cur.Spec.DatabaseRef.Name {
-				errs = append(errs, fmt.Errorf(
-					"spec.databaseRef.name is immutable after creation (current: %q, desired: %q)",
-					old.Spec.DatabaseRef.Name, cur.Spec.DatabaseRef.Name,
-				))
-			}
-
-			if old.Spec.SchemaRef.Name != cur.Spec.SchemaRef.Name {
-				errs = append(errs, fmt.Errorf(
-					"spec.schemaRef.name is immutable after creation (current: %q, desired: %q)",
-					old.Spec.SchemaRef.Name, cur.Spec.SchemaRef.Name,
-				))
-			}
+			errs = append(errs, validateImmutableRef(
+				"spec.databaseRef", old.Spec.DatabaseRef, cur.Spec.DatabaseRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.databaseName", old.Spec.DatabaseName, cur.Spec.DatabaseName,
+			)...)
+			errs = append(errs, validateImmutableRef(
+				"spec.schemaRef", old.Spec.SchemaRef, cur.Spec.SchemaRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.schemaName", old.Spec.SchemaName, cur.Spec.SchemaName,
+			)...)
 
 			errs = append(errs, validateImmutablePointer(
 				"spec.useRole", old.Spec.UseRole, cur.Spec.UseRole,
@@ -504,19 +545,18 @@ func NewStageValidator(scheme *runtime.Scheme) admission.Handler {
 				))
 			}
 
-			if old.Spec.DatabaseRef.Name != cur.Spec.DatabaseRef.Name {
-				errs = append(errs, fmt.Errorf(
-					"spec.databaseRef.name is immutable after creation (current: %q, desired: %q)",
-					old.Spec.DatabaseRef.Name, cur.Spec.DatabaseRef.Name,
-				))
-			}
-
-			if old.Spec.SchemaRef.Name != cur.Spec.SchemaRef.Name {
-				errs = append(errs, fmt.Errorf(
-					"spec.schemaRef.name is immutable after creation (current: %q, desired: %q)",
-					old.Spec.SchemaRef.Name, cur.Spec.SchemaRef.Name,
-				))
-			}
+			errs = append(errs, validateImmutableRef(
+				"spec.databaseRef", old.Spec.DatabaseRef, cur.Spec.DatabaseRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.databaseName", old.Spec.DatabaseName, cur.Spec.DatabaseName,
+			)...)
+			errs = append(errs, validateImmutableRef(
+				"spec.schemaRef", old.Spec.SchemaRef, cur.Spec.SchemaRef,
+			)...)
+			errs = append(errs, validateImmutableStringPtr(
+				"spec.schemaName", old.Spec.SchemaName, cur.Spec.SchemaName,
+			)...)
 
 			// Stage type (internal/external) is immutable.
 			if old.IsExternal() != cur.IsExternal() {
@@ -733,6 +773,9 @@ func NewMaskingPolicyValidator(scheme *runtime.Scheme) admission.Handler {
 
 			return errs
 		},
+		func(obj *snowplanev1alpha1.MaskingPolicy) []error {
+			return validatePolicyBody(obj.Spec.Body)
+		},
 	)
 }
 
@@ -770,6 +813,9 @@ func NewRowAccessPolicyValidator(scheme *runtime.Scheme) admission.Handler {
 			)...)
 
 			return errs
+		},
+		func(obj *snowplanev1alpha1.RowAccessPolicy) []error {
+			return validatePolicyBody(obj.Spec.Body)
 		},
 	)
 }

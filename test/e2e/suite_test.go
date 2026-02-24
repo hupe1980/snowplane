@@ -270,6 +270,8 @@ func TestMain(m *testing.M) {
 		"--set", "controller.requeueInterval=10s",
 		"--set", "controller.enableAlphaResources=true",
 		"--set", "webhooks.enabled=false",
+		"--set", "rbac.secrets.write=true",
+		"--set", "rbac.configMaps.write=true",
 		"--wait", "--timeout", "120s",
 	); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to deploy Helm chart: %v\n", err)
@@ -1056,17 +1058,15 @@ func newFieldExportCR(name, sourceKind, sourceName, path, targetKind, targetName
 			"spec": map[string]interface{}{
 				"from": map[string]interface{}{
 					"resource": map[string]interface{}{
-						"kind":      sourceKind,
-						"name":      sourceName,
-						"namespace": testNamespace,
+						"kind": sourceKind,
+						"name": sourceName,
 					},
 					"path": path,
 				},
 				"to": map[string]interface{}{
-					"kind":      targetKind,
-					"name":      targetName,
-					"namespace": testNamespace,
-					"key":       targetKey,
+					"kind": targetKind,
+					"name": targetName,
+					"key":  targetKey,
 				},
 			},
 		},

@@ -37,7 +37,9 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 - 🏷️ **Resource Adoption** — Adopt pre-existing Snowflake resources via `adoption-policy: adopt` annotation
 - 🔒 **Immutable Field Enforcement** — Three layers: CRD schema (CEL `self == oldSelf`), validating webhooks, reconciler-level errors
 - 🛡️ **Dangerous Grant Protection** — Blocks grants to ACCOUNTADMIN/SECURITYADMIN/ORGADMIN and dangerous privileges by default
-- ⚛️ **CREATE OR ALTER** — Opt-in atomic `CREATE OR ALTER` for Database & Warehouse via annotation
+- 🛡️ **Policy Body Validation** — Blocklist-based SQL injection prevention for MaskingPolicy and RowAccessPolicy `body` fields
+- 🏷️ **Ownership Conflict Detection** — Prevents duplicate CRs from managing the same Snowflake object via label-based conflict detection
+- ⚛️ **CREATE OR ALTER** — Opt-in atomic `CREATE OR ALTER` for Database & Warehouse via annotation, with graceful fallback for unsupported Snowflake editions
 - 🗑️ **Deletion Policies** — `Delete` (drop resource) or `Orphan` (leave intact)
 - 🏷️ **ForceNew Annotation** — Delete+recreate on immutable field changes
 
@@ -54,7 +56,7 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 
 - 📊 **Custom Prometheus Metrics** — Reconciliation, Snowflake ops, client pool, rate limits, drift, circuit breaker
 - 📉 **Grafana Dashboard** — Pre-built dashboard at `config/grafana/snowplane-dashboard.json`
-- 🔌 **Connection Pooling** — LRU client cache with config-change rotation and configurable max size
+- 🔌 **Connection Pooling** — LRU client cache with config-change rotation, configurable max size, and idle TTL eviction
 - ⏱️ **Rate Limiting** — Per-provider token-bucket rate limiter (configurable QPS/burst)
 - 🔌 **Circuit Breaker** — Per-provider 3-state failure isolation (closed/open/half-open)
 - ☸️ **Helm Chart** — Production-ready with CRDs, RBAC, ServiceMonitor, PDB
@@ -220,6 +222,7 @@ kubectl get databases
 | Label | Values | Description |
 |-------|--------|-------------|
 | `snowplane.hupe1980.github.io/maturity` | `alpha` / `beta` / `stable` | CRD maturity classification |
+| `snowplane.hupe1980.github.io/external-name-hash` | SHA-256 prefix | Ownership label — prevents duplicate CRs from managing the same Snowflake object |
 
 ## ☸️ Helm Chart
 
@@ -242,6 +245,7 @@ helm install snowplane charts/snowplane/ \
 | `metrics.serviceMonitor.enabled` | `false` | Create Prometheus ServiceMonitor |
 | `grafana.dashboard.enabled` | `false` | Deploy Grafana dashboard ConfigMap |
 | `webhooks.enabled` | `false` | Enable admission webhooks |
+| `webhooks.allowCrossNamespaceFieldExport` | `false` | Allow FieldExport to target ConfigMaps/Secrets in other namespaces |
 | `watchNamespaces` | `""` | Namespaces to watch (empty = all) |
 | `priorityClassName` | `""` | Pod PriorityClass name |
 | `topologySpreadConstraints` | `[]` | Topology spread constraints |
@@ -262,11 +266,21 @@ All metrics use the `snowplane_` namespace.
 | `snowplane_snowflake_operation_duration_seconds` | Histogram | `controller`, `operation` | Snowflake API call duration |
 | `snowplane_client_pool_size` | Gauge | — | Active Snowflake clients in pool |
 | `snowplane_rate_limit_waits_total` | Counter | `controller` | Rate limiter wait events |
+| `snowplane_orphaned_resources_total` | Counter | `controller` | Orphan-policy deletions |
+| `snowplane_ownership_conflicts_total` | Counter | `controller` | Ownership conflicts during adoption |
 | `snowplane_adoption_total` | Counter | `controller`, `result` | Adoption outcomes |
 | `snowplane_drift_detected_total` | Counter | `controller` | Drift detection events |
 | `snowplane_managed_resources` | Gauge | `controller`, `state` | Resources by state (`ready`/`not_ready`/`terminal`) |
 | `snowplane_circuit_breaker_trips_total` | Counter | `provider` | Circuit breaker trips |
 | `snowplane_circuit_breaker_state` | Gauge | `provider` | Breaker state (0=closed, 1=open, 2=half-open) |
+| `snowplane_orphaned_resources_total` | Counter | `controller` | Orphan-policy deletions (resource left in Snowflake) |
+| `snowplane_ownership_conflicts_total` | Counter | `controller` | Ownership conflicts detected during adoption |
+| `snowplane_db_max_open_conns` | Gauge | `provider` | Max open DB connections per provider |
+| `snowplane_db_open_conns` | Gauge | `provider` | Current open DB connections per provider |
+| `snowplane_db_in_use_conns` | Gauge | `provider` | In-use DB connections per provider |
+| `snowplane_db_idle_conns` | Gauge | `provider` | Idle DB connections per provider |
+| `snowplane_db_wait_count` | Gauge | `provider` | Total DB connection wait count per provider |
+| `snowplane_db_wait_duration_seconds` | Gauge | `provider` | Total DB connection wait duration per provider |
 
 ### 📉 Grafana Dashboard
 
@@ -461,7 +475,7 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 | `spec.name` | `string` | Table name *(immutable)* |
 | `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
-| `spec.columns` | `[]ColumnDefinition` | Column definitions (name, type, nullable, default, comment) |
+| `spec.columns` | `[]ColumnDefinition` | Column definitions (name, type, nullable, default, comment). Column drift is detected and corrected via ADD/DROP/ALTER COLUMN. |
 | `spec.transient` | `bool` | Transient table *(immutable)* |
 | `spec.dataRetentionTimeInDays` | `*int32` | Time Travel retention (0–90) |
 | `spec.clusterBy` | `[]string` | Clustering key expressions |
@@ -515,6 +529,8 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 | `spec.to.key` | `string` | Key within the target data |
 
 > 📤 **Cross-Resource Data Passing:** FieldExport reads status fields and writes them to ConfigMaps/Secrets. The exported value is tracked by SHA-256 hash to avoid unnecessary writes. On deletion, exported keys are cleaned up.
+>
+> 🔒 **Same-Namespace Security:** FieldExport is restricted to resources in the same namespace — the source resource, target ConfigMap/Secret, and the FieldExport itself must all reside in the same namespace. This prevents cross-namespace privilege escalation (following the ACK model).
 
 </details>
 

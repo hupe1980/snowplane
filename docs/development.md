@@ -58,7 +58,7 @@ This guide explains the project layout, conventions, and workflow for contributi
 │   │   ├── clientfactory/     # Snowflake client cache with SHA-256 hash-based rotation
 │   │   └── snowflake/         # Snowflake SDK wrapper (client, all resource ops, identifiers, errors)
 │   ├── controller/
-│   │   ├── reconciler/        # Generic reconciler framework (GenericReconciler[T], ResourceAdapter[T])
+│   │   ├── reconciler/        # Generic reconciler framework (GenericReconciler[T], ResourceAdapter[T], ownership conflict detection)
 │   │   ├── accountrole/       # AccountRole reconciler (adapter + helpers)
 │   │   ├── database/          # Database reconciler (adapter + helpers)
 │   │   ├── databaserole/      # DatabaseRole reconciler with databaseRef resolution (adapter + helpers)
@@ -389,6 +389,8 @@ Internally `GenericReconciler` has a `requeueOverride` field set via the `WithRe
 - Uses `errors.Join` to aggregate all violations into a single denial response.
 - **Database:** `name`, `transient`, `useRole` are immutable. **Schema:** `name`, `databaseRef`, `transient`, `useRole` are immutable. **Warehouse:** `name`, `useRole` are immutable. **AccountRole:** `name`, `useRole` are immutable. **DatabaseRole:** `name`, `databaseRef`, `useRole` are immutable. **User:** `name`, `type`, `useRole` are immutable. **AccountRoleGrant / DatabaseRoleGrant / ShareGrant:** all spec fields are immutable (grants are immutable — revoke and re-grant). **GrantOwnership:** all spec fields are immutable. **Table:** `name`, `databaseRef`, `schemaRef`, `useRole` are immutable. **View:** `name`, `databaseRef`, `schemaRef`, `useRole` are immutable. **Stage:** `name`, `databaseRef`, `schemaRef`, `stageType`, `useRole` are immutable. **Task:** `name`, `databaseRef`, `schemaRef` are immutable. **Stream:** `name`, `databaseRef`, `schemaRef`, `sourceType`, `sourceName` are immutable. **Tag:** `name`, `databaseRef`, `schemaRef` are immutable. **NetworkPolicy:** `name` is immutable. **ResourceMonitor:** `name` is immutable. **MaskingPolicy:** `name`, `databaseRef`, `schemaRef`, `signature` are immutable. **RowAccessPolicy:** `name`, `databaseRef`, `schemaRef`, `signature` are immutable. **ProviderConfig:** `account`, `user` are immutable (guarded by `ObservedGeneration > 0`, consistent with all other validators).
 - ForceNew annotation (`snowplane.hupe1980.github.io/force-new: "true"`) bypasses immutability checks, allowing the reconciler to handle delete+recreate.
+- **Policy body validation:** MaskingPolicy and RowAccessPolicy validators include blocklist-based SQL injection prevention on `spec.body`. The blocklist rejects semicolons and 16 dangerous patterns (SYSTEM$, EXECUTE IMMEDIATE, CALL, CREATE, ALTER, DROP, GRANT, REVOKE, INSERT, UPDATE, DELETE, MERGE, COPY INTO, PUT, GET, REMOVE). This is defense-in-depth; RBAC should still restrict who can author policies.
+- **FieldExport same-namespace restriction:** FieldExport only operates within its own namespace — the source resource, target ConfigMap/Secret, and the FieldExport itself must all be in the same namespace. The `Namespace` field was removed from the API types entirely, making cross-namespace writes structurally impossible (following the ACK model).
 - Webhooks are optional — enabled via `--enable-webhooks` flag in the controller.
 - Webhook configuration YAML is in `config/webhook/`.
 
@@ -546,8 +548,9 @@ After the first reconciliation, the resource will have:
 - Annotation constants: `api/v1alpha1/annotations.go` (`AnnotationAdoptionPolicy`, `AdoptionPolicyAdopt`, `AdoptionPolicyFailIfExists`)
 - Condition type: `api/v1alpha1/conditions.go` (`TypeLateInitialized`, `ReasonAdopted`, `ReasonResourceExists`)
 - Reconciler logic: `internal/controller/reconciler/reconciler.go` (`reconcileAdoptOrReject`, `getAdoptionPolicy`)
-- Metrics: `internal/metrics/metrics.go` (`AdoptionTotal`, `RecordAdoption`, `RecordAdoptionRejected`)
-- Unit tests: `internal/controller/reconciler/reconciler_test.go` (5 adoption tests)
+- Ownership conflict detection: `internal/controller/reconciler/ownership.go` (`ComputeExternalNameHash`, `checkOwnershipConflict`, `setExternalNameLabel`)
+- Metrics: `internal/metrics/metrics.go` (`AdoptionTotal`, `RecordAdoption`, `RecordAdoptionRejected`, `OwnershipConflictsTotal`)
+- Unit tests: `internal/controller/reconciler/reconciler_test.go` (5 adoption tests), `internal/controller/reconciler/ownership_test.go` (5 ownership tests)
 - Integration tests: `test/integration/database_test.go` (3 tests), `test/integration/warehouse_test.go` (2 tests)
 
 ## Maturity Classification

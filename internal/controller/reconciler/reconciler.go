@@ -3,6 +3,7 @@ package reconciler
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -216,6 +217,18 @@ func (r *GenericReconciler[T, S]) Reconcile(ctx context.Context, req ctrl.Reques
 	if err != nil {
 		if !obj.GetDeletionTimestamp().IsZero() {
 			logger.Info("cannot resolve provider during deletion, removing finalizer to unblock", "error", err)
+
+			// H-1: Emit a warning event and set conditions so operators are
+			// alerted that the Snowflake resource may still exist.
+			orphanMsg := fmt.Sprintf(
+				"Snowflake %s %q may still exist — provider resolution failed during deletion: %v. "+
+					"Manual cleanup may be required.",
+				resName, obj.GetSpecName(), err)
+			r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonOrphanedResource, orphanMsg)
+			conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonOrphanedResource, orphanMsg)
+			r.bestEffortPatchStatus(ctx, obj)
+			metrics.RecordOrphanedResource(resName)
+
 			if finalizers.Remove(obj, r.Adapter.FinalizerName()) {
 				if updateErr := r.Client.Update(ctx, obj); updateErr != nil {
 					return ctrl.Result{}, fmt.Errorf("removing finalizer during provider resolution failure: %w", updateErr)
@@ -357,6 +370,10 @@ func (r *GenericReconciler[T, S]) reconcileCreate(ctx context.Context, obj T, st
 	// "someone else created this" (M-3).
 	if !hasCreationInitiated(obj) {
 		setCreationInitiated(obj)
+
+		// Stamp ownership label for same-cluster conflict detection (H-3).
+		fqn := id.FullyQualifiedName()
+		setExternalNameLabel(obj, ComputeExternalNameHash(fqn))
 
 		// PATCH a copy rather than obj so that in-memory status mutations
 		// from PreReconcile (e.g. Schema.Status.DatabaseName) are preserved.
@@ -533,12 +550,26 @@ func (r *GenericReconciler[T, S]) reconcileUpdate(ctx context.Context, obj T, sv
 		useCoA := r.Adapter.SupportsCreateOrAlter() && snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
 
 		if useCoA {
-			logger.V(1).Info("executing Snowflake CREATE OR ALTER", "resource", resName, "name", obj.GetSpecName(), "isDrift", isDrift)
+			logger.Info("using CREATE OR ALTER (Snowflake preview feature)", "resource", resName, "name", obj.GetSpecName(), "isDrift", isDrift)
 
 			if err := r.executeSnowflakeOp(ctx, opCtx, obj, "create_or_alter", "CREATE OR ALTER", func() error {
 				return r.Adapter.Create(opCtx, svc, obj, id)
 			}); err != nil {
-				return ctrl.Result{}, err
+				// Graceful fallback: if CREATE OR ALTER is not supported,
+				// fall back to the standard ALTER path.
+				if isCreateOrAlterUnsupported(err) {
+					logger.Info("CREATE OR ALTER not supported, falling back to ALTER", "resource", resName, "name", obj.GetSpecName())
+					r.Recorder.Event(obj, corev1.EventTypeWarning, "CreateOrAlterFallback",
+						fmt.Sprintf("CREATE OR ALTER not supported for %s %q, falling back to ALTER", resName, obj.GetSpecName()))
+
+					if err := r.executeSnowflakeOp(ctx, opCtx, obj, "alter", "alter", func() error {
+						return r.Adapter.Alter(opCtx, svc, alterOpts)
+					}); err != nil {
+						return ctrl.Result{}, err
+					}
+				} else {
+					return ctrl.Result{}, err
+				}
 			}
 		} else {
 			// Only warn when the annotation is explicitly set on an unsupported resource type.
@@ -670,6 +701,22 @@ func (r *GenericReconciler[T, S]) reconcileAdoptOrReject(ctx context.Context, ob
 
 	// Adoption flow: take over management of the existing resource.
 	logger.Info("adopting existing "+resName, resName, obj.GetSpecName())
+
+	// Ownership conflict detection (H-3): before adopting, check whether
+	// another CR in this cluster already manages the same Snowflake resource.
+	id := r.Adapter.BuildIdentifier(obj)
+	fqn := id.FullyQualifiedName()
+	hash := ComputeExternalNameHash(fqn)
+
+	if conflict, err := r.checkOwnershipConflict(ctx, obj, hash); err != nil {
+		return ctrl.Result{}, fmt.Errorf("checking ownership conflict during adoption: %w", err)
+	} else if conflict {
+		return ctrl.Result{}, nil // Terminal — do not requeue; ConflictDetected condition is set.
+	}
+
+	// Stamp the ownership label so future adoption attempts by other CRs
+	// will detect the conflict.
+	setExternalNameLabel(obj, hash)
 
 	r.Adapter.ApplyObservation(obj, obs)
 	conditions.ClearDriftDetected(obj)
@@ -908,4 +955,20 @@ func (r *GenericReconciler[T, S]) finalizeSpec(ctx context.Context, obj T) error
 	obj.SetTrackedParametersList(r.Adapter.ComputeTrackedParameters(obj))
 
 	return nil
+}
+
+// isCreateOrAlterUnsupported checks whether an error indicates that the
+// CREATE OR ALTER syntax is not supported by the Snowflake account.
+// Snowflake returns SQL compilation error 2032 for unsupported syntax.
+func isCreateOrAlterUnsupported(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	msg := strings.ToUpper(err.Error())
+
+	return strings.Contains(msg, "UNSUPPORTED") ||
+		strings.Contains(msg, "UNEXPECTED 'OR'") ||
+		strings.Contains(msg, "SYNTAX ERROR") ||
+		strings.Contains(msg, "002032")
 }

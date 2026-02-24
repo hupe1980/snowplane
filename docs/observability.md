@@ -31,6 +31,8 @@ All metrics use the `snowplane_` namespace and are exposed on the controller's m
 | `snowplane_managed_resources` | Gauge | `controller`, `state` | Managed resources by controller and state (`ready`, `not_ready`, `terminal`) |
 | `snowplane_adoption_total` | Counter | `controller`, `result` | Resource adoption outcomes (`adopted` / `rejected`) |
 | `snowplane_drift_detected_total` | Counter | `controller` | Drift detection events |
+| `snowplane_orphaned_resources_total` | Counter | `controller` | Orphan-policy deletions (Snowflake resource intentionally left intact) |
+| `snowplane_ownership_conflicts_total` | Counter | `controller` | Ownership conflicts detected — another CR already manages the same Snowflake object |
 
 ### Circuit Breaker
 
@@ -44,6 +46,19 @@ All metrics use the `snowplane_` namespace and are exposed on the controller's m
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
 | `snowplane_providerconfig_healthy` | Gauge | `provider`, `account` | Whether a ProviderConfig is healthy (1 = connected, 0 = unhealthy). Cleaned up when the ProviderConfig is deleted. |
+
+### Connection Pool (database/sql)
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `snowplane_db_max_open_conns` | Gauge | `provider` | Maximum number of open connections allowed |
+| `snowplane_db_open_conns` | Gauge | `provider` | Current number of open connections |
+| `snowplane_db_in_use_conns` | Gauge | `provider` | Connections currently in use |
+| `snowplane_db_idle_conns` | Gauge | `provider` | Connections currently idle |
+| `snowplane_db_wait_count` | Gauge | `provider` | Total connections waited for |
+| `snowplane_db_wait_duration_seconds` | Gauge | `provider` | Total time blocked waiting for connections |
+
+These metrics are collected from `database/sql.DBStats` for each cached Snowflake client. They are recorded periodically via `ClientFactory.CollectDBStats()` and expose connection pool pressure per provider.
 
 ### Prometheus ServiceMonitor
 
@@ -151,6 +166,9 @@ Snowplane emits Kubernetes events on CRs for all significant lifecycle transitio
 | `DependencyNotReady` | A ProviderConfig or parent resource is not ready |
 | `ValidationFailed` | Spec validation failure (defense-in-depth) |
 | `ImmutableField` | Attempt to modify an immutable field |
+| `OrphanedResource` | Resource deleted with `Orphan` deletion policy — Snowflake object left intact |
+| `ConflictDetected` | Another CR already manages the same Snowflake object (ownership conflict) |
+| `CreateOrAlterFallback` | `CREATE OR ALTER` not supported by the Snowflake edition; falling back to `ALTER` |
 
 ### SafeRecorder
 

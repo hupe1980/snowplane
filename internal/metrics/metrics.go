@@ -63,6 +63,80 @@ var ClientPoolSize = prometheus.NewGauge(
 	},
 )
 
+// Connection pool statistics gauges (from sql.DBStats).
+var (
+	// DBStatsMaxOpenConns reports the configured maximum open connections per provider.
+	DBStatsMaxOpenConns = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "db_max_open_connections",
+			Help:      "Maximum number of open connections to Snowflake per provider.",
+		},
+		[]string{"provider"},
+	)
+
+	// DBStatsOpenConns reports the current number of open connections per provider.
+	DBStatsOpenConns = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "db_open_connections",
+			Help:      "Number of established connections (in-use + idle) per provider.",
+		},
+		[]string{"provider"},
+	)
+
+	// DBStatsInUse reports the number of connections currently in use per provider.
+	DBStatsInUse = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "db_in_use_connections",
+			Help:      "Number of connections currently in use per provider.",
+		},
+		[]string{"provider"},
+	)
+
+	// DBStatsIdle reports the number of idle connections per provider.
+	DBStatsIdle = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "db_idle_connections",
+			Help:      "Number of idle connections per provider.",
+		},
+		[]string{"provider"},
+	)
+
+	// DBStatsWaitCount reports cumulative wait count for connections per provider.
+	DBStatsWaitCount = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "db_wait_count_total",
+			Help:      "Total number of connections waited for per provider.",
+		},
+		[]string{"provider"},
+	)
+
+	// DBStatsWaitDuration reports cumulative wait duration for connections per provider.
+	DBStatsWaitDuration = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "db_wait_duration_seconds_total",
+			Help:      "Total time blocked waiting for a new connection per provider.",
+		},
+		[]string{"provider"},
+	)
+)
+
+// RecordDBStats publishes sql.DBStats for a given provider.
+func RecordDBStats(provider string, maxOpen, open, inUse, idle int, waitCount int64, waitDuration time.Duration) {
+	labels := prometheus.Labels{"provider": provider}
+	DBStatsMaxOpenConns.With(labels).Set(float64(maxOpen))
+	DBStatsOpenConns.With(labels).Set(float64(open))
+	DBStatsInUse.With(labels).Set(float64(inUse))
+	DBStatsIdle.With(labels).Set(float64(idle))
+	DBStatsWaitCount.With(labels).Set(float64(waitCount))
+	DBStatsWaitDuration.With(labels).Set(waitDuration.Seconds())
+}
+
 // SnowflakeRateLimitWaits counts how many times a reconciler waited for rate limit.
 var SnowflakeRateLimitWaits = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
@@ -89,6 +163,29 @@ var DriftDetectedTotal = prometheus.NewCounterVec(
 		Namespace: namespace,
 		Name:      "drift_detected_total",
 		Help:      "Total number of drift detection events.",
+	},
+	[]string{"controller"},
+)
+
+// OrphanedResourcesTotal counts resources orphaned during deletion due to
+// provider resolution failure. These Snowflake resources may still exist
+// and require manual cleanup.
+var OrphanedResourcesTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "orphaned_resources_total",
+		Help:      "Total number of Snowflake resources orphaned during deletion (provider resolution failed).",
+	},
+	[]string{"controller"},
+)
+
+// OwnershipConflictsTotal counts adoption attempts that were rejected because
+// another CR in the same cluster already manages the same Snowflake resource.
+var OwnershipConflictsTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "ownership_conflicts_total",
+		Help:      "Total number of adoption attempts rejected due to same-cluster ownership conflict.",
 	},
 	[]string{"controller"},
 )
@@ -149,6 +246,18 @@ func RecordAdoptionRejected(controller string) {
 // RecordDriftDetected records a drift detection event.
 func RecordDriftDetected(controller string) {
 	DriftDetectedTotal.With(prometheus.Labels{"controller": controller}).Inc()
+}
+
+// RecordOrphanedResource records a resource orphaned during deletion because
+// the provider could not be resolved.
+func RecordOrphanedResource(controller string) {
+	OrphanedResourcesTotal.With(prometheus.Labels{"controller": controller}).Inc()
+}
+
+// RecordOwnershipConflict records an adoption attempt rejected because another
+// CR already manages the same Snowflake resource.
+func RecordOwnershipConflict(controller string) {
+	OwnershipConflictsTotal.With(prometheus.Labels{"controller": controller}).Inc()
 }
 
 // SetManagedResources updates the managed resources gauge for a controller.
@@ -229,9 +338,17 @@ func init() {
 		SnowflakeRateLimitWaits,
 		AdoptionTotal,
 		DriftDetectedTotal,
+		OrphanedResourcesTotal,
+		OwnershipConflictsTotal,
 		ManagedResources,
 		CircuitBreakerTripsTotal,
 		CircuitBreakerState,
 		ProviderConfigHealthy,
+		DBStatsMaxOpenConns,
+		DBStatsOpenConns,
+		DBStatsInUse,
+		DBStatsIdle,
+		DBStatsWaitCount,
+		DBStatsWaitDuration,
 	)
 }

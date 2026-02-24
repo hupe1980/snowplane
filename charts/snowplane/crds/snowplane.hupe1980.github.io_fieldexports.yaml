@@ -89,10 +89,6 @@ spec:
                         description: Name is the resource name.
                         minLength: 1
                         type: string
-                      namespace:
-                        description: Namespace of the source resource. Defaults to
-                          the FieldExport's namespace.
-                        type: string
                     required:
                     - kind
                     - name
@@ -119,10 +115,6 @@ spec:
                   name:
                     description: Name is the target ConfigMap or Secret name.
                     minLength: 1
-                    type: string
-                  namespace:
-                    description: Namespace of the target resource. Defaults to the
-                      FieldExport's namespace.
                     type: string
                 required:
                 - key

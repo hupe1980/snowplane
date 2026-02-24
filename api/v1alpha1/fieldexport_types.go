@@ -31,6 +31,7 @@ type FieldExportSource struct {
 }
 
 // FieldExportResourceRef identifies a Snowplane managed resource.
+// The source resource must be in the same namespace as the FieldExport.
 type FieldExportResourceRef struct {
 	// Kind is the resource kind (e.g., "Database", "Warehouse", "Schema").
 	// +kubebuilder:validation:MinLength=1
@@ -39,13 +40,11 @@ type FieldExportResourceRef struct {
 	// Name is the resource name.
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
-
-	// Namespace of the source resource. Defaults to the FieldExport's namespace.
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
 }
 
 // FieldExportTarget specifies where to write the exported value.
+// The target ConfigMap or Secret must be in the same namespace as the FieldExport.
+// This prevents cross-namespace privilege escalation via Secret/ConfigMap writes.
 type FieldExportTarget struct {
 	// Kind is the target resource kind: "ConfigMap" or "Secret".
 	Kind FieldExportTargetKind `json:"kind"`
@@ -53,10 +52,6 @@ type FieldExportTarget struct {
 	// Name is the target ConfigMap or Secret name.
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
-
-	// Namespace of the target resource. Defaults to the FieldExport's namespace.
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
 
 	// Key is the key within the ConfigMap data or Secret data to write to.
 	// +kubebuilder:validation:MinLength=1

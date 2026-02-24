@@ -313,18 +313,17 @@ func TestManagedByFieldExportPredicate_Reject_WrongLabel(t *testing.T) {
 	assert.False(t, pred.Create(event.TypedCreateEvent[client.Object]{Object: cm}))
 }
 
-func TestMapSourceToFieldExports_CrossNamespace_Skipped(t *testing.T) {
+func TestMapSourceToFieldExports_DifferentNamespace_Skipped(t *testing.T) {
 	scheme := testutil.TestScheme()
 
-	// FieldExport in "default" references source in "other",
-	// but the triggering Database event is in "default" — should NOT match
-	// because the FieldExport's resolved source namespace ("other") differs.
+	// FieldExport in "default" can only reference sources in "default".
+	// A Database event from a different namespace should NOT match.
 	fe := &snowplanev1alpha1.FieldExport{
-		ObjectMeta: metav1.ObjectMeta{Name: "fe-cross", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: "fe-ns-mismatch", Namespace: "default"},
 		Spec: snowplanev1alpha1.FieldExportSpec{
 			From: snowplanev1alpha1.FieldExportSource{
 				Resource: snowplanev1alpha1.FieldExportResourceRef{
-					Kind: "Database", Name: "my-db", Namespace: "other",
+					Kind: "Database", Name: "my-db",
 				},
 				Path: ".status.showOutput.name",
 			},
@@ -343,24 +342,23 @@ func TestMapSourceToFieldExports_CrossNamespace_Skipped(t *testing.T) {
 	rec := &Reconciler{client: c, recorder: record.NewFakeRecorder(10)}
 
 	db := &snowplanev1alpha1.Database{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-db", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: "my-db", Namespace: "other"},
 	}
 
 	requests := rec.mapSourceToFieldExports(context.Background(), db)
-	assert.Empty(t, requests, "source namespace mismatch: FE references 'other' but event is from 'default'")
+	assert.Empty(t, requests, "namespace mismatch: FE in 'default' but event from 'other'")
 }
 
-func TestMapSourceToFieldExports_CrossNamespace_Match(t *testing.T) {
+func TestMapSourceToFieldExports_SameNamespace_Match(t *testing.T) {
 	scheme := testutil.TestScheme()
 
-	// FieldExport in "app" references source Database in "snowflake".
-	// When the Database in "snowflake" changes, the FE in "app" should be triggered.
+	// FieldExport in "app" references source Database — must be in "app" too.
 	fe := &snowplanev1alpha1.FieldExport{
-		ObjectMeta: metav1.ObjectMeta{Name: "fe-cross-match", Namespace: "app"},
+		ObjectMeta: metav1.ObjectMeta{Name: "fe-same-match", Namespace: "app"},
 		Spec: snowplanev1alpha1.FieldExportSpec{
 			From: snowplanev1alpha1.FieldExportSource{
 				Resource: snowplanev1alpha1.FieldExportResourceRef{
-					Kind: "Database", Name: "my-db", Namespace: "snowflake",
+					Kind: "Database", Name: "my-db",
 				},
 				Path: ".status.showOutput.name",
 			},
@@ -379,12 +377,12 @@ func TestMapSourceToFieldExports_CrossNamespace_Match(t *testing.T) {
 	rec := &Reconciler{client: c, recorder: record.NewFakeRecorder(10)}
 
 	db := &snowplanev1alpha1.Database{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-db", Namespace: "snowflake"},
+		ObjectMeta: metav1.ObjectMeta{Name: "my-db", Namespace: "app"},
 	}
 
 	requests := rec.mapSourceToFieldExports(context.Background(), db)
-	require.Len(t, requests, 1, "cross-namespace FE referencing the correct source namespace should match")
-	assert.Equal(t, "fe-cross-match", requests[0].Name)
+	require.Len(t, requests, 1, "same-namespace FE should match")
+	assert.Equal(t, "fe-same-match", requests[0].Name)
 	assert.Equal(t, "app", requests[0].Namespace)
 }
 

@@ -380,4 +380,102 @@ func TestAlterTableOptionsHasChanges(t *testing.T) {
 	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), Comment: ptrString("x")}).HasChanges())
 	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), DropClusteringKey: true}).HasChanges())
 	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), ClusterBy: []string{"A"}}).HasChanges())
+	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), AddColumns: []CreateTableColumn{{Name: "X", Type: "INT"}}}).HasChanges())
+	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), DropColumns: []string{"X"}}).HasChanges())
+	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), AlterColumns: []AlterColumnAction{{Name: "X", SetComment: ptrString("c")}}}).HasChanges())
+}
+
+func TestBuildAlterTableStatements_AddColumn(t *testing.T) {
+	t.Parallel()
+
+	id := NewSchemaObjectIdentifier("DB", "S", "T")
+	notNull := false
+
+	got, err := buildAlterTableStatements(AlterTableOptions{
+		Name: id,
+		AddColumns: []CreateTableColumn{
+			{Name: "AGE", Type: "NUMBER(10,0)", Nullable: &notNull, Comment: ptrString("user age")},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, `ALTER TABLE "DB"."S"."T" ADD COLUMN "AGE" NUMBER(10,0) NOT NULL COMMENT 'user age'`, got[0])
+}
+
+func TestBuildAlterTableStatements_DropColumn(t *testing.T) {
+	t.Parallel()
+
+	id := NewSchemaObjectIdentifier("DB", "S", "T")
+
+	got, err := buildAlterTableStatements(AlterTableOptions{
+		Name:        id,
+		DropColumns: []string{"OLD_COL"},
+	})
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, `ALTER TABLE "DB"."S"."T" DROP COLUMN "OLD_COL"`, got[0])
+}
+
+func TestBuildAlterTableStatements_AlterColumn(t *testing.T) {
+	t.Parallel()
+
+	id := NewSchemaObjectIdentifier("DB", "S", "T")
+	setNotNull := true
+
+	got, err := buildAlterTableStatements(AlterTableOptions{
+		Name: id,
+		AlterColumns: []AlterColumnAction{
+			{
+				Name:       "EMAIL",
+				SetType:    ptrString("VARCHAR(500)"),
+				SetNotNull: &setNotNull,
+				SetComment: ptrString("email addr"),
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, got, 3)
+	assert.Equal(t, `ALTER TABLE "DB"."S"."T" ALTER COLUMN "EMAIL" SET DATA TYPE VARCHAR(500)`, got[0])
+	assert.Equal(t, `ALTER TABLE "DB"."S"."T" ALTER COLUMN "EMAIL" SET NOT NULL`, got[1])
+	assert.Equal(t, `ALTER TABLE "DB"."S"."T" ALTER COLUMN "EMAIL" COMMENT 'email addr'`, got[2])
+}
+
+func TestBuildAlterTableStatements_AlterColumn_DropNotNull(t *testing.T) {
+	t.Parallel()
+
+	id := NewSchemaObjectIdentifier("DB", "S", "T")
+	dropNotNull := false
+
+	got, err := buildAlterTableStatements(AlterTableOptions{
+		Name: id,
+		AlterColumns: []AlterColumnAction{
+			{Name: "STATUS", SetNotNull: &dropNotNull},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, `ALTER TABLE "DB"."S"."T" ALTER COLUMN "STATUS" DROP NOT NULL`, got[0])
+}
+
+func TestBuildAlterTableStatements_AlterColumn_DropDefault(t *testing.T) {
+	t.Parallel()
+
+	id := NewSchemaObjectIdentifier("DB", "S", "T")
+
+	got, err := buildAlterTableStatements(AlterTableOptions{
+		Name: id,
+		AlterColumns: []AlterColumnAction{
+			{Name: "SCORE", DropDefault: true},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, `ALTER TABLE "DB"."S"."T" ALTER COLUMN "SCORE" DROP DEFAULT`, got[0])
+}
+
+func TestBuildDescribeTableSQL(t *testing.T) {
+	t.Parallel()
+
+	id := NewSchemaObjectIdentifier("DB", "S", "EVENTS")
+	assert.Equal(t, `DESCRIBE TABLE "DB"."S"."EVENTS"`, buildDescribeTableSQL(id))
 }

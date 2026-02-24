@@ -99,8 +99,16 @@ The observed state is captured in `status.showOutput` (from `SHOW DATABASE ROLES
 The Table controller detects drift on:
 
 - `comment`, `changeTracking`, `enableSchemaEvolution`
+- **Column drift:** Columns are observed via `DESCRIBE TABLE` and compared against `spec.columns`. The controller detects:
+  - **Missing columns** — columns in spec but not in Snowflake (corrected via `ALTER TABLE ADD COLUMN`)
+  - **Extra columns** — columns in Snowflake but not in spec (corrected via `ALTER TABLE DROP COLUMN`)
+  - **Type changes** — column type mismatch (corrected via `ALTER TABLE ALTER COLUMN SET DATA TYPE`)
+  - **Nullable changes** — NOT NULL constraint mismatch (corrected via `ALTER TABLE ALTER COLUMN SET/DROP NOT NULL`)
+  - **Comment changes** — column comment mismatch (corrected via `ALTER TABLE ALTER COLUMN COMMENT`)
 
 The observed state is captured in `status.showOutput` (from `SHOW TABLES`).
+
+> ⚠️ **Breaking Change:** Column drift correction issues DDL statements that may fail if the column has data incompatible with the new type or NOT NULL constraint. Review column changes carefully.
 
 ### View Drift-Detected Fields
 
@@ -115,6 +123,7 @@ The observed state is captured in `status.showOutput` (from `SHOW VIEWS`).
 The Stage controller detects drift on:
 
 - `comment`, `url`, `storageIntegration`
+- **Unset fields:** When a previously-set optional field (e.g. `comment`, `url`, `storageIntegration`, `fileFormat`, `directory`) is removed from the spec, the controller issues an `ALTER STAGE UNSET` command to clear the value in Snowflake. Previously-set values are tracked via `status.trackedParameters`.
 
 The observed state is captured in `status.showOutput` (from `SHOW STAGES`).
 

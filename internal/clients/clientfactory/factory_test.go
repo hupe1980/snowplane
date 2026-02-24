@@ -310,3 +310,48 @@ func TestEvict_RemovesFromLRUOrder(t *testing.T) {
 	assert.False(t, (*created)[1].closed.Load(), "'b' should still be open")
 	assert.False(t, (*created)[2].closed.Load(), "'c' should still be open")
 }
+
+// ---------------------------------------------------------------------------
+// Tests: Idle TTL (M-5)
+// ---------------------------------------------------------------------------
+
+func TestGetOrCreate_IdleTTL_EvictsExpiredClient(t *testing.T) {
+	t.Parallel()
+
+	factory, created := newFakeFactory()
+	factory.WithIdleTTL(1) // 1 nanosecond — effectively always expired
+	defer factory.Close()
+
+	// First call — creates client.
+	c1, err := factory.GetOrCreate("p", "h1", snowflake.Config{})
+	require.NoError(t, err)
+	require.NotNil(t, c1)
+
+	// Second call with same hash — client should be evicted due to TTL.
+	c2, err := factory.GetOrCreate("p", "h1", snowflake.Config{})
+	require.NoError(t, err)
+	require.NotNil(t, c2)
+
+	// The first client should have been closed.
+	assert.True(t, (*created)[0].closed.Load(), "expired client should be closed")
+	// A new (second) client should have been created.
+	assert.Len(t, *created, 2, "should create a new client after TTL expiry")
+}
+
+func TestGetOrCreate_IdleTTL_Zero_NeverExpires(t *testing.T) {
+	t.Parallel()
+
+	factory, created := newFakeFactory()
+	// idleTTL = 0 (default) — no TTL check.
+	defer factory.Close()
+
+	_, err := factory.GetOrCreate("p", "h1", snowflake.Config{})
+	require.NoError(t, err)
+
+	_, err = factory.GetOrCreate("p", "h1", snowflake.Config{})
+	require.NoError(t, err)
+
+	// Should reuse the same client — only 1 created.
+	assert.Len(t, *created, 1)
+	assert.False(t, (*created)[0].closed.Load())
+}

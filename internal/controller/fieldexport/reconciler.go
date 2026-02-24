@@ -96,13 +96,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 		return ctrl.Result{}, nil // Terminal — do not requeue.
 	}
 
-	// Step 1: Resolve source resource.
-	sourceNS := fe.Spec.From.Resource.Namespace
-	if sourceNS == "" {
-		sourceNS = fe.Namespace
-	}
-
-	source, err := r.fetchSourceResource(ctx, fe.Spec.From.Resource.Kind, fe.Spec.From.Resource.Name, sourceNS)
+	// Step 1: Resolve source resource (same namespace as FieldExport).
+	source, err := r.fetchSourceResource(ctx, fe.Spec.From.Resource.Kind, fe.Spec.From.Resource.Name, fe.Namespace)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			msg := fmt.Sprintf("source resource %s/%s not found", fe.Spec.From.Resource.Kind, fe.Spec.From.Resource.Name)
@@ -149,13 +144,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 
 	valueStr := formatValue(value)
 
-	// Step 4: Write to target.
-	targetNS := fe.Spec.To.Namespace
-	if targetNS == "" {
-		targetNS = fe.Namespace
-	}
-
-	if err := r.writeToTarget(ctx, fe.Spec.To, targetNS, valueStr); err != nil {
+	// Step 4: Write to target (same namespace as FieldExport).
+	if err := r.writeToTarget(ctx, fe.Spec.To, fe.Namespace, valueStr); err != nil {
 		conditions.SetNotReady(&fe, snowplanev1alpha1.ReasonReconcileError,
 			fmt.Sprintf("writing to target %s/%s: %v", fe.Spec.To.Kind, fe.Spec.To.Name, err))
 		r.bestEffortPatchStatus(ctx, &fe)
@@ -196,12 +186,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 // and removes the finalizer.
 func (r *Reconciler) reconcileDelete(ctx context.Context, fe *snowplanev1alpha1.FieldExport) (ctrl.Result, error) {
 	if finalizers.Has(fe, finalizerName) {
-		targetNS := fe.Spec.To.Namespace
-		if targetNS == "" {
-			targetNS = fe.Namespace
-		}
-
-		if err := r.removeFromTarget(ctx, fe.Spec.To, targetNS); err != nil {
+		if err := r.removeFromTarget(ctx, fe.Spec.To, fe.Namespace); err != nil {
 			// Log but don't block deletion — target may already be gone.
 			log.FromContext(ctx).V(1).Info("failed to clean up target, proceeding with finalizer removal",
 				"error", err, "target", fmt.Sprintf("%s/%s", fe.Spec.To.Kind, fe.Spec.To.Name))
@@ -654,13 +639,8 @@ func (r *Reconciler) mapSourceToFieldExports(ctx context.Context, obj client.Obj
 	for i := range feList.Items {
 		fe := &feList.Items[i]
 
-		// Only match if the source namespace resolves to this object's namespace.
-		sourceNS := fe.Spec.From.Resource.Namespace
-		if sourceNS == "" {
-			sourceNS = fe.Namespace
-		}
-
-		if sourceNS != obj.GetNamespace() {
+		// Source must be in the same namespace as the FieldExport.
+		if fe.Namespace != obj.GetNamespace() {
 			continue
 		}
 
@@ -714,12 +694,8 @@ func (r *Reconciler) mapTargetToFieldExports(ctx context.Context, obj client.Obj
 	for i := range feList.Items {
 		fe := &feList.Items[i]
 
-		targetNS := fe.Spec.To.Namespace
-		if targetNS == "" {
-			targetNS = fe.Namespace
-		}
-
-		if targetNS != obj.GetNamespace() {
+		// Target must be in the same namespace as the FieldExport.
+		if fe.Namespace != obj.GetNamespace() {
 			continue
 		}
 

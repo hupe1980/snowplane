@@ -154,6 +154,8 @@ func buildAlterOptions(stage *snowplanev1alpha1.Stage, id snowflake.SchemaObject
 		}
 	}
 
+	opts.UnsetFields = computeUnsetFields(stage)
+
 	return opts
 }
 
@@ -181,6 +183,43 @@ func computeTrackedParameters(spec *snowplanev1alpha1.StageSpec) []string {
 	}
 
 	return fields
+}
+
+// computeUnsetFields returns the Snowflake parameter names that were previously
+// SET (tracked in status.TrackedParameters) but are now nil in the spec.
+func computeUnsetFields(stage *snowplanev1alpha1.Stage) []string {
+	if len(stage.Status.TrackedParameters) == 0 {
+		return nil
+	}
+
+	managed := make(map[string]bool, len(stage.Status.TrackedParameters))
+	for _, f := range stage.Status.TrackedParameters {
+		managed[f] = true
+	}
+
+	var unset []string
+
+	if stage.Spec.Comment == nil && managed["COMMENT"] {
+		unset = append(unset, "COMMENT")
+	}
+
+	if stage.Spec.URL == nil && managed["URL"] {
+		unset = append(unset, "URL")
+	}
+
+	if stage.Spec.StorageIntegration == nil && managed["STORAGE_INTEGRATION"] {
+		unset = append(unset, "STORAGE_INTEGRATION")
+	}
+
+	if stage.Spec.FileFormat == nil && managed["FILE_FORMAT"] {
+		unset = append(unset, "FILE_FORMAT")
+	}
+
+	if stage.Spec.Directory == nil && managed["DIRECTORY"] {
+		unset = append(unset, "DIRECTORY")
+	}
+
+	return unset
 }
 
 func detectDrift(stage *snowplanev1alpha1.Stage, obs *snowflake.StageObservation) *drift.Result {

@@ -579,3 +579,77 @@ func TestMapSchemaToStages(t *testing.T) {
 	assert.Len(t, reqs, 1)
 	assert.Equal(t, "mystage", reqs[0].Name)
 }
+
+// ---------------------------------------------------------------------------
+// Tests: computeUnsetFields (M-2)
+// ---------------------------------------------------------------------------
+
+func TestComputeUnsetFields_NoPreviousTracking(t *testing.T) {
+	t.Parallel()
+
+	stage := newTestStage("s", "default")
+	stage.Status.TrackedParameters = nil // no previous tracking
+
+	unset := computeUnsetFields(stage)
+	assert.Empty(t, unset)
+}
+
+func TestComputeUnsetFields_CommentRemoved(t *testing.T) {
+	t.Parallel()
+
+	stage := newTestStage("s", "default")
+	stage.Status.TrackedParameters = []string{"COMMENT", "URL"}
+	stage.Spec.Comment = nil // was set → now removed
+	stage.Spec.URL = testutil.PtrString("s3://bucket/")
+
+	unset := computeUnsetFields(stage)
+	assert.Contains(t, unset, "COMMENT")
+	assert.NotContains(t, unset, "URL")
+}
+
+func TestComputeUnsetFields_AllRemoved(t *testing.T) {
+	t.Parallel()
+
+	stage := newTestStage("s", "default")
+	stage.Status.TrackedParameters = []string{"COMMENT", "URL", "STORAGE_INTEGRATION", "FILE_FORMAT", "DIRECTORY"}
+	stage.Spec.Comment = nil
+	stage.Spec.URL = nil
+	stage.Spec.StorageIntegration = nil
+	stage.Spec.FileFormat = nil
+	stage.Spec.Directory = nil
+
+	unset := computeUnsetFields(stage)
+	assert.Len(t, unset, 5)
+	assert.Contains(t, unset, "COMMENT")
+	assert.Contains(t, unset, "URL")
+	assert.Contains(t, unset, "STORAGE_INTEGRATION")
+	assert.Contains(t, unset, "FILE_FORMAT")
+	assert.Contains(t, unset, "DIRECTORY")
+}
+
+func TestComputeUnsetFields_NoneRemoved(t *testing.T) {
+	t.Parallel()
+
+	stage := newTestStage("s", "default")
+	stage.Status.TrackedParameters = []string{"COMMENT"}
+	stage.Spec.Comment = testutil.PtrString("still here")
+
+	unset := computeUnsetFields(stage)
+	assert.Empty(t, unset)
+}
+
+func TestBuildAlterOptions_IncludesUnsetFields(t *testing.T) {
+	t.Parallel()
+
+	stage := newTestStage("s", "default")
+	stage.Status.TrackedParameters = []string{"COMMENT", "URL"}
+	stage.Spec.Comment = nil
+	stage.Spec.URL = nil
+	id := snowflake.NewSchemaObjectIdentifier("DB", "SCH", "MYSTAGE")
+	obs := successfulObservation()
+
+	opts := buildAlterOptions(stage, id, obs)
+	assert.True(t, opts.HasChanges(), "Unset fields should trigger HasChanges")
+	assert.Contains(t, opts.UnsetFields, "COMMENT")
+	assert.Contains(t, opts.UnsetFields, "URL")
+}

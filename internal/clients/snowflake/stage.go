@@ -86,6 +86,10 @@ type AlterStageOptions struct {
 	FileFormat         *string
 	Comment            *string
 	Directory          *StageDirectoryCreateOptions
+
+	// UnsetFields lists Snowflake parameter names to revert to their
+	// server-side defaults (e.g. when a user removes a field from the spec).
+	UnsetFields []string
 }
 
 // Validate checks the AlterStageOptions for validity.
@@ -111,7 +115,8 @@ func (o *AlterStageOptions) HasChanges() bool {
 		o.StorageIntegration != nil ||
 		o.FileFormat != nil ||
 		o.Comment != nil ||
-		o.Directory != nil
+		o.Directory != nil ||
+		len(o.UnsetFields) > 0
 }
 
 // StageClient provides operations against Snowflake stages.
@@ -214,13 +219,13 @@ func buildAlterStageStatements(opts AlterStageOptions) ([]string, error) {
 
 	sc.String("COMMENT", opts.Comment)
 
-	if sc.HasClauses() {
-		alter, err := sc.BuildAlter("STAGE", fqn)
+	if sc.HasClauses() || len(opts.UnsetFields) > 0 {
+		stmts, err := sqlbuilder.BuildAlterStatements("STAGE", fqn, &sc, opts.UnsetFields)
 		if err != nil {
-			return nil, fmt.Errorf("building SET clause: %w", err)
+			return nil, fmt.Errorf("building SET/UNSET clauses: %w", err)
 		}
 
-		statements = append(statements, alter)
+		statements = append(statements, stmts...)
 	}
 
 	return statements, nil

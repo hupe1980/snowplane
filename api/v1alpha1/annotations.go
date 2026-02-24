@@ -54,6 +54,14 @@ const (
 	// Applied to CRD metadata.labels to indicate stability guarantees.
 	// Valid values are "alpha", "beta", and "stable".
 	LabelMaturity = "snowplane.hupe1980.github.io/maturity"
+
+	// LabelExternalNameHash is a label applied to managed CRs containing a
+	// truncated SHA-256 hex digest of the Snowflake fully-qualified name.
+	// Used for same-cluster ownership conflict detection during adoption:
+	// before adopting, the reconciler lists all CRs of the same GVK with
+	// the same label value and rejects if another CR (different UID) already
+	// claims the same Snowflake resource.
+	LabelExternalNameHash = "snowplane.hupe1980.github.io/external-name-hash"
 )
 
 // Adoption policy values.

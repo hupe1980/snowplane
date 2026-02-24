@@ -17,6 +17,9 @@ type TableObservation struct {
 
 	// ShowOutput contains the SHOW TABLES row.
 	ShowOutput *TableShowOutput
+
+	// Columns contains the columns returned by DESCRIBE TABLE.
+	Columns []ColumnInfo
 }
 
 // TableShowOutput contains the fields from SHOW TABLES.
@@ -162,6 +165,25 @@ type AlterTableOptions struct {
 
 	// UnsetFields lists Snowflake parameter names to revert to their server-side defaults.
 	UnsetFields []string
+
+	// AddColumns lists columns to add via ALTER TABLE ... ADD COLUMN.
+	AddColumns []CreateTableColumn
+
+	// DropColumns lists column names to drop via ALTER TABLE ... DROP COLUMN.
+	DropColumns []string
+
+	// AlterColumns lists column modifications via ALTER TABLE ... ALTER COLUMN.
+	AlterColumns []AlterColumnAction
+}
+
+// AlterColumnAction describes a column-level alteration.
+type AlterColumnAction struct {
+	Name        string
+	SetType     *string // ALTER COLUMN ... SET DATA TYPE
+	SetNotNull  *bool   // ALTER COLUMN ... SET NOT NULL / DROP NOT NULL
+	SetComment  *string // ALTER COLUMN ... COMMENT
+	SetDefault  *string // ALTER COLUMN ... SET DEFAULT
+	DropDefault bool    // ALTER COLUMN ... DROP DEFAULT
 }
 
 // Validate checks the AlterTableOptions for validity.
@@ -193,7 +215,10 @@ func (o *AlterTableOptions) HasChanges() bool {
 		o.EnableSchemaEvolution != nil ||
 		len(o.ClusterBy) > 0 ||
 		o.DropClusteringKey ||
-		len(o.UnsetFields) > 0
+		len(o.UnsetFields) > 0 ||
+		len(o.AddColumns) > 0 ||
+		len(o.DropColumns) > 0 ||
+		len(o.AlterColumns) > 0
 }
 
 // TableClient provides operations against Snowflake tables.
@@ -328,11 +353,11 @@ func (t *TableClient) Create(ctx context.Context, opts CreateTableOptions) error
 // buildAlterTableStatements builds the ALTER TABLE SQL statements.
 func buildAlterTableStatements(opts AlterTableOptions) ([]string, error) {
 	var statements []string
+	fqn := opts.Name.FullyQualifiedName()
 
 	// Handle cluster key changes as separate statements.
 	if opts.DropClusteringKey {
-		statements = append(statements, fmt.Sprintf("ALTER TABLE %s DROP CLUSTERING KEY",
-			opts.Name.FullyQualifiedName()))
+		statements = append(statements, fmt.Sprintf("ALTER TABLE %s DROP CLUSTERING KEY", fqn))
 	} else if len(opts.ClusterBy) > 0 {
 		quoted := make([]string, len(opts.ClusterBy))
 		for i, c := range opts.ClusterBy {
@@ -340,7 +365,68 @@ func buildAlterTableStatements(opts AlterTableOptions) ([]string, error) {
 		}
 
 		statements = append(statements, fmt.Sprintf("ALTER TABLE %s CLUSTER BY (%s)",
-			opts.Name.FullyQualifiedName(), strings.Join(quoted, ", ")))
+			fqn, strings.Join(quoted, ", ")))
+	}
+
+	// Column additions — one ADD COLUMN per column for clarity.
+	for _, col := range opts.AddColumns {
+		var sb strings.Builder
+
+		fmt.Fprintf(&sb, "ALTER TABLE %s ADD COLUMN %s %s",
+			fqn, sqlbuilder.QuoteIdentifier(col.Name), col.Type)
+
+		if col.Nullable != nil && !*col.Nullable {
+			sb.WriteString(" NOT NULL")
+		}
+
+		if col.Default != nil {
+			fmt.Fprintf(&sb, " DEFAULT %s", *col.Default)
+		}
+
+		if col.Comment != nil {
+			fmt.Fprintf(&sb, " COMMENT '%s'", sqlbuilder.EscapeString(*col.Comment))
+		}
+
+		statements = append(statements, sb.String())
+	}
+
+	// Column drops — one DROP COLUMN per column.
+	for _, colName := range opts.DropColumns {
+		statements = append(statements, fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s",
+			fqn, sqlbuilder.QuoteIdentifier(colName)))
+	}
+
+	// Column alterations.
+	for _, ac := range opts.AlterColumns {
+		colID := sqlbuilder.QuoteIdentifier(ac.Name)
+
+		if ac.SetType != nil {
+			statements = append(statements, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET DATA TYPE %s",
+				fqn, colID, *ac.SetType))
+		}
+
+		if ac.SetNotNull != nil {
+			if *ac.SetNotNull {
+				statements = append(statements, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL",
+					fqn, colID))
+			} else {
+				statements = append(statements, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL",
+					fqn, colID))
+			}
+		}
+
+		if ac.DropDefault {
+			statements = append(statements, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s DROP DEFAULT",
+				fqn, colID))
+		} else if ac.SetDefault != nil {
+			statements = append(statements, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s",
+				fqn, colID, *ac.SetDefault))
+		}
+
+		if ac.SetComment != nil {
+			statements = append(statements, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s COMMENT '%s'",
+				fqn, colID, sqlbuilder.EscapeString(*ac.SetComment)))
+		}
 	}
 
 	// Build SET clause for parameters.
@@ -424,6 +510,77 @@ func (t *TableClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier)
 	return scanTableShowOutput(rows, name.Name())
 }
 
+// buildDescribeTableSQL builds the DESCRIBE TABLE SQL statement.
+func buildDescribeTableSQL(name SchemaObjectIdentifier) string {
+	return fmt.Sprintf("DESCRIBE TABLE %s", name.FullyQualifiedName())
+}
+
+// DescribeTable runs DESCRIBE TABLE and returns the column definitions.
+func (t *TableClient) DescribeTable(ctx context.Context, name SchemaObjectIdentifier) ([]ColumnInfo, error) {
+	if !ValidObjectIdentifier(name) {
+		return nil, NewTerminalError(fmt.Errorf("table name is required"))
+	}
+
+	rows, err := t.client.Query(ctx, buildDescribeTableSQL(name))
+	if err != nil {
+		return nil, fmt.Errorf("describing table %s: %w", name, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	return scanColumnInfo(rows)
+}
+
+// scanColumnInfo scans DESCRIBE TABLE output into []ColumnInfo.
+func scanColumnInfo(rows *sql.Rows) ([]ColumnInfo, error) {
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("reading columns: %w", err)
+	}
+
+	var result []ColumnInfo
+
+	for rows.Next() {
+		values := make([]sql.NullString, len(cols))
+		ptrs := make([]any, len(cols))
+
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, fmt.Errorf("scanning row: %w", err)
+		}
+
+		colMap := make(map[string]string, len(cols))
+		for i, col := range cols {
+			if values[i].Valid {
+				colMap[col] = values[i].String
+			}
+		}
+
+		// Only include COLUMN rows (skip virtual columns, etc.).
+		kind := colMap["kind"]
+		if kind != "" && kind != "COLUMN" {
+			continue
+		}
+
+		result = append(result, ColumnInfo{
+			Name:    colMap["name"],
+			Type:    colMap["type"],
+			Kind:    colMap["kind"],
+			Null:    colMap["null?"],
+			Default: colMap["default"],
+			Comment: colMap["comment"],
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating rows: %w", err)
+	}
+
+	return result, nil
+}
+
 // Observe combines ShowByID into a TableObservation.
 func (t *TableClient) Observe(ctx context.Context, name SchemaObjectIdentifier) (*TableObservation, error) {
 	show, err := t.ShowByID(ctx, name)
@@ -435,9 +592,15 @@ func (t *TableClient) Observe(ctx context.Context, name SchemaObjectIdentifier) 
 		return nil, err
 	}
 
+	columns, err := t.DescribeTable(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("describing table columns: %w", err)
+	}
+
 	return &TableObservation{
 		Exists:     true,
 		ShowOutput: show,
+		Columns:    columns,
 	}, nil
 }
 
