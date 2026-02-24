@@ -81,7 +81,7 @@ func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
 	}
 }
 
-func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation, error) {
+func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation[*snowflake.SchemaObservation], error) {
 	did, err := reconciler.AssertIdentifier[snowflake.DatabaseObjectIdentifier](id)
 	if err != nil {
 		return nil, err
@@ -92,7 +92,7 @@ func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identi
 		return nil, err
 	}
 
-	return &reconciler.Observation{Exists: obs.Exists, Detail: obs}, nil
+	return &reconciler.Observation[*snowflake.SchemaObservation]{Exists: obs.Exists, Detail: obs}, nil
 }
 
 func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha1.Schema, id reconciler.Identifier) error {
@@ -152,27 +152,19 @@ func (a *adapter) ValidateImmutableFields(_ context.Context, schema *snowplanev1
 	return nil
 }
 
-func (a *adapter) BuildAlterOptions(_ context.Context, obj *snowplanev1alpha1.Schema, id reconciler.Identifier, obs *reconciler.Observation) (reconciler.AlterOptions, error) {
+func (a *adapter) BuildAlterOptions(_ context.Context, obj *snowplanev1alpha1.Schema, id reconciler.Identifier, obs *reconciler.Observation[*snowflake.SchemaObservation]) (reconciler.AlterOptions, error) {
 	did, err := reconciler.AssertIdentifier[snowflake.DatabaseObjectIdentifier](id)
 	if err != nil {
 		return nil, err
 	}
 
-	detail, err := reconciler.AssertDetail[*snowflake.SchemaObservation](obs)
-	if err != nil {
-		return nil, err
-	}
-
+	detail := obs.Detail
 	opts := buildAlterOptions(obj, did, detail)
 	return &opts, nil
 }
 
-func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.Schema, obs *reconciler.Observation) {
-	detail, ok := obs.Detail.(*snowflake.SchemaObservation)
-	if !ok {
-		return
-	}
-
+func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.Schema, obs *reconciler.Observation[*snowflake.SchemaObservation]) {
+	detail := obs.Detail
 	applyObservation(obj, detail)
 }
 
@@ -180,12 +172,8 @@ func (a *adapter) ComputeTrackedParameters(obj *snowplanev1alpha1.Schema) []stri
 	return computeTrackedParameters(&obj.Spec)
 }
 
-func (a *adapter) DetectDrift(obj *snowplanev1alpha1.Schema, obs *reconciler.Observation) *drift.Result {
-	detail, ok := obs.Detail.(*snowflake.SchemaObservation)
-	if !ok {
-		return drift.New().Result()
-	}
-
+func (a *adapter) DetectDrift(obj *snowplanev1alpha1.Schema, obs *reconciler.Observation[*snowflake.SchemaObservation]) *drift.Result {
+	detail := obs.Detail
 	return detectDrift(obj, detail)
 }
 
@@ -194,4 +182,4 @@ func (a *adapter) PostUpdate(_ *snowplanev1alpha1.Schema, _ bool, _ reconciler.A
 
 func (a *adapter) SupportsCreateOrAlter() bool { return true }
 
-var _ reconciler.ResourceAdapter[*snowplanev1alpha1.Schema, Service] = (*adapter)(nil)
+var _ reconciler.ResourceAdapter[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation] = (*adapter)(nil)

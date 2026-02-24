@@ -28,43 +28,28 @@ func TestAssertIdentifier_Failure(t *testing.T) {
 	assert.Contains(t, err.Error(), "AccountObjectIdentifier")
 }
 
-func TestAssertDetail_Success(t *testing.T) {
+func TestObservation_TypedDetail(t *testing.T) {
 	t.Parallel()
 
-	obs := &Observation{
+	obs := &Observation[*snowflake.DatabaseObservation]{
 		Exists: true,
 		Detail: &snowflake.DatabaseObservation{},
 	}
 
-	got, err := AssertDetail[*snowflake.DatabaseObservation](obs)
-	require.NoError(t, err)
-	assert.NotNil(t, got)
+	assert.True(t, obs.Exists)
+	assert.NotNil(t, obs.Detail)
 }
 
-func TestAssertDetail_Failure(t *testing.T) {
+func TestObservation_NilDetail(t *testing.T) {
 	t.Parallel()
 
-	obs := &Observation{
-		Exists: true,
-		Detail: &snowflake.WarehouseObservation{},
-	}
-
-	_, err := AssertDetail[*snowflake.DatabaseObservation](obs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "observation detail type mismatch")
-}
-
-func TestAssertDetail_NilDetail(t *testing.T) {
-	t.Parallel()
-
-	obs := &Observation{
+	obs := &Observation[*snowflake.DatabaseObservation]{
 		Exists: false,
 		Detail: nil,
 	}
 
-	_, err := AssertDetail[*snowflake.DatabaseObservation](obs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "observation detail type mismatch")
+	assert.False(t, obs.Exists)
+	assert.Nil(t, obs.Detail)
 }
 
 type assertTestAlterOpts struct{ hasChanges bool }

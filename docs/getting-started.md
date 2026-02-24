@@ -22,15 +22,25 @@ kubectl create secret generic snowflake-creds \
   -n default
 
 # Option B: Username/password (simpler for development)
+# Write your password to a file first to avoid leaking it in shell history.
+echo -n 'YourPassword123!' > /tmp/sf-password.txt
 kubectl create secret generic snowflake-creds \
-  --from-literal=password='YourPassword123!' \
+  --from-file=password=/tmp/sf-password.txt \
   -n default
+rm -f /tmp/sf-password.txt
 
 # Option C: External OAuth token (for Secret-based OAuth)
+# Write your token to a file first to avoid leaking it in shell history.
+echo -n '<your-oauth-access-token>' > /tmp/sf-token.txt
 kubectl create secret generic snowflake-creds \
-  --from-literal=token='<your-oauth-access-token>' \
+  --from-file=token=/tmp/sf-token.txt \
   -n default
+rm -f /tmp/sf-token.txt
 ```
+
+> **Security note:** Always use `--from-file` instead of `--from-literal` for
+> credentials. `--from-literal` values are visible in process listings
+> (`/proc/*/cmdline`) and shell history.
 
 ### Workload Identity Federation (WIF)
 
@@ -398,7 +408,7 @@ Integrate with Prometheus using a `ServiceMonitor` or annotation-based scraping.
 
 ## What's Next
 
-Snowplane now supports **22 managed resource types**. Beyond the resources covered in this guide, you can also manage:
+Snowplane now supports **25 managed resource types**. Beyond the resources covered in this guide, you can also manage:
 
 - **Task** — Scheduled SQL tasks with DAG scheduling and serverless execution
 - **Stream** — Change data capture on tables, views, external tables, stages, and dynamic tables
@@ -408,6 +418,10 @@ Snowplane now supports **22 managed resource types**. Beyond the resources cover
 - **MaskingPolicy** — Dynamic data masking for PII/PCI compliance
 - **RowAccessPolicy** — Row-level security for multi-tenant access control
 - **GrantOwnership** — Ownership transfer between roles
+- **StorageIntegration** — External cloud storage integrations (S3, GCS, Azure)
+- **FileFormat** — Named file format objects (CSV, JSON, Parquet, etc.)
+- **Pipe** — Snowpipe continuous data loading
+- **DynamicTable** — Declarative dynamic tables with auto-refresh
 
 See the `config/samples/` directory for example CRs of every resource type.
 
@@ -528,7 +542,7 @@ You can safely delete a Database CR even if dependent Schema CRs still exist. Th
 
 This means `kubectl delete database my-database` will not leave Schemas stuck in `Terminating` state.
 
-> **Note:** ProviderConfig itself is protected by an in-use finalizer. It cannot be deleted while any managed resource (Database, Schema, Warehouse, User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, Table, View, Stage, Task, Stream, Tag, NetworkPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, or GrantOwnership) still references it. The controller emits an `InUse` warning event and requeues until all references are removed.
+> **Note:** ProviderConfig itself is protected by an in-use finalizer. It cannot be deleted while any managed resource (Database, Schema, Warehouse, User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, Table, View, Stage, Task, Stream, Tag, NetworkPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, GrantOwnership, StorageIntegration, FileFormat, Pipe, or DynamicTable) still references it. The controller emits an `InUse` warning event and requeues until all references are removed.
 
 ### Immutable Fields
 
@@ -728,9 +742,11 @@ Snowplane manages Snowflake users with full lifecycle support, including secret-
 ### Create User Credentials Secret
 
 ```bash
+echo -n 'YourSecurePassword' > /tmp/user-password.txt
 kubectl create secret generic user-credentials \
-  --from-literal=password='SecureP@ssw0rd!' \
+  --from-file=password=/tmp/user-password.txt \
   -n default
+rm -f /tmp/user-password.txt
 ```
 
 ### Basic User

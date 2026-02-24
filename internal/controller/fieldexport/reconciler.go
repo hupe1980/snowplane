@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
+	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/metrics"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 	"github.com/hupe1980/snowplane/internal/utils/finalizers"
@@ -192,7 +193,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, fe *snowplanev1alpha1.
 				"error", err, "target", fmt.Sprintf("%s/%s", fe.Spec.To.Kind, fe.Spec.To.Name))
 		}
 
-		r.recorder.Event(fe, corev1.EventTypeNormal, "FinalizerRemoved",
+		r.recorder.Event(fe, corev1.EventTypeNormal, snowplanev1alpha1.ReasonFinalizerRemoved,
 			fmt.Sprintf("cleaned up exported key %q from %s/%s", fe.Spec.To.Key, fe.Spec.To.Kind, fe.Spec.To.Name))
 
 		patchBase := fe.DeepCopy()
@@ -522,8 +523,8 @@ func (r *Reconciler) patchStatus(ctx context.Context, fe *snowplanev1alpha1.Fiel
 	// SSA patch objects must not contain managedFields.
 	fe.SetManagedFields(nil)
 
-	return r.client.Status().Patch(ctx, fe, client.Apply, //nolint:staticcheck // TODO: migrate to client.Client.SubResource().Apply()
-		client.FieldOwner("snowplane-controller"),
+	return r.client.Status().Patch(ctx, fe, client.Apply, //nolint:staticcheck // TODO: migrate to client.SubResource("status").Apply() with ApplyConfiguration types
+		client.FieldOwner(reconciler.StatusFieldOwner),
 		client.ForceOwnership,
 	)
 }

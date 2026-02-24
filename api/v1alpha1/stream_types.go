@@ -163,66 +163,6 @@ type StreamList struct {
 	Items           []Stream `json:"items"`
 }
 
-// GetConditions returns the conditions of the Stream.
-func (s *Stream) GetConditions() []metav1.Condition { return s.Status.Conditions }
-
-// SetConditions sets the conditions of the Stream.
-func (s *Stream) SetConditions(c []metav1.Condition) { s.Status.Conditions = c }
-
-// GetFullyQualifiedName returns the Snowflake fully qualified identifier from status.
-func (s *Stream) GetFullyQualifiedName() string { return s.Status.FullyQualifiedName }
-
-// GetSpecName returns the Snowflake resource name from the spec.
-func (s *Stream) GetSpecName() string { return s.Spec.Name }
-
-// GetProviderRef returns the provider reference from the spec.
-func (s *Stream) GetProviderRef() ProviderReference { return s.Spec.ProviderRef }
-
-// GetUseRole returns the use role from the spec.
-func (s *Stream) GetUseRole() *string { return s.Spec.UseRole }
-
-// GetObservedGeneration returns the observed generation from status.
-func (s *Stream) GetObservedGeneration() int64 { return s.Status.ObservedGeneration }
-
-// SetObservedGeneration sets the observed generation in status.
-func (s *Stream) SetObservedGeneration(v int64) { s.Status.ObservedGeneration = v }
-
-// GetLastAppliedSpecHash returns the last applied spec hash from status.
-func (s *Stream) GetLastAppliedSpecHash() string { return s.Status.LastAppliedSpecHash }
-
-// SetLastAppliedSpecHash sets the last applied spec hash in status.
-func (s *Stream) SetLastAppliedSpecHash(v string) { s.Status.LastAppliedSpecHash = v }
-
-// GetTrackedParametersList returns the tracked parameters list from status.
-func (s *Stream) GetTrackedParametersList() []string { return s.Status.TrackedParameters }
-
-// SetTrackedParametersList sets the tracked parameters list in status.
-func (s *Stream) SetTrackedParametersList(v []string) { s.Status.TrackedParameters = v }
-
-// ValidateSpec validates the resource spec.
-func (s *Stream) ValidateSpec() error { return s.Spec.Validate() }
-
-// ComputeSpecHash returns a SHA-256 hash of the spec for drift detection.
-func (s *Stream) ComputeSpecHash() (string, error) { return ComputeSpecHash(s.Spec) }
-
-// GetDeletionPolicy returns the deletion policy, defaulting to Delete.
-func (s *Stream) GetDeletionPolicy() DeletionPolicy {
-	if s.Spec.DeletionPolicy == "" {
-		return DeletionPolicyDelete
-	}
-
-	return s.Spec.DeletionPolicy
-}
-
-// GetOwner returns the owner from status.
-func (s *Stream) GetOwner() string {
-	if s.Status.ShowOutput != nil {
-		return s.Status.ShowOutput.Owner
-	}
-
-	return ""
-}
-
 func init() {
 	SchemeBuilder.Register(&Stream{}, &StreamList{})
 }

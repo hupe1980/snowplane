@@ -134,7 +134,7 @@ func successfulObservation() *snowflake.SchemaObservation {
 	}
 }
 
-func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service] {
+func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation] {
 	scheme := testutil.TestScheme()
 	cb := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(
@@ -149,7 +149,7 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	factory := clientfactory.NewClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: rec,
@@ -166,7 +166,7 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 
 // newTestReconcilerWithIndex creates a reconciler with the field indexer on
 // .spec.databaseRef.name so MapByFieldIndex can be tested.
-func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service] {
+func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation] {
 	scheme := testutil.TestScheme()
 	cb := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(
@@ -188,7 +188,7 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 	factory := clientfactory.NewClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: rec,
@@ -1716,7 +1716,7 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 
 	rec := record.NewFakeRecorder(100)
 
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service]{
+	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation]{
 		Client:   c,
 		Factory:  clientfactory.NewClientFactory(),
 		Recorder: rec,

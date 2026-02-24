@@ -222,7 +222,7 @@ func (mp *MaskingPolicyClient) ShowByID(ctx context.Context, name SchemaObjectId
 	if err != nil {
 		return nil, fmt.Errorf("showing masking policy %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanMaskingPolicyShowOutput(rows, name.Name())
 }

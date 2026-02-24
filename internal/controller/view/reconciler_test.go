@@ -159,7 +159,7 @@ func successfulObservation() *snowflake.ViewObservation {
 	}
 }
 
-func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.View, Service] {
+func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.View, Service, *snowflake.ViewObservation] {
 	scheme := testutil.TestScheme()
 	cb := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(
@@ -177,7 +177,7 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	factory := clientfactory.NewClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.View, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.View, Service, *snowflake.ViewObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: rec,
@@ -192,7 +192,7 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 }
 
-func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.View, Service] {
+func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.View, Service, *snowflake.ViewObservation] {
 	scheme := testutil.TestScheme()
 	cb := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(
@@ -226,7 +226,7 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 	factory := clientfactory.NewClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.View, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.View, Service, *snowflake.ViewObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: rec,

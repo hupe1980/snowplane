@@ -215,7 +215,7 @@ func (rap *RowAccessPolicyClient) ShowByID(ctx context.Context, name SchemaObjec
 	if err != nil {
 		return nil, fmt.Errorf("showing row access policy %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanRowAccessPolicyShowOutput(rows, name.Name())
 }

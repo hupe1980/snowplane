@@ -180,66 +180,6 @@ type MaskingPolicyList struct {
 	Items           []MaskingPolicy `json:"items"`
 }
 
-// GetConditions returns the conditions of the MaskingPolicy.
-func (mp *MaskingPolicy) GetConditions() []metav1.Condition { return mp.Status.Conditions }
-
-// SetConditions sets the conditions of the MaskingPolicy.
-func (mp *MaskingPolicy) SetConditions(c []metav1.Condition) { mp.Status.Conditions = c }
-
-// GetFullyQualifiedName returns the Snowflake fully qualified identifier from status.
-func (mp *MaskingPolicy) GetFullyQualifiedName() string { return mp.Status.FullyQualifiedName }
-
-// GetSpecName returns the Snowflake resource name from the spec.
-func (mp *MaskingPolicy) GetSpecName() string { return mp.Spec.Name }
-
-// GetProviderRef returns the provider reference from the spec.
-func (mp *MaskingPolicy) GetProviderRef() ProviderReference { return mp.Spec.ProviderRef }
-
-// GetUseRole returns the use role from the spec.
-func (mp *MaskingPolicy) GetUseRole() *string { return mp.Spec.UseRole }
-
-// GetObservedGeneration returns the observed generation from status.
-func (mp *MaskingPolicy) GetObservedGeneration() int64 { return mp.Status.ObservedGeneration }
-
-// SetObservedGeneration sets the observed generation in status.
-func (mp *MaskingPolicy) SetObservedGeneration(v int64) { mp.Status.ObservedGeneration = v }
-
-// GetLastAppliedSpecHash returns the last applied spec hash from status.
-func (mp *MaskingPolicy) GetLastAppliedSpecHash() string { return mp.Status.LastAppliedSpecHash }
-
-// SetLastAppliedSpecHash sets the last applied spec hash in status.
-func (mp *MaskingPolicy) SetLastAppliedSpecHash(v string) { mp.Status.LastAppliedSpecHash = v }
-
-// GetTrackedParametersList returns the tracked parameters list from status.
-func (mp *MaskingPolicy) GetTrackedParametersList() []string { return mp.Status.TrackedParameters }
-
-// SetTrackedParametersList sets the tracked parameters list in status.
-func (mp *MaskingPolicy) SetTrackedParametersList(v []string) { mp.Status.TrackedParameters = v }
-
-// ValidateSpec validates the resource spec.
-func (mp *MaskingPolicy) ValidateSpec() error { return mp.Spec.Validate() }
-
-// ComputeSpecHash returns a SHA-256 hash of the spec for drift detection.
-func (mp *MaskingPolicy) ComputeSpecHash() (string, error) { return ComputeSpecHash(mp.Spec) }
-
-// GetDeletionPolicy returns the deletion policy, defaulting to Delete.
-func (mp *MaskingPolicy) GetDeletionPolicy() DeletionPolicy {
-	if mp.Spec.DeletionPolicy == "" {
-		return DeletionPolicyDelete
-	}
-
-	return mp.Spec.DeletionPolicy
-}
-
-// GetOwner returns the owner from status.
-func (mp *MaskingPolicy) GetOwner() string {
-	if mp.Status.ShowOutput != nil {
-		return mp.Status.ShowOutput.Owner
-	}
-
-	return ""
-}
-
 func init() {
 	SchemeBuilder.Register(&MaskingPolicy{}, &MaskingPolicyList{})
 }

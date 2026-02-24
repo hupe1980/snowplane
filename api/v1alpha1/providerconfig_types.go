@@ -35,10 +35,10 @@ const (
 
 // ProviderConfigSpec defines the desired state of ProviderConfig.
 //
-// +kubebuilder:validation:XValidation:rule="self.authenticationType != 'KeyPair' || (has(self.credentials) && has(self.credentials.secretRef) && self.credentials.secretRef.name != ” && self.credentials.secretRef.key != ”)",message="spec.credentials.secretRef (name and key) is required for KeyPair authentication"
-// +kubebuilder:validation:XValidation:rule="self.authenticationType != 'UsernamePassword' || (has(self.credentials) && has(self.credentials.secretRef) && self.credentials.secretRef.name != ” && self.credentials.secretRef.key != ”)",message="spec.credentials.secretRef (name and key) is required for UsernamePassword authentication"
+// +kubebuilder:validation:XValidation:rule="self.authenticationType != 'KeyPair' || (has(self.credentials) && has(self.credentials.secretRef) && size(self.credentials.secretRef.name) > 0 && size(self.credentials.secretRef.key) > 0)",message="spec.credentials.secretRef (name and key) is required for KeyPair authentication"
+// +kubebuilder:validation:XValidation:rule="self.authenticationType != 'UsernamePassword' || (has(self.credentials) && has(self.credentials.secretRef) && size(self.credentials.secretRef.name) > 0 && size(self.credentials.secretRef.key) > 0)",message="spec.credentials.secretRef (name and key) is required for UsernamePassword authentication"
 // +kubebuilder:validation:XValidation:rule="self.authenticationType != 'WorkloadIdentity' || has(self.workloadIdentity)",message="spec.workloadIdentity is required for WorkloadIdentity authentication"
-// +kubebuilder:validation:XValidation:rule="self.authenticationType != 'WorkloadIdentity' || !has(self.credentials) || !has(self.credentials.secretRef) || self.credentials.secretRef.name == ”",message="spec.credentials.secretRef must not be set for WorkloadIdentity authentication"
+// +kubebuilder:validation:XValidation:rule="self.authenticationType != 'WorkloadIdentity' || !has(self.credentials) || !has(self.credentials.secretRef) || size(self.credentials.secretRef.name) == 0",message="spec.credentials.secretRef must not be set for WorkloadIdentity authentication"
 // +kubebuilder:validation:XValidation:rule="self.account == oldSelf.account",message="spec.account is immutable (changing would redirect to a different Snowflake account)"
 // +kubebuilder:validation:XValidation:rule="self.user == oldSelf.user",message="spec.user is immutable (changing would redirect to a different Snowflake user)"
 type ProviderConfigSpec struct {

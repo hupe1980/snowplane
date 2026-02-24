@@ -15,6 +15,8 @@ import (
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
 // +kubebuilder:validation:XValidation:rule="!(has(self.warehouse) && has(self.userTaskManagedInitialWarehouseSize))",message="spec.warehouse and spec.userTaskManagedInitialWarehouseSize are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.finalize) || !has(self.schedule)",message="spec.finalize and spec.schedule are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.finalize) || !has(self.after) || size(self.after) == 0",message="spec.finalize and spec.after are mutually exclusive"
 type TaskSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -111,6 +113,47 @@ type TaskSpec struct {
 	// +optional
 	// +kubebuilder:default=true
 	Suspend *bool `json:"suspend,omitempty"`
+
+	// Config specifies the default configuration string in valid JSON format
+	// that all tasks in a task graph can access via SYSTEM$GET_TASK_GRAPH_CONFIG.
+	// +optional
+	Config *string `json:"config,omitempty"`
+
+	// Finalize specifies the name of a root task that this finalizer task is
+	// associated with. Finalizer tasks run after all other tasks in the task
+	// graph complete. Mutually exclusive with Schedule and After.
+	// +optional
+	Finalize *string `json:"finalize,omitempty"`
+
+	// LogLevel specifies the severity level of events for the task.
+	// +optional
+	// +kubebuilder:validation:Enum=TRACE;DEBUG;INFO;WARN;ERROR;FATAL;OFF
+	LogLevel *string `json:"logLevel,omitempty"`
+
+	// UserTaskMinimumTriggerIntervalInSeconds defines how frequently a triggered task
+	// can execute, in seconds. Changes within this interval are batched together.
+	// +optional
+	// +kubebuilder:validation:Minimum=10
+	// +kubebuilder:validation:Maximum=604800
+	UserTaskMinimumTriggerIntervalInSeconds *int32 `json:"userTaskMinimumTriggerIntervalInSeconds,omitempty"`
+
+	// TargetCompletionInterval specifies the desired task completion time.
+	// Only applies to serverless tasks. Required for serverless triggered tasks.
+	// Examples: "10 MINUTES", "1 HOURS"
+	// +optional
+	TargetCompletionInterval *string `json:"targetCompletionInterval,omitempty"`
+
+	// ServerlessTaskMinStatementSize specifies the minimum warehouse size for
+	// the serverless task. Only applies to serverless tasks.
+	// +optional
+	// +kubebuilder:validation:Enum=XSMALL;SMALL;MEDIUM;LARGE;XLARGE;XXLARGE
+	ServerlessTaskMinStatementSize *string `json:"serverlessTaskMinStatementSize,omitempty"`
+
+	// ServerlessTaskMaxStatementSize specifies the maximum warehouse size for
+	// the serverless task. Only applies to serverless tasks.
+	// +optional
+	// +kubebuilder:validation:Enum=XSMALL;SMALL;MEDIUM;LARGE;XLARGE;XXLARGE
+	ServerlessTaskMaxStatementSize *string `json:"serverlessTaskMaxStatementSize,omitempty"`
 }
 
 // TaskShowOutput mirrors the SHOW TASKS output stored in status.
@@ -198,72 +241,6 @@ type TaskList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Task `json:"items"`
 }
-
-// GetConditions returns the conditions of the Task.
-func (t *Task) GetConditions() []metav1.Condition {
-	return t.Status.Conditions
-}
-
-// SetConditions sets the conditions of the Task.
-func (t *Task) SetConditions(conditions []metav1.Condition) {
-	t.Status.Conditions = conditions
-}
-
-// GetDeletionPolicy returns the deletion policy, defaulting to Delete.
-func (t *Task) GetDeletionPolicy() DeletionPolicy {
-	if t.Spec.DeletionPolicy == "" {
-		return DeletionPolicyDelete
-	}
-
-	return t.Spec.DeletionPolicy
-}
-
-// GetFullyQualifiedName returns the Snowflake fully qualified identifier from status.
-func (t *Task) GetFullyQualifiedName() string {
-	return t.Status.FullyQualifiedName
-}
-
-// GetSpecName returns the Snowflake resource name from the spec.
-func (t *Task) GetSpecName() string { return t.Spec.Name }
-
-// GetProviderRef returns the provider reference from the spec.
-func (t *Task) GetProviderRef() ProviderReference { return t.Spec.ProviderRef }
-
-// GetUseRole returns the use role from the spec.
-func (t *Task) GetUseRole() *string { return t.Spec.UseRole }
-
-// GetObservedGeneration returns the observed generation from status.
-func (t *Task) GetObservedGeneration() int64 { return t.Status.ObservedGeneration }
-
-// SetObservedGeneration sets the observed generation in status.
-func (t *Task) SetObservedGeneration(v int64) { t.Status.ObservedGeneration = v }
-
-// GetLastAppliedSpecHash returns the last applied spec hash from status.
-func (t *Task) GetLastAppliedSpecHash() string { return t.Status.LastAppliedSpecHash }
-
-// SetLastAppliedSpecHash sets the last applied spec hash in status.
-func (t *Task) SetLastAppliedSpecHash(v string) { t.Status.LastAppliedSpecHash = v }
-
-// GetTrackedParametersList returns the tracked parameters list from status.
-func (t *Task) GetTrackedParametersList() []string { return t.Status.TrackedParameters }
-
-// SetTrackedParametersList sets the tracked parameters list in status.
-func (t *Task) SetTrackedParametersList(v []string) { t.Status.TrackedParameters = v }
-
-// GetOwner returns the owner role from status.
-func (t *Task) GetOwner() string {
-	if t.Status.ShowOutput != nil {
-		return t.Status.ShowOutput.Owner
-	}
-
-	return ""
-}
-
-// ValidateSpec validates the resource spec.
-func (t *Task) ValidateSpec() error { return t.Spec.Validate() }
-
-// ComputeSpecHash returns a SHA-256 hash of the spec for drift detection.
-func (t *Task) ComputeSpecHash() (string, error) { return ComputeSpecHash(t.Spec) }
 
 func init() {
 	SchemeBuilder.Register(&Task{}, &TaskList{})

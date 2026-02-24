@@ -163,7 +163,7 @@ func (r *AccountRoleClient) ShowByID(ctx context.Context, name AccountObjectIden
 	if err != nil {
 		return nil, fmt.Errorf("showing role %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanAccountRoleShowOutput(rows, name.Name())
 }

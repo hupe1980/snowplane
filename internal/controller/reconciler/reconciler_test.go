@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -73,14 +74,14 @@ func (id testID) String() string             { return string(id) }
 
 type mockAdapter struct {
 	serviceFromClientFn func(ctx context.Context, sfClient clientfactory.SnowflakeClient, useRole string) (any, func(context.Context), error)
-	observeFn           func(ctx context.Context, svc any, id reconciler.Identifier) (*reconciler.Observation, error)
+	observeFn           func(ctx context.Context, svc any, id reconciler.Identifier) (*reconciler.Observation[any], error)
 	createFn            func(ctx context.Context, svc any, obj *snowplanev1alpha1.Database, id reconciler.Identifier) error
 	alterFn             func(ctx context.Context, svc any, opts reconciler.AlterOptions) error
 	dropFn              func(ctx context.Context, svc any, id reconciler.Identifier) error
 	validateImmutableFn func(ctx context.Context, obj *snowplanev1alpha1.Database) error
-	buildAlterOptsFn    func(ctx context.Context, obj *snowplanev1alpha1.Database, id reconciler.Identifier, obs *reconciler.Observation) (reconciler.AlterOptions, error)
+	buildAlterOptsFn    func(ctx context.Context, obj *snowplanev1alpha1.Database, id reconciler.Identifier, obs *reconciler.Observation[any]) (reconciler.AlterOptions, error)
 	preReconcileFn      func(ctx context.Context, obj *snowplanev1alpha1.Database) error
-	detectDriftFn       func(obj *snowplanev1alpha1.Database, obs *reconciler.Observation) *drift.Result
+	detectDriftFn       func(obj *snowplanev1alpha1.Database, obs *reconciler.Observation[any]) *drift.Result
 
 	applyObservationCalled int
 	postCreateCalled       int
@@ -115,11 +116,11 @@ func (m *mockAdapter) BuildIdentifier(_ *snowplanev1alpha1.Database) reconciler.
 
 func (m *mockAdapter) SetupWatches() reconciler.SetupWatchesFunc { return nil }
 
-func (m *mockAdapter) Observe(ctx context.Context, svc any, id reconciler.Identifier) (*reconciler.Observation, error) {
+func (m *mockAdapter) Observe(ctx context.Context, svc any, id reconciler.Identifier) (*reconciler.Observation[any], error) {
 	if m.observeFn != nil {
 		return m.observeFn(ctx, svc, id)
 	}
-	return &reconciler.Observation{Exists: false}, nil
+	return &reconciler.Observation[any]{Exists: false}, nil
 }
 
 func (m *mockAdapter) Create(ctx context.Context, svc any, obj *snowplanev1alpha1.Database, id reconciler.Identifier) error {
@@ -150,14 +151,14 @@ func (m *mockAdapter) ValidateImmutableFields(ctx context.Context, obj *snowplan
 	return nil
 }
 
-func (m *mockAdapter) BuildAlterOptions(ctx context.Context, obj *snowplanev1alpha1.Database, id reconciler.Identifier, obs *reconciler.Observation) (reconciler.AlterOptions, error) {
+func (m *mockAdapter) BuildAlterOptions(ctx context.Context, obj *snowplanev1alpha1.Database, id reconciler.Identifier, obs *reconciler.Observation[any]) (reconciler.AlterOptions, error) {
 	if m.buildAlterOptsFn != nil {
 		return m.buildAlterOptsFn(ctx, obj, id, obs)
 	}
 	return &mockAlterOpts{hasChanges: false}, nil
 }
 
-func (m *mockAdapter) ApplyObservation(_ *snowplanev1alpha1.Database, _ *reconciler.Observation) {
+func (m *mockAdapter) ApplyObservation(_ *snowplanev1alpha1.Database, _ *reconciler.Observation[any]) {
 	m.applyObservationCalled++
 }
 
@@ -165,7 +166,7 @@ func (m *mockAdapter) ComputeTrackedParameters(_ *snowplanev1alpha1.Database) []
 	return []string{"NAME", "COMMENT"}
 }
 
-func (m *mockAdapter) DetectDrift(_ *snowplanev1alpha1.Database, obs *reconciler.Observation) *drift.Result {
+func (m *mockAdapter) DetectDrift(_ *snowplanev1alpha1.Database, obs *reconciler.Observation[any]) *drift.Result {
 	if m.detectDriftFn != nil {
 		return m.detectDriftFn(nil, obs)
 	}
@@ -183,13 +184,13 @@ func (m *mockAdapter) PostUpdate(_ *snowplanev1alpha1.Database, altered bool, _ 
 
 func (m *mockAdapter) SupportsCreateOrAlter() bool { return m.supportsCreateOrAlter }
 
-var _ reconciler.ResourceAdapter[*snowplanev1alpha1.Database, any] = (*mockAdapter)(nil)
+var _ reconciler.ResourceAdapter[*snowplanev1alpha1.Database, any, any] = (*mockAdapter)(nil)
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-func newTestReconciler(adapter *mockAdapter, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Database, any] {
+func newTestReconciler(adapter *mockAdapter, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any] {
 	scheme := testutil.TestScheme()
 	cb := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(&snowplanev1alpha1.Database{}, &snowplanev1alpha1.ProviderConfig{})
@@ -201,7 +202,7 @@ func newTestReconciler(adapter *mockAdapter, objs ...runtime.Object) *reconciler
 		return &mockSnowflakeClient{}, nil
 	})
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: record.NewFakeRecorder(100),
@@ -247,12 +248,12 @@ func TestReconcile_Create_Success(t *testing.T) {
 	db := newTestDB()
 	observeCalls := 0
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
 			observeCalls++
 			if observeCalls <= 2 {
-				return &reconciler.Observation{Exists: false}, nil
+				return &reconciler.Observation[any]{Exists: false}, nil
 			}
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
@@ -270,12 +271,12 @@ func TestReconcile_Create_PostCreateHook(t *testing.T) {
 	db := newTestDB()
 	callCount := 0
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
 			callCount++
 			if callCount <= 1 {
-				return &reconciler.Observation{Exists: false}, nil
+				return &reconciler.Observation[any]{Exists: false}, nil
 			}
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
@@ -298,8 +299,8 @@ func TestReconcile_Update_NoChanges(t *testing.T) {
 	db.Finalizers = []string{"snowplane.test/database"}
 	db.Status.ObservedGeneration = 1
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
@@ -317,10 +318,10 @@ func TestReconcile_Update_WithChanges(t *testing.T) {
 	db.Status.ObservedGeneration = 1
 	alterCalled := false
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
-		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation) (reconciler.AlterOptions, error) {
+		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation[any]) (reconciler.AlterOptions, error) {
 			return &mockAlterOpts{hasChanges: true}, nil
 		},
 		alterFn: func(_ context.Context, _ any, _ reconciler.AlterOptions) error {
@@ -389,8 +390,8 @@ func TestReconcile_ImmutableField_Terminal(t *testing.T) {
 	db.Finalizers = []string{"snowplane.test/database"}
 	db.Status.ObservedGeneration = 1
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 		validateImmutableFn: func(_ context.Context, _ *snowplanev1alpha1.Database) error {
 			return errors.New("spec.name is immutable")
@@ -446,7 +447,7 @@ func TestReconcile_ObserveError_ReturnsError(t *testing.T) {
 	db := newTestDB()
 	db.Finalizers = []string{"snowplane.test/database"}
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
 			return nil, errors.New("snowflake connection failed")
 		},
 	}
@@ -464,8 +465,8 @@ func TestReconcile_CreateError_ReturnsError(t *testing.T) {
 	t.Parallel()
 	db := newTestDB()
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: false}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: false}, nil
 		},
 		createFn: func(_ context.Context, _ any, _ *snowplanev1alpha1.Database, _ reconciler.Identifier) error {
 			return errors.New("create failed")
@@ -499,10 +500,10 @@ func TestReconcile_DriftDetection_DetectOnlyPolicy(t *testing.T) {
 	db.Status.LastAppliedSpecHash = hash
 	alterCalled := false
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
-		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation) (reconciler.AlterOptions, error) {
+		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation[any]) (reconciler.AlterOptions, error) {
 			return &mockAlterOpts{hasChanges: true}, nil
 		},
 		alterFn: func(_ context.Context, _ any, _ reconciler.AlterOptions) error {
@@ -536,17 +537,17 @@ func TestReconcile_ImmutableOnlyDrift_SkipsAlter(t *testing.T) {
 	alterCalled := false
 
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
-		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation) (reconciler.AlterOptions, error) {
+		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation[any]) (reconciler.AlterOptions, error) {
 			return &mockAlterOpts{hasChanges: true}, nil
 		},
 		alterFn: func(_ context.Context, _ any, _ reconciler.AlterOptions) error {
 			alterCalled = true
 			return nil
 		},
-		detectDriftFn: func(_ *snowplanev1alpha1.Database, _ *reconciler.Observation) *drift.Result {
+		detectDriftFn: func(_ *snowplanev1alpha1.Database, _ *reconciler.Observation[any]) *drift.Result {
 			// Return immutable-only drift — OWNER changed externally.
 			return drift.New().
 				CompareStringValue("OWNER", "SYSADMIN", "ACCOUNTADMIN", true).
@@ -576,17 +577,17 @@ func TestReconcile_MixedDrift_StillAlters(t *testing.T) {
 	alterCalled := false
 
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
-		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation) (reconciler.AlterOptions, error) {
+		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation[any]) (reconciler.AlterOptions, error) {
 			return &mockAlterOpts{hasChanges: true}, nil
 		},
 		alterFn: func(_ context.Context, _ any, _ reconciler.AlterOptions) error {
 			alterCalled = true
 			return nil
 		},
-		detectDriftFn: func(_ *snowplanev1alpha1.Database, _ *reconciler.Observation) *drift.Result {
+		detectDriftFn: func(_ *snowplanev1alpha1.Database, _ *reconciler.Observation[any]) *drift.Result {
 			// Return mixed drift: OWNER (immutable) + COMMENT (mutable).
 			return drift.New().
 				CompareStringValue("OWNER", "SYSADMIN", "ACCOUNTADMIN", true).
@@ -702,8 +703,8 @@ func TestReconcile_ApplyObservation_Called(t *testing.T) {
 	db.Finalizers = []string{"snowplane.test/database"}
 	db.Status.ObservedGeneration = 1
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
@@ -781,10 +782,10 @@ func TestReconcile_CreateOrAlter_UpdateUsesCreate(t *testing.T) {
 	alterCalled := false
 	adapter := &mockAdapter{
 		supportsCreateOrAlter: true,
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
-		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation) (reconciler.AlterOptions, error) {
+		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation[any]) (reconciler.AlterOptions, error) {
 			return &mockAlterOpts{hasChanges: true}, nil
 		},
 		createFn: func(_ context.Context, _ any, _ *snowplanev1alpha1.Database, _ reconciler.Identifier) error {
@@ -813,10 +814,10 @@ func TestReconcile_CreateOrAlter_UnsupportedType_FallsBackToAlter(t *testing.T) 
 	alterCalled := false
 	adapter := &mockAdapter{
 		supportsCreateOrAlter: false, // Not supported
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
-		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation) (reconciler.AlterOptions, error) {
+		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation[any]) (reconciler.AlterOptions, error) {
 			return &mockAlterOpts{hasChanges: true}, nil
 		},
 		alterFn: func(_ context.Context, _ any, _ reconciler.AlterOptions) error {
@@ -840,10 +841,10 @@ func TestReconcile_BuildAlterOptionsError_Terminal(t *testing.T) {
 	db.Finalizers = []string{"snowplane.test/database"}
 	db.Status.ObservedGeneration = 1
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
-		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation) (reconciler.AlterOptions, error) {
+		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation[any]) (reconciler.AlterOptions, error) {
 			return nil, errors.New("cannot compute diff")
 		},
 	}
@@ -863,10 +864,10 @@ func TestReconcile_AlterError_Terminal(t *testing.T) {
 	db.Finalizers = []string{"snowplane.test/database"}
 	db.Status.ObservedGeneration = 1
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
-		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation) (reconciler.AlterOptions, error) {
+		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation[any]) (reconciler.AlterOptions, error) {
 			return &mockAlterOpts{hasChanges: true}, nil
 		},
 		alterFn: func(_ context.Context, _ any, _ reconciler.AlterOptions) error {
@@ -885,10 +886,10 @@ func TestReconcile_AlterError_Recoverable(t *testing.T) {
 	db.Finalizers = []string{"snowplane.test/database"}
 	db.Status.ObservedGeneration = 1
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
-		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation) (reconciler.AlterOptions, error) {
+		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation[any]) (reconciler.AlterOptions, error) {
 			return &mockAlterOpts{hasChanges: true}, nil
 		},
 		alterFn: func(_ context.Context, _ any, _ reconciler.AlterOptions) error {
@@ -909,9 +910,9 @@ func TestReconcile_PostCreateObserve_NotExists(t *testing.T) {
 	t.Parallel()
 	db := newTestDB()
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
 			// Always returns Exists: false — resource not yet observable after create.
-			return &reconciler.Observation{Exists: false}, nil
+			return &reconciler.Observation[any]{Exists: false}, nil
 		},
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
@@ -936,8 +937,8 @@ func TestReconcile_CreateError_Terminal(t *testing.T) {
 	t.Parallel()
 	db := newTestDB()
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: false}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: false}, nil
 		},
 		createFn: func(_ context.Context, _ any, _ *snowplanev1alpha1.Database, _ reconciler.Identifier) error {
 			return snowflake.NewTerminalError(errors.New("invalid identifier"))
@@ -984,8 +985,8 @@ func TestWithRequeueInterval_UsedInResult(t *testing.T) {
 	db.Finalizers = []string{"snowplane.test/database"}
 	db.Status.ObservedGeneration = 1
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 	customInterval := 10 * time.Minute
@@ -1005,8 +1006,8 @@ func TestReconcile_Adoption_ExistingResource_NoAnnotation_Terminal(t *testing.T)
 	db := newTestDB()
 	db.Finalizers = []string{"snowplane.test/database"}
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
@@ -1032,8 +1033,8 @@ func TestReconcile_Adoption_ExistingResource_FailIfExists_Terminal(t *testing.T)
 		snowplanev1alpha1.AnnotationAdoptionPolicy: snowplanev1alpha1.AdoptionPolicyFailIfExists,
 	}
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
@@ -1057,8 +1058,8 @@ func TestReconcile_Adoption_Adopt_Success(t *testing.T) {
 		snowplanev1alpha1.AnnotationAdoptionPolicy: snowplanev1alpha1.AdoptionPolicyAdopt,
 	}
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
@@ -1085,8 +1086,8 @@ func TestReconcile_Adoption_SecondReconcile_SkipsAdoptionCheck(t *testing.T) {
 	db.Finalizers = []string{"snowplane.test/database"}
 	db.Status.ObservedGeneration = 1 // Already reconciled.
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
@@ -1105,8 +1106,8 @@ func TestReconcile_Adoption_InvalidAnnotation_DefaultsToReject(t *testing.T) {
 		snowplanev1alpha1.AnnotationAdoptionPolicy: "adopt-typo", // invalid value
 	}
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
@@ -1131,7 +1132,7 @@ func TestReconcile_Adoption_InvalidAnnotation_DefaultsToReject(t *testing.T) {
 func TestReconciler_MaturityDefaults(t *testing.T) {
 	t.Parallel()
 	// A bare GenericReconciler should default to alpha maturity.
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any]{
+	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any]{
 		Adapter: &mockAdapter{},
 	}
 	// WithMaturity returns the same reconciler (fluent API).
@@ -1144,7 +1145,7 @@ func TestReconciler_MaturityDefaults(t *testing.T) {
 func TestReconciler_SetupWithManager_SkipsAlphaWhenDisabled(t *testing.T) {
 	t.Parallel()
 	adapter := &mockAdapter{}
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any]{
+	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any]{
 		Adapter: adapter,
 	}
 	// Alpha maturity (default) + alpha disabled → should return nil without error.
@@ -1157,7 +1158,7 @@ func TestReconciler_SetupWithManager_SkipsAlphaWhenDisabled(t *testing.T) {
 func TestReconciler_SetupWithManager_DoesNotSkipBetaWhenAlphaDisabled(t *testing.T) {
 	t.Parallel()
 	adapter := &mockAdapter{}
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any]{
+	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any]{
 		Adapter: adapter,
 	}
 	// Beta maturity + alpha disabled → should try to register (will fail with nil manager).
@@ -1170,7 +1171,7 @@ func TestReconciler_SetupWithManager_DoesNotSkipBetaWhenAlphaDisabled(t *testing
 func TestReconciler_SetupWithManager_DoesNotSkipStableWhenAlphaDisabled(t *testing.T) {
 	t.Parallel()
 	adapter := &mockAdapter{}
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any]{
+	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any]{
 		Adapter: adapter,
 	}
 	// Stable maturity + alpha disabled → should try to register.
@@ -1181,7 +1182,7 @@ func TestReconciler_SetupWithManager_DoesNotSkipStableWhenAlphaDisabled(t *testi
 
 func TestReconciler_WithDisabled_FluentAPI(t *testing.T) {
 	t.Parallel()
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any]{
+	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any]{
 		Adapter: &mockAdapter{},
 	}
 	same := r.WithDisabled(true)
@@ -1191,7 +1192,7 @@ func TestReconciler_WithDisabled_FluentAPI(t *testing.T) {
 func TestReconciler_SetupWithManager_SkipsExplicitlyDisabled(t *testing.T) {
 	t.Parallel()
 	adapter := &mockAdapter{}
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any]{
+	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any]{
 		Adapter: adapter,
 	}
 	// Explicitly disabled → should return nil without error, even with alpha enabled.
@@ -1203,7 +1204,7 @@ func TestReconciler_SetupWithManager_SkipsExplicitlyDisabled(t *testing.T) {
 func TestReconciler_SetupWithManager_DisabledTakesPrecedenceOverMaturity(t *testing.T) {
 	t.Parallel()
 	adapter := &mockAdapter{}
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any]{
+	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any]{
 		Adapter: adapter,
 	}
 	// Stable maturity + disabled → should still skip.
@@ -1260,4 +1261,204 @@ func TestShouldSkipImmutableValidation_ForceNewFalse(t *testing.T) {
 
 	assert.False(t, reconciler.ShouldSkipImmutableValidation(db),
 		"should not skip when ForceNew is explicitly false")
+}
+
+// ---------------------------------------------------------------------------
+// Tests: isCreateOrAlterUnsupported table-driven (M-2)
+// ---------------------------------------------------------------------------
+
+func TestIsCreateOrAlterUnsupported(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{"nil error", nil, false},
+		{"generic error", errors.New("connection reset"), false},
+		{"permission denied", errors.New("insufficient privileges"), false},
+		{"unsupported keyword", errors.New("SQL compilation error: UNSUPPORTED feature"), true},
+		{"unexpected OR", errors.New("SQL compilation error: unexpected 'OR'"), true},
+		{"syntax error", errors.New("SQL compilation error: syntax error"), true},
+		{"error code 002032", errors.New("002032 (42601): SQL compilation error"), true},
+		{"case insensitive unsupported", errors.New("unsupported statement type"), true},
+		{"case insensitive syntax", errors.New("Syntax Error near 'CREATE'"), true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, reconciler.IsCreateOrAlterUnsupported(tt.err))
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: CREATE OR ALTER fallback to ALTER on syntax error (M-1)
+// ---------------------------------------------------------------------------
+
+func TestReconcile_CreateOrAlter_SyntaxError_FallsBackToAlter(t *testing.T) {
+	t.Parallel()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.Status.ObservedGeneration = 1
+	db.Status.LastAppliedSpecHash = "old-hash"
+
+	createCalled := false
+	alterCalled := false
+	adapter := &mockAdapter{
+		supportsCreateOrAlter: true,
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
+		},
+		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation[any]) (reconciler.AlterOptions, error) {
+			return &mockAlterOpts{hasChanges: true}, nil
+		},
+		createFn: func(_ context.Context, _ any, _ *snowplanev1alpha1.Database, _ reconciler.Identifier) error {
+			createCalled = true
+			return errors.New("SQL compilation error: syntax error line 1 at position 7 unexpected 'OR'")
+		},
+		alterFn: func(_ context.Context, _ any, _ reconciler.AlterOptions) error {
+			alterCalled = true
+			return nil
+		},
+	}
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	result, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.True(t, createCalled, "CREATE OR ALTER should be attempted first")
+	assert.True(t, alterCalled, "should fall back to ALTER after syntax error")
+	assert.True(t, result.RequeueAfter > 0, "should requeue after successful fallback")
+
+	// Verify the fallback warning event was emitted.
+	rec := r.Recorder.(*record.FakeRecorder)
+	events := testutil.DrainEvents(rec)
+	var foundFallback bool
+	for _, e := range events {
+		if strings.Contains(e, snowplanev1alpha1.ReasonCreateOrAlterFallback) {
+			foundFallback = true
+		}
+	}
+	assert.True(t, foundFallback, "should emit CreateOrAlterFallback warning event")
+}
+
+// ---------------------------------------------------------------------------
+// Tests: Post-crash create recovery (M-3)
+// ---------------------------------------------------------------------------
+
+func TestReconcile_PostCrashCreate_Recovery(t *testing.T) {
+	t.Parallel()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.Status.ObservedGeneration = 0 // Never successfully reconciled.
+	db.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationCreationInitiated: "true",
+	}
+
+	adapter := &mockAdapter{
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
+		},
+	}
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	result, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.True(t, result.RequeueAfter > 0, "should requeue after post-crash recovery")
+
+	// PostCreate hook should have been called.
+	assert.Equal(t, 1, adapter.postCreateCalled, "PostCreate should be called during recovery")
+
+	// ApplyObservation should have been called.
+	assert.GreaterOrEqual(t, adapter.applyObservationCalled, 1, "ApplyObservation should be called")
+
+	// Re-read the object to check conditions and annotations.
+	var fetched snowplanev1alpha1.Database
+	require.NoError(t, r.Client.Get(context.Background(), reconcileReq().NamespacedName, &fetched))
+
+	// Should be Ready after recovery.
+	ready := conditions.Get(&fetched, snowplanev1alpha1.TypeReady)
+	require.NotNil(t, ready)
+	assert.Equal(t, metav1.ConditionTrue, ready.Status)
+	assert.Contains(t, ready.Message, "recovered")
+
+	// Creation-initiated annotation should be cleared.
+	assert.Empty(t, fetched.Annotations[snowplanev1alpha1.AnnotationCreationInitiated],
+		"creation-initiated annotation should be cleared after recovery")
+}
+
+// ---------------------------------------------------------------------------
+// Tests: Orphan deletion — condition and event assertions (M-4)
+// ---------------------------------------------------------------------------
+
+func TestReconcile_Delete_OrphanPolicy_ConditionsAndEvents(t *testing.T) {
+	t.Parallel()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.Spec.DeletionPolicy = snowplanev1alpha1.DeletionPolicyOrphan
+	now := metav1.Now()
+	db.DeletionTimestamp = &now
+
+	dropCalled := false
+	adapter := &mockAdapter{
+		dropFn: func(_ context.Context, _ any, _ reconciler.Identifier) error {
+			dropCalled = true
+			return nil
+		},
+	}
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.False(t, dropCalled, "Drop should NOT be called with Orphan policy")
+
+	// Verify orphan event was emitted.
+	rec := r.Recorder.(*record.FakeRecorder)
+	events := testutil.DrainEvents(rec)
+	var foundOrphan bool
+	for _, e := range events {
+		if strings.Contains(e, "orphaned") {
+			foundOrphan = true
+		}
+	}
+	assert.True(t, foundOrphan, "should emit orphan event")
+
+	// Object should be fully deleted (finalizer removed + DeletionTimestamp set
+	// means the fake client garbage-collects it).
+	var fetched snowplanev1alpha1.Database
+	err = r.Client.Get(context.Background(), reconcileReq().NamespacedName, &fetched)
+	assert.Error(t, err, "object should be deleted after finalizer removal")
+}
+
+// ---------------------------------------------------------------------------
+// Tests: ForceNew warning event (M-5)
+// ---------------------------------------------------------------------------
+
+func TestReconcile_ForceNew_EmitsWarningEvent(t *testing.T) {
+	t.Parallel()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.Status.ObservedGeneration = 1
+	db.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationForceNew: "true",
+	}
+
+	adapter := &mockAdapter{
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
+		},
+	}
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+
+	// Verify ForceNewActive warning event was emitted.
+	rec := r.Recorder.(*record.FakeRecorder)
+	events := testutil.DrainEvents(rec)
+	var foundForceNew bool
+	for _, e := range events {
+		if strings.Contains(e, snowplanev1alpha1.ReasonForceNewActive) {
+			foundForceNew = true
+		}
+	}
+	assert.True(t, foundForceNew, "should emit ForceNewActive warning event")
 }

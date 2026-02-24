@@ -174,66 +174,6 @@ type RowAccessPolicyList struct {
 	Items           []RowAccessPolicy `json:"items"`
 }
 
-// GetConditions returns the conditions of the RowAccessPolicy.
-func (rap *RowAccessPolicy) GetConditions() []metav1.Condition { return rap.Status.Conditions }
-
-// SetConditions sets the conditions of the RowAccessPolicy.
-func (rap *RowAccessPolicy) SetConditions(c []metav1.Condition) { rap.Status.Conditions = c }
-
-// GetFullyQualifiedName returns the Snowflake fully qualified identifier from status.
-func (rap *RowAccessPolicy) GetFullyQualifiedName() string { return rap.Status.FullyQualifiedName }
-
-// GetSpecName returns the Snowflake resource name from the spec.
-func (rap *RowAccessPolicy) GetSpecName() string { return rap.Spec.Name }
-
-// GetProviderRef returns the provider reference from the spec.
-func (rap *RowAccessPolicy) GetProviderRef() ProviderReference { return rap.Spec.ProviderRef }
-
-// GetUseRole returns the use role from the spec.
-func (rap *RowAccessPolicy) GetUseRole() *string { return rap.Spec.UseRole }
-
-// GetObservedGeneration returns the observed generation from status.
-func (rap *RowAccessPolicy) GetObservedGeneration() int64 { return rap.Status.ObservedGeneration }
-
-// SetObservedGeneration sets the observed generation in status.
-func (rap *RowAccessPolicy) SetObservedGeneration(v int64) { rap.Status.ObservedGeneration = v }
-
-// GetLastAppliedSpecHash returns the last applied spec hash from status.
-func (rap *RowAccessPolicy) GetLastAppliedSpecHash() string { return rap.Status.LastAppliedSpecHash }
-
-// SetLastAppliedSpecHash sets the last applied spec hash in status.
-func (rap *RowAccessPolicy) SetLastAppliedSpecHash(v string) { rap.Status.LastAppliedSpecHash = v }
-
-// GetTrackedParametersList returns the tracked parameters list from status.
-func (rap *RowAccessPolicy) GetTrackedParametersList() []string { return rap.Status.TrackedParameters }
-
-// SetTrackedParametersList sets the tracked parameters list in status.
-func (rap *RowAccessPolicy) SetTrackedParametersList(v []string) { rap.Status.TrackedParameters = v }
-
-// ValidateSpec validates the resource spec.
-func (rap *RowAccessPolicy) ValidateSpec() error { return rap.Spec.Validate() }
-
-// ComputeSpecHash returns a SHA-256 hash of the spec for drift detection.
-func (rap *RowAccessPolicy) ComputeSpecHash() (string, error) { return ComputeSpecHash(rap.Spec) }
-
-// GetDeletionPolicy returns the deletion policy, defaulting to Delete.
-func (rap *RowAccessPolicy) GetDeletionPolicy() DeletionPolicy {
-	if rap.Spec.DeletionPolicy == "" {
-		return DeletionPolicyDelete
-	}
-
-	return rap.Spec.DeletionPolicy
-}
-
-// GetOwner returns the owner from status.
-func (rap *RowAccessPolicy) GetOwner() string {
-	if rap.Status.ShowOutput != nil {
-		return rap.Status.ShowOutput.Owner
-	}
-
-	return ""
-}
-
 func init() {
 	SchemeBuilder.Register(&RowAccessPolicy{}, &RowAccessPolicyList{})
 }

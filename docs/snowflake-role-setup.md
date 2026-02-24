@@ -112,6 +112,24 @@ The `EXECUTE TASK` privilege is required to resume (unsuspend) tasks.
 
     GRANT CREATE ROW ACCESS POLICY ON SCHEMA <database_name>.<schema_name> TO ROLE SNOWPLANE_ROLE;
 
+### Storage Integration Management
+
+    GRANT CREATE INTEGRATION ON ACCOUNT TO ROLE SNOWPLANE_ROLE;
+
+**Note:** Storage integrations are account-level objects. The `CREATE INTEGRATION` privilege is powerful — grant it only if using the StorageIntegration CRD.
+
+### File Format Management
+
+    GRANT CREATE FILE FORMAT ON SCHEMA <database_name>.<schema_name> TO ROLE SNOWPLANE_ROLE;
+
+### Pipe Management
+
+    GRANT CREATE PIPE ON SCHEMA <database_name>.<schema_name> TO ROLE SNOWPLANE_ROLE;
+
+### Dynamic Table Management
+
+    GRANT CREATE DYNAMIC TABLE ON SCHEMA <database_name>.<schema_name> TO ROLE SNOWPLANE_ROLE;
+
 ## Step 5: Set RSA Public Key (Key-Pair Auth)
 
     ALTER USER SNOWPLANE_USER SET RSA_PUBLIC_KEY = '<your-public-key>';
@@ -165,6 +183,10 @@ See [Workload Identity Guide](workload-identity.md) for cloud-specific setup.
 | `CREATE RESOURCE MONITOR ON ACCOUNT` | ResourceMonitor CRD | If using ResourceMonitor |
 | `CREATE MASKING POLICY ON SCHEMA` | MaskingPolicy CRD | Per-schema |
 | `CREATE ROW ACCESS POLICY ON SCHEMA` | RowAccessPolicy CRD | Per-schema |
+| `CREATE INTEGRATION ON ACCOUNT` | StorageIntegration CRD | If using StorageIntegration |
+| `CREATE FILE FORMAT ON SCHEMA` | FileFormat CRD | Per-schema |
+| `CREATE PIPE ON SCHEMA` | Pipe CRD | Per-schema |
+| `CREATE DYNAMIC TABLE ON SCHEMA` | DynamicTable CRD | Per-schema |
 
 ## Using `useRole` for Role Switching
 
@@ -188,7 +210,7 @@ Under the hood, Snowplane executes `USE ROLE <useRole>` before creating the reso
 3. **Set `useRole` on the resource spec**:
 
     ```yaml
-    apiVersion: snowplane.io/v1alpha1
+    apiVersion: snowplane.hupe1980.github.io/v1alpha1
     kind: Database
     metadata:
       name: analytics-db

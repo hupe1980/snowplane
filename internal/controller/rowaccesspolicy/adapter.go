@@ -112,7 +112,7 @@ func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
 	}
 }
 
-func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation, error) {
+func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation[*snowflake.RowAccessPolicyObservation], error) {
 	sid, err := reconciler.AssertIdentifier[snowflake.SchemaObjectIdentifier](id)
 	if err != nil {
 		return nil, err
@@ -123,7 +123,7 @@ func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identi
 		return nil, err
 	}
 
-	return &reconciler.Observation{Exists: obs.Exists, Detail: obs}, nil
+	return &reconciler.Observation[*snowflake.RowAccessPolicyObservation]{Exists: obs.Exists, Detail: obs}, nil
 }
 
 func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha1.RowAccessPolicy, id reconciler.Identifier) error {
@@ -182,27 +182,19 @@ func (a *adapter) ValidateImmutableFields(_ context.Context, rap *snowplanev1alp
 	return nil
 }
 
-func (a *adapter) BuildAlterOptions(_ context.Context, obj *snowplanev1alpha1.RowAccessPolicy, id reconciler.Identifier, obs *reconciler.Observation) (reconciler.AlterOptions, error) {
+func (a *adapter) BuildAlterOptions(_ context.Context, obj *snowplanev1alpha1.RowAccessPolicy, id reconciler.Identifier, obs *reconciler.Observation[*snowflake.RowAccessPolicyObservation]) (reconciler.AlterOptions, error) {
 	sid, err := reconciler.AssertIdentifier[snowflake.SchemaObjectIdentifier](id)
 	if err != nil {
 		return nil, err
 	}
 
-	detail, err := reconciler.AssertDetail[*snowflake.RowAccessPolicyObservation](obs)
-	if err != nil {
-		return nil, err
-	}
-
+	detail := obs.Detail
 	opts := buildAlterOptions(obj, sid, detail)
 	return &opts, nil
 }
 
-func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.RowAccessPolicy, obs *reconciler.Observation) {
-	detail, ok := obs.Detail.(*snowflake.RowAccessPolicyObservation)
-	if !ok {
-		return
-	}
-
+func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.RowAccessPolicy, obs *reconciler.Observation[*snowflake.RowAccessPolicyObservation]) {
+	detail := obs.Detail
 	applyObservation(obj, detail)
 }
 
@@ -210,12 +202,8 @@ func (a *adapter) ComputeTrackedParameters(obj *snowplanev1alpha1.RowAccessPolic
 	return computeTrackedParameters(&obj.Spec)
 }
 
-func (a *adapter) DetectDrift(obj *snowplanev1alpha1.RowAccessPolicy, obs *reconciler.Observation) *drift.Result {
-	detail, ok := obs.Detail.(*snowflake.RowAccessPolicyObservation)
-	if !ok {
-		return drift.New().Result()
-	}
-
+func (a *adapter) DetectDrift(obj *snowplanev1alpha1.RowAccessPolicy, obs *reconciler.Observation[*snowflake.RowAccessPolicyObservation]) *drift.Result {
+	detail := obs.Detail
 	return detectDrift(obj, detail)
 }
 
@@ -224,4 +212,4 @@ func (a *adapter) PostUpdate(_ *snowplanev1alpha1.RowAccessPolicy, _ bool, _ rec
 }
 func (a *adapter) SupportsCreateOrAlter() bool { return false }
 
-var _ reconciler.ResourceAdapter[*snowplanev1alpha1.RowAccessPolicy, Service] = (*adapter)(nil)
+var _ reconciler.ResourceAdapter[*snowplanev1alpha1.RowAccessPolicy, Service, *snowflake.RowAccessPolicyObservation] = (*adapter)(nil)

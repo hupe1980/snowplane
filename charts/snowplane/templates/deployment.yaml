@@ -64,7 +64,8 @@ spec:
               protocol: TCP
             - name: health
               containerPort: {{ .Values.healthProbes.containerPort }}
-              protocol: TCP\n          livenessProbe:
+              protocol: TCP
+          livenessProbe:
             httpGet:
               path: /healthz
               port: health

@@ -386,7 +386,7 @@ func (d *DatabaseClient) ShowByID(ctx context.Context, name AccountObjectIdentif
 	if err != nil {
 		return nil, fmt.Errorf("showing database %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanDatabaseShowOutput(rows, name.Name())
 }
@@ -406,7 +406,7 @@ func (d *DatabaseClient) ShowParameters(ctx context.Context, name AccountObjectI
 	if err != nil {
 		return nil, fmt.Errorf("showing parameters for database %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanDatabaseParameters(rows)
 }

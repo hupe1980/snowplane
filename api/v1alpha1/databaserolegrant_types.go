@@ -79,24 +79,6 @@ type DatabaseRoleGrantList struct {
 	Items           []DatabaseRoleGrant `json:"items"`
 }
 
-// GetConditions returns the conditions.
-func (r *DatabaseRoleGrant) GetConditions() []metav1.Condition { return r.Status.Conditions }
-
-// SetConditions sets the conditions.
-func (r *DatabaseRoleGrant) SetConditions(c []metav1.Condition) { r.Status.Conditions = c }
-
-// GetDeletionPolicy returns the deletion policy, defaulting to Delete.
-func (r *DatabaseRoleGrant) GetDeletionPolicy() DeletionPolicy {
-	if r.Spec.DeletionPolicy == "" {
-		return DeletionPolicyDelete
-	}
-
-	return r.Spec.DeletionPolicy
-}
-
-// GetFullyQualifiedName returns the Snowflake fully qualified identifier from status.
-func (r *DatabaseRoleGrant) GetFullyQualifiedName() string { return r.Status.FullyQualifiedName }
-
 // GetSpecName returns a human-readable composite name for the grant.
 func (r *DatabaseRoleGrant) GetSpecName() string {
 	role := r.Spec.DatabaseRole
@@ -106,45 +88,6 @@ func (r *DatabaseRoleGrant) GetSpecName() string {
 
 	return fmt.Sprintf("%s %s -> DATABASE ROLE %s", r.Spec.Privilege, r.Spec.On.Description(), role)
 }
-
-// GetProviderRef returns the provider reference.
-func (r *DatabaseRoleGrant) GetProviderRef() ProviderReference { return r.Spec.ProviderRef }
-
-// GetUseRole returns the use role (the role that executes the GRANT).
-func (r *DatabaseRoleGrant) GetUseRole() *string { return r.Spec.UseRole }
-
-// GetObservedGeneration returns the observed generation.
-func (r *DatabaseRoleGrant) GetObservedGeneration() int64 { return r.Status.ObservedGeneration }
-
-// SetObservedGeneration sets the observed generation.
-func (r *DatabaseRoleGrant) SetObservedGeneration(v int64) { r.Status.ObservedGeneration = v }
-
-// GetLastAppliedSpecHash returns the last applied spec hash.
-func (r *DatabaseRoleGrant) GetLastAppliedSpecHash() string { return r.Status.LastAppliedSpecHash }
-
-// SetLastAppliedSpecHash sets the last applied spec hash.
-func (r *DatabaseRoleGrant) SetLastAppliedSpecHash(v string) { r.Status.LastAppliedSpecHash = v }
-
-// GetTrackedParametersList returns nil — grants don't track parameters.
-func (r *DatabaseRoleGrant) GetTrackedParametersList() []string { return nil }
-
-// SetTrackedParametersList is a no-op for grants.
-func (r *DatabaseRoleGrant) SetTrackedParametersList(_ []string) {}
-
-// GetOwner returns the granting role from status.
-func (r *DatabaseRoleGrant) GetOwner() string {
-	if r.Status.ShowOutput != nil {
-		return r.Status.ShowOutput.GrantedBy
-	}
-
-	return ""
-}
-
-// ValidateSpec validates the resource spec.
-func (r *DatabaseRoleGrant) ValidateSpec() error { return r.Spec.Validate() }
-
-// ComputeSpecHash returns a SHA-256 hash of the spec.
-func (r *DatabaseRoleGrant) ComputeSpecHash() (string, error) { return ComputeSpecHash(r.Spec) }
 
 // ResolvedDatabaseRole returns the resolved database role name (either direct or from ref).
 func (r *DatabaseRoleGrant) ResolvedDatabaseRole() string { return r.Spec.DatabaseRole }

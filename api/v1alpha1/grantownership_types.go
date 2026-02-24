@@ -183,45 +183,6 @@ type GrantOwnershipList struct {
 	Items           []GrantOwnership `json:"items"`
 }
 
-// GetConditions returns the conditions of the GrantOwnership.
-func (g *GrantOwnership) GetConditions() []metav1.Condition { return g.Status.Conditions }
-
-// SetConditions sets the conditions of the GrantOwnership.
-func (g *GrantOwnership) SetConditions(c []metav1.Condition) { g.Status.Conditions = c }
-
-// GetFullyQualifiedName returns the Snowflake fully qualified identifier from status.
-func (g *GrantOwnership) GetFullyQualifiedName() string { return g.Status.FullyQualifiedName }
-
-// GetProviderRef returns the provider reference from the spec.
-func (g *GrantOwnership) GetProviderRef() ProviderReference { return g.Spec.ProviderRef }
-
-// GetUseRole returns the use role from the spec.
-func (g *GrantOwnership) GetUseRole() *string { return g.Spec.UseRole }
-
-// GetObservedGeneration returns the observed generation from status.
-func (g *GrantOwnership) GetObservedGeneration() int64 { return g.Status.ObservedGeneration }
-
-// SetObservedGeneration sets the observed generation in status.
-func (g *GrantOwnership) SetObservedGeneration(v int64) { g.Status.ObservedGeneration = v }
-
-// GetLastAppliedSpecHash returns the last applied spec hash from status.
-func (g *GrantOwnership) GetLastAppliedSpecHash() string { return g.Status.LastAppliedSpecHash }
-
-// SetLastAppliedSpecHash sets the last applied spec hash in status.
-func (g *GrantOwnership) SetLastAppliedSpecHash(v string) { g.Status.LastAppliedSpecHash = v }
-
-// GetTrackedParametersList returns the tracked parameters list from status.
-func (g *GrantOwnership) GetTrackedParametersList() []string { return g.Status.TrackedParameters }
-
-// SetTrackedParametersList sets the tracked parameters list in status.
-func (g *GrantOwnership) SetTrackedParametersList(v []string) { g.Status.TrackedParameters = v }
-
-// ValidateSpec validates the resource spec.
-func (g *GrantOwnership) ValidateSpec() error { return g.Spec.Validate() }
-
-// ComputeSpecHash returns a SHA-256 hash of the spec for drift detection.
-func (g *GrantOwnership) ComputeSpecHash() (string, error) { return ComputeSpecHash(g.Spec) }
-
 // GetSpecName returns a human-readable composite name for the ownership transfer.
 func (g *GrantOwnership) GetSpecName() string {
 	role := g.Spec.AccountRole
@@ -239,18 +200,6 @@ func (g *GrantOwnership) GetSpecName() string {
 
 	return fmt.Sprintf("OWNERSHIP ON %s %s -> %s", g.Spec.ObjectType, g.Spec.ObjectName, role)
 }
-
-// GetDeletionPolicy returns the deletion policy, defaulting to Delete.
-func (g *GrantOwnership) GetDeletionPolicy() DeletionPolicy {
-	if g.Spec.DeletionPolicy == "" {
-		return DeletionPolicyDelete
-	}
-
-	return g.Spec.DeletionPolicy
-}
-
-// GetOwner returns empty — ownership transfers are account-scoped operations.
-func (g *GrantOwnership) GetOwner() string { return "" }
 
 func init() {
 	SchemeBuilder.Register(&GrantOwnership{}, &GrantOwnershipList{})

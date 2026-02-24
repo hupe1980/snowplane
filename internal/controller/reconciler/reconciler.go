@@ -37,10 +37,10 @@ const (
 	DefaultRequeueInterval = 5 * time.Minute
 	snowflakeOpTimeout     = 60 * time.Second
 
-	// statusFieldOwner is the SSA field manager for status patches.
+	// StatusFieldOwner is the SSA field manager for status patches.
 	// Using a dedicated field owner ensures the controller has exclusive
 	// ownership of .status fields and eliminates conflict-based retries.
-	statusFieldOwner = "snowplane-controller"
+	StatusFieldOwner = "snowplane-controller"
 )
 
 // GenericReconciler implements the shared Observe-Diff-Apply state machine.
@@ -49,13 +49,14 @@ const (
 // Type parameters:
 //   - T: the CRD type (e.g. *snowplanev1alpha1.Database)
 //   - S: the Snowflake CRUD service interface (e.g. database.Service)
-type GenericReconciler[T ManagedResource, S any] struct {
+//   - D: the resource-specific observation detail type (e.g. *snowflake.DatabaseObservation)
+type GenericReconciler[T ManagedResource, S any, D any] struct {
 	Client         client.Client
 	Factory        *clientfactory.ClientFactory
 	Recorder       record.EventRecorder
 	RateLimiter    *ratelimit.Limiter
 	CircuitBreaker *circuitbreaker.Breaker
-	Adapter        ResourceAdapter[T, S]
+	Adapter        ResourceAdapter[T, S, D]
 	GVK            schema.GroupVersionKind // set during SetupWithManager or manually in tests
 
 	requeueOverride      time.Duration
@@ -65,21 +66,21 @@ type GenericReconciler[T ManagedResource, S any] struct {
 }
 
 // WithRequeueInterval overrides the default periodic-resync interval.
-func (r *GenericReconciler[T, S]) WithRequeueInterval(d time.Duration) *GenericReconciler[T, S] {
+func (r *GenericReconciler[T, S, D]) WithRequeueInterval(d time.Duration) *GenericReconciler[T, S, D] {
 	r.requeueOverride = d
 	return r
 }
 
 // WithMaturity sets the maturity classification for this controller.
 // Valid values are "alpha", "beta", and "stable". Defaults to "alpha".
-func (r *GenericReconciler[T, S]) WithMaturity(m string) *GenericReconciler[T, S] {
+func (r *GenericReconciler[T, S, D]) WithMaturity(m string) *GenericReconciler[T, S, D] {
 	r.maturity = m
 	return r
 }
 
 // WithAlphaEnabled controls whether alpha-maturity controllers are registered.
 // When false, SetupWithManager will skip alpha controllers.
-func (r *GenericReconciler[T, S]) WithAlphaEnabled(enabled bool) *GenericReconciler[T, S] {
+func (r *GenericReconciler[T, S, D]) WithAlphaEnabled(enabled bool) *GenericReconciler[T, S, D] {
 	r.enableAlphaResources = enabled
 	return r
 }
@@ -88,7 +89,7 @@ func (r *GenericReconciler[T, S]) WithAlphaEnabled(enabled bool) *GenericReconci
 // controller. When set, the reconciler rejects calls to providers that have
 // exceeded the failure threshold and records success/failure after each
 // reconciliation.
-func (r *GenericReconciler[T, S]) WithCircuitBreaker(cb *circuitbreaker.Breaker) *GenericReconciler[T, S] {
+func (r *GenericReconciler[T, S, D]) WithCircuitBreaker(cb *circuitbreaker.Breaker) *GenericReconciler[T, S, D] {
 	r.CircuitBreaker = cb
 	return r
 }
@@ -96,12 +97,12 @@ func (r *GenericReconciler[T, S]) WithCircuitBreaker(cb *circuitbreaker.Breaker)
 // WithDisabled explicitly disables this controller. When true, SetupWithManager
 // will skip registration regardless of maturity settings. This is used by the
 // --disable-controllers flag for fine-grained per-controller control.
-func (r *GenericReconciler[T, S]) WithDisabled(disabled bool) *GenericReconciler[T, S] {
+func (r *GenericReconciler[T, S, D]) WithDisabled(disabled bool) *GenericReconciler[T, S, D] {
 	r.disabled = disabled
 	return r
 }
 
-func (r *GenericReconciler[T, S]) getMaturity() string {
+func (r *GenericReconciler[T, S, D]) getMaturity() string {
 	if r.maturity != "" {
 		return r.maturity
 	}
@@ -109,7 +110,7 @@ func (r *GenericReconciler[T, S]) getMaturity() string {
 	return snowplanev1alpha1.MaturityAlpha
 }
 
-func (r *GenericReconciler[T, S]) getRequeueInterval() time.Duration {
+func (r *GenericReconciler[T, S, D]) getRequeueInterval() time.Duration {
 	if r.requeueOverride > 0 {
 		return r.requeueOverride
 	}
@@ -120,7 +121,7 @@ func (r *GenericReconciler[T, S]) getRequeueInterval() time.Duration {
 // SetupWithManager registers the controller with the manager.
 // Controllers that are explicitly disabled or alpha-maturity controllers with
 // alpha not enabled are skipped.
-func (r *GenericReconciler[T, S]) SetupWithManager(mgr ctrl.Manager, maxConcurrent int) error {
+func (r *GenericReconciler[T, S, D]) SetupWithManager(mgr ctrl.Manager, maxConcurrent int) error {
 	if r.disabled {
 		log.Log.Info("skipping disabled controller (--disable-controllers)",
 			"controller", r.Adapter.ResourceName())
@@ -162,7 +163,7 @@ func (r *GenericReconciler[T, S]) SetupWithManager(mgr ctrl.Manager, maxConcurre
 }
 
 // Reconcile implements the shared reconciliation state machine.
-func (r *GenericReconciler[T, S]) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
+func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
 	resName := r.Adapter.ResourceName()
 	start := time.Now()
 
@@ -213,7 +214,7 @@ func (r *GenericReconciler[T, S]) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// Resolve Snowflake client via ProviderConfig.
-	sfClient, err := provider.ResolveClient(ctx, r.Client, r.Factory, obj, obj.GetProviderRef(), obj.GetNamespace(), r.RateLimiter, r.CircuitBreaker, resName)
+	resolved, err := provider.ResolveClient(ctx, r.Client, r.Factory, obj, obj.GetProviderRef(), obj.GetNamespace(), r.RateLimiter, r.CircuitBreaker, resName)
 	if err != nil {
 		if !obj.GetDeletionTimestamp().IsZero() {
 			logger.Info("cannot resolve provider during deletion, removing finalizer to unblock", "error", err)
@@ -243,7 +244,11 @@ func (r *GenericReconciler[T, S]) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	providerName = obj.GetProviderRef().Name
+	sfClient := resolved.Client
+	providerName = resolved.Name
+
+	// L-3: Enrich logger with provider metadata for multi-account log correlation.
+	logger = logger.WithValues("provider", resolved.Name, "account", resolved.Account)
 
 	// Resolve use role.
 	useRole := ""
@@ -273,6 +278,10 @@ func (r *GenericReconciler[T, S]) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// Handle deletion.
 	if !obj.GetDeletionTimestamp().IsZero() {
+		// Mark Snowflake I/O as attempted so the deferred circuit breaker
+		// update fires — reconcileDelete calls Drop() which is real I/O.
+		snowflakeOpAttempted = true
+
 		return r.reconcileDelete(ctx, obj, svc, id)
 	}
 
@@ -310,7 +319,7 @@ func (r *GenericReconciler[T, S]) Reconcile(ctx context.Context, req ctrl.Reques
 	// Audit trail: emit a warning event when force-new is active (M-8).
 	if snowplanev1alpha1.IsForceNew(obj.GetAnnotations()) {
 		logger.Info("force-new annotation active, immutable field validation bypassed", "resource", resName)
-		r.Recorder.Event(obj, corev1.EventTypeWarning, "ForceNewActive",
+		r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonForceNewActive,
 			fmt.Sprintf("force-new annotation active on %s %q — immutable field validation bypassed, resource may be deleted and recreated", resName, obj.GetSpecName()))
 	}
 
@@ -318,7 +327,7 @@ func (r *GenericReconciler[T, S]) Reconcile(ctx context.Context, req ctrl.Reques
 	opCtx, cancel := context.WithTimeout(ctx, snowflakeOpTimeout)
 	defer cancel()
 
-	var obs *Observation
+	var obs *Observation[D]
 
 	logger.V(1).Info("observing current Snowflake state", "resource", resName, "name", obj.GetSpecName())
 
@@ -360,7 +369,7 @@ func (r *GenericReconciler[T, S]) Reconcile(ctx context.Context, req ctrl.Reques
 	return r.reconcileUpdate(ctx, obj, svc, id, obs)
 }
 
-func (r *GenericReconciler[T, S]) reconcileCreate(ctx context.Context, obj T, statusBase T, svc S, id Identifier) (ctrl.Result, error) {
+func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T, statusBase T, svc S, id Identifier) (ctrl.Result, error) {
 	resName := r.Adapter.ResourceName()
 	logger := log.FromContext(ctx)
 	logger.Info("creating "+resName+" in Snowflake", resName, obj.GetSpecName())
@@ -404,7 +413,7 @@ func (r *GenericReconciler[T, S]) reconcileCreate(ctx context.Context, obj T, st
 	}
 
 	// Post-create observation.
-	var postObs *Observation
+	var postObs *Observation[D]
 
 	if err := sfretry.Do(opCtx, sfretry.DefaultOptions(), func() error {
 		var e error
@@ -451,7 +460,7 @@ func (r *GenericReconciler[T, S]) reconcileCreate(ctx context.Context, obj T, st
 	return ctrl.Result{RequeueAfter: r.getRequeueInterval()}, nil
 }
 
-func (r *GenericReconciler[T, S]) reconcileUpdate(ctx context.Context, obj T, svc S, id Identifier, obs *Observation) (ctrl.Result, error) {
+func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T, svc S, id Identifier, obs *Observation[D]) (ctrl.Result, error) {
 	resName := r.Adapter.ResourceName()
 	logger := log.FromContext(ctx)
 
@@ -559,7 +568,7 @@ func (r *GenericReconciler[T, S]) reconcileUpdate(ctx context.Context, obj T, sv
 				// fall back to the standard ALTER path.
 				if isCreateOrAlterUnsupported(err) {
 					logger.Info("CREATE OR ALTER not supported, falling back to ALTER", "resource", resName, "name", obj.GetSpecName())
-					r.Recorder.Event(obj, corev1.EventTypeWarning, "CreateOrAlterFallback",
+					r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonCreateOrAlterFallback,
 						fmt.Sprintf("CREATE OR ALTER not supported for %s %q, falling back to ALTER", resName, obj.GetSpecName()))
 
 					if err := r.executeSnowflakeOp(ctx, opCtx, obj, "alter", "alter", func() error {
@@ -579,7 +588,7 @@ func (r *GenericReconciler[T, S]) reconcileUpdate(ctx context.Context, obj T, sv
 			if !r.Adapter.SupportsCreateOrAlter() {
 				if _, explicit := obj.GetAnnotations()[snowplanev1alpha1.AnnotationUseCreateOrAlter]; explicit {
 					logger.Info("use-create-or-alter annotation ignored: not supported for resource type", "resource", resName)
-					r.Recorder.Event(obj, corev1.EventTypeWarning, "UnsupportedAnnotation",
+					r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonUnsupportedAnnotation,
 						fmt.Sprintf("use-create-or-alter annotation is not supported for %s, using ALTER", resName))
 				}
 			}
@@ -603,7 +612,7 @@ func (r *GenericReconciler[T, S]) reconcileUpdate(ctx context.Context, obj T, sv
 		}
 
 		// Re-observe after successful alter.
-		var reObs *Observation
+		var reObs *Observation[D]
 
 		if err := sfretry.Do(opCtx, sfretry.DefaultOptions(), func() error {
 			var e error
@@ -640,7 +649,7 @@ func (r *GenericReconciler[T, S]) reconcileUpdate(ctx context.Context, obj T, sv
 // but the controller crashed before status was committed. The creation-initiated
 // annotation proves we created this resource, so we skip the adoption path and
 // finish the normal post-create setup (M-3).
-func (r *GenericReconciler[T, S]) reconcilePostCrashCreate(ctx context.Context, obj T, statusBase T, obs *Observation) (ctrl.Result, error) {
+func (r *GenericReconciler[T, S, D]) reconcilePostCrashCreate(ctx context.Context, obj T, statusBase T, obs *Observation[D]) (ctrl.Result, error) {
 	resName := r.Adapter.ResourceName()
 	logger := log.FromContext(ctx)
 	logger.Info("completing post-crash create setup", resName, obj.GetSpecName())
@@ -677,7 +686,7 @@ func (r *GenericReconciler[T, S]) reconcilePostCrashCreate(ctx context.Context, 
 // reconcileAdoptOrReject handles the first reconciliation when the Snowflake
 // resource already exists. Without the adoption annotation, this is a Terminal
 // error. With adoption-policy=adopt, the reconciler takes over management.
-func (r *GenericReconciler[T, S]) reconcileAdoptOrReject(ctx context.Context, obj T, statusBase T, obs *Observation) (ctrl.Result, error) {
+func (r *GenericReconciler[T, S, D]) reconcileAdoptOrReject(ctx context.Context, obj T, statusBase T, obs *Observation[D]) (ctrl.Result, error) {
 	resName := r.Adapter.ResourceName()
 	logger := log.FromContext(ctx)
 
@@ -742,7 +751,6 @@ func (r *GenericReconciler[T, S]) reconcileAdoptOrReject(ctx context.Context, ob
 	}
 
 	obj.SetResourceVersion(patchTarget.GetResourceVersion())
-	_ = patchTarget.DeepCopyObject().(T) // statusBase not needed after this point
 
 	if err := r.patchStatus(ctx, obj); err != nil {
 		return ctrl.Result{}, err
@@ -773,7 +781,7 @@ func getAdoptionPolicy[T ManagedResource](obj T) string {
 	return snowplanev1alpha1.AdoptionPolicyFailIfExists
 }
 
-func (r *GenericReconciler[T, S]) reconcileDelete(ctx context.Context, obj T, svc S, id Identifier) (ctrl.Result, error) {
+func (r *GenericReconciler[T, S, D]) reconcileDelete(ctx context.Context, obj T, svc S, id Identifier) (ctrl.Result, error) {
 	resName := r.Adapter.ResourceName()
 	logger := log.FromContext(ctx)
 
@@ -831,7 +839,7 @@ func (r *GenericReconciler[T, S]) reconcileDelete(ctx context.Context, obj T, sv
 // retry loops — the server resolves ownership via managedFields instead.
 // ForceOwnership ensures the controller takes exclusive ownership of .status
 // fields even if another field manager previously owned them (B-2).
-func (r *GenericReconciler[T, S]) patchStatus(ctx context.Context, obj T) error {
+func (r *GenericReconciler[T, S, D]) patchStatus(ctx context.Context, obj T) error {
 	// SSA requires TypeMeta (apiVersion + kind) in the patch payload.
 	// controller-runtime's Get() strips TypeMeta from typed objects,
 	// so we must set it explicitly from the GVK resolved at setup time.
@@ -843,15 +851,15 @@ func (r *GenericReconciler[T, S]) patchStatus(ctx context.Context, obj T) error 
 	// server to reject the patch with "metadata.managedFields must be nil".
 	obj.SetManagedFields(nil)
 
-	return r.Client.Status().Patch(ctx, obj, client.Apply, //nolint:staticcheck // TODO: migrate to client.Client.SubResource().Apply()
-		client.FieldOwner(statusFieldOwner),
+	return r.Client.Status().Patch(ctx, obj, client.Apply, //nolint:staticcheck // TODO: migrate to client.SubResource("status").Apply() with ApplyConfiguration types
+		client.FieldOwner(StatusFieldOwner),
 		client.ForceOwnership,
 	)
 }
 
 // bestEffortPatchStatus patches status and logs a warning on failure.
 // Used in error paths where the primary error must be returned.
-func (r *GenericReconciler[T, S]) bestEffortPatchStatus(ctx context.Context, obj T) {
+func (r *GenericReconciler[T, S, D]) bestEffortPatchStatus(ctx context.Context, obj T) {
 	if err := r.patchStatus(ctx, obj); err != nil {
 		log.FromContext(ctx).Error(err, "best-effort status patch failed")
 	}
@@ -905,7 +913,7 @@ func setLateInitializedAnnotation[T ManagedResource](obj T) {
 // emits events, and attempts a best-effort status patch. The opName is used
 // for metrics (e.g. "create", "alter"), and opVerb for human-readable event
 // messages (e.g. "creating", "altering", "CREATE OR ALTER").
-func (r *GenericReconciler[T, S]) executeSnowflakeOp(
+func (r *GenericReconciler[T, S, D]) executeSnowflakeOp(
 	ctx context.Context,
 	opCtx context.Context,
 	obj T,
@@ -940,7 +948,7 @@ func (r *GenericReconciler[T, S]) executeSnowflakeOp(
 // tracked-parameters list. On error it sets terminal conditions and attempts a
 // best-effort status patch. This consolidates the repeated hash-computation +
 // error-handling pattern used after every successful create/update/adopt.
-func (r *GenericReconciler[T, S]) finalizeSpec(ctx context.Context, obj T) error {
+func (r *GenericReconciler[T, S, D]) finalizeSpec(ctx context.Context, obj T) error {
 	hash, err := obj.ComputeSpecHash()
 	if err != nil {
 		err = fmt.Errorf("computing spec hash: %w", err)

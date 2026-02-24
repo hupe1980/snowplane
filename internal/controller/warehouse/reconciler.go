@@ -37,9 +37,9 @@ type Service interface {
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
 // NewReconciler returns a new Warehouse reconciler backed by the generic framework.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service] {
+func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation] {
 	a := &adapter{newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,
@@ -57,9 +57,9 @@ func NewReconcilerWithServiceFactory(
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
-) *reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service] {
+) *reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation] {
 	a := &adapter{newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,
@@ -136,6 +136,10 @@ func buildCreateOptions(wh *snowplanev1alpha1.Warehouse, id snowflake.AccountObj
 	if wh.Spec.ResourceConstraint != nil {
 		s := string(*wh.Spec.ResourceConstraint)
 		opts.ResourceConstraint = &s
+	}
+
+	if wh.Spec.Generation != nil {
+		opts.Generation = wh.Spec.Generation
 	}
 
 	return opts
@@ -220,6 +224,14 @@ func buildAlterOptions(wh *snowplanev1alpha1.Warehouse, id snowflake.AccountObje
 		s := string(*wh.Spec.ResourceConstraint)
 		if s != wh.Status.LastAppliedResourceConstraint {
 			opts.ResourceConstraint = &s
+		}
+	}
+
+	// Generation is not surfaced in SHOW WAREHOUSES; compare against
+	// the last value we applied (stored in status) to avoid unnecessary ALTERs.
+	if wh.Spec.Generation != nil {
+		if *wh.Spec.Generation != wh.Status.LastAppliedGeneration {
+			opts.Generation = wh.Spec.Generation
 		}
 	}
 
@@ -400,6 +412,10 @@ func computeUnsetFields(wh *snowplanev1alpha1.Warehouse) []string {
 		unset = append(unset, "RESOURCE_CONSTRAINT")
 	}
 
+	if wh.Spec.Generation == nil && managed["GENERATION"] {
+		unset = append(unset, "GENERATION")
+	}
+
 	return unset
 }
 
@@ -466,6 +482,10 @@ func computeTrackedParameters(spec *snowplanev1alpha1.WarehouseSpec) []string {
 
 	if spec.ResourceConstraint != nil {
 		fields = append(fields, "RESOURCE_CONSTRAINT")
+	}
+
+	if spec.Generation != nil {
+		fields = append(fields, "GENERATION")
 	}
 
 	return fields

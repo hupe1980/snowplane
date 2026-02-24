@@ -81,7 +81,7 @@ func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
 	}
 }
 
-func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation, error) {
+func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation[*snowflake.DatabaseRoleObservation], error) {
 	did, err := reconciler.AssertIdentifier[snowflake.DatabaseObjectIdentifier](id)
 	if err != nil {
 		return nil, err
@@ -92,7 +92,7 @@ func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identi
 		return nil, err
 	}
 
-	return &reconciler.Observation{Exists: obs.Exists, Detail: obs}, nil
+	return &reconciler.Observation[*snowflake.DatabaseRoleObservation]{Exists: obs.Exists, Detail: obs}, nil
 }
 
 func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha1.DatabaseRole, id reconciler.Identifier) error {
@@ -145,27 +145,19 @@ func (a *adapter) ValidateImmutableFields(_ context.Context, role *snowplanev1al
 	return nil
 }
 
-func (a *adapter) BuildAlterOptions(_ context.Context, obj *snowplanev1alpha1.DatabaseRole, id reconciler.Identifier, obs *reconciler.Observation) (reconciler.AlterOptions, error) {
+func (a *adapter) BuildAlterOptions(_ context.Context, obj *snowplanev1alpha1.DatabaseRole, id reconciler.Identifier, obs *reconciler.Observation[*snowflake.DatabaseRoleObservation]) (reconciler.AlterOptions, error) {
 	did, err := reconciler.AssertIdentifier[snowflake.DatabaseObjectIdentifier](id)
 	if err != nil {
 		return nil, err
 	}
 
-	detail, err := reconciler.AssertDetail[*snowflake.DatabaseRoleObservation](obs)
-	if err != nil {
-		return nil, err
-	}
-
+	detail := obs.Detail
 	opts := buildAlterOptions(obj, did, detail)
 	return &opts, nil
 }
 
-func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.DatabaseRole, obs *reconciler.Observation) {
-	detail, ok := obs.Detail.(*snowflake.DatabaseRoleObservation)
-	if !ok {
-		return
-	}
-
+func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.DatabaseRole, obs *reconciler.Observation[*snowflake.DatabaseRoleObservation]) {
+	detail := obs.Detail
 	applyObservation(obj, detail)
 }
 
@@ -173,12 +165,8 @@ func (a *adapter) ComputeTrackedParameters(obj *snowplanev1alpha1.DatabaseRole) 
 	return computeTrackedParameters(&obj.Spec)
 }
 
-func (a *adapter) DetectDrift(obj *snowplanev1alpha1.DatabaseRole, obs *reconciler.Observation) *drift.Result {
-	detail, ok := obs.Detail.(*snowflake.DatabaseRoleObservation)
-	if !ok {
-		return drift.New().Result()
-	}
-
+func (a *adapter) DetectDrift(obj *snowplanev1alpha1.DatabaseRole, obs *reconciler.Observation[*snowflake.DatabaseRoleObservation]) *drift.Result {
+	detail := obs.Detail
 	return detectDrift(obj, detail)
 }
 
@@ -188,4 +176,4 @@ func (a *adapter) PostUpdate(_ *snowplanev1alpha1.DatabaseRole, _ bool, _ reconc
 
 func (a *adapter) SupportsCreateOrAlter() bool { return false }
 
-var _ reconciler.ResourceAdapter[*snowplanev1alpha1.DatabaseRole, Service] = (*adapter)(nil)
+var _ reconciler.ResourceAdapter[*snowplanev1alpha1.DatabaseRole, Service, *snowflake.DatabaseRoleObservation] = (*adapter)(nil)

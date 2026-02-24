@@ -85,6 +85,15 @@ spec:
                 description: EnableQueryAcceleration enables the query acceleration
                   service.
                 type: boolean
+              generation:
+                description: |-
+                  Generation specifies the warehouse generation for standard warehouses.
+                  Valid values are "1" (gen1) or "2" (gen2). This is a simplified alternative
+                  to using ResourceConstraint for generation selection.
+                enum:
+                - "1"
+                - "2"
+                type: string
               initiallySuspended:
                 description: |-
                   InitiallySuspended creates the warehouse in a suspended state.
@@ -133,9 +142,17 @@ spec:
                 type: integer
               resourceConstraint:
                 description: ResourceConstraint specifies resource constraints (e.g.,
-                  MEMORY).
+                  MEMORY, STANDARD_GEN_1, MEMORY_16X).
                 enum:
                 - MEMORY
+                - STANDARD_GEN_1
+                - STANDARD_GEN_2
+                - MEMORY_1X
+                - MEMORY_1X_x86
+                - MEMORY_16X
+                - MEMORY_16X_x86
+                - MEMORY_64X
+                - MEMORY_64X_x86
                 type: string
               resourceMonitor:
                 description: ResourceMonitor is the name of the resource monitor to
@@ -200,6 +217,8 @@ spec:
                 to change)
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
                 || self.useRole == oldSelf.useRole)
+            - message: spec.generation and spec.resourceConstraint are mutually exclusive
+              rule: '!(has(self.generation) && has(self.resourceConstraint))'
           status:
             description: WarehouseStatus defines the observed state of a Warehouse.
             properties:
@@ -264,6 +283,12 @@ spec:
               fullyQualifiedName:
                 description: FullyQualifiedName is the Snowflake fully qualified identifier
                   for this resource.
+                type: string
+              lastAppliedGeneration:
+                description: |-
+                  LastAppliedGeneration stores the last generation value applied to
+                  Snowflake. Like ResourceConstraint, SHOW WAREHOUSES does not surface
+                  this field, so we track it to prevent redundant ALTERs.
                 type: string
               lastAppliedResourceConstraint:
                 description: |-

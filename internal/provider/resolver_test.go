@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -22,8 +23,8 @@ import (
 
 func testScheme() *runtime.Scheme {
 	s := runtime.NewScheme()
-	_ = clientgoscheme.AddToScheme(s)
-	_ = snowplanev1alpha1.AddToScheme(s)
+	utilruntime.Must(clientgoscheme.AddToScheme(s))
+	utilruntime.Must(snowplanev1alpha1.AddToScheme(s))
 
 	return s
 }
@@ -94,9 +95,11 @@ func TestResolveClient_Success(t *testing.T) {
 	obj := &testConditionedObject{}
 	ref := snowplanev1alpha1.ProviderReference{Name: "default-pc"}
 
-	sfClient, err := ResolveClient(context.Background(), c, factory, obj, ref, "default", nil, nil, "test")
+	resolved, err := ResolveClient(context.Background(), c, factory, obj, ref, "default", nil, nil, "test")
 	require.NoError(t, err)
-	assert.NotNil(t, sfClient)
+	assert.NotNil(t, resolved.Client)
+	assert.Equal(t, "default-pc", resolved.Name)
+	assert.Equal(t, "acct", resolved.Account)
 }
 
 func TestResolveClient_CrossNamespace(t *testing.T) {
@@ -120,9 +123,11 @@ func TestResolveClient_CrossNamespace(t *testing.T) {
 	ref := snowplanev1alpha1.ProviderReference{Name: "default-pc", Namespace: "system"}
 
 	// Resource namespace is "team-a" but providerRef.namespace overrides to "system".
-	sfClient, err := ResolveClient(context.Background(), c, factory, obj, ref, "team-a", nil, nil, "test")
+	resolved, err := ResolveClient(context.Background(), c, factory, obj, ref, "team-a", nil, nil, "test")
 	require.NoError(t, err)
-	assert.NotNil(t, sfClient)
+	assert.NotNil(t, resolved.Client)
+	assert.Equal(t, "default-pc", resolved.Name)
+	assert.Equal(t, "acct", resolved.Account)
 }
 
 func TestResolveClient_AllowedNamespaces_Allowed(t *testing.T) {
@@ -145,9 +150,9 @@ func TestResolveClient_AllowedNamespaces_Allowed(t *testing.T) {
 	obj := &testConditionedObject{}
 	ref := snowplanev1alpha1.ProviderReference{Name: "default-pc", Namespace: "system"}
 
-	sfClient, err := ResolveClient(context.Background(), c, factory, obj, ref, "team-a", nil, nil, "test")
+	resolved, err := ResolveClient(context.Background(), c, factory, obj, ref, "team-a", nil, nil, "test")
 	require.NoError(t, err)
-	assert.NotNil(t, sfClient)
+	assert.NotNil(t, resolved.Client)
 }
 
 func TestResolveClient_AllowedNamespaces_Denied(t *testing.T) {
@@ -201,9 +206,9 @@ func TestResolveClient_AllowedNamespaces_Wildcard(t *testing.T) {
 	obj := &testConditionedObject{}
 	ref := snowplanev1alpha1.ProviderReference{Name: "default-pc", Namespace: "system"}
 
-	sfClient, err := ResolveClient(context.Background(), c, factory, obj, ref, "any-namespace", nil, nil, "test")
+	resolved, err := ResolveClient(context.Background(), c, factory, obj, ref, "any-namespace", nil, nil, "test")
 	require.NoError(t, err)
-	assert.NotNil(t, sfClient)
+	assert.NotNil(t, resolved.Client)
 }
 
 func TestResolveClient_AllowedNamespaces_EmptyListAllowsAll(t *testing.T) {
@@ -226,9 +231,9 @@ func TestResolveClient_AllowedNamespaces_EmptyListAllowsAll(t *testing.T) {
 	obj := &testConditionedObject{}
 	ref := snowplanev1alpha1.ProviderReference{Name: "default-pc", Namespace: "system"}
 
-	sfClient, err := ResolveClient(context.Background(), c, factory, obj, ref, "any-ns", nil, nil, "test")
+	resolved, err := ResolveClient(context.Background(), c, factory, obj, ref, "any-ns", nil, nil, "test")
 	require.NoError(t, err)
-	assert.NotNil(t, sfClient)
+	assert.NotNil(t, resolved.Client)
 }
 
 func TestResolveClient_ProviderConfigNotFound(t *testing.T) {

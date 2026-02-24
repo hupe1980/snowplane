@@ -36,7 +36,7 @@ func (a *adapter) BuildIdentifier(obj *snowplanev1alpha1.Warehouse) reconciler.I
 
 func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc { return nil }
 
-func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation, error) {
+func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation[*snowflake.WarehouseObservation], error) {
 	aid, err := reconciler.AssertIdentifier[snowflake.AccountObjectIdentifier](id)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identi
 		return nil, err
 	}
 
-	return &reconciler.Observation{Exists: obs.Exists, Detail: obs}, nil
+	return &reconciler.Observation[*snowflake.WarehouseObservation]{Exists: obs.Exists, Detail: obs}, nil
 }
 
 func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha1.Warehouse, id reconciler.Identifier) error {
@@ -63,9 +63,13 @@ func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha
 		return err
 	}
 
-	// Track resource constraint for change detection on future reconciles.
+	// Track resource constraint and generation for change detection on future reconciles.
 	if obj.Spec.ResourceConstraint != nil {
 		obj.Status.LastAppliedResourceConstraint = string(*obj.Spec.ResourceConstraint)
+	}
+
+	if obj.Spec.Generation != nil {
+		obj.Status.LastAppliedGeneration = *obj.Spec.Generation
 	}
 
 	return nil
@@ -104,28 +108,20 @@ func (a *adapter) ValidateImmutableFields(_ context.Context, wh *snowplanev1alph
 	return nil
 }
 
-func (a *adapter) BuildAlterOptions(_ context.Context, obj *snowplanev1alpha1.Warehouse, id reconciler.Identifier, obs *reconciler.Observation) (reconciler.AlterOptions, error) {
+func (a *adapter) BuildAlterOptions(_ context.Context, obj *snowplanev1alpha1.Warehouse, id reconciler.Identifier, obs *reconciler.Observation[*snowflake.WarehouseObservation]) (reconciler.AlterOptions, error) {
 	aid, err := reconciler.AssertIdentifier[snowflake.AccountObjectIdentifier](id)
 	if err != nil {
 		return nil, err
 	}
 
-	detail, err := reconciler.AssertDetail[*snowflake.WarehouseObservation](obs)
-	if err != nil {
-		return nil, err
-	}
-
+	detail := obs.Detail
 	opts := buildAlterOptions(obj, aid, detail)
 
 	return &opts, nil
 }
 
-func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.Warehouse, obs *reconciler.Observation) {
-	detail, ok := obs.Detail.(*snowflake.WarehouseObservation)
-	if !ok {
-		return
-	}
-
+func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.Warehouse, obs *reconciler.Observation[*snowflake.WarehouseObservation]) {
+	detail := obs.Detail
 	applyObservation(obj, detail)
 }
 
@@ -133,32 +129,38 @@ func (a *adapter) ComputeTrackedParameters(obj *snowplanev1alpha1.Warehouse) []s
 	return computeTrackedParameters(&obj.Spec)
 }
 
-func (a *adapter) DetectDrift(obj *snowplanev1alpha1.Warehouse, obs *reconciler.Observation) *drift.Result {
-	detail, ok := obs.Detail.(*snowflake.WarehouseObservation)
-	if !ok {
-		return drift.New().Result()
-	}
-
+func (a *adapter) DetectDrift(obj *snowplanev1alpha1.Warehouse, obs *reconciler.Observation[*snowflake.WarehouseObservation]) *drift.Result {
+	detail := obs.Detail
 	return detectDrift(obj, detail)
 }
 
 func (a *adapter) PostCreate(_ *snowplanev1alpha1.Warehouse) {}
 
 func (a *adapter) PostUpdate(wh *snowplanev1alpha1.Warehouse, altered bool, alterOpts reconciler.AlterOptions) {
-	// Commit resource constraint only after a successful ALTER, reading from
-	// the per-reconciliation AlterOptions (no shared mutable state).
+	// Commit resource constraint and generation only after a successful ALTER,
+	// reading from the per-reconciliation AlterOptions (no shared mutable state).
 	if altered {
-		if opts, ok := alterOpts.(*snowflake.AlterWarehouseOptions); ok && opts.ResourceConstraint != nil {
-			wh.Status.LastAppliedResourceConstraint = *opts.ResourceConstraint
+		if opts, ok := alterOpts.(*snowflake.AlterWarehouseOptions); ok {
+			if opts.ResourceConstraint != nil {
+				wh.Status.LastAppliedResourceConstraint = *opts.ResourceConstraint
+			}
+
+			if opts.Generation != nil {
+				wh.Status.LastAppliedGeneration = *opts.Generation
+			}
 		}
 	}
 
-	// Clear tracked value when resource constraint is removed from spec.
+	// Clear tracked values when fields are removed from spec.
 	if wh.Spec.ResourceConstraint == nil {
 		wh.Status.LastAppliedResourceConstraint = ""
+	}
+
+	if wh.Spec.Generation == nil {
+		wh.Status.LastAppliedGeneration = ""
 	}
 }
 
 func (a *adapter) SupportsCreateOrAlter() bool { return true }
 
-var _ reconciler.ResourceAdapter[*snowplanev1alpha1.Warehouse, Service] = (*adapter)(nil)
+var _ reconciler.ResourceAdapter[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation] = (*adapter)(nil)

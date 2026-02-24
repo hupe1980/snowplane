@@ -1216,31 +1216,167 @@ func (s *StageSpec) Validate() error {
 	return errors.Join(errs...)
 }
 
+// Validate checks the StorageIntegrationSpec for configuration errors.
+func (s *StorageIntegrationSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if len(s.StorageAllowedLocations) == 0 {
+		errs = append(errs, errors.New("spec.storageAllowedLocations must not be empty"))
+	}
+
+	if s.StorageProvider == "" {
+		errs = append(errs, errors.New("spec.storageProvider is required"))
+	}
+
+	// Provider-specific validation.
+	switch strings.ToUpper(s.StorageProvider) {
+	case "S3":
+		if s.StorageAWSRoleARN == nil || *s.StorageAWSRoleARN == "" {
+			errs = append(errs, errors.New("spec.storageAWSRoleARN is required when storageProvider is S3"))
+		}
+	case "AZURE":
+		if s.AzureTenantID == nil || *s.AzureTenantID == "" {
+			errs = append(errs, errors.New("spec.azureTenantID is required when storageProvider is AZURE"))
+		}
+	case "GCS":
+		// GCS requires no additional provider-specific fields.
+	default:
+		errs = append(errs, fmt.Errorf("spec.storageProvider must be one of S3, GCS, AZURE (got: %q)", s.StorageProvider))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the FileFormatSpec for configuration errors.
+func (s *FileFormatSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.Type == "" {
+		errs = append(errs, errors.New("spec.type is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the PipeSpec for configuration errors.
+func (s *PipeSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.CopyStatement == "" {
+		errs = append(errs, errors.New("spec.copyStatement is required"))
+	}
+
+	if s.AutoIngest != nil && *s.AutoIngest && (s.Integration == nil || *s.Integration == "") {
+		errs = append(errs, errors.New("spec.integration is required when spec.autoIngest is true"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the DynamicTableSpec for configuration errors.
+func (s *DynamicTableSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.Query == "" {
+		errs = append(errs, errors.New("spec.query is required"))
+	}
+
+	if s.TargetLag == "" {
+		errs = append(errs, errors.New("spec.targetLag is required"))
+	}
+
+	if s.Warehouse == "" {
+		errs = append(errs, errors.New("spec.warehouse is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
 // ValidFieldExportSourceKinds enumerates the Snowplane managed resource kinds
 // supported as FieldExport sources.
 //
 //nolint:gochecknoglobals // package-level constant set
 var ValidFieldExportSourceKinds = map[string]struct{}{
-	"Database":          {},
-	"Schema":            {},
-	"Warehouse":         {},
-	"User":              {},
-	"AccountRole":       {},
-	"DatabaseRole":      {},
-	"AccountRoleGrant":  {},
-	"DatabaseRoleGrant": {},
-	"ShareGrant":        {},
-	"Table":             {},
-	"View":              {},
-	"Stage":             {},
-	"Task":              {},
-	"Stream":            {},
-	"Tag":               {},
-	"NetworkPolicy":     {},
-	"ResourceMonitor":   {},
-	"MaskingPolicy":     {},
-	"RowAccessPolicy":   {},
-	"GrantOwnership":    {},
+	"Database":           {},
+	"Schema":             {},
+	"Warehouse":          {},
+	"User":               {},
+	"AccountRole":        {},
+	"DatabaseRole":       {},
+	"AccountRoleGrant":   {},
+	"DatabaseRoleGrant":  {},
+	"ShareGrant":         {},
+	"Table":              {},
+	"View":               {},
+	"Stage":              {},
+	"Task":               {},
+	"Stream":             {},
+	"Tag":                {},
+	"NetworkPolicy":      {},
+	"ResourceMonitor":    {},
+	"MaskingPolicy":      {},
+	"RowAccessPolicy":    {},
+	"GrantOwnership":     {},
+	"StorageIntegration": {},
+	"FileFormat":         {},
+	"Pipe":               {},
+	"DynamicTable":       {},
 }
 
 // Validate checks that the FieldExport spec fields are semantically valid.

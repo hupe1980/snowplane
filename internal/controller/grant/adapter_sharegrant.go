@@ -25,7 +25,7 @@ type shareGrantAdapter struct {
 	newService ServiceFactory
 }
 
-var _ reconciler.ResourceAdapter[*snowplanev1alpha1.ShareGrant, Service] = (*shareGrantAdapter)(nil)
+var _ reconciler.ResourceAdapter[*snowplanev1alpha1.ShareGrant, Service, *snowflake.GrantObservation] = (*shareGrantAdapter)(nil)
 
 func (a *shareGrantAdapter) ResourceName() string  { return "sharegrant" }
 func (a *shareGrantAdapter) FinalizerName() string { return shareGrantFinalizer }
@@ -69,7 +69,7 @@ func (a *shareGrantAdapter) SetupWatches() reconciler.SetupWatchesFunc {
 }
 
 // Observe queries Snowflake for the current state.
-func (a *shareGrantAdapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation, error) {
+func (a *shareGrantAdapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation[*snowflake.GrantObservation], error) {
 	return grantObserve(ctx, svc, id)
 }
 
@@ -114,17 +114,13 @@ func (a *shareGrantAdapter) ValidateImmutableFields(_ context.Context, grant *sn
 }
 
 // BuildAlterOptions returns no-change options.
-func (a *shareGrantAdapter) BuildAlterOptions(_ context.Context, _ *snowplanev1alpha1.ShareGrant, _ reconciler.Identifier, _ *reconciler.Observation) (reconciler.AlterOptions, error) {
+func (a *shareGrantAdapter) BuildAlterOptions(_ context.Context, _ *snowplanev1alpha1.ShareGrant, _ reconciler.Identifier, _ *reconciler.Observation[*snowflake.GrantObservation]) (reconciler.AlterOptions, error) {
 	return grantAlterOptions{}, nil
 }
 
 // ApplyObservation maps the observation into the CR's status.
-func (a *shareGrantAdapter) ApplyObservation(obj *snowplanev1alpha1.ShareGrant, obs *reconciler.Observation) {
-	grantObs, ok := obs.Detail.(*snowflake.GrantObservation)
-	if !ok {
-		return
-	}
-
+func (a *shareGrantAdapter) ApplyObservation(obj *snowplanev1alpha1.ShareGrant, obs *reconciler.Observation[*snowflake.GrantObservation]) {
+	grantObs := obs.Detail
 	if grantObs.ShowOutput != nil {
 		onClause := fmt.Sprintf("ON %s %s", obj.Spec.ObjectType, obj.Spec.ObjectName)
 		toClause := snowflake.BuildToClause("", "", obj.Spec.Share)
@@ -139,12 +135,8 @@ func (a *shareGrantAdapter) ComputeTrackedParameters(_ *snowplanev1alpha1.ShareG
 }
 
 // DetectDrift compares spec vs observation.
-func (a *shareGrantAdapter) DetectDrift(obj *snowplanev1alpha1.ShareGrant, obs *reconciler.Observation) *drift.Result {
-	detail, ok := obs.Detail.(*snowflake.GrantObservation)
-	if !ok {
-		return drift.New().Result()
-	}
-
+func (a *shareGrantAdapter) DetectDrift(obj *snowplanev1alpha1.ShareGrant, obs *reconciler.Observation[*snowflake.GrantObservation]) *drift.Result {
+	detail := obs.Detail
 	// Shares don't have WithGrantOption.
 	return detectGrantDrift(obj.Spec.Privilege, false, detail)
 }

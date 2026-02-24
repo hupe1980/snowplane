@@ -264,7 +264,7 @@ func (v *ViewClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) 
 	if err != nil {
 		return nil, fmt.Errorf("showing view %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanViewShowOutput(rows, name.Name())
 }

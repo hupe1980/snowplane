@@ -39,7 +39,7 @@ func newTestDBWithUID(name, namespace, uid string) *snowplanev1alpha1.Database {
 	}
 }
 
-func newOwnershipReconciler(adapter *mockAdapter, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Database, any] {
+func newOwnershipReconciler(adapter *mockAdapter, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any] {
 	scheme := testutil.TestScheme()
 	cb := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(&snowplanev1alpha1.Database{}, &snowplanev1alpha1.ProviderConfig{})
@@ -51,7 +51,7 @@ func newOwnershipReconciler(adapter *mockAdapter, objs ...runtime.Object) *recon
 		return &mockSnowflakeClient{}, nil
 	})
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: record.NewFakeRecorder(100),
@@ -84,8 +84,8 @@ func TestReconcile_Adoption_OwnershipConflict_Rejected(t *testing.T) {
 	}
 
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 
@@ -122,8 +122,8 @@ func TestReconcile_Adoption_NoConflict_Succeeds(t *testing.T) {
 	}
 
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 
@@ -161,8 +161,8 @@ func TestReconcile_Adoption_SameUIDRetry_Succeeds(t *testing.T) {
 	}
 
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 
@@ -195,8 +195,8 @@ func TestReconcile_Adoption_CrossNamespaceConflict_Rejected(t *testing.T) {
 	}
 
 	adapter := &mockAdapter{
-		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation, error) {
-			return &reconciler.Observation{Exists: true, Detail: "observed"}, nil
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
 		},
 	}
 

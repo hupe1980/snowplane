@@ -61,6 +61,7 @@ type CreateWarehouseOptions struct {
 	StatementQueuedTimeoutInSeconds *int32
 	StatementTimeoutInSeconds       *int32
 	ResourceConstraint              *string
+	Generation                      *string
 
 	// UseCreateOrAlter emits CREATE OR ALTER WAREHOUSE instead of
 	// CREATE WAREHOUSE IF NOT EXISTS. Requires Snowflake 2024+ support.
@@ -106,6 +107,7 @@ type AlterWarehouseOptions struct {
 	StatementQueuedTimeoutInSeconds *int32
 	StatementTimeoutInSeconds       *int32
 	ResourceConstraint              *string
+	Generation                      *string
 	UnsetFields                     []string
 }
 
@@ -147,6 +149,7 @@ func (o *AlterWarehouseOptions) HasChanges() bool {
 		o.StatementQueuedTimeoutInSeconds != nil ||
 		o.StatementTimeoutInSeconds != nil ||
 		o.ResourceConstraint != nil ||
+		o.Generation != nil ||
 		len(o.UnsetFields) > 0
 }
 
@@ -191,6 +194,7 @@ func buildCreateWarehouseSQL(opts CreateWarehouseOptions) string {
 	b.SetInt32("STATEMENT_QUEUED_TIMEOUT_IN_SECONDS", opts.StatementQueuedTimeoutInSeconds)
 	b.SetInt32("STATEMENT_TIMEOUT_IN_SECONDS", opts.StatementTimeoutInSeconds)
 	b.SetString("RESOURCE_CONSTRAINT", opts.ResourceConstraint)
+	b.SetKeyword("GENERATION", opts.Generation)
 
 	return b.String()
 }
@@ -227,6 +231,7 @@ func buildAlterWarehouseStatements(opts AlterWarehouseOptions) ([]string, error)
 	sc.Int32("STATEMENT_QUEUED_TIMEOUT_IN_SECONDS", opts.StatementQueuedTimeoutInSeconds)
 	sc.Int32("STATEMENT_TIMEOUT_IN_SECONDS", opts.StatementTimeoutInSeconds)
 	sc.String("RESOURCE_CONSTRAINT", opts.ResourceConstraint)
+	sc.Keyword("GENERATION", opts.Generation)
 
 	return sqlbuilder.BuildAlterStatements("WAREHOUSE", opts.Name.FullyQualifiedName(), &sc, opts.UnsetFields)
 }
@@ -282,7 +287,7 @@ func (w *WarehouseClient) ShowByID(ctx context.Context, name AccountObjectIdenti
 	if err != nil {
 		return nil, fmt.Errorf("showing warehouse %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanWarehouseShowOutput(rows, name.Name())
 }
@@ -297,7 +302,7 @@ func (w *WarehouseClient) ShowParameters(ctx context.Context, name AccountObject
 	if err != nil {
 		return nil, fmt.Errorf("showing warehouse parameters %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanWarehouseParameters(rows)
 }

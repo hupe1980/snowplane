@@ -271,7 +271,7 @@ func (g *GrantClient) ShowGrants(ctx context.Context, target string, future bool
 	if err != nil {
 		return nil, fmt.Errorf("showing grants (%s): %w", query, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanGrantShowOutput(rows, future)
 }

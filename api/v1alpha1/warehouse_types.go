@@ -54,8 +54,24 @@ const (
 type ResourceConstraint string
 
 const (
-	// ResourceConstraintMemory constrains warehouse resources by memory.
+	// ResourceConstraintMemory constrains warehouse resources by memory (legacy).
 	ResourceConstraintMemory ResourceConstraint = "MEMORY"
+	// ResourceConstraintStandardGen1 specifies standard generation 1.
+	ResourceConstraintStandardGen1 ResourceConstraint = "STANDARD_GEN_1"
+	// ResourceConstraintStandardGen2 specifies standard generation 2.
+	ResourceConstraintStandardGen2 ResourceConstraint = "STANDARD_GEN_2"
+	// ResourceConstraintMemory1X specifies 1x memory.
+	ResourceConstraintMemory1X ResourceConstraint = "MEMORY_1X"
+	// ResourceConstraintMemory1Xx86 specifies 1x memory x86.
+	ResourceConstraintMemory1Xx86 ResourceConstraint = "MEMORY_1X_x86"
+	// ResourceConstraintMemory16X specifies 16x memory.
+	ResourceConstraintMemory16X ResourceConstraint = "MEMORY_16X"
+	// ResourceConstraintMemory16Xx86 specifies 16x memory x86.
+	ResourceConstraintMemory16Xx86 ResourceConstraint = "MEMORY_16X_x86"
+	// ResourceConstraintMemory64X specifies 64x memory.
+	ResourceConstraintMemory64X ResourceConstraint = "MEMORY_64X"
+	// ResourceConstraintMemory64Xx86 specifies 64x memory x86.
+	ResourceConstraintMemory64Xx86 ResourceConstraint = "MEMORY_64X_x86"
 )
 
 // WarehouseState represents the running state of a warehouse.
@@ -73,6 +89,7 @@ const (
 // WarehouseSpec defines the desired state of a Warehouse.
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="!(has(self.generation) && has(self.resourceConstraint))",message="spec.generation and spec.resourceConstraint are mutually exclusive"
 type WarehouseSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -130,9 +147,16 @@ type WarehouseSpec struct {
 	// StatementTimeoutInSeconds controls the max execution time per statement.
 	StatementTimeoutInSeconds *int32 `json:"statementTimeoutInSeconds,omitempty"`
 
-	// ResourceConstraint specifies resource constraints (e.g., MEMORY).
-	// +kubebuilder:validation:Enum=MEMORY
+	// ResourceConstraint specifies resource constraints (e.g., MEMORY, STANDARD_GEN_1, MEMORY_16X).
+	// +kubebuilder:validation:Enum=MEMORY;STANDARD_GEN_1;STANDARD_GEN_2;MEMORY_1X;MEMORY_1X_x86;MEMORY_16X;MEMORY_16X_x86;MEMORY_64X;MEMORY_64X_x86
 	ResourceConstraint *ResourceConstraint `json:"resourceConstraint,omitempty"`
+
+	// Generation specifies the warehouse generation for standard warehouses.
+	// Valid values are "1" (gen1) or "2" (gen2). This is a simplified alternative
+	// to using ResourceConstraint for generation selection.
+	// +optional
+	// +kubebuilder:validation:Enum="1";"2"
+	Generation *string `json:"generation,omitempty"`
 }
 
 // WarehouseShowOutput mirrors the SHOW WAREHOUSES output stored in status.
@@ -169,6 +193,11 @@ type WarehouseStatus struct {
 	// applied to Snowflake. Because SHOW WAREHOUSES does not surface this
 	// field, tracking it prevents unnecessary ALTER on every reconcile.
 	LastAppliedResourceConstraint string `json:"lastAppliedResourceConstraint,omitempty"`
+
+	// LastAppliedGeneration stores the last generation value applied to
+	// Snowflake. Like ResourceConstraint, SHOW WAREHOUSES does not surface
+	// this field, so we track it to prevent redundant ALTERs.
+	LastAppliedGeneration string `json:"lastAppliedGeneration,omitempty"`
 }
 
 // Warehouse is the Schema for the warehouses API.
@@ -197,64 +226,4 @@ type WarehouseList struct {
 	Items           []Warehouse `json:"items"`
 }
 
-// GetConditions returns the warehouse conditions.
-func (w *Warehouse) GetConditions() []metav1.Condition { return w.Status.Conditions }
-
-// SetConditions sets the warehouse conditions.
-func (w *Warehouse) SetConditions(conditions []metav1.Condition) { w.Status.Conditions = conditions }
-
-// GetDeletionPolicy returns the deletion policy.
-func (w *Warehouse) GetDeletionPolicy() DeletionPolicy {
-	if w.Spec.DeletionPolicy == "" {
-		return DeletionPolicyDelete
-	}
-
-	return w.Spec.DeletionPolicy
-}
-
-// GetFullyQualifiedName returns the warehouse FQN.
-func (w *Warehouse) GetFullyQualifiedName() string { return w.Status.FullyQualifiedName }
-
 func init() { SchemeBuilder.Register(&Warehouse{}, &WarehouseList{}) }
-
-// GetSpecName returns the Snowflake resource name from the spec.
-func (w *Warehouse) GetSpecName() string { return w.Spec.Name }
-
-// GetProviderRef returns the provider reference from the spec.
-func (w *Warehouse) GetProviderRef() ProviderReference { return w.Spec.ProviderRef }
-
-// GetUseRole returns the use role from the spec.
-func (w *Warehouse) GetUseRole() *string { return w.Spec.UseRole }
-
-// GetObservedGeneration returns the observed generation from status.
-func (w *Warehouse) GetObservedGeneration() int64 { return w.Status.ObservedGeneration }
-
-// SetObservedGeneration sets the observed generation in status.
-func (w *Warehouse) SetObservedGeneration(v int64) { w.Status.ObservedGeneration = v }
-
-// GetLastAppliedSpecHash returns the last applied spec hash from status.
-func (w *Warehouse) GetLastAppliedSpecHash() string { return w.Status.LastAppliedSpecHash }
-
-// SetLastAppliedSpecHash sets the last applied spec hash in status.
-func (w *Warehouse) SetLastAppliedSpecHash(v string) { w.Status.LastAppliedSpecHash = v }
-
-// GetTrackedParametersList returns the tracked parameters list from status.
-func (w *Warehouse) GetTrackedParametersList() []string { return w.Status.TrackedParameters }
-
-// SetTrackedParametersList sets the tracked parameters list in status.
-func (w *Warehouse) SetTrackedParametersList(v []string) { w.Status.TrackedParameters = v }
-
-// GetOwner returns the use role from status.
-func (w *Warehouse) GetOwner() string {
-	if w.Status.ShowOutput != nil {
-		return w.Status.ShowOutput.Owner
-	}
-
-	return ""
-}
-
-// ValidateSpec validates the resource spec.
-func (w *Warehouse) ValidateSpec() error { return w.Spec.Validate() }
-
-// ComputeSpecHash returns a SHA-256 hash of the spec for drift detection.
-func (w *Warehouse) ComputeSpecHash() (string, error) { return ComputeSpecHash(w.Spec) }

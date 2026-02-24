@@ -51,8 +51,10 @@ type StageEncryptionOptions struct {
 
 // StageDirectoryCreateOptions configures directory table settings for creation.
 type StageDirectoryCreateOptions struct {
-	Enable      bool
-	AutoRefresh *bool
+	Enable                  bool
+	AutoRefresh             *bool
+	RefreshOnCreate         *bool
+	NotificationIntegration *string
 }
 
 // Validate checks the CreateStageOptions for validity.
@@ -159,6 +161,14 @@ func buildCreateStageSQL(opts CreateStageOptions) string {
 			dirClause += fmt.Sprintf(" AUTO_REFRESH = %s", sqlbuilder.BoolToSQL(*opts.Directory.AutoRefresh))
 		}
 
+		if opts.Directory.RefreshOnCreate != nil {
+			dirClause += fmt.Sprintf(" REFRESH_ON_CREATE = %s", sqlbuilder.BoolToSQL(*opts.Directory.RefreshOnCreate))
+		}
+
+		if opts.Directory.NotificationIntegration != nil {
+			dirClause += fmt.Sprintf(" NOTIFICATION_INTEGRATION = %s", sqlbuilder.QuoteIdentifier(*opts.Directory.NotificationIntegration))
+		}
+
 		dirClause += ")"
 		b.WriteString(dirClause)
 	}
@@ -191,15 +201,25 @@ func buildAlterStageStatements(opts AlterStageOptions) ([]string, error) {
 
 	fqn := opts.Name.FullyQualifiedName()
 
-	// Handle directory separately.
+	// Handle directory separately — mirror the CREATE logic for all sub-options.
 	if opts.Directory != nil {
 		dir := "FALSE"
 		if opts.Directory.Enable {
 			dir = "TRUE"
 		}
 
-		statements = append(statements,
-			fmt.Sprintf("ALTER STAGE %s SET DIRECTORY = (ENABLE = %s)", fqn, dir))
+		dirClause := fmt.Sprintf("ALTER STAGE %s SET DIRECTORY = (ENABLE = %s", fqn, dir)
+
+		if opts.Directory.AutoRefresh != nil {
+			dirClause += fmt.Sprintf(" AUTO_REFRESH = %s", sqlbuilder.BoolToSQL(*opts.Directory.AutoRefresh))
+		}
+
+		if opts.Directory.NotificationIntegration != nil {
+			dirClause += fmt.Sprintf(" NOTIFICATION_INTEGRATION = %s", sqlbuilder.QuoteIdentifier(*opts.Directory.NotificationIntegration))
+		}
+
+		dirClause += ")"
+		statements = append(statements, dirClause)
 	}
 
 	// Build SET clause.
@@ -287,7 +307,7 @@ func (s *StageClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier)
 	if err != nil {
 		return nil, fmt.Errorf("showing stage %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanStageShowOutput(rows, name.Name())
 }

@@ -73,6 +73,10 @@ rules:
   - maskingpolicies
   - rowaccesspolicies
   - grantownerships
+  - dynamictables
+  - fileformats
+  - pipes
+  - storageintegrations
   - fieldexports
   - providerconfigs
   verbs:
@@ -106,6 +110,10 @@ rules:
   - maskingpolicies/status
   - rowaccesspolicies/status
   - grantownerships/status
+  - dynamictables/status
+  - fileformats/status
+  - pipes/status
+  - storageintegrations/status
   - fieldexports/status
   - providerconfigs/status
   verbs:
@@ -135,6 +143,10 @@ rules:
   - maskingpolicies/finalizers
   - rowaccesspolicies/finalizers
   - grantownerships/finalizers
+  - dynamictables/finalizers
+  - fileformats/finalizers
+  - pipes/finalizers
+  - storageintegrations/finalizers
   - fieldexports/finalizers
   - providerconfigs/finalizers
   verbs:
@@ -221,6 +233,10 @@ rules:
   - maskingpolicies
   - rowaccesspolicies
   - grantownerships
+  - dynamictables
+  - fileformats
+  - pipes
+  - storageintegrations
   - fieldexports
   - providerconfigs
   verbs:
@@ -250,6 +266,10 @@ rules:
   - maskingpolicies/status
   - rowaccesspolicies/status
   - grantownerships/status
+  - dynamictables/status
+  - fileformats/status
+  - pipes/status
+  - storageintegrations/status
   - fieldexports/status
   - providerconfigs/status
   verbs:
@@ -287,6 +307,10 @@ rules:
   - maskingpolicies
   - rowaccesspolicies
   - grantownerships
+  - dynamictables
+  - fileformats
+  - pipes
+  - storageintegrations
   - fieldexports
   - providerconfigs
   verbs:
@@ -320,6 +344,10 @@ rules:
   - maskingpolicies/status
   - rowaccesspolicies/status
   - grantownerships/status
+  - dynamictables/status
+  - fileformats/status
+  - pipes/status
+  - storageintegrations/status
   - fieldexports/status
   - providerconfigs/status
   verbs:

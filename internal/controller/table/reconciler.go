@@ -35,9 +35,9 @@ type Service interface {
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
 // NewReconciler returns a new Table reconciler backed by the generic framework.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Table, Service] {
+func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Table, Service, *snowflake.TableObservation] {
 	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Table, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.Table, Service, *snowflake.TableObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,
@@ -54,9 +54,9 @@ func NewReconcilerWithServiceFactory(
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
-) *reconciler.GenericReconciler[*snowplanev1alpha1.Table, Service] {
+) *reconciler.GenericReconciler[*snowplanev1alpha1.Table, Service, *snowflake.TableObservation] {
 	a := &adapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Table, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.Table, Service, *snowflake.TableObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,

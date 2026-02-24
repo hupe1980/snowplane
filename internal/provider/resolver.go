@@ -20,11 +20,22 @@ import (
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
+// ResolvedProvider contains the resolved Snowflake client along with
+// provider metadata useful for structured logging and metrics.
+type ResolvedProvider struct {
+	Client  clientfactory.SnowflakeClient
+	Name    string // ProviderConfig name (e.g. "default")
+	Account string // Snowflake account identifier (e.g. "orgname-accountname")
+}
+
 // ResolveClient resolves the Snowflake client for a managed resource by
 // looking up the ProviderConfig and its referenced credentials Secret.
 // It sets appropriate conditions on the object when resolution fails.
 // If a rate limiter is provided, it rate-limits the call per provider.
 // If a circuit breaker is provided, it short-circuits calls to failing providers.
+//
+// Returns a ResolvedProvider containing the client plus provider metadata
+// (name and account) for structured log enrichment (L-3).
 func ResolveClient(
 	ctx context.Context,
 	c client.Client,
@@ -35,7 +46,7 @@ func ResolveClient(
 	rl *ratelimit.Limiter,
 	cb *circuitbreaker.Breaker,
 	controllerName string,
-) (clientfactory.SnowflakeClient, error) {
+) (*ResolvedProvider, error) {
 	// Look up ProviderConfig. If providerRef.Namespace is set,
 	// use it; otherwise fall back to the resource's namespace.
 	pcNamespace := namespace
@@ -150,5 +161,9 @@ func ResolveClient(
 		return nil, err
 	}
 
-	return sfClient, nil
+	return &ResolvedProvider{
+		Client:  sfClient,
+		Name:    pc.Name,
+		Account: pc.Spec.Account,
+	}, nil
 }

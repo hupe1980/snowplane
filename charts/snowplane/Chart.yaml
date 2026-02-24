@@ -18,4 +18,4 @@ keywords:
 annotations:
   artifacthub.io/category: integration
   artifacthub.io/operator: "true"
-  artifacthub.io/license: MIT
+  artifacthub.io/license: Apache-2.0

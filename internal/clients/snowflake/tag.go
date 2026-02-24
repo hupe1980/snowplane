@@ -211,7 +211,7 @@ func (t *TagClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (
 	if err != nil {
 		return nil, fmt.Errorf("showing tag %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanTagShowOutput(rows, name.Name())
 }

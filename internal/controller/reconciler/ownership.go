@@ -49,7 +49,7 @@ func setExternalNameLabel[T ManagedResource](obj T, hash string) {
 //
 // Returns true when a conflict is detected (conditions and events are set on
 // obj before returning). Returns false when no conflict exists.
-func (r *GenericReconciler[T, S]) checkOwnershipConflict(ctx context.Context, obj T, hash string) (bool, error) {
+func (r *GenericReconciler[T, S, D]) checkOwnershipConflict(ctx context.Context, obj T, hash string) (bool, error) {
 	logger := log.FromContext(ctx)
 
 	// Build the List GVK from the resource GVK.

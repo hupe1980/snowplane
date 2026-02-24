@@ -65,8 +65,9 @@ uninstall:
 # Run all checks (CI equivalent)
 ci: lint vet test build
 
-# Generate deepcopy methods and CRD manifests
+# Generate deepcopy methods, CRD manifests, and accessor boilerplate
 generate:
+    go run hack/gen-accessors/main.go
     controller-gen object paths="./api/v1alpha1"
     controller-gen crd paths="./api/..." output:crd:artifacts:config=config/crd/bases
 

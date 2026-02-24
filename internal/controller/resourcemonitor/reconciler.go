@@ -38,9 +38,9 @@ type Service interface {
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
 // NewReconciler returns a new ResourceMonitor reconciler backed by the generic framework.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.ResourceMonitor, Service] {
+func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.ResourceMonitor, Service, *snowflake.ResourceMonitorObservation] {
 	a := &adapter{newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.ResourceMonitor, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.ResourceMonitor, Service, *snowflake.ResourceMonitorObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,
@@ -57,9 +57,9 @@ func NewReconcilerWithServiceFactory(
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
-) *reconciler.GenericReconciler[*snowplanev1alpha1.ResourceMonitor, Service] {
+) *reconciler.GenericReconciler[*snowplanev1alpha1.ResourceMonitor, Service, *snowflake.ResourceMonitorObservation] {
 	a := &adapter{newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.ResourceMonitor, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.ResourceMonitor, Service, *snowflake.ResourceMonitorObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,
@@ -147,23 +147,11 @@ func buildAlterOptions(rm *snowplanev1alpha1.ResourceMonitor, id snowflake.Accou
 	return opts
 }
 
-func computeUnsetFields(rm *snowplanev1alpha1.ResourceMonitor) []string {
-	if len(rm.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(rm.Status.TrackedParameters))
-	for _, f := range rm.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-	// Note: Most resource monitor fields cannot be UNSET. The only meaningful
-	// scenario is clearing notify_users or triggers. These are handled by
-	// sending empty values in ALTER rather than UNSET.
-	_ = managed
-
-	return unset
+func computeUnsetFields(_ *snowplanev1alpha1.ResourceMonitor) []string {
+	// Resource Monitor fields cannot be UNSET in Snowflake DDL.
+	// Clearing notify_users or triggers is handled by sending empty values
+	// in ALTER rather than UNSET, so this always returns nil.
+	return nil
 }
 
 func computeTrackedParameters(spec *snowplanev1alpha1.ResourceMonitorSpec) []string {

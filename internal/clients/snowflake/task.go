@@ -38,20 +38,27 @@ type TaskShowOutput struct {
 
 // CreateTaskOptions holds the parameters for creating a task.
 type CreateTaskOptions struct {
-	Name                                SchemaObjectIdentifier
-	Warehouse                           *string
-	UserTaskManagedInitialWarehouseSize *string
-	Schedule                            *string
-	SQLStatement                        string
-	After                               []string
-	When                                *string
-	Comment                             *string
-	AllowOverlappingExecution           *bool
-	UserTaskTimeoutMs                   *int32
-	SuspendTaskAfterNumFailures         *int32
-	ErrorIntegration                    *string
-	SuccessIntegration                  *string
-	TaskAutoRetryAttempts               *int32
+	Name                                    SchemaObjectIdentifier
+	Warehouse                               *string
+	UserTaskManagedInitialWarehouseSize     *string
+	Schedule                                *string
+	SQLStatement                            string
+	After                                   []string
+	When                                    *string
+	Comment                                 *string
+	AllowOverlappingExecution               *bool
+	UserTaskTimeoutMs                       *int32
+	SuspendTaskAfterNumFailures             *int32
+	ErrorIntegration                        *string
+	SuccessIntegration                      *string
+	TaskAutoRetryAttempts                   *int32
+	Config                                  *string
+	Finalize                                *string
+	LogLevel                                *string
+	UserTaskMinimumTriggerIntervalInSeconds *int32
+	TargetCompletionInterval                *string
+	ServerlessTaskMinStatementSize          *string
+	ServerlessTaskMaxStatementSize          *string
 
 	// UseCreateOrAlter emits CREATE OR ALTER TASK instead of CREATE TASK IF NOT EXISTS.
 	UseCreateOrAlter bool
@@ -92,20 +99,31 @@ func (o *CreateTaskOptions) Validate() error {
 
 // AlterTaskOptions holds the parameters for altering a task.
 type AlterTaskOptions struct {
-	Name                                SchemaObjectIdentifier
-	Warehouse                           *string
-	UserTaskManagedInitialWarehouseSize *string
-	Schedule                            *string
-	SQLStatement                        *string
-	When                                *string
-	Comment                             *string
-	AllowOverlappingExecution           *bool
-	UserTaskTimeoutMs                   *int32
-	SuspendTaskAfterNumFailures         *int32
-	ErrorIntegration                    *string
-	SuccessIntegration                  *string
-	TaskAutoRetryAttempts               *int32
-	Suspend                             *bool
+	Name                                    SchemaObjectIdentifier
+	Warehouse                               *string
+	UserTaskManagedInitialWarehouseSize     *string
+	Schedule                                *string
+	SQLStatement                            *string
+	When                                    *string
+	Comment                                 *string
+	AllowOverlappingExecution               *bool
+	UserTaskTimeoutMs                       *int32
+	SuspendTaskAfterNumFailures             *int32
+	ErrorIntegration                        *string
+	SuccessIntegration                      *string
+	TaskAutoRetryAttempts                   *int32
+	Config                                  *string
+	LogLevel                                *string
+	UserTaskMinimumTriggerIntervalInSeconds *int32
+	TargetCompletionInterval                *string
+	ServerlessTaskMinStatementSize          *string
+	ServerlessTaskMaxStatementSize          *string
+	Suspend                                 *bool
+
+	// SetFinalize sets the finalizer task root.
+	SetFinalize *string
+	// UnsetFinalize removes the finalizer association.
+	UnsetFinalize bool
 
 	// SetAfter replaces the predecessor list.
 	SetAfter []string
@@ -145,6 +163,14 @@ func (o *AlterTaskOptions) HasChanges() bool {
 		o.ErrorIntegration != nil ||
 		o.SuccessIntegration != nil ||
 		o.TaskAutoRetryAttempts != nil ||
+		o.Config != nil ||
+		o.LogLevel != nil ||
+		o.UserTaskMinimumTriggerIntervalInSeconds != nil ||
+		o.TargetCompletionInterval != nil ||
+		o.ServerlessTaskMinStatementSize != nil ||
+		o.ServerlessTaskMaxStatementSize != nil ||
+		o.SetFinalize != nil ||
+		o.UnsetFinalize ||
 		o.Suspend != nil ||
 		len(o.SetAfter) > 0 ||
 		len(o.RemoveAfter) > 0 ||
@@ -197,6 +223,20 @@ func buildCreateTaskSQL(opts CreateTaskOptions) string {
 	if opts.SuccessIntegration != nil {
 		fmt.Fprintf(&b.Builder, " SUCCESS_INTEGRATION = %s", sqlbuilder.QuoteIdentifier(*opts.SuccessIntegration))
 	}
+
+	if opts.Config != nil {
+		fmt.Fprintf(&b.Builder, " CONFIG = $$%s$$", *opts.Config)
+	}
+
+	if opts.Finalize != nil {
+		fmt.Fprintf(&b.Builder, " FINALIZE = %s", sqlbuilder.QuoteIdentifier(*opts.Finalize))
+	}
+
+	b.SetString("LOG_LEVEL", opts.LogLevel)
+	b.SetInt32("USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS", opts.UserTaskMinimumTriggerIntervalInSeconds)
+	b.SetString("TARGET_COMPLETION_INTERVAL", opts.TargetCompletionInterval)
+	b.SetString("SERVERLESS_TASK_MIN_STATEMENT_SIZE", opts.ServerlessTaskMinStatementSize)
+	b.SetString("SERVERLESS_TASK_MAX_STATEMENT_SIZE", opts.ServerlessTaskMaxStatementSize)
 
 	b.SetString("COMMENT", opts.Comment)
 
@@ -292,13 +332,27 @@ func buildAlterTaskStatements(opts AlterTaskOptions) (statements []string, err e
 	sc.Int32("SUSPEND_TASK_AFTER_NUM_FAILURES", opts.SuspendTaskAfterNumFailures)
 	sc.Int32("TASK_AUTO_RETRY_ATTEMPTS", opts.TaskAutoRetryAttempts)
 	sc.Bool("ALLOW_OVERLAPPING_EXECUTION", opts.AllowOverlappingExecution)
+	sc.String("LOG_LEVEL", opts.LogLevel)
+	sc.Int32("USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS", opts.UserTaskMinimumTriggerIntervalInSeconds)
+	sc.String("TARGET_COMPLETION_INTERVAL", opts.TargetCompletionInterval)
+	sc.String("SERVERLESS_TASK_MIN_STATEMENT_SIZE", opts.ServerlessTaskMinStatementSize)
+	sc.String("SERVERLESS_TASK_MAX_STATEMENT_SIZE", opts.ServerlessTaskMaxStatementSize)
 
 	if opts.Warehouse != nil {
 		sc.Keyword("WAREHOUSE", opts.Warehouse)
 	}
 
+	if opts.UserTaskManagedInitialWarehouseSize != nil {
+		sc.String("USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE", opts.UserTaskManagedInitialWarehouseSize)
+	}
+
 	if opts.Schedule != nil {
 		sc.String("SCHEDULE", opts.Schedule)
+	}
+
+	if opts.Config != nil {
+		// CONFIG uses $$ delimiters, not single quotes.
+		sc.Raw(fmt.Sprintf("CONFIG = $$%s$$", *opts.Config))
 	}
 
 	if opts.ErrorIntegration != nil {
@@ -315,6 +369,15 @@ func buildAlterTaskStatements(opts AlterTaskOptions) (statements []string, err e
 	}
 
 	statements = append(statements, alterStmts...)
+
+	// FINALIZE requires separate ALTER statements.
+	if opts.SetFinalize != nil {
+		statements = append(statements, fmt.Sprintf("ALTER TASK %s SET FINALIZE = %s",
+			opts.Name.FullyQualifiedName(), sqlbuilder.QuoteIdentifier(*opts.SetFinalize)))
+	} else if opts.UnsetFinalize {
+		statements = append(statements, fmt.Sprintf("ALTER TASK %s UNSET FINALIZE",
+			opts.Name.FullyQualifiedName()))
+	}
 
 	return statements, nil
 }
@@ -370,7 +433,7 @@ func (t *TaskClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) 
 	if err != nil {
 		return nil, fmt.Errorf("showing task %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanTaskShowOutput(rows, name.Name())
 }

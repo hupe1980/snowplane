@@ -24,17 +24,21 @@ import (
 	accountrolectl "github.com/hupe1980/snowplane/internal/controller/accountrole"
 	database "github.com/hupe1980/snowplane/internal/controller/database"
 	databaserolectl "github.com/hupe1980/snowplane/internal/controller/databaserole"
+	dynamictablectl "github.com/hupe1980/snowplane/internal/controller/dynamictable"
 	fieldexportctl "github.com/hupe1980/snowplane/internal/controller/fieldexport"
+	fileformatctl "github.com/hupe1980/snowplane/internal/controller/fileformat"
 	grantctl "github.com/hupe1980/snowplane/internal/controller/grant"
 	grantownershipctl "github.com/hupe1980/snowplane/internal/controller/grantownership"
 	maskingpolicyctl "github.com/hupe1980/snowplane/internal/controller/maskingpolicy"
 	networkpolicyctl "github.com/hupe1980/snowplane/internal/controller/networkpolicy"
+	pipectl "github.com/hupe1980/snowplane/internal/controller/pipe"
 	providerconfig "github.com/hupe1980/snowplane/internal/controller/providerconfig"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	resourcemonitorctl "github.com/hupe1980/snowplane/internal/controller/resourcemonitor"
 	rowaccesspolicyctl "github.com/hupe1980/snowplane/internal/controller/rowaccesspolicy"
 	schemactl "github.com/hupe1980/snowplane/internal/controller/schema"
 	stagectl "github.com/hupe1980/snowplane/internal/controller/stage"
+	storageintegrationctl "github.com/hupe1980/snowplane/internal/controller/storageintegration"
 	streamctl "github.com/hupe1980/snowplane/internal/controller/stream"
 	tablectl "github.com/hupe1980/snowplane/internal/controller/table"
 	tagctl "github.com/hupe1980/snowplane/internal/controller/tag"
@@ -61,27 +65,31 @@ func init() {
 
 // validControllerNames is the set of controller names accepted by --disable-controllers.
 var validControllerNames = map[string]bool{
-	"database":          true,
-	"schema":            true,
-	"warehouse":         true,
-	"accountrole":       true,
-	"databaserole":      true,
-	"accountrolegrant":  true,
-	"databaserolegrant": true,
-	"sharegrant":        true,
-	"user":              true,
-	"table":             true,
-	"view":              true,
-	"stage":             true,
-	"task":              true,
-	"stream":            true,
-	"tag":               true,
-	"networkpolicy":     true,
-	"resourcemonitor":   true,
-	"maskingpolicy":     true,
-	"rowaccesspolicy":   true,
-	"grantownership":    true,
-	"fieldexport":       true,
+	"database":           true,
+	"schema":             true,
+	"warehouse":          true,
+	"accountrole":        true,
+	"databaserole":       true,
+	"accountrolegrant":   true,
+	"databaserolegrant":  true,
+	"sharegrant":         true,
+	"user":               true,
+	"table":              true,
+	"view":               true,
+	"stage":              true,
+	"task":               true,
+	"stream":             true,
+	"tag":                true,
+	"networkpolicy":      true,
+	"resourcemonitor":    true,
+	"maskingpolicy":      true,
+	"rowaccesspolicy":    true,
+	"grantownership":     true,
+	"fieldexport":        true,
+	"storageintegration": true,
+	"fileformat":         true,
+	"pipe":               true,
+	"dynamictable":       true,
 }
 
 // parseDisabledControllers parses a comma-separated list of controller names
@@ -143,7 +151,7 @@ func main() {
 		"Enable controllers for alpha-maturity CRDs. Set to false to skip alpha resources.")
 	flag.StringVar(&disableControllers, "disable-controllers", "",
 		"Comma-separated list of controller names to disable (e.g. \"accountrolegrant,stage,view\"). "+
-			"Valid names: database, schema, warehouse, accountrole, databaserole, accountrolegrant, databaserolegrant, sharegrant, user, table, view, stage, task, stream, tag, networkpolicy, resourcemonitor, maskingpolicy, rowaccesspolicy, grantownership, fieldexport.")
+			"Valid names: database, schema, warehouse, accountrole, databaserole, accountrolegrant, databaserolegrant, sharegrant, user, table, view, stage, task, stream, tag, networkpolicy, resourcemonitor, maskingpolicy, rowaccesspolicy, grantownership, fieldexport, storageintegration, fileformat, pipe, dynamictable.")
 	flag.StringVar(&watchNamespaces, "watch-namespaces", "",
 		"Comma-separated list of namespaces to watch. If empty, all namespaces are watched.")
 	flag.StringVar(&leaderElectionID, "leader-election-id", "snowplane-leader-election",
@@ -191,7 +199,8 @@ func main() {
 	}
 
 	// Create shared client factory.
-	factory := clientfactory.NewClientFactory()
+	factory := clientfactory.NewClientFactory().
+		WithStartupGrace(30 * time.Second) // L-2: grace period before readiness probe checks Snowflake connectivity
 	defer factory.Close()
 
 	// Create shared rate limiter.
@@ -267,6 +276,10 @@ func main() {
 		{"maskingpolicy", maskingpolicyctl.NewReconciler(kc, factory, controllerRec("maskingpolicy"), rl)},
 		{"rowaccesspolicy", rowaccesspolicyctl.NewReconciler(kc, factory, controllerRec("rowaccesspolicy"), rl)},
 		{"grantownership", grantownershipctl.NewReconciler(kc, factory, controllerRec("grantownership"), rl)},
+		{"storageintegration", storageintegrationctl.NewReconciler(kc, factory, controllerRec("storageintegration"), rl)},
+		{"fileformat", fileformatctl.NewReconciler(kc, factory, controllerRec("fileformat"), rl)},
+		{"pipe", pipectl.NewReconciler(kc, factory, controllerRec("pipe"), rl)},
+		{"dynamictable", dynamictablectl.NewReconciler(kc, factory, controllerRec("dynamictable"), rl)},
 	}
 
 	for _, entry := range controllers {

@@ -3,6 +3,8 @@
 // +groupName=snowplane.hupe1980.github.io
 package v1alpha1
 
+//go:generate go run ../../hack/gen-accessors/main.go
+
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/scheme"

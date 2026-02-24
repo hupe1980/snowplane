@@ -237,7 +237,7 @@ func (np *NetworkPolicyClient) ShowByID(ctx context.Context, name AccountObjectI
 	if err != nil {
 		return nil, fmt.Errorf("showing network policy %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanNetworkPolicyShowOutput(rows, name.Name())
 }

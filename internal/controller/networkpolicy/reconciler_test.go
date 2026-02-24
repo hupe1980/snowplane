@@ -90,7 +90,7 @@ func successfulObservation() *snowflake.NetworkPolicyObservation {
 	}
 }
 
-func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.NetworkPolicy, Service] {
+func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.NetworkPolicy, Service, *snowflake.NetworkPolicyObservation] {
 	scheme := testutil.TestScheme()
 	cb := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(&snowplanev1alpha1.NetworkPolicy{}, &snowplanev1alpha1.ProviderConfig{})
@@ -99,7 +99,7 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 	c := cb.Build()
 	factory := clientfactory.NewClientFactory()
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.NetworkPolicy, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.NetworkPolicy, Service, *snowflake.NetworkPolicyObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: record.NewFakeRecorder(100),

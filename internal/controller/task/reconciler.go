@@ -34,9 +34,9 @@ type Service interface {
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
 // NewReconciler returns a new Task reconciler backed by the generic framework.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Task, Service] {
+func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Task, Service, *snowflake.TaskObservation] {
 	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Task, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.Task, Service, *snowflake.TaskObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,
@@ -53,9 +53,9 @@ func NewReconcilerWithServiceFactory(
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
-) *reconciler.GenericReconciler[*snowplanev1alpha1.Task, Service] {
+) *reconciler.GenericReconciler[*snowplanev1alpha1.Task, Service, *snowflake.TaskObservation] {
 	a := &adapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Task, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.Task, Service, *snowflake.TaskObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,
@@ -104,20 +104,27 @@ func applyObservation(task *snowplanev1alpha1.Task, obs *snowflake.TaskObservati
 
 func buildCreateOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectIdentifier) snowflake.CreateTaskOptions {
 	return snowflake.CreateTaskOptions{
-		Name:                                id,
-		Warehouse:                           task.Spec.Warehouse,
-		UserTaskManagedInitialWarehouseSize: task.Spec.UserTaskManagedInitialWarehouseSize,
-		Schedule:                            task.Spec.Schedule,
-		SQLStatement:                        task.Spec.SQLStatement,
-		After:                               task.Spec.After,
-		When:                                task.Spec.When,
-		Comment:                             task.Spec.Comment,
-		AllowOverlappingExecution:           task.Spec.AllowOverlappingExecution,
-		UserTaskTimeoutMs:                   task.Spec.UserTaskTimeoutMs,
-		SuspendTaskAfterNumFailures:         task.Spec.SuspendTaskAfterNumFailures,
-		ErrorIntegration:                    task.Spec.ErrorIntegration,
-		SuccessIntegration:                  task.Spec.SuccessIntegration,
-		TaskAutoRetryAttempts:               task.Spec.TaskAutoRetryAttempts,
+		Name:                                    id,
+		Warehouse:                               task.Spec.Warehouse,
+		UserTaskManagedInitialWarehouseSize:     task.Spec.UserTaskManagedInitialWarehouseSize,
+		Schedule:                                task.Spec.Schedule,
+		SQLStatement:                            task.Spec.SQLStatement,
+		After:                                   task.Spec.After,
+		When:                                    task.Spec.When,
+		Comment:                                 task.Spec.Comment,
+		AllowOverlappingExecution:               task.Spec.AllowOverlappingExecution,
+		UserTaskTimeoutMs:                       task.Spec.UserTaskTimeoutMs,
+		SuspendTaskAfterNumFailures:             task.Spec.SuspendTaskAfterNumFailures,
+		ErrorIntegration:                        task.Spec.ErrorIntegration,
+		SuccessIntegration:                      task.Spec.SuccessIntegration,
+		TaskAutoRetryAttempts:                   task.Spec.TaskAutoRetryAttempts,
+		Config:                                  task.Spec.Config,
+		Finalize:                                task.Spec.Finalize,
+		LogLevel:                                task.Spec.LogLevel,
+		UserTaskMinimumTriggerIntervalInSeconds: task.Spec.UserTaskMinimumTriggerIntervalInSeconds,
+		TargetCompletionInterval:                task.Spec.TargetCompletionInterval,
+		ServerlessTaskMinStatementSize:          task.Spec.ServerlessTaskMinStatementSize,
+		ServerlessTaskMaxStatementSize:          task.Spec.ServerlessTaskMaxStatementSize,
 	}
 }
 
@@ -188,6 +195,46 @@ func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectId
 		opts.TaskAutoRetryAttempts = task.Spec.TaskAutoRetryAttempts
 	}
 
+	if task.Spec.Config != nil {
+		opts.Config = task.Spec.Config
+	}
+
+	// Finalize — uses dedicated SET/UNSET FINALIZE.
+	if task.Spec.Finalize != nil {
+		opts.SetFinalize = task.Spec.Finalize
+	} else {
+		for _, p := range task.Status.TrackedParameters {
+			if p == "FINALIZE" {
+				opts.UnsetFinalize = true
+				break
+			}
+		}
+	}
+
+	if task.Spec.LogLevel != nil {
+		opts.LogLevel = task.Spec.LogLevel
+	}
+
+	if task.Spec.UserTaskMinimumTriggerIntervalInSeconds != nil {
+		opts.UserTaskMinimumTriggerIntervalInSeconds = task.Spec.UserTaskMinimumTriggerIntervalInSeconds
+	}
+
+	if task.Spec.TargetCompletionInterval != nil {
+		opts.TargetCompletionInterval = task.Spec.TargetCompletionInterval
+	}
+
+	if task.Spec.ServerlessTaskMinStatementSize != nil {
+		opts.ServerlessTaskMinStatementSize = task.Spec.ServerlessTaskMinStatementSize
+	}
+
+	if task.Spec.ServerlessTaskMaxStatementSize != nil {
+		opts.ServerlessTaskMaxStatementSize = task.Spec.ServerlessTaskMaxStatementSize
+	}
+
+	if task.Spec.UserTaskManagedInitialWarehouseSize != nil {
+		opts.UserTaskManagedInitialWarehouseSize = task.Spec.UserTaskManagedInitialWarehouseSize
+	}
+
 	return opts
 }
 
@@ -235,6 +282,36 @@ func computeUnsetFields(task *snowplanev1alpha1.Task) []string {
 		unset = append(unset, "TASK_AUTO_RETRY_ATTEMPTS")
 	}
 
+	if task.Spec.Config == nil && managed["CONFIG"] {
+		unset = append(unset, "CONFIG")
+	}
+
+	// FINALIZE is handled separately via UnsetFinalize, not via generic UnsetFields.
+
+	if task.Spec.LogLevel == nil && managed["LOG_LEVEL"] {
+		unset = append(unset, "LOG_LEVEL")
+	}
+
+	if task.Spec.TargetCompletionInterval == nil && managed["TARGET_COMPLETION_INTERVAL"] {
+		unset = append(unset, "TARGET_COMPLETION_INTERVAL")
+	}
+
+	if task.Spec.ServerlessTaskMinStatementSize == nil && managed["SERVERLESS_TASK_MIN_STATEMENT_SIZE"] {
+		unset = append(unset, "SERVERLESS_TASK_MIN_STATEMENT_SIZE")
+	}
+
+	if task.Spec.ServerlessTaskMaxStatementSize == nil && managed["SERVERLESS_TASK_MAX_STATEMENT_SIZE"] {
+		unset = append(unset, "SERVERLESS_TASK_MAX_STATEMENT_SIZE")
+	}
+
+	if task.Spec.UserTaskMinimumTriggerIntervalInSeconds == nil && managed["USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS"] {
+		unset = append(unset, "USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS")
+	}
+
+	if task.Spec.UserTaskManagedInitialWarehouseSize == nil && managed["USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE"] {
+		unset = append(unset, "USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE")
+	}
+
 	return unset
 }
 
@@ -271,6 +348,38 @@ func computeTrackedParameters(spec *snowplanev1alpha1.TaskSpec) []string {
 
 	if spec.TaskAutoRetryAttempts != nil {
 		fields = append(fields, "TASK_AUTO_RETRY_ATTEMPTS")
+	}
+
+	if spec.Config != nil {
+		fields = append(fields, "CONFIG")
+	}
+
+	if spec.Finalize != nil {
+		fields = append(fields, "FINALIZE")
+	}
+
+	if spec.LogLevel != nil {
+		fields = append(fields, "LOG_LEVEL")
+	}
+
+	if spec.UserTaskMinimumTriggerIntervalInSeconds != nil {
+		fields = append(fields, "USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS")
+	}
+
+	if spec.TargetCompletionInterval != nil {
+		fields = append(fields, "TARGET_COMPLETION_INTERVAL")
+	}
+
+	if spec.ServerlessTaskMinStatementSize != nil {
+		fields = append(fields, "SERVERLESS_TASK_MIN_STATEMENT_SIZE")
+	}
+
+	if spec.ServerlessTaskMaxStatementSize != nil {
+		fields = append(fields, "SERVERLESS_TASK_MAX_STATEMENT_SIZE")
+	}
+
+	if spec.UserTaskManagedInitialWarehouseSize != nil {
+		fields = append(fields, "USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE")
 	}
 
 	return fields

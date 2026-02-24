@@ -116,7 +116,7 @@ func successfulObservation() *snowflake.DatabaseObservation {
 }
 
 // newTestReconciler builds a reconciler with a fake k8s client and injected mock service.
-func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Database, Service] {
+func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Database, Service, *snowflake.DatabaseObservation] {
 	scheme := testutil.TestScheme()
 
 	cb := fake.NewClientBuilder().WithScheme(scheme).
@@ -128,7 +128,7 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	c := cb.Build()
 	factory := clientfactory.NewClientFactory()
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Database, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.Database, Service, *snowflake.DatabaseObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: record.NewFakeRecorder(100),
@@ -1842,7 +1842,7 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 
 	rec := record.NewFakeRecorder(100)
 
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, Service]{
+	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, Service, *snowflake.DatabaseObservation]{
 		Client:   c,
 		Factory:  clientfactory.NewClientFactory(),
 		Recorder: rec,

@@ -28,6 +28,9 @@ import (
 	"github.com/snowflakedb/gosnowflake"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/k3s"
+
+	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -299,13 +302,18 @@ func TestMain(m *testing.M) {
 	// Dump controller logs for debugging on failure.
 	if code != 0 {
 		fmt.Println("==> Dumping controller pod logs (test failure)")
-		_ = runCmd(repoRoot, "kubectl", "--kubeconfig", kubeconfigPath,
-			"-n", testNamespace, "logs", "-l", "app.kubernetes.io/name=snowplane", "--tail=200")
+		if err := runCmd(repoRoot, "kubectl", "--kubeconfig", kubeconfigPath,
+			"-n", testNamespace, "logs", "-l", "app.kubernetes.io/name=snowplane", "--tail=200"); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to dump controller logs: %v\n", err)
+		}
 	}
 
 	cleanupK8sCRs()
 	cleanupSnowflake()
-	_ = sfDB.Close()
+
+	if err := sfDB.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to close Snowflake connection: %v\n", err)
+	}
 	os.Exit(code)
 }
 
@@ -406,10 +414,28 @@ func setupSnowflakeCredentials(ctx context.Context, kubeconfigPath, repoRoot str
 	_ = runCmd(repoRoot, "kubectl", "--kubeconfig", kubeconfigPath,
 		"-n", testNamespace, "delete", "secret", "snowflake-credentials", "--ignore-not-found")
 
-	// Create the credentials secret.
+	// L-5: Write credentials to a temporary file and use --from-file to avoid
+	// leaking secrets in process listings (/proc/*/cmdline) and shell history.
+	// This also correctly handles multiline PEM private keys.
+	credFile, err := os.CreateTemp("", "snowplane-cred-*")
+	if err != nil {
+		return fmt.Errorf("creating temporary credential file: %w", err)
+	}
+	defer os.Remove(credFile.Name())
+
+	if _, err := credFile.WriteString(secretValue); err != nil {
+		credFile.Close()
+		return fmt.Errorf("writing credential to temp file: %w", err)
+	}
+
+	if err := credFile.Close(); err != nil {
+		return fmt.Errorf("closing temp credential file: %w", err)
+	}
+
+	// Create the credentials secret from file (credentials never appear in argv).
 	if err := runCmd(repoRoot, "kubectl", "--kubeconfig", kubeconfigPath,
 		"-n", testNamespace, "create", "secret", "generic", "snowflake-credentials",
-		fmt.Sprintf("--from-literal=%s=%s", secretKey, secretValue),
+		fmt.Sprintf("--from-file=%s=%s", secretKey, credFile.Name()),
 	); err != nil {
 		return fmt.Errorf("failed to create secret: %w", err)
 	}
@@ -468,7 +494,7 @@ func sfExists(t *testing.T, resourceType, name string) bool {
 	t.Helper()
 	qCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	query := fmt.Sprintf("SHOW %s LIKE '%s'", resourceType, name)
+	query := fmt.Sprintf("SHOW %s LIKE '%s'", resourceType, sqlbuilder.EscapeLikePattern(name))
 	rows, err := sfDB.QueryContext(qCtx, query)
 	if err != nil {
 		return false
@@ -481,7 +507,7 @@ func sfExistsInDB(t *testing.T, resourceType, dbName, name string) bool {
 	t.Helper()
 	qCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	query := fmt.Sprintf("SHOW %s LIKE '%s' IN DATABASE \"%s\"", resourceType, name, dbName)
+	query := fmt.Sprintf("SHOW %s LIKE '%s' IN DATABASE %s", resourceType, sqlbuilder.EscapeLikePattern(name), sqlbuilder.QuoteIdentifier(dbName))
 	rows, err := sfDB.QueryContext(qCtx, query)
 	if err != nil {
 		return false
@@ -494,7 +520,7 @@ func sfExistsInSchema(t *testing.T, resourceType, dbName, schemaName, name strin
 	t.Helper()
 	qCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	query := fmt.Sprintf("SHOW %s LIKE '%s' IN SCHEMA \"%s\".\"%s\"", resourceType, name, dbName, schemaName)
+	query := fmt.Sprintf("SHOW %s LIKE '%s' IN SCHEMA %s.%s", resourceType, sqlbuilder.EscapeLikePattern(name), sqlbuilder.QuoteIdentifier(dbName), sqlbuilder.QuoteIdentifier(schemaName))
 	rows, err := sfDB.QueryContext(qCtx, query)
 	if err != nil {
 		return false
@@ -507,7 +533,7 @@ func sfGetComment(t *testing.T, resourceType, name string) string {
 	t.Helper()
 	qCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	query := fmt.Sprintf("SHOW %s LIKE '%s'", resourceType, name)
+	query := fmt.Sprintf("SHOW %s LIKE '%s'", resourceType, sqlbuilder.EscapeLikePattern(name))
 	rows, err := sfDB.QueryContext(qCtx, query)
 	if err != nil {
 		return ""
@@ -540,7 +566,7 @@ func sfGetSchemaComment(t *testing.T, dbName, schemaName string) string {
 	t.Helper()
 	qCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	query := fmt.Sprintf("SHOW SCHEMAS LIKE '%s' IN DATABASE \"%s\"", schemaName, dbName)
+	query := fmt.Sprintf("SHOW SCHEMAS LIKE '%s' IN DATABASE %s", sqlbuilder.EscapeLikePattern(schemaName), sqlbuilder.QuoteIdentifier(dbName))
 	rows, err := sfDB.QueryContext(qCtx, query)
 	if err != nil {
 		return ""
@@ -573,14 +599,14 @@ func sfDrop(t *testing.T, resourceType, name string) {
 	t.Helper()
 	dropCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	_, _ = sfDB.ExecContext(dropCtx, fmt.Sprintf("DROP %s IF EXISTS \"%s\"", resourceType, name))
+	_, _ = sfDB.ExecContext(dropCtx, fmt.Sprintf("DROP %s IF EXISTS %s", resourceType, sqlbuilder.QuoteIdentifier(name)))
 }
 
 func sfDropInSchema(t *testing.T, resourceType, dbName, schemaName, name string) {
 	t.Helper()
 	dropCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	_, _ = sfDB.ExecContext(dropCtx, fmt.Sprintf("DROP %s IF EXISTS \"%s\".\"%s\".\"%s\"", resourceType, dbName, schemaName, name))
+	_, _ = sfDB.ExecContext(dropCtx, fmt.Sprintf("DROP %s IF EXISTS %s.%s.%s", resourceType, sqlbuilder.QuoteIdentifier(dbName), sqlbuilder.QuoteIdentifier(schemaName), sqlbuilder.QuoteIdentifier(name)))
 }
 
 // cleanupK8sCRs deletes all Snowplane CRs from the test namespace.
@@ -634,7 +660,7 @@ func cleanupSnowflake() {
 	defer cancel()
 	resourceTypes := []string{"VIEWS", "TABLES", "STAGES", "SCHEMAS", "DATABASES", "WAREHOUSES", "USERS", "ROLES"}
 	for _, rt := range resourceTypes {
-		rows, err := sfDB.QueryContext(cleanCtx, fmt.Sprintf("SHOW %s LIKE '%s%%'", rt, sfPrefix))
+		rows, err := sfDB.QueryContext(cleanCtx, fmt.Sprintf("SHOW %s LIKE '%s%%'", rt, sqlbuilder.EscapeLikePattern(sfPrefix)))
 		if err != nil {
 			continue
 		}

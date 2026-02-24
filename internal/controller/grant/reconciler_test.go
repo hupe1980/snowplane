@@ -102,7 +102,7 @@ func newSuccessfulObservation() *snowflake.GrantObservation {
 	}
 }
 
-func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service] {
+func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service, *snowflake.GrantObservation] {
 	scheme := testutil.TestScheme()
 
 	cb := fake.NewClientBuilder().WithScheme(scheme).
@@ -121,7 +121,7 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	factory := clientfactory.NewClientFactory()
 	recorder := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service, *snowflake.GrantObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: recorder,
@@ -738,7 +738,7 @@ func TestPreReconcile_AccountRoleRefNotReady(t *testing.T) {
 // Helpers: newTestReconcilerWithIndex
 // --------------------------------------------------------------------------
 
-func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service] {
+func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service, *snowflake.GrantObservation] {
 	scheme := testutil.TestScheme()
 
 	cb := fake.NewClientBuilder().WithScheme(scheme).
@@ -781,7 +781,7 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 	factory := clientfactory.NewClientFactory()
 	recorder := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service, *snowflake.GrantObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: recorder,

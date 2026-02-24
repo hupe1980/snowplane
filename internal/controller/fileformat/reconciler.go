@@ -1,0 +1,495 @@
+// Package fileformat implements the reconciler for FileFormat resources.
+package fileformat
+
+import (
+	"context"
+
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
+	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
+	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/drift"
+	"github.com/hupe1980/snowplane/internal/ratelimit"
+)
+
+const (
+	finalizerName = "snowplane.hupe1980.github.io/fileformat"
+)
+
+// SnowflakeClient is the Snowflake client interface used by this package.
+type SnowflakeClient = clientfactory.SnowflakeClient
+
+// Service defines operations the reconciler needs against Snowflake file formats.
+type Service interface {
+	Observe(ctx context.Context, name snowflake.SchemaObjectIdentifier) (*snowflake.FileFormatObservation, error)
+	Create(ctx context.Context, opts snowflake.CreateFileFormatOptions) error
+	Alter(ctx context.Context, opts snowflake.AlterFileFormatOptions) error
+	Drop(ctx context.Context, name snowflake.SchemaObjectIdentifier) error
+}
+
+// ServiceFactory creates a Service from a Snowflake client.
+type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
+
+// NewReconciler returns a new FileFormat reconciler.
+func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.FileFormat, Service, *snowflake.FileFormatObservation] {
+	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.FileFormat, Service, *snowflake.FileFormatObservation]{
+		Client:      c,
+		Factory:     factory,
+		Recorder:    recorder,
+		RateLimiter: rl,
+		Adapter:     a,
+	}
+}
+
+// NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
+// supply a custom ServiceFactory for testing.
+func NewReconcilerWithServiceFactory(
+	c client.Client,
+	factory *clientfactory.ClientFactory,
+	recorder record.EventRecorder,
+	rl *ratelimit.Limiter,
+	sf ServiceFactory,
+) *reconciler.GenericReconciler[*snowplanev1alpha1.FileFormat, Service, *snowflake.FileFormatObservation] {
+	a := &adapter{client: c, recorder: recorder, newService: sf}
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.FileFormat, Service, *snowflake.FileFormatObservation]{
+		Client:      c,
+		Factory:     factory,
+		Recorder:    recorder,
+		RateLimiter: rl,
+		Adapter:     a,
+	}
+}
+
+// defaultServiceFactory is the production ServiceFactory.
+func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
+	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return snowflake.NewFileFormatClient(sfC), cleanup, nil
+}
+
+func applyObservation(ff *snowplanev1alpha1.FileFormat, obs *snowflake.FileFormatObservation) {
+	if obs.ShowOutput != nil {
+		ff.Status.FullyQualifiedName = snowflake.NewSchemaObjectIdentifier(
+			obs.ShowOutput.DatabaseName,
+			obs.ShowOutput.SchemaName,
+			obs.ShowOutput.Name,
+		).FullyQualifiedName()
+		ff.Status.DatabaseName = obs.ShowOutput.DatabaseName
+		ff.Status.SchemaName = obs.ShowOutput.SchemaName
+
+		ff.Status.ShowOutput = &snowplanev1alpha1.FileFormatShowOutput{
+			CreatedOn:    obs.ShowOutput.CreatedOn,
+			Name:         obs.ShowOutput.Name,
+			DatabaseName: obs.ShowOutput.DatabaseName,
+			SchemaName:   obs.ShowOutput.SchemaName,
+			Owner:        obs.ShowOutput.Owner,
+			Comment:      obs.ShowOutput.Comment,
+			Type:         obs.ShowOutput.Type,
+		}
+	}
+}
+
+func buildCreateOptions(ff *snowplanev1alpha1.FileFormat, id snowflake.SchemaObjectIdentifier) snowflake.CreateFileFormatOptions {
+	return snowflake.CreateFileFormatOptions{
+		Name:                       id,
+		Type:                       string(ff.Spec.Type),
+		FieldDelimiter:             ff.Spec.FieldDelimiter,
+		RecordDelimiter:            ff.Spec.RecordDelimiter,
+		SkipHeader:                 ff.Spec.SkipHeader,
+		FieldOptionallyEnclosedBy:  ff.Spec.FieldOptionallyEnclosedBy,
+		Escape:                     ff.Spec.Escape,
+		EscapeUnenclosedField:      ff.Spec.EscapeUnenclosedField,
+		EmptyFieldAsNull:           ff.Spec.EmptyFieldAsNull,
+		NullIf:                     ff.Spec.NullIf,
+		ErrorOnColumnCountMismatch: ff.Spec.ErrorOnColumnCountMismatch,
+		SkipBlankLines:             ff.Spec.SkipBlankLines,
+		ParseHeader:                ff.Spec.ParseHeader,
+		Encoding:                   ff.Spec.Encoding,
+		Compression:                ff.Spec.Compression,
+		StripOuterArray:            ff.Spec.StripOuterArray,
+		StripNullValues:            ff.Spec.StripNullValues,
+		EnableOctal:                ff.Spec.EnableOctal,
+		AllowDuplicate:             ff.Spec.AllowDuplicate,
+		BinaryAsText:               ff.Spec.BinaryAsText,
+		UseLogicalType:             ff.Spec.UseLogicalType,
+		SnappyCompression:          ff.Spec.SnappyCompression,
+		PreserveSpace:              ff.Spec.PreserveSpace,
+		StripOuterElement:          ff.Spec.StripOuterElement,
+		DisableAutoConvert:         ff.Spec.DisableAutoConvert,
+		DisableSnowflakeData:       ff.Spec.DisableSnowflakeData,
+		ReplaceInvalidCharacters:   ff.Spec.ReplaceInvalidCharacters,
+		SkipByteOrderMark:          ff.Spec.SkipByteOrderMark,
+		IgnoreUtf8Errors:           ff.Spec.IgnoreUtf8Errors,
+		DateFormat:                 ff.Spec.DateFormat,
+		TimeFormat:                 ff.Spec.TimeFormat,
+		TimestampFormat:            ff.Spec.TimestampFormat,
+		BinaryFormat:               ff.Spec.BinaryFormat,
+		TrimSpace:                  ff.Spec.TrimSpace,
+		Comment:                    ff.Spec.Comment,
+	}
+}
+
+func buildAlterOptions(ff *snowplanev1alpha1.FileFormat, id snowflake.SchemaObjectIdentifier, obs *snowflake.FileFormatObservation) snowflake.AlterFileFormatOptions {
+	opts := snowflake.AlterFileFormatOptions{Name: id}
+	opts.UnsetFields = computeUnsetFields(ff)
+
+	// FileFormat SHOW output does not expose per-field values, so we always
+	// send the full spec for mutable fields to converge to the desired state.
+	// This is consistent with how StorageIntegration handles fields where
+	// observation lacks per-field granularity.
+	opts.FieldDelimiter = ff.Spec.FieldDelimiter
+	opts.RecordDelimiter = ff.Spec.RecordDelimiter
+	opts.SkipHeader = ff.Spec.SkipHeader
+	opts.FieldOptionallyEnclosedBy = ff.Spec.FieldOptionallyEnclosedBy
+	opts.Escape = ff.Spec.Escape
+	opts.EscapeUnenclosedField = ff.Spec.EscapeUnenclosedField
+	opts.EmptyFieldAsNull = ff.Spec.EmptyFieldAsNull
+	opts.ErrorOnColumnCountMismatch = ff.Spec.ErrorOnColumnCountMismatch
+	opts.SkipBlankLines = ff.Spec.SkipBlankLines
+	opts.ParseHeader = ff.Spec.ParseHeader
+	opts.Encoding = ff.Spec.Encoding
+	opts.Compression = ff.Spec.Compression
+	opts.StripOuterArray = ff.Spec.StripOuterArray
+	opts.StripNullValues = ff.Spec.StripNullValues
+	opts.EnableOctal = ff.Spec.EnableOctal
+	opts.AllowDuplicate = ff.Spec.AllowDuplicate
+	opts.BinaryAsText = ff.Spec.BinaryAsText
+	opts.UseLogicalType = ff.Spec.UseLogicalType
+	opts.SnappyCompression = ff.Spec.SnappyCompression
+	opts.PreserveSpace = ff.Spec.PreserveSpace
+	opts.StripOuterElement = ff.Spec.StripOuterElement
+	opts.DisableAutoConvert = ff.Spec.DisableAutoConvert
+	opts.DisableSnowflakeData = ff.Spec.DisableSnowflakeData
+	opts.ReplaceInvalidCharacters = ff.Spec.ReplaceInvalidCharacters
+	opts.SkipByteOrderMark = ff.Spec.SkipByteOrderMark
+	opts.IgnoreUtf8Errors = ff.Spec.IgnoreUtf8Errors
+	opts.DateFormat = ff.Spec.DateFormat
+	opts.TimeFormat = ff.Spec.TimeFormat
+	opts.TimestampFormat = ff.Spec.TimestampFormat
+	opts.BinaryFormat = ff.Spec.BinaryFormat
+	opts.TrimSpace = ff.Spec.TrimSpace
+
+	// Comment is available in SHOW output — compare before sending.
+	if ff.Spec.Comment != nil {
+		if obs == nil || obs.ShowOutput == nil || *ff.Spec.Comment != obs.ShowOutput.Comment {
+			opts.Comment = ff.Spec.Comment
+		}
+	}
+
+	if len(ff.Spec.NullIf) > 0 {
+		nullIf := make([]string, len(ff.Spec.NullIf))
+		copy(nullIf, ff.Spec.NullIf)
+		opts.NullIf = &nullIf
+	}
+
+	return opts
+}
+
+func computeUnsetFields(ff *snowplanev1alpha1.FileFormat) []string {
+	if len(ff.Status.TrackedParameters) == 0 {
+		return nil
+	}
+
+	managed := make(map[string]bool, len(ff.Status.TrackedParameters))
+	for _, f := range ff.Status.TrackedParameters {
+		managed[f] = true
+	}
+
+	var unset []string
+
+	if ff.Spec.Comment == nil && managed["COMMENT"] {
+		unset = append(unset, "COMMENT")
+	}
+
+	if ff.Spec.FieldDelimiter == nil && managed["FIELD_DELIMITER"] {
+		unset = append(unset, "FIELD_DELIMITER")
+	}
+
+	if ff.Spec.RecordDelimiter == nil && managed["RECORD_DELIMITER"] {
+		unset = append(unset, "RECORD_DELIMITER")
+	}
+
+	if ff.Spec.SkipHeader == nil && managed["SKIP_HEADER"] {
+		unset = append(unset, "SKIP_HEADER")
+	}
+
+	if ff.Spec.Compression == nil && managed["COMPRESSION"] {
+		unset = append(unset, "COMPRESSION")
+	}
+
+	if ff.Spec.TrimSpace == nil && managed["TRIM_SPACE"] {
+		unset = append(unset, "TRIM_SPACE")
+	}
+
+	if ff.Spec.StripOuterArray == nil && managed["STRIP_OUTER_ARRAY"] {
+		unset = append(unset, "STRIP_OUTER_ARRAY")
+	}
+
+	if ff.Spec.StripNullValues == nil && managed["STRIP_NULL_VALUES"] {
+		unset = append(unset, "STRIP_NULL_VALUES")
+	}
+
+	if ff.Spec.ErrorOnColumnCountMismatch == nil && managed["ERROR_ON_COLUMN_COUNT_MISMATCH"] {
+		unset = append(unset, "ERROR_ON_COLUMN_COUNT_MISMATCH")
+	}
+
+	if ff.Spec.FieldOptionallyEnclosedBy == nil && managed["FIELD_OPTIONALLY_ENCLOSED_BY"] {
+		unset = append(unset, "FIELD_OPTIONALLY_ENCLOSED_BY")
+	}
+
+	if len(ff.Spec.NullIf) == 0 && managed["NULL_IF"] {
+		unset = append(unset, "NULL_IF")
+	}
+
+	if ff.Spec.Escape == nil && managed["ESCAPE"] {
+		unset = append(unset, "ESCAPE")
+	}
+
+	if ff.Spec.EscapeUnenclosedField == nil && managed["ESCAPE_UNENCLOSED_FIELD"] {
+		unset = append(unset, "ESCAPE_UNENCLOSED_FIELD")
+	}
+
+	if ff.Spec.EmptyFieldAsNull == nil && managed["EMPTY_FIELD_AS_NULL"] {
+		unset = append(unset, "EMPTY_FIELD_AS_NULL")
+	}
+
+	if ff.Spec.SkipBlankLines == nil && managed["SKIP_BLANK_LINES"] {
+		unset = append(unset, "SKIP_BLANK_LINES")
+	}
+
+	if ff.Spec.ParseHeader == nil && managed["PARSE_HEADER"] {
+		unset = append(unset, "PARSE_HEADER")
+	}
+
+	if ff.Spec.Encoding == nil && managed["ENCODING"] {
+		unset = append(unset, "ENCODING")
+	}
+
+	if ff.Spec.EnableOctal == nil && managed["ENABLE_OCTAL"] {
+		unset = append(unset, "ENABLE_OCTAL")
+	}
+
+	if ff.Spec.AllowDuplicate == nil && managed["ALLOW_DUPLICATE"] {
+		unset = append(unset, "ALLOW_DUPLICATE")
+	}
+
+	if ff.Spec.DisableSnowflakeData == nil && managed["DISABLE_SNOWFLAKE_DATA"] {
+		unset = append(unset, "DISABLE_SNOWFLAKE_DATA")
+	}
+
+	if ff.Spec.BinaryAsText == nil && managed["BINARY_AS_TEXT"] {
+		unset = append(unset, "BINARY_AS_TEXT")
+	}
+
+	if ff.Spec.UseLogicalType == nil && managed["USE_LOGICAL_TYPE"] {
+		unset = append(unset, "USE_LOGICAL_TYPE")
+	}
+
+	if ff.Spec.SnappyCompression == nil && managed["SNAPPY_COMPRESSION"] {
+		unset = append(unset, "SNAPPY_COMPRESSION")
+	}
+
+	if ff.Spec.PreserveSpace == nil && managed["PRESERVE_SPACE"] {
+		unset = append(unset, "PRESERVE_SPACE")
+	}
+
+	if ff.Spec.StripOuterElement == nil && managed["STRIP_OUTER_ELEMENT"] {
+		unset = append(unset, "STRIP_OUTER_ELEMENT")
+	}
+
+	if ff.Spec.DisableAutoConvert == nil && managed["DISABLE_AUTO_CONVERT"] {
+		unset = append(unset, "DISABLE_AUTO_CONVERT")
+	}
+
+	if ff.Spec.ReplaceInvalidCharacters == nil && managed["REPLACE_INVALID_CHARACTERS"] {
+		unset = append(unset, "REPLACE_INVALID_CHARACTERS")
+	}
+
+	if ff.Spec.SkipByteOrderMark == nil && managed["SKIP_BYTE_ORDER_MARK"] {
+		unset = append(unset, "SKIP_BYTE_ORDER_MARK")
+	}
+
+	if ff.Spec.IgnoreUtf8Errors == nil && managed["IGNORE_UTF8_ERRORS"] {
+		unset = append(unset, "IGNORE_UTF8_ERRORS")
+	}
+
+	if ff.Spec.DateFormat == nil && managed["DATE_FORMAT"] {
+		unset = append(unset, "DATE_FORMAT")
+	}
+
+	if ff.Spec.TimeFormat == nil && managed["TIME_FORMAT"] {
+		unset = append(unset, "TIME_FORMAT")
+	}
+
+	if ff.Spec.TimestampFormat == nil && managed["TIMESTAMP_FORMAT"] {
+		unset = append(unset, "TIMESTAMP_FORMAT")
+	}
+
+	if ff.Spec.BinaryFormat == nil && managed["BINARY_FORMAT"] {
+		unset = append(unset, "BINARY_FORMAT")
+	}
+
+	return unset
+}
+
+func computeTrackedParameters(spec *snowplanev1alpha1.FileFormatSpec) []string {
+	var fields []string
+
+	if spec.Comment != nil {
+		fields = append(fields, "COMMENT")
+	}
+
+	if spec.FieldDelimiter != nil {
+		fields = append(fields, "FIELD_DELIMITER")
+	}
+
+	if spec.RecordDelimiter != nil {
+		fields = append(fields, "RECORD_DELIMITER")
+	}
+
+	if spec.SkipHeader != nil {
+		fields = append(fields, "SKIP_HEADER")
+	}
+
+	if spec.FieldOptionallyEnclosedBy != nil {
+		fields = append(fields, "FIELD_OPTIONALLY_ENCLOSED_BY")
+	}
+
+	if len(spec.NullIf) > 0 {
+		fields = append(fields, "NULL_IF")
+	}
+
+	if spec.ErrorOnColumnCountMismatch != nil {
+		fields = append(fields, "ERROR_ON_COLUMN_COUNT_MISMATCH")
+	}
+
+	if spec.Compression != nil {
+		fields = append(fields, "COMPRESSION")
+	}
+
+	if spec.StripOuterArray != nil {
+		fields = append(fields, "STRIP_OUTER_ARRAY")
+	}
+
+	if spec.StripNullValues != nil {
+		fields = append(fields, "STRIP_NULL_VALUES")
+	}
+
+	if spec.TrimSpace != nil {
+		fields = append(fields, "TRIM_SPACE")
+	}
+
+	if spec.Escape != nil {
+		fields = append(fields, "ESCAPE")
+	}
+
+	if spec.EscapeUnenclosedField != nil {
+		fields = append(fields, "ESCAPE_UNENCLOSED_FIELD")
+	}
+
+	if spec.EmptyFieldAsNull != nil {
+		fields = append(fields, "EMPTY_FIELD_AS_NULL")
+	}
+
+	if spec.SkipBlankLines != nil {
+		fields = append(fields, "SKIP_BLANK_LINES")
+	}
+
+	if spec.ParseHeader != nil {
+		fields = append(fields, "PARSE_HEADER")
+	}
+
+	if spec.Encoding != nil {
+		fields = append(fields, "ENCODING")
+	}
+
+	if spec.EnableOctal != nil {
+		fields = append(fields, "ENABLE_OCTAL")
+	}
+
+	if spec.AllowDuplicate != nil {
+		fields = append(fields, "ALLOW_DUPLICATE")
+	}
+
+	if spec.DisableSnowflakeData != nil {
+		fields = append(fields, "DISABLE_SNOWFLAKE_DATA")
+	}
+
+	if spec.BinaryAsText != nil {
+		fields = append(fields, "BINARY_AS_TEXT")
+	}
+
+	if spec.UseLogicalType != nil {
+		fields = append(fields, "USE_LOGICAL_TYPE")
+	}
+
+	if spec.SnappyCompression != nil {
+		fields = append(fields, "SNAPPY_COMPRESSION")
+	}
+
+	if spec.PreserveSpace != nil {
+		fields = append(fields, "PRESERVE_SPACE")
+	}
+
+	if spec.StripOuterElement != nil {
+		fields = append(fields, "STRIP_OUTER_ELEMENT")
+	}
+
+	if spec.DisableAutoConvert != nil {
+		fields = append(fields, "DISABLE_AUTO_CONVERT")
+	}
+
+	if spec.ReplaceInvalidCharacters != nil {
+		fields = append(fields, "REPLACE_INVALID_CHARACTERS")
+	}
+
+	if spec.SkipByteOrderMark != nil {
+		fields = append(fields, "SKIP_BYTE_ORDER_MARK")
+	}
+
+	if spec.IgnoreUtf8Errors != nil {
+		fields = append(fields, "IGNORE_UTF8_ERRORS")
+	}
+
+	if spec.DateFormat != nil {
+		fields = append(fields, "DATE_FORMAT")
+	}
+
+	if spec.TimeFormat != nil {
+		fields = append(fields, "TIME_FORMAT")
+	}
+
+	if spec.TimestampFormat != nil {
+		fields = append(fields, "TIMESTAMP_FORMAT")
+	}
+
+	if spec.BinaryFormat != nil {
+		fields = append(fields, "BINARY_FORMAT")
+	}
+
+	return fields
+}
+
+func detectDrift(ff *snowplanev1alpha1.FileFormat, obs *snowflake.FileFormatObservation) *drift.Result {
+	d := drift.New()
+
+	if obs.ShowOutput != nil {
+		// Immutable fields.
+		d.CompareStringValueFold("NAME", ff.Spec.Name, obs.ShowOutput.Name, true)
+		d.CompareStringValueFold("DATABASE", snowflake.ParseDatabaseNameFromFQN(ff.Status.DatabaseName), obs.ShowOutput.DatabaseName, true)
+		d.CompareStringValueFold("SCHEMA", snowflake.ParseSchemaNameFromFQN(ff.Status.SchemaName), obs.ShowOutput.SchemaName, true)
+		d.CompareStringValueFold("TYPE", string(ff.Spec.Type), obs.ShowOutput.Type, true)
+
+		// Mutable fields.
+		d.CompareString("COMMENT", ff.Spec.Comment, obs.ShowOutput.Comment, false)
+	}
+
+	return d.Result()
+}

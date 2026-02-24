@@ -39,7 +39,7 @@ type accountRoleGrantAdapter struct {
 	newService ServiceFactory
 }
 
-var _ reconciler.ResourceAdapter[*snowplanev1alpha1.AccountRoleGrant, Service] = (*accountRoleGrantAdapter)(nil)
+var _ reconciler.ResourceAdapter[*snowplanev1alpha1.AccountRoleGrant, Service, *snowflake.GrantObservation] = (*accountRoleGrantAdapter)(nil)
 
 func (a *accountRoleGrantAdapter) ResourceName() string  { return "accountrolegrant" }
 func (a *accountRoleGrantAdapter) FinalizerName() string { return accountRoleGrantFinalizer }
@@ -194,7 +194,7 @@ func (a *accountRoleGrantAdapter) listByIndex(ctx context.Context, obj sigs.Obje
 }
 
 // Observe queries Snowflake for the current state.
-func (a *accountRoleGrantAdapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation, error) {
+func (a *accountRoleGrantAdapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation[*snowflake.GrantObservation], error) {
 	return grantObserve(ctx, svc, id)
 }
 
@@ -244,17 +244,13 @@ func (a *accountRoleGrantAdapter) ValidateImmutableFields(_ context.Context, gra
 }
 
 // BuildAlterOptions returns no-change options since grants don't support ALTER.
-func (a *accountRoleGrantAdapter) BuildAlterOptions(_ context.Context, _ *snowplanev1alpha1.AccountRoleGrant, _ reconciler.Identifier, _ *reconciler.Observation) (reconciler.AlterOptions, error) {
+func (a *accountRoleGrantAdapter) BuildAlterOptions(_ context.Context, _ *snowplanev1alpha1.AccountRoleGrant, _ reconciler.Identifier, _ *reconciler.Observation[*snowflake.GrantObservation]) (reconciler.AlterOptions, error) {
 	return grantAlterOptions{}, nil
 }
 
 // ApplyObservation maps the observation into the CR's status.
-func (a *accountRoleGrantAdapter) ApplyObservation(obj *snowplanev1alpha1.AccountRoleGrant, obs *reconciler.Observation) {
-	grantObs, ok := obs.Detail.(*snowflake.GrantObservation)
-	if !ok {
-		return
-	}
-
+func (a *accountRoleGrantAdapter) ApplyObservation(obj *snowplanev1alpha1.AccountRoleGrant, obs *reconciler.Observation[*snowflake.GrantObservation]) {
+	grantObs := obs.Detail
 	if grantObs.ShowOutput != nil {
 		on := onToParams(&obj.Spec.On)
 		onClause := snowflake.BuildOnClause(on)
@@ -271,12 +267,8 @@ func (a *accountRoleGrantAdapter) ComputeTrackedParameters(_ *snowplanev1alpha1.
 }
 
 // DetectDrift compares spec vs observation.
-func (a *accountRoleGrantAdapter) DetectDrift(obj *snowplanev1alpha1.AccountRoleGrant, obs *reconciler.Observation) *drift.Result {
-	detail, ok := obs.Detail.(*snowflake.GrantObservation)
-	if !ok {
-		return drift.New().Result()
-	}
-
+func (a *accountRoleGrantAdapter) DetectDrift(obj *snowplanev1alpha1.AccountRoleGrant, obs *reconciler.Observation[*snowflake.GrantObservation]) *drift.Result {
+	detail := obs.Detail
 	return detectGrantDrift(obj.Spec.Privilege, obj.Spec.WithGrantOption, detail)
 }
 

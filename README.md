@@ -16,22 +16,23 @@
 
 ## ✨ Features
 
-### 🏗️ Resource Management (21 CRDs)
+### 🏗️ Resource Management (25 CRDs)
 
 | Category | Resources |
 |----------|-----------|
 | 🗄️ **Core Infrastructure** | Database, Schema, Warehouse |
-| 📊 **Data Objects** | Table, View, Stage, Stream |
+| 📊 **Data Objects** | Table, View, Stage, Stream, DynamicTable, FileFormat, Pipe |
 | 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, GrantOwnership |
 | ⏰ **Orchestration** | Task (DAG scheduling, serverless or warehouse-backed) |
-| 🛡️ **Security & Governance** | NetworkPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
+| � **Integrations** | StorageIntegration |
+| �🛡️ **Security & Governance** | NetworkPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
 | 📤 **Utilities** | FieldExport (copy status fields into ConfigMaps/Secrets) |
 
 Every resource supports full lifecycle management (create, alter, drop), drift detection, adoption of pre-existing objects, and deletion policies. See the [API Reference](#-api-reference) below for detailed field documentation.
 
 ### 🔧 Operator Capabilities
 
-- 🔗 **Cross-Resource References** — Schemas → Databases; Tables, Views, Stages → Databases + Schemas with automatic dependency resolution and backoff
+- 🔗 **Cross-Resource References** — Schemas → Databases; Tables, Views, Stages, FileFormats, Pipes, DynamicTables → Databases + Schemas with automatic dependency resolution and backoff
 - 🔄 **Observe-Diff-Apply Reconciliation** — Only altered fields are pushed to Snowflake, minimizing API calls
 - 🔍 **Drift Detection & Correction** — Field-level drift detection with structured reporting, detect-only policy option
 - 🏷️ **Resource Adoption** — Adopt pre-existing Snowflake resources via `adoption-policy: adopt` annotation
@@ -65,10 +66,10 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 ## 🏛️ Architecture
 
 ```
-┌──────────────────────────────────────────────────┐
+┌──────────────────────────-────────────────────────┐
 │                Kubernetes Cluster                 │
 │                                                   │
-│  ┌──────────────┐   ┌────────────────────────┐   │
+│  ┌────────-──────┐   ┌────────────────────────┐   │
 │  │ ProviderConfig│   │   Snowflake Resource   │   │
 │  │      CR       │   │     Custom Resources   │   │
 │  └──────┬────────┘   └────────┬───────────────┘   │
@@ -83,7 +84,7 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 │  │  └──────────────────────────────────────────┘  ││
 │  │                                                ││
 │  │  ┌──────────────────────────────────────────┐  ││
-│  │  │  21 Resource Controllers (see above)     │  ││
+│  │  │  25 Resource Controllers (see above)     │  ││
 │  │  │  Observe → Diff → Apply reconciliation   │  ││
 │  │  └──────────────────────────────────────────┘  ││
 │  │                                                ││
@@ -269,8 +270,6 @@ All metrics use the `snowplane_` namespace.
 | `snowplane_managed_resources` | Gauge | `controller`, `state` | Resources by state (`ready`/`not_ready`/`terminal`) |
 | `snowplane_circuit_breaker_trips_total` | Counter | `provider` | Circuit breaker trips |
 | `snowplane_circuit_breaker_state` | Gauge | `provider` | Breaker state (0=closed, 1=open, 2=half-open) |
-| `snowplane_orphaned_resources_total` | Counter | `controller` | Orphan-policy deletions (resource left in Snowflake) |
-| `snowplane_ownership_conflicts_total` | Counter | `controller` | Ownership conflicts detected during adoption |
 | `snowplane_db_max_open_conns` | Gauge | `provider` | Max open DB connections per provider |
 | `snowplane_db_open_conns` | Gauge | `provider` | Current open DB connections per provider |
 | `snowplane_db_in_use_conns` | Gauge | `provider` | In-use DB connections per provider |
@@ -576,6 +575,91 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 </details>
 
 <details>
+<summary>🔌 <strong>StorageIntegration</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Storage integration name *(immutable)* |
+| `spec.type` | `enum` | Integration type: `EXTERNAL_STAGE` *(immutable, default: EXTERNAL_STAGE)* |
+| `spec.enabled` | `*bool` | Whether the integration is active *(default: true)* |
+| `spec.storageProvider` | `enum` | Cloud provider: `S3` / `GCS` / `AZURE` *(immutable)* |
+| `spec.storageAllowedLocations` | `[]string` | Cloud storage URIs the integration can access *(min 1)* |
+| `spec.storageBlockedLocations` | `[]string` | Cloud storage URIs explicitly denied access |
+| `spec.storageAWSRoleARN` | `*string` | IAM role ARN Snowflake assumes for S3 *(required when S3)* |
+| `spec.storageAWSExternalID` | `*string` | Optional external ID for AWS trust relationship *(auto-generated if omitted)* |
+| `spec.azureTenantID` | `*string` | Azure AD tenant ID *(required when AZURE)* |
+| `spec.comment` | `*string` | Optional description |
+| `status.storageAWSIAMUserARN` | `string` | Snowflake IAM user ARN — needed for IAM trust policy |
+| `status.storageAWSExternalID` | `string` | External ID currently in use (from DESCRIBE) |
+
+> 🔌 **Cloud Integration:** Storage integrations configure secure access between Snowflake and cloud storage (S3, GCS, Azure Blob). Use `status.storageAWSIAMUserARN` to configure your IAM trust policy.
+
+</details>
+
+<details>
+<summary>📄 <strong>FileFormat</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | File format name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.type` | `enum` | Format type: `CSV` / `JSON` / `AVRO` / `ORC` / `PARQUET` / `XML` *(immutable)* |
+| `spec.fieldDelimiter` | `*string` | Field separator character (CSV only) |
+| `spec.recordDelimiter` | `*string` | Record separator character (CSV only) |
+| `spec.skipHeader` | `*int32` | Lines to skip at start (CSV only) |
+| `spec.fieldOptionallyEnclosedBy` | `*string` | Character to enclose strings (CSV only) |
+| `spec.nullIf` | `[]string` | Strings representing NULL (CSV/JSON) |
+| `spec.errorOnColumnCountMismatch` | `*bool` | Abort on column count mismatch (CSV only) |
+| `spec.compression` | `*string` | Compression: `AUTO` / `GZIP` / `BZ2` / `BROTLI` / `ZSTD` / `DEFLATE` / `RAW_DEFLATE` / `NONE` |
+| `spec.stripOuterArray` | `*bool` | Remove outer brackets from JSON arrays (JSON only) |
+| `spec.stripNullValues` | `*bool` | Remove key-value pairs with null values (JSON only) |
+| `spec.trimSpace` | `*bool` | Remove leading/trailing whitespace |
+| `spec.comment` | `*string` | Optional description |
+
+> 📄 **Data Loading:** File formats define parsing rules for structured and semi-structured data. Reuse across stages, pipes, and COPY INTO statements.
+
+</details>
+
+<details>
+<summary>🚰 <strong>Pipe</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Pipe name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.copyStatement` | `string` | COPY INTO statement defining pipe behavior |
+| `spec.autoIngest` | `*bool` | Enable automatic data loading on new files |
+| `spec.integration` | `*string` | Notification integration for auto-ingest *(required when autoIngest=true)* |
+| `spec.errorIntegration` | `*string` | Notification integration for error notifications |
+| `spec.comment` | `*string` | Optional description |
+| `status.notificationChannel` | `string` | Cloud notification channel (e.g. SQS ARN) — configure cloud event notifications |
+
+> 🚰 **Continuous Ingestion:** Pipes enable serverless, continuous data loading from cloud storage. Use `autoIngest` with a notification integration for fully automated pipelines.
+
+</details>
+
+<details>
+<summary>⚡ <strong>DynamicTable</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Dynamic table name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.query` | `string` | SQL query defining the dynamic table content |
+| `spec.targetLag` | `string` | Maximum acceptable staleness (e.g. `"1 minute"`, `"DOWNSTREAM"`) |
+| `spec.warehouse` | `string` | Warehouse used for refreshing |
+| `spec.refreshMode` | `*enum` | Refresh strategy: `AUTO` / `FULL` / `INCREMENTAL` |
+| `spec.initialize` | `*enum` | Initial data population: `ON_CREATE` / `ON_SCHEDULE` |
+| `spec.comment` | `*string` | Optional description |
+
+> ⚡ **Declarative Pipelines:** Dynamic tables automatically refresh based on upstream changes. Use `targetLag` to control freshness and `DOWNSTREAM` for chained pipeline dependencies.
+
+</details>
+
+<details>
 <summary>🏷️ <strong>Tag</strong></summary>
 
 | Field | Type | Description |
@@ -772,7 +856,7 @@ Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped a
 │   ├── clients/
 │   │   ├── clientfactory/  # Client cache with hash-based rotation
 │   │   └── snowflake/      # Snowflake SDK wrapper & SQL builder
-│   ├── controller/         # All reconcilers (20 managed resources + FieldExport + ProviderConfig)
+│   ├── controller/         # All reconcilers (24 managed resources + FieldExport + ProviderConfig)
 │   ├── drift/              # Field-level drift detection engine
 │   ├── metrics/            # Custom Prometheus metrics
 │   ├── provider/           # Provider config builder & client resolution

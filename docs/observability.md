@@ -19,10 +19,10 @@ All metrics use the `snowplane_` namespace and are exposed on the controller's m
 |--------|------|--------|-------------|
 | `snowplane_snowflake_operation_total` | Counter | `controller`, `operation`, `result` | Snowflake API calls by operation (`observe`, `create`, `alter`, `drop`, `ping`) |
 | `snowplane_snowflake_operation_duration_seconds` | Histogram | `controller`, `operation` | Snowflake API call latencies |
-| `snowplane_client_pool_size` | Gauge | — | Active Snowflake clients in the connection pool (LRU-evicted when configurable max size is reached) |
+| `snowplane_client_pool_size` | Gauge | — | Active Snowflake clients in the connection pool (O(1) LRU eviction via doubly-linked list when configurable max size is reached) |
 | `snowplane_rate_limit_waits_total` | Counter | `controller` | Number of times a reconciler waited for the rate limiter |
 
-> **Cardinality Bounds:** The `operation` label is bounded to a fixed set of values: `observe`, `create`, `alter`, `drop`, `create_or_alter`, and `ping`. The `controller` label is bounded by the number of registered controllers (currently 22). The `result` label is bounded to `success` and `error`. Total cardinality for operation metrics is at most ~264 series (22 controllers × 6 operations × 2 results), well within Prometheus best practices.
+> **Cardinality Bounds:** The `operation` label is bounded to a fixed set of values: `observe`, `create`, `alter`, `drop`, `create_or_alter`, and `ping`. The `controller` label is bounded by the number of registered controllers (currently 26). The `result` label is bounded to `success` and `error`. Total cardinality for operation metrics is at most ~312 series (26 controllers × 6 operations × 2 results), well within Prometheus best practices.
 
 ### Resource Management
 
@@ -184,6 +184,8 @@ All event messages pass through `SafeRecorder`, which wraps the standard `record
 Configure with `--health-probe-bind-address` (default `:8081`).
 
 The readiness probe uses `ClientFactory.CheckHealth()`, which iterates all cached Snowflake connections and executes a `SELECT 1` with a 5-second timeout. If no clients are cached (e.g., before the first ProviderConfig is reconciled), the probe returns healthy.
+
+A configurable **startup grace period** (`WithStartupGrace`, default 30 seconds) allows the readiness probe to pass during initial startup before any ProviderConfig has been reconciled and a Snowflake client cached. This prevents Kubernetes from killing the pod before it has had a chance to establish its first connection.
 
 ## Grafana Dashboard
 

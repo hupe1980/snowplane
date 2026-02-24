@@ -103,7 +103,7 @@ func successfulObservation() *snowflake.AccountRoleObservation {
 }
 
 // newTestReconciler builds a reconciler with a fake k8s client and injected mock service.
-func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRole, Service] {
+func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRole, Service, *snowflake.AccountRoleObservation] {
 	scheme := testutil.TestScheme()
 
 	cb := fake.NewClientBuilder().WithScheme(scheme).
@@ -115,7 +115,7 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	c := cb.Build()
 	factory := clientfactory.NewClientFactory()
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRole, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRole, Service, *snowflake.AccountRoleObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: record.NewFakeRecorder(100),
@@ -1221,7 +1221,7 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 		WithRuntimeObjects(role, testutil.NewTestPC("default"), testutil.NewTestSecret("default")).
 		Build()
 
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRole, Service]{
+	r := &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRole, Service, *snowflake.AccountRoleObservation]{
 		Client:   c,
 		Factory:  clientfactory.NewClientFactory(),
 		Recorder: record.NewFakeRecorder(100),

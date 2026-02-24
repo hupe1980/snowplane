@@ -71,68 +71,11 @@ type ShareGrantList struct {
 	Items           []ShareGrant `json:"items"`
 }
 
-// GetConditions returns the conditions.
-func (r *ShareGrant) GetConditions() []metav1.Condition { return r.Status.Conditions }
-
-// SetConditions sets the conditions.
-func (r *ShareGrant) SetConditions(c []metav1.Condition) { r.Status.Conditions = c }
-
-// GetDeletionPolicy returns the deletion policy, defaulting to Delete.
-func (r *ShareGrant) GetDeletionPolicy() DeletionPolicy {
-	if r.Spec.DeletionPolicy == "" {
-		return DeletionPolicyDelete
-	}
-
-	return r.Spec.DeletionPolicy
-}
-
-// GetFullyQualifiedName returns the Snowflake fully qualified identifier from status.
-func (r *ShareGrant) GetFullyQualifiedName() string { return r.Status.FullyQualifiedName }
-
 // GetSpecName returns a human-readable composite name for the grant.
 func (r *ShareGrant) GetSpecName() string {
 	return fmt.Sprintf("%s ON %s %s -> SHARE %s",
 		r.Spec.Privilege, r.Spec.ObjectType, r.Spec.ObjectName, r.Spec.Share)
 }
-
-// GetProviderRef returns the provider reference.
-func (r *ShareGrant) GetProviderRef() ProviderReference { return r.Spec.ProviderRef }
-
-// GetUseRole returns the use role (the role that executes the GRANT).
-func (r *ShareGrant) GetUseRole() *string { return r.Spec.UseRole }
-
-// GetObservedGeneration returns the observed generation.
-func (r *ShareGrant) GetObservedGeneration() int64 { return r.Status.ObservedGeneration }
-
-// SetObservedGeneration sets the observed generation.
-func (r *ShareGrant) SetObservedGeneration(v int64) { r.Status.ObservedGeneration = v }
-
-// GetLastAppliedSpecHash returns the last applied spec hash.
-func (r *ShareGrant) GetLastAppliedSpecHash() string { return r.Status.LastAppliedSpecHash }
-
-// SetLastAppliedSpecHash sets the last applied spec hash.
-func (r *ShareGrant) SetLastAppliedSpecHash(v string) { r.Status.LastAppliedSpecHash = v }
-
-// GetTrackedParametersList returns nil — grants don't track parameters.
-func (r *ShareGrant) GetTrackedParametersList() []string { return nil }
-
-// SetTrackedParametersList is a no-op for grants.
-func (r *ShareGrant) SetTrackedParametersList(_ []string) {}
-
-// GetOwner returns the granting role from status.
-func (r *ShareGrant) GetOwner() string {
-	if r.Status.ShowOutput != nil {
-		return r.Status.ShowOutput.GrantedBy
-	}
-
-	return ""
-}
-
-// ValidateSpec validates the resource spec.
-func (r *ShareGrant) ValidateSpec() error { return r.Spec.Validate() }
-
-// ComputeSpecHash returns a SHA-256 hash of the spec.
-func (r *ShareGrant) ComputeSpecHash() (string, error) { return ComputeSpecHash(r.Spec) }
 
 func init() {
 	SchemeBuilder.Register(&ShareGrant{}, &ShareGrantList{})

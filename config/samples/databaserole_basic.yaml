@@ -1,0 +1,11 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: DatabaseRole
+metadata:
+  name: my-database-role
+spec:
+  name: MY_DB_ROLE
+  providerRef:
+    name: default
+  databaseRef:
+    name: my-database
+  comment: "Database role managed by Snowplane"

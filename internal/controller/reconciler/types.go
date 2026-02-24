@@ -67,11 +67,13 @@ type Identifier interface {
 }
 
 // Observation is the generic observation from Snowflake.
-type Observation struct {
+// The type parameter D holds the resource-specific observation data,
+// providing compile-time safety instead of runtime type assertions.
+type Observation[D any] struct {
 	// Exists indicates whether the resource exists in Snowflake.
 	Exists bool
 	// Detail holds the resource-specific observation data.
-	Detail any
+	Detail D
 }
 
 // ResourceAdapter encapsulates all resource-specific behaviour for the generic
@@ -81,11 +83,12 @@ type Observation struct {
 // Type parameters:
 //   - T: the CRD type (e.g. *snowplanev1alpha1.Database)
 //   - S: the Snowflake CRUD service interface (e.g. database.Service)
+//   - D: the resource-specific observation detail type (e.g. *snowflake.DatabaseObservation)
 //
-// Using a type parameter for S eliminates the `any`-typed `svc` parameter
-// that previously required runtime type assertions in every adapter method.
-// A wrong service type is now a compile-time error instead of a runtime panic (B-4).
-type ResourceAdapter[T ManagedResource, S any] interface {
+// Using type parameters for S and D eliminates runtime type assertions in
+// every adapter method. A wrong service or observation type is now a
+// compile-time error instead of a runtime panic.
+type ResourceAdapter[T ManagedResource, S any, D any] interface {
 	// ResourceName returns the controller name (e.g. "database").
 	ResourceName() string
 
@@ -113,7 +116,7 @@ type ResourceAdapter[T ManagedResource, S any] interface {
 	SetupWatches() SetupWatchesFunc
 
 	// Observe queries Snowflake for the current state.
-	Observe(ctx context.Context, svc S, id Identifier) (*Observation, error)
+	Observe(ctx context.Context, svc S, id Identifier) (*Observation[D], error)
 
 	// Create creates the resource in Snowflake.
 	Create(ctx context.Context, svc S, obj T, id Identifier) error
@@ -128,16 +131,16 @@ type ResourceAdapter[T ManagedResource, S any] interface {
 	ValidateImmutableFields(ctx context.Context, obj T) error
 
 	// BuildAlterOptions diffs spec vs observation and returns alter options.
-	BuildAlterOptions(ctx context.Context, obj T, id Identifier, obs *Observation) (AlterOptions, error)
+	BuildAlterOptions(ctx context.Context, obj T, id Identifier, obs *Observation[D]) (AlterOptions, error)
 
 	// ApplyObservation maps the observation into the CR's status fields.
-	ApplyObservation(obj T, obs *Observation)
+	ApplyObservation(obj T, obs *Observation[D])
 
 	// ComputeTrackedParameters returns actively-managed field names.
 	ComputeTrackedParameters(obj T) []string
 
 	// DetectDrift compares spec vs observation for reporting.
-	DetectDrift(obj T, obs *Observation) *drift.Result
+	DetectDrift(obj T, obs *Observation[D]) *drift.Result
 
 	// SupportsCreateOrAlter reports whether this resource type supports
 	// the CREATE OR ALTER SQL syntax. When true and the CR carries the

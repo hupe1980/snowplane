@@ -505,7 +505,7 @@ func (t *TableClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier)
 	if err != nil {
 		return nil, fmt.Errorf("showing table %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanTableShowOutput(rows, name.Name())
 }
@@ -525,7 +525,7 @@ func (t *TableClient) DescribeTable(ctx context.Context, name SchemaObjectIdenti
 	if err != nil {
 		return nil, fmt.Errorf("describing table %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanColumnInfo(rows)
 }

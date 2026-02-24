@@ -242,31 +242,61 @@ These are defense-in-depth — they complement the CEL rules on the struct.
 
 ## 4. Implement the ManagedResource Interface
 
-Every CRD type must satisfy the `reconciler.ManagedResource` constraint. Add these methods to the root type (the `Thing` struct, not the spec):
+Every CRD type must satisfy the `reconciler.ManagedResource` constraint. The 16 standard accessor methods are **code-generated** — you only need to register your new type in the generator.
+
+### Step 4a. Register in the accessor generator
+
+Edit `hack/gen-accessors/main.go` and add your type to the `types` slice:
 
 ```go
-func (t *Thing) GetDeletionPolicy() DeletionPolicy         { return t.Spec.DeletionPolicy }
-func (t *Thing) GetSpecName() string                        { return t.Spec.Name }
-func (t *Thing) GetProviderRef() ProviderReference          { return t.Spec.ProviderRef }
-func (t *Thing) GetUseRole() *string                      { return t.Spec.UseRole }
-func (t *Thing) GetObservedGeneration() int64               { return t.Status.ObservedGeneration }
-func (t *Thing) SetObservedGeneration(gen int64)            { t.Status.ObservedGeneration = gen }
-func (t *Thing) GetLastAppliedSpecHash() string             { return t.Status.LastAppliedSpecHash }
-func (t *Thing) SetLastAppliedSpecHash(h string)            { t.Status.LastAppliedSpecHash = h }
-func (t *Thing) GetTrackedParametersList() []string         { return t.Status.TrackedParameters }
-func (t *Thing) SetTrackedParametersList(p []string)        { t.Status.TrackedParameters = p }
-func (t *Thing) GetFullyQualifiedName() string              { return t.Status.FullyQualifiedName }
-func (t *Thing) GetOwner() string {
-    if t.Status.ShowOutput != nil { return t.Status.ShowOutput.Owner }
-    return ""
-}
-func (t *Thing) ValidateSpec() error                        { return t.Spec.Validate() }
-func (t *Thing) ComputeSpecHash() (string, error)           { return ComputeSpecHash(t.Spec) }
+// Choose the correct pattern:
 
-// ConditionedObject methods:
-func (t *Thing) GetConditions() []metav1.Condition          { return t.Status.Conditions }
-func (t *Thing) SetConditions(c []metav1.Condition)         { t.Status.Conditions = c }
+// Pattern A1 — standard resource with ShowOutput.Owner:
+{TypeName: "Thing", Receiver: "t", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
+
+// Pattern A2 — standard resource without owner column:
+{TypeName: "Thing", Receiver: "t", Owner: OwnerEmpty, OwnerComment: "SHOW THINGS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+
+// Pattern B — grant resource (custom GetSpecName, no tracked params):
+{TypeName: "Thing", Receiver: "t", SkipGetSpecName: true, Owner: OwnerFromShowOutputGrantedBy, TrackedParams: TrackedParamsNil},
 ```
+
+### Step 4b. Custom GetSpecName (grants only)
+
+If your type has `SkipGetSpecName: true` (pattern B/C), add a hand-written `GetSpecName()` in the `_types.go` file:
+
+```go
+func (t *Thing) GetSpecName() string {
+    return fmt.Sprintf("%s %s -> ROLE %s", t.Spec.Privilege, t.Spec.On.Description(), t.Spec.Role)
+}
+```
+
+For standard resources (pattern A1/A2), `GetSpecName()` is generated as `t.Spec.Name`.
+
+### Step 4c. Regenerate
+
+```bash
+just generate
+```
+
+This regenerates `api/v1alpha1/zz_generated_accessors.go` with all 16 interface methods for every registered type. The generated methods are:
+
+| Method | Source |
+|--------|--------|
+| `GetConditions` / `SetConditions` | `Status.Conditions` |
+| `GetDeletionPolicy` | `Spec.DeletionPolicy` (default: `Delete`) |
+| `GetFullyQualifiedName` | `Status.FullyQualifiedName` |
+| `GetSpecName` | `Spec.Name` (generated for A1/A2; hand-written for B/C) |
+| `GetProviderRef` | `Spec.ProviderRef` |
+| `GetUseRole` | `Spec.UseRole` |
+| `Get/SetObservedGeneration` | `Status.ObservedGeneration` |
+| `Get/SetLastAppliedSpecHash` | `Status.LastAppliedSpecHash` |
+| `Get/SetTrackedParametersList` | `Status.TrackedParameters` (or nil/no-op for grants) |
+| `GetOwner` | `Status.ShowOutput.Owner` / `.GrantedBy` / `""` |
+| `ValidateSpec` | `Spec.Validate()` |
+| `ComputeSpecHash` | `ComputeSpecHash(Spec)` |
+
+**Never edit `zz_generated_accessors.go` manually.**
 
 ---
 
@@ -284,6 +314,7 @@ just sync-crds
 
 This produces:
 - `api/v1alpha1/zz_generated.deepcopy.go` — handles nil-safe copying of pointer fields
+- `api/v1alpha1/zz_generated_accessors.go` — ManagedResource interface methods (380 methods, 24 types)
 - `config/crd/bases/snowplane.hupe1980.github.io_things.yaml` — the CRD manifest with CEL rules
 
 **Never edit these files manually.**
@@ -358,9 +389,9 @@ type Service interface {
 
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Thing] {
+func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Thing, Service, *snowflake.ThingObservation] {
     a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-    return &reconciler.GenericReconciler[*snowplanev1alpha1.Thing]{
+    return &reconciler.GenericReconciler[*snowplanev1alpha1.Thing, Service, *snowflake.ThingObservation]{
         Client:      c,
         Factory:     factory,
         Recorder:    recorder,
@@ -383,7 +414,7 @@ func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRol
 
 ### `adapter.go`
 
-Implements `ResourceAdapter[T]`. The structure varies by resource level:
+Implements `ResourceAdapter[T, S, D]`. The structure varies by resource level:
 
 #### Account-Level Adapter (simplest)
 
@@ -688,12 +719,12 @@ Use this checklist to verify completeness:
 - [ ] **Types:** `api/v1alpha1/<resource>_types.go` with spec, status, show output, kubebuilder markers
 - [ ] **Dual ref/name:** `DatabaseRef *LocalObjectReference` + `DatabaseName *string` with CEL XOR rule (if database/schema-level)
 - [ ] **Validation:** `Validate()` method using `validateDatabaseSource`/`validateSchemaSource` helpers
-- [ ] **ManagedResource:** All interface methods implemented on the root type
-- [ ] **DeepCopy:** `just generate` run (never edit `zz_generated.deepcopy.go`)
+- [ ] **ManagedResource:** Type registered in `hack/gen-accessors/main.go`; `just generate` run
+- [ ] **DeepCopy:** `just generate` run (never edit `zz_generated.deepcopy.go` or `zz_generated_accessors.go`)
 - [ ] **CRD manifest:** `just generate && just sync-crds` run, maturity label added
 - [ ] **Enum markers:** `+kubebuilder:validation:Enum` on all string-typed enum fields (quote values starting with digits, e.g. `"2XLARGE"`)
 - [ ] **Snowflake client:** Observe/Create/Alter/Drop with proper identifier type
-- [ ] **Adapter:** Implements `ResourceAdapter[T]` with nil-safe field indexers
+- [ ] **Adapter:** Implements `ResourceAdapter[T, S, D]` with nil-safe field indexers
 - [ ] **Reference resolution:** `PreReconcile` uses `refresolver.PreReconcileDatabaseRef()` / `PreReconcileSchemaRef()` (handles resolution, conditions, deletion fallback, and logging)
 - [ ] **Reconciler:** `NewReconciler` + `defaultServiceFactory` + helper functions
 - [ ] **Drift detection:** `detectDrift` includes all immutable fields (`name`, `useRole`, container refs, type fields) with `immutable=true`, plus all mutable spec fields
@@ -702,5 +733,5 @@ Use this checklist to verify completeness:
 - [ ] **Samples:** CR YAML with both `databaseRef` and `databaseName` variants
 - [ ] **Tests:** Unit + integration (including CEL validation)
 - [ ] **Interface assertion:** `var _ reconciler.ResourceAdapter[...] = (*adapter)(nil)`
-- [ ] **Safe type assertions:** Use `reconciler.AssertIdentifier[I]` / `AssertDetail[D]` / `AssertAlterOptions[A]` in error-returning methods; comma-ok pattern in non-error-returning methods (never bare `x.(T)` assertions)
+- [ ] **Safe type assertions:** Use `reconciler.AssertIdentifier[I]` / `AssertAlterOptions[A]` in error-returning methods (never bare `x.(T)` assertions). Observation details are type-safe via `Observation[D]` — no assertion needed.
 - [ ] **ProviderConfig in-use guard:** Add the new type to the in-use check in `internal/controller/providerconfig/adapter.go`

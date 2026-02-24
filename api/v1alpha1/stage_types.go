@@ -28,6 +28,16 @@ type StageDirectoryOptions struct {
 	// AutoRefresh enables automatic refresh for external stage directories.
 	// +optional
 	AutoRefresh *bool `json:"autoRefresh,omitempty"`
+
+	// RefreshOnCreate triggers an automatic refresh of the directory table
+	// metadata when the stage is created. Default is true.
+	// +optional
+	RefreshOnCreate *bool `json:"refreshOnCreate,omitempty"`
+
+	// NotificationIntegration specifies the notification integration for
+	// automatic directory table metadata refreshes.
+	// +optional
+	NotificationIntegration *string `json:"notificationIntegration,omitempty"`
 }
 
 // StageSpec defines the desired state of a Stage.
@@ -38,7 +48,7 @@ type StageDirectoryOptions struct {
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef) || self.schemaRef == oldSelf.schemaRef)",message="spec.schemaRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName) || self.schemaName == oldSelf.schemaName)",message="spec.schemaName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="(has(self.url) && self.url != ”) == (has(oldSelf.url) && oldSelf.url != ”)",message="stage type (internal/external) is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="(has(self.url) && size(self.url) > 0) == (has(oldSelf.url) && size(oldSelf.url) > 0)",message="stage type (internal/external) is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
 type StageSpec struct {
@@ -175,72 +185,6 @@ type StageList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Stage `json:"items"`
 }
-
-// GetConditions returns the conditions of the Stage.
-func (s *Stage) GetConditions() []metav1.Condition {
-	return s.Status.Conditions
-}
-
-// SetConditions sets the conditions of the Stage.
-func (s *Stage) SetConditions(conditions []metav1.Condition) {
-	s.Status.Conditions = conditions
-}
-
-// GetDeletionPolicy returns the deletion policy, defaulting to Delete.
-func (s *Stage) GetDeletionPolicy() DeletionPolicy {
-	if s.Spec.DeletionPolicy == "" {
-		return DeletionPolicyDelete
-	}
-
-	return s.Spec.DeletionPolicy
-}
-
-// GetFullyQualifiedName returns the Snowflake fully qualified identifier from status.
-func (s *Stage) GetFullyQualifiedName() string {
-	return s.Status.FullyQualifiedName
-}
-
-// GetSpecName returns the Snowflake resource name from the spec.
-func (s *Stage) GetSpecName() string { return s.Spec.Name }
-
-// GetProviderRef returns the provider reference from the spec.
-func (s *Stage) GetProviderRef() ProviderReference { return s.Spec.ProviderRef }
-
-// GetUseRole returns the use role from the spec.
-func (s *Stage) GetUseRole() *string { return s.Spec.UseRole }
-
-// GetObservedGeneration returns the observed generation from status.
-func (s *Stage) GetObservedGeneration() int64 { return s.Status.ObservedGeneration }
-
-// SetObservedGeneration sets the observed generation in status.
-func (s *Stage) SetObservedGeneration(v int64) { s.Status.ObservedGeneration = v }
-
-// GetLastAppliedSpecHash returns the last applied spec hash from status.
-func (s *Stage) GetLastAppliedSpecHash() string { return s.Status.LastAppliedSpecHash }
-
-// SetLastAppliedSpecHash sets the last applied spec hash in status.
-func (s *Stage) SetLastAppliedSpecHash(v string) { s.Status.LastAppliedSpecHash = v }
-
-// GetTrackedParametersList returns the tracked parameters list from status.
-func (s *Stage) GetTrackedParametersList() []string { return s.Status.TrackedParameters }
-
-// SetTrackedParametersList sets the tracked parameters list in status.
-func (s *Stage) SetTrackedParametersList(v []string) { s.Status.TrackedParameters = v }
-
-// GetOwner returns the use role from status.
-func (s *Stage) GetOwner() string {
-	if s.Status.ShowOutput != nil {
-		return s.Status.ShowOutput.Owner
-	}
-
-	return ""
-}
-
-// ValidateSpec validates the resource spec.
-func (s *Stage) ValidateSpec() error { return s.Spec.Validate() }
-
-// ComputeSpecHash returns a SHA-256 hash of the spec for drift detection.
-func (s *Stage) ComputeSpecHash() (string, error) { return ComputeSpecHash(s.Spec) }
 
 // IsExternal returns true if the stage is configured as an external stage.
 func (s *Stage) IsExternal() bool { return s.Spec.URL != nil && *s.Spec.URL != "" }

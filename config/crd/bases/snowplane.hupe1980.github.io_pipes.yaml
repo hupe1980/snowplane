@@ -1,0 +1,360 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: pipes.snowplane.hupe1980.github.io
+spec:
+  group: snowplane.hupe1980.github.io
+  names:
+    categories:
+    - snowplane
+    kind: Pipe
+    listKind: PipeList
+    plural: pipes
+    singular: pipe
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: SYNCED
+      type: string
+    - jsonPath: .spec.name
+      name: SNOWFLAKE-NAME
+      type: string
+    - jsonPath: .status.databaseName
+      name: DATABASE
+      type: string
+    - jsonPath: .status.schemaName
+      name: SCHEMA
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Pipe is the Schema for the pipes API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PipeSpec defines the desired state of a Snowflake Pipe.
+            properties:
+              autoIngest:
+                description: |-
+                  AutoIngest enables automatic data loading when new files arrive in the stage
+                  (requires a configured notification integration). Immutable after creation.
+                type: boolean
+              awsSnsTopic:
+                description: |-
+                  AwsSnsTopic specifies the Amazon SNS topic ARN for S3 auto-ingest.
+                  Used when auto-ingest relies on SNS rather than a notification integration.
+                  Immutable after creation.
+                type: string
+              comment:
+                description: Comment is an optional description for the pipe.
+                type: string
+              copyStatement:
+                description: |-
+                  CopyStatement is the COPY INTO statement that defines the pipe behavior.
+                  This is the core of the pipe — it specifies source stage, target table,
+                  file format, and any transformation logic. Immutable after creation.
+                minLength: 1
+                type: string
+              databaseName:
+                description: |-
+                  DatabaseName is the raw Snowflake database identifier.
+                  Mutually exclusive with DatabaseRef. Immutable after creation.
+                minLength: 1
+                type: string
+              databaseRef:
+                description: |-
+                  DatabaseRef references a Database CR in the same namespace.
+                  Mutually exclusive with DatabaseName. Immutable after creation.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy specifies what happens to the Snowflake resource when the CR is deleted.
+                  Defaults to "Delete".
+                enum:
+                - Delete
+                - Orphan
+                type: string
+              errorIntegration:
+                description: ErrorIntegration specifies a notification integration
+                  for pipe error notifications.
+                type: string
+              integration:
+                description: |-
+                  Integration is the notification integration name for auto-ingest.
+                  Required when autoIngest is true. Immutable after creation.
+                type: string
+              name:
+                description: Name is the Snowflake pipe name. Immutable after creation.
+                minLength: 1
+                type: string
+              providerRef:
+                description: ProviderRef references the ProviderConfig to use for
+                  Snowflake connectivity.
+                properties:
+                  name:
+                    default: default
+                    description: Name of the ProviderConfig to use.
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the ProviderConfig. Defaults to the namespace of the
+                      referring resource. Set this to reference a ProviderConfig in a
+                      different namespace (e.g. a shared system namespace).
+                    type: string
+                type: object
+              schemaName:
+                description: |-
+                  SchemaName is the raw Snowflake schema FQN.
+                  Mutually exclusive with SchemaRef. Immutable after creation.
+                minLength: 1
+                type: string
+              schemaRef:
+                description: |-
+                  SchemaRef references a Schema CR in the same namespace.
+                  Mutually exclusive with SchemaName. Immutable after creation.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              useRole:
+                description: |-
+                  UseRole specifies the Snowflake role to activate via USE ROLE before
+                  CREATE/ALTER/DROP operations. In Snowflake's DAC model the role active
+                  at CREATE time becomes the object owner, so this field indirectly
+                  controls initial ownership.
+                  This field is immutable after the resource has been created in Snowflake.
+                minLength: 1
+                type: string
+            required:
+            - copyStatement
+            - name
+            - providerRef
+            type: object
+            x-kubernetes-validations:
+            - message: spec.name is immutable (delete and recreate the resource to
+                change)
+              rule: self.name == oldSelf.name
+            - message: spec.databaseRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.databaseRef) == has(self.databaseRef) && (!has(self.databaseRef)
+                || self.databaseRef == oldSelf.databaseRef)
+            - message: spec.databaseName is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName)
+                || self.databaseName == oldSelf.databaseName)
+            - message: spec.schemaRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef)
+                || self.schemaRef == oldSelf.schemaRef)
+            - message: spec.schemaName is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName)
+                || self.schemaName == oldSelf.schemaName)
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
+            - message: spec.copyStatement is immutable (delete and recreate the resource
+                to change)
+              rule: self.copyStatement == oldSelf.copyStatement
+            - message: spec.autoIngest is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.autoIngest) == has(self.autoIngest) && (!has(self.autoIngest)
+                || self.autoIngest == oldSelf.autoIngest)
+            - message: spec.integration is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.integration) == has(self.integration) && (!has(self.integration)
+                || self.integration == oldSelf.integration)
+            - message: spec.awsSnsTopic is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.awsSnsTopic) == has(self.awsSnsTopic) && (!has(self.awsSnsTopic)
+                || self.awsSnsTopic == oldSelf.awsSnsTopic)
+            - message: exactly one of spec.databaseRef or spec.databaseName must be
+                set
+              rule: (has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef)
+                && has(self.databaseName))
+            - message: exactly one of spec.schemaRef or spec.schemaName must be set
+              rule: (has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef)
+                && has(self.schemaName))
+          status:
+            description: PipeStatus defines the observed state of a Pipe.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the resource's state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              databaseName:
+                description: DatabaseName is the parent Snowflake database name.
+                type: string
+              fullyQualifiedName:
+                description: FullyQualifiedName is the Snowflake fully qualified identifier
+                  for this resource.
+                type: string
+              lastAppliedSpecHash:
+                description: |-
+                  LastAppliedSpecHash is the SHA-256 hash of the spec as of the last
+                  successful reconciliation. The reconciler uses this to distinguish
+                  spec changes (user edited the CR) from external drift (Snowflake
+                  state diverged without a spec change). This is more reliable than
+                  comparing ObservedGeneration vs Generation because metadata-only
+                  changes (labels, annotations) increment Generation without changing
+                  the spec.
+                type: string
+              notificationChannel:
+                description: |-
+                  NotificationChannel is the cloud notification channel for auto-ingest.
+                  Users need this to configure the cloud event notification (e.g. SQS queue policy).
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              schemaName:
+                description: SchemaName is the parent Snowflake schema name.
+                type: string
+              showOutput:
+                description: ShowOutput contains the raw SHOW PIPES output for this
+                  pipe.
+                properties:
+                  awsSnsTopic:
+                    description: AwsSnsTopic is the SNS topic ARN for S3 auto-ingest.
+                    type: string
+                  comment:
+                    description: Comment is the pipe description.
+                    type: string
+                  createdOn:
+                    description: CreatedOn is the timestamp when the pipe was created.
+                    type: string
+                  databaseName:
+                    description: DatabaseName is the parent database name.
+                    type: string
+                  definition:
+                    description: Definition is the COPY INTO statement.
+                    type: string
+                  errorIntegration:
+                    description: ErrorIntegration is the error notification integration
+                      name.
+                    type: string
+                  integration:
+                    description: Integration is the notification integration name.
+                    type: string
+                  name:
+                    description: Name is the pipe name as returned by Snowflake.
+                    type: string
+                  notificationChannel:
+                    description: NotificationChannel is the cloud notification channel
+                      ARN/URL.
+                    type: string
+                  owner:
+                    description: Owner is the role that owns the pipe.
+                    type: string
+                  schemaName:
+                    description: SchemaName is the parent schema name.
+                    type: string
+                type: object
+              trackedParameters:
+                description: TrackedParameters tracks which optional spec fields have
+                  been actively SET.
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

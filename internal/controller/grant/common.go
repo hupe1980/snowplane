@@ -277,7 +277,7 @@ func dedupStrings(ss []string) []string {
 }
 
 // grantObserve queries Snowflake for the current state of a grant.
-func grantObserve(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation, error) {
+func grantObserve(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation[*snowflake.GrantObservation], error) {
 	gid, err := reconciler.AssertIdentifier[snowflake.GrantIdentifier](id)
 	if err != nil {
 		return nil, err
@@ -288,7 +288,7 @@ func grantObserve(ctx context.Context, svc Service, id reconciler.Identifier) (*
 		return nil, err
 	}
 
-	return &reconciler.Observation{Exists: obs.Exists, Detail: obs}, nil
+	return &reconciler.Observation[*snowflake.GrantObservation]{Exists: obs.Exists, Detail: obs}, nil
 }
 
 // grantDrop revokes a privilege from Snowflake given an identifier.

@@ -101,6 +101,16 @@ spec:
                   enable:
                     description: Enable enables or disables the directory table.
                     type: boolean
+                  notificationIntegration:
+                    description: |-
+                      NotificationIntegration specifies the notification integration for
+                      automatic directory table metadata refreshes.
+                    type: string
+                  refreshOnCreate:
+                    description: |-
+                      RefreshOnCreate triggers an automatic refresh of the directory table
+                      metadata when the stage is created. Default is true.
+                    type: boolean
                 required:
                 - enable
                 type: object
@@ -214,8 +224,8 @@ spec:
                 || self.useRole == oldSelf.useRole)
             - message: stage type (internal/external) is immutable (delete and recreate
                 the resource to change)
-              rule: (has(self.url) && self.url != '') == (has(oldSelf.url) && oldSelf.url
-                != '')
+              rule: (has(self.url) && size(self.url) > 0) == (has(oldSelf.url) &&
+                size(oldSelf.url) > 0)
             - message: exactly one of spec.databaseRef or spec.databaseName must be
                 set
               rule: (has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef)

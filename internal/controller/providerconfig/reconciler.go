@@ -24,6 +24,7 @@ import (
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
+	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/metrics"
 	"github.com/hupe1980/snowplane/internal/provider"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
@@ -141,6 +142,10 @@ func managedResourceTypes() []managedResourceEntry {
 		{proto: &snowplanev1alpha1.AccountRoleGrant{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AccountRoleGrantList{} }},
 		{proto: &snowplanev1alpha1.DatabaseRoleGrant{}, newList: func() client.ObjectList { return &snowplanev1alpha1.DatabaseRoleGrantList{} }},
 		{proto: &snowplanev1alpha1.ShareGrant{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ShareGrantList{} }},
+		{proto: &snowplanev1alpha1.StorageIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.StorageIntegrationList{} }},
+		{proto: &snowplanev1alpha1.FileFormat{}, newList: func() client.ObjectList { return &snowplanev1alpha1.FileFormatList{} }},
+		{proto: &snowplanev1alpha1.Pipe{}, newList: func() client.ObjectList { return &snowplanev1alpha1.PipeList{} }},
+		{proto: &snowplanev1alpha1.DynamicTable{}, newList: func() client.ObjectList { return &snowplanev1alpha1.DynamicTableList{} }},
 	}
 }
 
@@ -368,7 +373,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 	metrics.SetProviderConfigHealthy(pc.Name, pc.Spec.Account, true)
 
 	if credentialsRotated {
-		r.recorder.Event(pc, corev1.EventTypeNormal, "CredentialsRotated", "Credentials rotated, reconnecting")
+		r.recorder.Event(pc, corev1.EventTypeNormal, snowplanev1alpha1.ReasonCredentialsRotated, "Credentials rotated, reconnecting")
 	}
 
 	r.recorder.Event(pc, corev1.EventTypeNormal, snowplanev1alpha1.ReasonAvailable, "Snowflake connection verified")
@@ -389,8 +394,8 @@ func (r *Reconciler) patchStatus(ctx context.Context, pc *snowplanev1alpha1.Prov
 	// SSA patch objects must not contain managedFields.
 	pc.SetManagedFields(nil)
 
-	return r.client.Status().Patch(ctx, pc, client.Apply, //nolint:staticcheck // TODO: migrate to client.Client.SubResource().Apply()
-		client.FieldOwner("snowplane-controller"),
+	return r.client.Status().Patch(ctx, pc, client.Apply, //nolint:staticcheck // TODO: migrate to client.SubResource("status").Apply() with ApplyConfiguration types
+		client.FieldOwner(reconciler.StatusFieldOwner),
 		client.ForceOwnership,
 	)
 }
@@ -424,8 +429,8 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, pc *snowplanev1alpha1.
 	if inUse {
 		msg := fmt.Sprintf("ProviderConfig %q is still referenced by managed resources; cannot delete", pc.Name)
 		logger.Info(msg)
-		r.recorder.Event(pc, corev1.EventTypeWarning, "InUse", msg)
-		conditions.SetNotReady(pc, "InUse", msg)
+		r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonInUse, msg)
+		conditions.SetNotReady(pc, snowplanev1alpha1.ReasonInUse, msg)
 		r.bestEffortPatchStatus(ctx, pc)
 
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil

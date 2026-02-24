@@ -141,7 +141,7 @@ func (g *GrantOwnershipClient) Observe(ctx context.Context, id GrantOwnershipIde
 
 		return nil, fmt.Errorf("showing grants on %s %s: %w", id.ObjectType, id.ObjectName, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanOwnershipGrant(rows, id.GranteeName)
 }

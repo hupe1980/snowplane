@@ -1,0 +1,15 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Pipe
+metadata:
+  name: my-pipe
+spec:
+  name: MY_PIPE
+  providerRef:
+    name: default
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  copyStatement: "COPY INTO MY_DATABASE.MY_SCHEMA.MY_TABLE FROM @MY_DATABASE.MY_SCHEMA.MY_STAGE"
+  autoIngest: false
+  comment: "Snowpipe managed by Snowplane"

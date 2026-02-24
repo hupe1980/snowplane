@@ -95,13 +95,19 @@ kubectl -n "${NAMESPACE}" delete secret snowflake-credentials 2>/dev/null || tru
 if [[ -n "${SNOWFLAKE_PRIVATE_KEY:-}" ]]; then
   AUTH_TYPE="KeyPair"
   SECRET_KEY="privateKey"
+  CRED_FILE=$(mktemp)
+  trap 'rm -f "${CRED_FILE}"' EXIT
+  printf '%s' "${SNOWFLAKE_PRIVATE_KEY}" > "${CRED_FILE}"
   kubectl -n "${NAMESPACE}" create secret generic snowflake-credentials \
-    --from-literal=privateKey="${SNOWFLAKE_PRIVATE_KEY}"
+    --from-file=privateKey="${CRED_FILE}"
 else
   AUTH_TYPE="UsernamePassword"
   SECRET_KEY="password"
+  CRED_FILE=$(mktemp)
+  trap 'rm -f "${CRED_FILE}"' EXIT
+  printf '%s' "${SNOWFLAKE_PASSWORD}" > "${CRED_FILE}"
   kubectl -n "${NAMESPACE}" create secret generic snowflake-credentials \
-    --from-literal=password="${SNOWFLAKE_PASSWORD}"
+    --from-file=password="${CRED_FILE}"
 fi
 
 # ── Create ProviderConfig ─────────────────────────────────────────────────────

@@ -121,66 +121,6 @@ type TagList struct {
 	Items           []Tag `json:"items"`
 }
 
-// GetConditions returns the conditions of the Tag.
-func (t *Tag) GetConditions() []metav1.Condition { return t.Status.Conditions }
-
-// SetConditions sets the conditions of the Tag.
-func (t *Tag) SetConditions(c []metav1.Condition) { t.Status.Conditions = c }
-
-// GetFullyQualifiedName returns the Snowflake fully qualified identifier from status.
-func (t *Tag) GetFullyQualifiedName() string { return t.Status.FullyQualifiedName }
-
-// GetSpecName returns the Snowflake resource name from the spec.
-func (t *Tag) GetSpecName() string { return t.Spec.Name }
-
-// GetProviderRef returns the provider reference from the spec.
-func (t *Tag) GetProviderRef() ProviderReference { return t.Spec.ProviderRef }
-
-// GetUseRole returns the use role from the spec.
-func (t *Tag) GetUseRole() *string { return t.Spec.UseRole }
-
-// GetObservedGeneration returns the observed generation from status.
-func (t *Tag) GetObservedGeneration() int64 { return t.Status.ObservedGeneration }
-
-// SetObservedGeneration sets the observed generation in status.
-func (t *Tag) SetObservedGeneration(v int64) { t.Status.ObservedGeneration = v }
-
-// GetLastAppliedSpecHash returns the last applied spec hash from status.
-func (t *Tag) GetLastAppliedSpecHash() string { return t.Status.LastAppliedSpecHash }
-
-// SetLastAppliedSpecHash sets the last applied spec hash in status.
-func (t *Tag) SetLastAppliedSpecHash(v string) { t.Status.LastAppliedSpecHash = v }
-
-// GetTrackedParametersList returns the tracked parameters list from status.
-func (t *Tag) GetTrackedParametersList() []string { return t.Status.TrackedParameters }
-
-// SetTrackedParametersList sets the tracked parameters list in status.
-func (t *Tag) SetTrackedParametersList(v []string) { t.Status.TrackedParameters = v }
-
-// ValidateSpec validates the resource spec.
-func (t *Tag) ValidateSpec() error { return t.Spec.Validate() }
-
-// ComputeSpecHash returns a SHA-256 hash of the spec for drift detection.
-func (t *Tag) ComputeSpecHash() (string, error) { return ComputeSpecHash(t.Spec) }
-
-// GetDeletionPolicy returns the deletion policy, defaulting to Delete.
-func (t *Tag) GetDeletionPolicy() DeletionPolicy {
-	if t.Spec.DeletionPolicy == "" {
-		return DeletionPolicyDelete
-	}
-
-	return t.Spec.DeletionPolicy
-}
-
-// GetOwner returns the owner from status.
-func (t *Tag) GetOwner() string {
-	if t.Status.ShowOutput != nil {
-		return t.Status.ShowOutput.Owner
-	}
-
-	return ""
-}
-
 func init() {
 	SchemeBuilder.Register(&Tag{}, &TagList{})
 }

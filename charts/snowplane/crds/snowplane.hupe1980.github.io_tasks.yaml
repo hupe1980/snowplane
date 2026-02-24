@@ -72,6 +72,11 @@ spec:
               comment:
                 description: Comment is an optional description for the task.
                 type: string
+              config:
+                description: |-
+                  Config specifies the default configuration string in valid JSON format
+                  that all tasks in a task graph can access via SYSTEM$GET_TASK_GRAPH_CONFIG.
+                type: string
               databaseName:
                 description: |-
                   DatabaseName is the raw Snowflake database identifier.
@@ -102,6 +107,24 @@ spec:
               errorIntegration:
                 description: ErrorIntegration is the notification integration for
                   error notifications.
+                type: string
+              finalize:
+                description: |-
+                  Finalize specifies the name of a root task that this finalizer task is
+                  associated with. Finalizer tasks run after all other tasks in the task
+                  graph complete. Mutually exclusive with Schedule and After.
+                type: string
+              logLevel:
+                description: LogLevel specifies the severity level of events for the
+                  task.
+                enum:
+                - TRACE
+                - DEBUG
+                - INFO
+                - WARN
+                - ERROR
+                - FATAL
+                - "OFF"
                 type: string
               name:
                 description: Name is the Snowflake task name. Immutable after creation.
@@ -146,6 +169,30 @@ spec:
                 required:
                 - name
                 type: object
+              serverlessTaskMaxStatementSize:
+                description: |-
+                  ServerlessTaskMaxStatementSize specifies the maximum warehouse size for
+                  the serverless task. Only applies to serverless tasks.
+                enum:
+                - XSMALL
+                - SMALL
+                - MEDIUM
+                - LARGE
+                - XLARGE
+                - XXLARGE
+                type: string
+              serverlessTaskMinStatementSize:
+                description: |-
+                  ServerlessTaskMinStatementSize specifies the minimum warehouse size for
+                  the serverless task. Only applies to serverless tasks.
+                enum:
+                - XSMALL
+                - SMALL
+                - MEDIUM
+                - LARGE
+                - XLARGE
+                - XXLARGE
+                type: string
               sqlStatement:
                 description: SQLStatement is the SQL code executed when the task runs.
                 minLength: 1
@@ -167,6 +214,12 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+              targetCompletionInterval:
+                description: |-
+                  TargetCompletionInterval specifies the desired task completion time.
+                  Only applies to serverless tasks. Required for serverless triggered tasks.
+                  Examples: "10 MINUTES", "1 HOURS"
+                type: string
               taskAutoRetryAttempts:
                 description: TaskAutoRetryAttempts specifies the number of automatic
                   retry attempts (0-30).
@@ -195,6 +248,14 @@ spec:
                 - XLARGE
                 - XXLARGE
                 type: string
+              userTaskMinimumTriggerIntervalInSeconds:
+                description: |-
+                  UserTaskMinimumTriggerIntervalInSeconds defines how frequently a triggered task
+                  can execute, in seconds. Changes within this interval are batched together.
+                format: int32
+                maximum: 604800
+                minimum: 10
+                type: integer
               userTaskTimeoutMs:
                 description: UserTaskTimeoutMs specifies the time limit on a single
                   run in milliseconds (0-604800000).
@@ -250,6 +311,11 @@ spec:
             - message: spec.warehouse and spec.userTaskManagedInitialWarehouseSize
                 are mutually exclusive
               rule: '!(has(self.warehouse) && has(self.userTaskManagedInitialWarehouseSize))'
+            - message: spec.finalize and spec.schedule are mutually exclusive
+              rule: '!has(self.finalize) || !has(self.schedule)'
+            - message: spec.finalize and spec.after are mutually exclusive
+              rule: '!has(self.finalize) || !has(self.after) || size(self.after) ==
+                0'
           status:
             description: TaskStatus defines the observed state of a Task.
             properties:

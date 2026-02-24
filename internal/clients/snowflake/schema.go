@@ -344,7 +344,7 @@ func (s *SchemaClient) ShowByID(ctx context.Context, name DatabaseObjectIdentifi
 	if err != nil {
 		return nil, fmt.Errorf("showing schema %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanSchemaShowOutput(rows, name.Name())
 }
@@ -364,7 +364,7 @@ func (s *SchemaClient) ShowParameters(ctx context.Context, name DatabaseObjectId
 	if err != nil {
 		return nil, fmt.Errorf("showing parameters for schema %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanSchemaParameters(rows)
 }

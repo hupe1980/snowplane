@@ -59,10 +59,22 @@ rules:
   - accountrolegrants
   - databaserolegrants
   - sharegrants
+  - grantownerships
   - users
   - tables
   - views
   - stages
+  - tasks
+  - streams
+  - tags
+  - networkpolicies
+  - resourcemonitors
+  - maskingpolicies
+  - rowaccesspolicies
+  - dynamictables
+  - fileformats
+  - pipes
+  - storageintegrations
   - fieldexports
   - providerconfigs
   verbs:
@@ -84,10 +96,22 @@ rules:
   - accountrolegrants/status
   - databaserolegrants/status
   - sharegrants/status
+  - grantownerships/status
   - users/status
   - tables/status
   - views/status
   - stages/status
+  - tasks/status
+  - streams/status
+  - tags/status
+  - networkpolicies/status
+  - resourcemonitors/status
+  - maskingpolicies/status
+  - rowaccesspolicies/status
+  - dynamictables/status
+  - fileformats/status
+  - pipes/status
+  - storageintegrations/status
   - fieldexports/status
   - providerconfigs/status
   verbs:
@@ -105,10 +129,22 @@ rules:
   - accountrolegrants/finalizers
   - databaserolegrants/finalizers
   - sharegrants/finalizers
+  - grantownerships/finalizers
   - users/finalizers
   - tables/finalizers
   - views/finalizers
   - stages/finalizers
+  - tasks/finalizers
+  - streams/finalizers
+  - tags/finalizers
+  - networkpolicies/finalizers
+  - resourcemonitors/finalizers
+  - maskingpolicies/finalizers
+  - rowaccesspolicies/finalizers
+  - dynamictables/finalizers
+  - fileformats/finalizers
+  - pipes/finalizers
+  - storageintegrations/finalizers
   - fieldexports/finalizers
   - providerconfigs/finalizers
   verbs:

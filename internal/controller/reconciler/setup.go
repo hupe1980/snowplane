@@ -35,7 +35,7 @@ type SetupConfig struct {
 	MaxConcurrentReconciles int
 }
 
-// Registerable is the interface satisfied by every GenericReconciler[T, S] instance.
+// Registerable is the interface satisfied by every GenericReconciler[T, S, D] instance.
 // It allows type-erased controller registration without knowing the concrete
 // CRD and service type parameters.
 type Registerable interface {
@@ -45,7 +45,7 @@ type Registerable interface {
 // Setup applies shared configuration and registers the controller with the manager.
 // It is the single entry-point for controller wiring, replacing the repeated
 // With*().With*().SetupWithManager() chains.
-func (r *GenericReconciler[T, S]) Setup(cfg SetupConfig) error {
+func (r *GenericReconciler[T, S, D]) Setup(cfg SetupConfig) error {
 	return r.
 		WithCircuitBreaker(cfg.CircuitBreaker).
 		WithRequeueInterval(cfg.RequeueInterval).

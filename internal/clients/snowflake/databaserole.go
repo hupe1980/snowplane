@@ -164,7 +164,7 @@ func (r *DatabaseRoleClient) ShowByID(ctx context.Context, name DatabaseObjectId
 	if err != nil {
 		return nil, fmt.Errorf("showing database role %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanDatabaseRoleShowOutput(rows, name.Name())
 }

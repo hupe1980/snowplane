@@ -142,7 +142,7 @@ The chart creates three ClusterRoles:
 
 Full permissions required by the operator:
 
-- **CRDs:** get/list/watch/create/update/patch/delete on all 22 Snowplane resource types
+- **CRDs:** get/list/watch/create/update/patch/delete on all 26 Snowplane resource types
 - **Status/Finalizers:** get/patch/update on status subresources; update on finalizer subresources
 - **Secrets:** get/list/watch (read-only access for ProviderConfig credential resolution)
 - **ConfigMaps:** get/list/watch/create/update/patch

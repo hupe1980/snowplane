@@ -299,7 +299,7 @@ func (u *UserClient) ShowByID(ctx context.Context, name AccountObjectIdentifier)
 	if err != nil {
 		return nil, fmt.Errorf("showing user %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanUserShowOutput(rows, name.Name())
 }
@@ -319,7 +319,7 @@ func (u *UserClient) Describe(ctx context.Context, name AccountObjectIdentifier)
 	if err != nil {
 		return nil, fmt.Errorf("describing user %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanUserDescribeOutput(rows)
 }

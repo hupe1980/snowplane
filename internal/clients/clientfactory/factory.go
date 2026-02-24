@@ -2,9 +2,12 @@
 package clientfactory
 
 import (
+	"container/list"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -42,13 +45,33 @@ type StatsProvider interface {
 // An optional IdleTTL causes clients unused for longer than the TTL to be
 // closed and recreated on the next GetOrCreate call. This prevents holding
 // stale TCP connections or expired tokens indefinitely.
+//
+// LRU tracking uses container/list (doubly-linked list) with a map of
+// provider→*list.Element for O(1) touch, remove, and eviction operations.
 type ClientFactory struct {
-	mu      sync.RWMutex
-	clients map[string]cachedClient
-	order   []string // insertion/access order for LRU eviction
-	newFn   func(cfg snowflake.Config) (SnowflakeClient, error)
-	maxSize int           // 0 = unlimited
-	idleTTL time.Duration // 0 = disabled (default)
+	mu       sync.RWMutex
+	clients  map[string]*list.Element // provider → *list.Element (value is lruEntry)
+	lruOrder *list.List               // front = LRU (oldest), back = MRU (newest)
+	newFn    func(cfg snowflake.Config) (SnowflakeClient, error)
+	maxSize  int           // 0 = unlimited
+	idleTTL  time.Duration // 0 = disabled (default)
+
+	// startupGrace is the duration after factory creation during which the
+	// readiness probe passes even when no clients are cached. This prevents
+	// the probe from failing during the initial startup window before any
+	// ProviderConfig has been reconciled and a Snowflake client cached.
+	startupGrace time.Duration
+	startTime    time.Time
+
+	// logger for non-critical warnings (e.g. Close errors during eviction).
+	// Defaults to slog.Default() if not set.
+	logger *slog.Logger
+}
+
+// lruEntry is the value stored in each list.Element.
+type lruEntry struct {
+	provider string
+	cached   cachedClient
 }
 
 type cachedClient struct {
@@ -61,10 +84,13 @@ type cachedClient struct {
 // Use WithMaxSize to set an upper bound on cached clients.
 func NewClientFactory() *ClientFactory {
 	return &ClientFactory{
-		clients: make(map[string]cachedClient),
+		clients:  make(map[string]*list.Element),
+		lruOrder: list.New(),
 		newFn: func(cfg snowflake.Config) (SnowflakeClient, error) {
 			return snowflake.NewClient(cfg)
 		},
+		startTime: time.Now(),
+		logger:    slog.Default(),
 	}
 }
 
@@ -83,11 +109,30 @@ func (f *ClientFactory) WithIdleTTL(d time.Duration) *ClientFactory {
 	return f
 }
 
+// WithStartupGrace sets the duration after factory creation during which the
+// readiness probe passes even when no clients are cached. This prevents the
+// probe from failing during the initial startup window before any ProviderConfig
+// has been reconciled. Default is 0 (no grace period).
+func (f *ClientFactory) WithStartupGrace(d time.Duration) *ClientFactory {
+	f.startupGrace = d
+	return f
+}
+
+// WithLogger sets a custom logger for non-critical warnings (e.g. Close errors
+// during eviction). Defaults to slog.Default().
+func (f *ClientFactory) WithLogger(l *slog.Logger) *ClientFactory {
+	f.logger = l
+	return f
+}
+
 // NewTestClientFactoryWithFn creates a ClientFactory with a custom constructor for testing.
 func NewTestClientFactoryWithFn(fn func(cfg snowflake.Config) (SnowflakeClient, error)) *ClientFactory {
 	return &ClientFactory{
-		clients: make(map[string]cachedClient),
-		newFn:   fn,
+		clients:   make(map[string]*list.Element),
+		lruOrder:  list.New(),
+		newFn:     fn,
+		startTime: time.Now(),
+		logger:    slog.Default(),
 	}
 }
 
@@ -101,26 +146,26 @@ func (f *ClientFactory) GetOrCreate(provider string, hash string, cfg snowflake.
 	now := time.Now()
 
 	// Return cached client if hash matches and TTL is not exceeded.
-	if cc, ok := f.clients[provider]; ok && cc.hash == hash {
-		if f.idleTTL > 0 && now.Sub(cc.lastAccess) > f.idleTTL {
-			// Idle too long — evict and recreate below.
-			_ = cc.client.Close()
-			delete(f.clients, provider)
-			f.removeFromOrder(provider)
+	if elem, ok := f.clients[provider]; ok {
+		entry := elem.Value.(*lruEntry)
+		if entry.cached.hash == hash {
+			if f.idleTTL > 0 && now.Sub(entry.cached.lastAccess) > f.idleTTL {
+				// Idle too long — evict and recreate below.
+				f.closeClient(entry.cached.client, provider, "idle TTL expired")
+				f.lruOrder.Remove(elem)
+				delete(f.clients, provider)
+			} else {
+				entry.cached.lastAccess = now
+				f.lruOrder.MoveToBack(elem) // O(1) touch
+
+				return entry.cached.client, nil
+			}
 		} else {
-			cc.lastAccess = now
-			f.clients[provider] = cc
-			f.touchOrder(provider)
-
-			return cc.client, nil
+			// Hash changed — close stale client.
+			f.closeClient(entry.cached.client, provider, "config hash changed")
+			f.lruOrder.Remove(elem)
+			delete(f.clients, provider)
 		}
-	}
-
-	// Close stale client if it exists.
-	if cc, ok := f.clients[provider]; ok {
-		_ = cc.client.Close()
-		delete(f.clients, provider)
-		f.removeFromOrder(provider)
 	}
 
 	// Evict LRU client if at capacity.
@@ -133,53 +178,42 @@ func (f *ClientFactory) GetOrCreate(provider string, hash string, cfg snowflake.
 		return nil, fmt.Errorf("creating snowflake client for provider %q: %w", provider, err)
 	}
 
-	f.clients[provider] = cachedClient{client: client, hash: hash, lastAccess: now}
-	f.order = append(f.order, provider)
+	entry := &lruEntry{
+		provider: provider,
+		cached:   cachedClient{client: client, hash: hash, lastAccess: now},
+	}
+	elem := f.lruOrder.PushBack(entry) // O(1) insert at MRU end
+	f.clients[provider] = elem
 
 	metrics.ClientPoolSize.Set(float64(len(f.clients)))
 
 	return client, nil
 }
 
-// touchOrder moves the provider to the end of the LRU order (most-recently-used).
-// Must be called under write lock.
-func (f *ClientFactory) touchOrder(provider string) {
-	for i, p := range f.order {
-		if p == provider {
-			f.order = append(f.order[:i], f.order[i+1:]...)
-			f.order = append(f.order, provider)
-
-			return
-		}
-	}
-	// Not found — append.
-	f.order = append(f.order, provider)
-}
-
-// removeFromOrder removes the provider from the LRU order.
-// Must be called under write lock.
-func (f *ClientFactory) removeFromOrder(provider string) {
-	for i, p := range f.order {
-		if p == provider {
-			f.order = append(f.order[:i], f.order[i+1:]...)
-			return
-		}
-	}
-}
-
-// evictLRU closes and removes the least-recently-used client.
-// Must be called under write lock.
+// evictLRU closes and removes the least-recently-used client (front of list).
+// Must be called under write lock. O(1).
 func (f *ClientFactory) evictLRU() {
-	if len(f.order) == 0 {
+	front := f.lruOrder.Front()
+	if front == nil {
 		return
 	}
 
-	victim := f.order[0]
-	f.order = f.order[1:]
+	entry := front.Value.(*lruEntry)
+	f.closeClient(entry.cached.client, entry.provider, "LRU eviction")
+	f.lruOrder.Remove(front)
+	delete(f.clients, entry.provider)
+}
 
-	if cc, ok := f.clients[victim]; ok {
-		_ = cc.client.Close()
-		delete(f.clients, victim)
+// closeClient closes a Snowflake client and logs any Close error at debug level.
+// Close errors on database connections are rarely actionable, but logging aids
+// post-mortem diagnostics (L-7).
+func (f *ClientFactory) closeClient(c SnowflakeClient, provider, reason string) {
+	if err := c.Close(); err != nil {
+		f.logger.Debug("error closing Snowflake client",
+			"provider", provider,
+			"reason", reason,
+			"error", err,
+		)
 	}
 }
 
@@ -188,10 +222,11 @@ func (f *ClientFactory) Evict(provider string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if cc, ok := f.clients[provider]; ok {
-		_ = cc.client.Close()
+	if elem, ok := f.clients[provider]; ok {
+		entry := elem.Value.(*lruEntry)
+		f.closeClient(entry.cached.client, provider, "explicit eviction")
+		f.lruOrder.Remove(elem)
 		delete(f.clients, provider)
-		f.removeFromOrder(provider)
 
 		metrics.ClientPoolSize.Set(float64(len(f.clients)))
 	}
@@ -204,43 +239,63 @@ func (f *ClientFactory) HasStaleHash(provider, hash string) bool {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	cc, ok := f.clients[provider]
+	elem, ok := f.clients[provider]
 	if !ok {
 		return false
 	}
 
-	return cc.hash != hash
+	return elem.Value.(*lruEntry).cached.hash != hash
 }
 
 // Close closes all cached clients.
 func (f *ClientFactory) Close() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for name, cc := range f.clients {
-		_ = cc.client.Close()
+
+	for name, elem := range f.clients {
+		entry := elem.Value.(*lruEntry)
+		f.closeClient(entry.cached.client, name, "factory shutdown")
 		delete(f.clients, name)
 	}
 
-	f.order = nil
+	f.lruOrder.Init() // reset list
 }
 
 // CheckHealth pings all cached Snowflake clients and returns an error if any
 // client is unreachable. It satisfies the healthz.Checker interface
 // (func(*http.Request) error) and is used as a readiness probe to verify
-// Snowflake connectivity. When no clients are cached (e.g. at startup before
-// any ProviderConfig is reconciled), the check passes.
+// Snowflake connectivity.
+//
+// All providers are checked — a combined error is returned listing every
+// unhealthy provider, giving operators full outage visibility.
+//
+// During the startup grace period, the check passes even when no clients are
+// cached (the operator hasn't reconciled any ProviderConfig yet). After the
+// grace period, when no clients are cached, the check still passes — having
+// zero providers is a valid steady-state configuration.
+//
+// When r is nil (e.g. in tests), context.Background() is used as the base
+// context. The health check is bounded by a hardcoded 5-second timeout
+// regardless of the request context.
 func (f *ClientFactory) CheckHealth(r *http.Request) error {
 	f.mu.RLock()
 	// Snapshot under read lock to avoid holding the lock during I/O.
 	providers := make([]string, 0, len(f.clients))
 	clients := make([]SnowflakeClient, 0, len(f.clients))
 
-	for p, cc := range f.clients {
-		providers = append(providers, p)
-		clients = append(clients, cc.client)
+	for _, elem := range f.clients {
+		entry := elem.Value.(*lruEntry)
+		providers = append(providers, entry.provider)
+		clients = append(clients, entry.cached.client)
 	}
 
 	f.mu.RUnlock()
+
+	// During startup grace period, skip connectivity checks — Snowflake
+	// clients may not be cached yet.
+	if f.startupGrace > 0 && len(clients) == 0 && time.Since(f.startTime) < f.startupGrace {
+		return nil
+	}
 
 	baseCtx := context.Background()
 	if r != nil {
@@ -250,10 +305,15 @@ func (f *ClientFactory) CheckHealth(r *http.Request) error {
 	ctx, cancel := context.WithTimeout(baseCtx, 5*time.Second)
 	defer cancel()
 
+	var errs []error
 	for i, c := range clients {
 		if err := c.Ping(ctx); err != nil {
-			return fmt.Errorf("snowflake connectivity check failed for provider %q: %w", providers[i], err)
+			errs = append(errs, fmt.Errorf("provider %q: %w", providers[i], err))
 		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("snowflake connectivity check failed: %w", errors.Join(errs...))
 	}
 
 	return nil
@@ -262,22 +322,39 @@ func (f *ClientFactory) CheckHealth(r *http.Request) error {
 // CollectDBStats publishes sql.DBStats metrics for all cached clients that
 // support the StatsProvider interface. This should be called periodically
 // (e.g., from a background ticker or alongside health checks).
+//
+// Like CheckHealth, this method snapshots clients under the read lock and
+// then performs I/O (gauge updates) outside the lock to avoid holding the
+// lock during Prometheus operations.
 func (f *ClientFactory) CollectDBStats() {
 	f.mu.RLock()
-	defer f.mu.RUnlock()
 
-	for provider, cc := range f.clients {
-		if sp, ok := cc.client.(StatsProvider); ok {
-			stats := sp.Stats()
-			metrics.RecordDBStats(
-				provider,
-				stats.MaxOpenConnections,
-				stats.OpenConnections,
-				stats.InUse,
-				stats.Idle,
-				stats.WaitCount,
-				stats.WaitDuration,
-			)
+	type snapshot struct {
+		provider string
+		sp       StatsProvider
+	}
+
+	snaps := make([]snapshot, 0, len(f.clients))
+
+	for _, elem := range f.clients {
+		entry := elem.Value.(*lruEntry)
+		if sp, ok := entry.cached.client.(StatsProvider); ok {
+			snaps = append(snaps, snapshot{provider: entry.provider, sp: sp})
 		}
+	}
+
+	f.mu.RUnlock()
+
+	for _, s := range snaps {
+		stats := s.sp.Stats()
+		metrics.RecordDBStats(
+			s.provider,
+			stats.MaxOpenConnections,
+			stats.OpenConnections,
+			stats.InUse,
+			stats.Idle,
+			stats.WaitCount,
+			stats.WaitDuration,
+		)
 	}
 }

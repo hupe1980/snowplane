@@ -10,6 +10,7 @@
 package sqlbuilder
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -218,12 +219,16 @@ func ValidateEncryptionType(ty string) error {
 }
 
 // fileFormatDenyRe rejects dangerous patterns in FILE_FORMAT expressions.
-var fileFormatDenyRe = regexp.MustCompile(`[;]|--`)
+// Aligned with columnDefaultDenyRe: blocks semicolons, line comments (--),
+// block comments (/* */), dollar-quoting ($$), and dangerous Snowflake
+// keywords (COPY, EXECUTE, CALL, SYSTEM$).
+var fileFormatDenyRe = regexp.MustCompile(`(?i)[;]|--|/\*|\*/|\$\$|\bCOPY\b|\bEXECUTE\b|\bCALL\b|\bSYSTEM\$`)
 
 // ValidateFileFormat validates a Snowflake FILE_FORMAT expression.
 // FILE_FORMAT values can be complex (FORMAT_NAME = 'name' or TYPE = CSV
-// FIELD_DELIMITER = ',' etc.) but must not contain semicolons or comment
-// markers that could enable SQL injection.
+// FIELD_DELIMITER = ',' etc.) but must not contain semicolons, comment
+// markers, dollar-quoting, or dangerous keywords that could enable SQL
+// injection.
 func ValidateFileFormat(ff string) error {
 	if ff == "" {
 		return fmt.Errorf("file format must not be empty")
@@ -234,7 +239,7 @@ func ValidateFileFormat(ff string) error {
 	}
 
 	if fileFormatDenyRe.MatchString(ff) {
-		return fmt.Errorf("invalid file format %q: must not contain semicolons or comment markers", ff)
+		return fmt.Errorf("invalid file format %q: contains forbidden pattern (semicolons, comment markers, dollar-quoting, or dangerous keywords)", ff)
 	}
 
 	return nil
@@ -268,15 +273,15 @@ func BoolToSQL(v bool) string {
 // It wraps a strings.Builder and provides methods for appending type-safe
 // Snowflake-specific SQL fragments.
 //
-// Methods that validate input accumulate errors internally rather than
-// panicking.  Callers must check Err() after building the statement.
+// Methods that validate input accumulate errors internally (via errors.Join)
+// rather than panicking.  Callers must check Err() after building the statement.
 type Builder struct {
 	strings.Builder
 	err error
 }
 
-// Err returns the first validation error recorded during statement building,
-// or nil if no errors occurred.
+// Err returns all validation errors accumulated during statement building,
+// or nil if no errors occurred.  Multiple errors are joined via errors.Join.
 func (b *Builder) Err() error {
 	return b.err
 }
@@ -310,7 +315,7 @@ func (b *Builder) SetBool(key string, value *bool) {
 func (b *Builder) SetKeyword(key string, value *string) {
 	if value != nil {
 		if err := ValidateKeywordValue(*value); err != nil {
-			b.err = fmt.Errorf("SetKeyword(%q, %q): %w", key, *value, err)
+			b.err = errors.Join(b.err, fmt.Errorf("SetKeyword(%q, %q): %w", key, *value, err))
 			return
 		}
 
@@ -326,7 +331,7 @@ func (b *Builder) SetKeyword(key string, value *string) {
 func (b *Builder) SetQuotedKeyword(key string, value *string) {
 	if value != nil {
 		if err := ValidateKeywordValue(*value); err != nil {
-			b.err = fmt.Errorf("SetQuotedKeyword(%q, %q): %w", key, *value, err)
+			b.err = errors.Join(b.err, fmt.Errorf("SetQuotedKeyword(%q, %q): %w", key, *value, err))
 			return
 		}
 
@@ -337,15 +342,15 @@ func (b *Builder) SetQuotedKeyword(key string, value *string) {
 // SetClauses collects individual SET clauses for ALTER statements and
 // provides methods to emit them as a single ALTER ... SET statement.
 //
-// Methods that validate input accumulate errors internally rather than
-// panicking.  Callers must check Err() after building clauses.
+// Methods that validate input accumulate errors internally (via errors.Join)
+// rather than panicking.  Callers must check Err() after building clauses.
 type SetClauses struct {
 	clauses []string
 	err     error
 }
 
-// Err returns the first validation error recorded during clause building,
-// or nil if no errors occurred.
+// Err returns all validation errors accumulated during clause building,
+// or nil if no errors occurred.  Multiple errors are joined via errors.Join.
 func (sc *SetClauses) Err() error {
 	return sc.err
 }
@@ -377,7 +382,7 @@ func (sc *SetClauses) Bool(key string, value *bool) {
 func (sc *SetClauses) Keyword(key string, value *string) {
 	if value != nil {
 		if err := ValidateKeywordValue(*value); err != nil {
-			sc.err = fmt.Errorf("SetClauses.Keyword(%q, %q): %w", key, *value, err)
+			sc.err = errors.Join(sc.err, fmt.Errorf("SetClauses.Keyword(%q, %q): %w", key, *value, err))
 			return
 		}
 
@@ -392,7 +397,7 @@ func (sc *SetClauses) Keyword(key string, value *string) {
 func (sc *SetClauses) QuotedKeyword(key string, value *string) {
 	if value != nil {
 		if err := ValidateKeywordValue(*value); err != nil {
-			sc.err = fmt.Errorf("SetClauses.QuotedKeyword(%q, %q): %w", key, *value, err)
+			sc.err = errors.Join(sc.err, fmt.Errorf("SetClauses.QuotedKeyword(%q, %q): %w", key, *value, err))
 			return
 		}
 
@@ -402,6 +407,11 @@ func (sc *SetClauses) QuotedKeyword(key string, value *string) {
 
 // Raw appends a pre-formatted clause string directly.
 // Use this for clauses with non-standard syntax that don't fit the other methods.
+//
+// SAFETY: Callers MUST validate the input before calling Raw().
+// This method performs no escaping or validation — it trusts the caller
+// to have applied appropriate validation (e.g. ValidateFileFormat,
+// ValidateEncryptionType) before constructing the clause string.
 func (sc *SetClauses) Raw(clause string) {
 	sc.clauses = append(sc.clauses, clause)
 }

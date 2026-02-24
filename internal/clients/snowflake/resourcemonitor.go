@@ -286,7 +286,7 @@ func (rm *ResourceMonitorClient) ShowByID(ctx context.Context, name AccountObjec
 	if err != nil {
 		return nil, fmt.Errorf("showing resource monitor %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanResourceMonitorShowOutput(rows, name.Name())
 }

@@ -179,63 +179,6 @@ type ResourceMonitorList struct {
 	Items           []ResourceMonitor `json:"items"`
 }
 
-// GetConditions returns the conditions of the ResourceMonitor.
-func (rm *ResourceMonitor) GetConditions() []metav1.Condition { return rm.Status.Conditions }
-
-// SetConditions sets the conditions of the ResourceMonitor.
-func (rm *ResourceMonitor) SetConditions(c []metav1.Condition) { rm.Status.Conditions = c }
-
-// GetFullyQualifiedName returns the Snowflake fully qualified identifier from status.
-func (rm *ResourceMonitor) GetFullyQualifiedName() string { return rm.Status.FullyQualifiedName }
-
-// GetSpecName returns the Snowflake resource name from the spec.
-func (rm *ResourceMonitor) GetSpecName() string { return rm.Spec.Name }
-
-// GetProviderRef returns the provider reference from the spec.
-func (rm *ResourceMonitor) GetProviderRef() ProviderReference { return rm.Spec.ProviderRef }
-
-// GetUseRole returns the use role from the spec.
-func (rm *ResourceMonitor) GetUseRole() *string { return rm.Spec.UseRole }
-
-// GetObservedGeneration returns the observed generation from status.
-func (rm *ResourceMonitor) GetObservedGeneration() int64 { return rm.Status.ObservedGeneration }
-
-// SetObservedGeneration sets the observed generation in status.
-func (rm *ResourceMonitor) SetObservedGeneration(v int64) { rm.Status.ObservedGeneration = v }
-
-// GetLastAppliedSpecHash returns the last applied spec hash from status.
-func (rm *ResourceMonitor) GetLastAppliedSpecHash() string { return rm.Status.LastAppliedSpecHash }
-
-// SetLastAppliedSpecHash sets the last applied spec hash in status.
-func (rm *ResourceMonitor) SetLastAppliedSpecHash(v string) { rm.Status.LastAppliedSpecHash = v }
-
-// GetTrackedParametersList returns the tracked parameters list from status.
-func (rm *ResourceMonitor) GetTrackedParametersList() []string { return rm.Status.TrackedParameters }
-
-// SetTrackedParametersList sets the tracked parameters list in status.
-func (rm *ResourceMonitor) SetTrackedParametersList(v []string) { rm.Status.TrackedParameters = v }
-
-// ValidateSpec validates the resource spec.
-func (rm *ResourceMonitor) ValidateSpec() error { return rm.Spec.Validate() }
-
-// ComputeSpecHash returns a SHA-256 hash of the spec for drift detection.
-func (rm *ResourceMonitor) ComputeSpecHash() (string, error) { return ComputeSpecHash(rm.Spec) }
-
-// GetDeletionPolicy returns the deletion policy, defaulting to Delete.
-func (rm *ResourceMonitor) GetDeletionPolicy() DeletionPolicy {
-	if rm.Spec.DeletionPolicy == "" {
-		return DeletionPolicyDelete
-	}
-
-	return rm.Spec.DeletionPolicy
-}
-
-// GetOwner returns the owner from status.
-func (rm *ResourceMonitor) GetOwner() string {
-	// SHOW RESOURCE MONITORS does not return an owner column.
-	return ""
-}
-
 func init() {
 	SchemeBuilder.Register(&ResourceMonitor{}, &ResourceMonitorList{})
 }

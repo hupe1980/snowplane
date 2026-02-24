@@ -1,0 +1,15 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: StorageIntegration
+metadata:
+  name: my-s3-integration
+spec:
+  name: MY_S3_INTEGRATION
+  providerRef:
+    name: default
+  type: EXTERNAL_STAGE
+  storageProvider: S3
+  storageAllowedLocations:
+    - "s3://my-bucket/path/"
+  storageAWSRoleARN: "arn:aws:iam::123456789012:role/myrole"
+  enabled: true
+  comment: "S3 integration managed by Snowplane"

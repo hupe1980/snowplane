@@ -226,7 +226,7 @@ func (s *StreamClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier
 	if err != nil {
 		return nil, fmt.Errorf("showing stream %s: %w", name, err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer closeRows(rows)
 
 	return scanStreamShowOutput(rows, name.Name())
 }

@@ -1,0 +1,296 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: storageintegrations.snowplane.hupe1980.github.io
+spec:
+  group: snowplane.hupe1980.github.io
+  names:
+    categories:
+    - snowplane
+    kind: StorageIntegration
+    listKind: StorageIntegrationList
+    plural: storageintegrations
+    singular: storageintegration
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: SYNCED
+      type: string
+    - jsonPath: .spec.name
+      name: SNOWFLAKE-NAME
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: StorageIntegration is the Schema for the storageintegrations
+          API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: StorageIntegrationSpec defines the desired state of a Snowflake
+              Storage Integration.
+            properties:
+              azureTenantID:
+                description: AzureTenantID is the Azure AD tenant ID for AZURE integrations.
+                type: string
+              comment:
+                description: Comment is an optional description for the storage integration.
+                type: string
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy specifies what happens to the Snowflake resource when the CR is deleted.
+                  Defaults to "Delete".
+                enum:
+                - Delete
+                - Orphan
+                type: string
+              enabled:
+                default: true
+                description: Enabled controls whether the integration is active.
+                type: boolean
+              name:
+                description: Name is the Snowflake storage integration name. Immutable
+                  after creation.
+                minLength: 1
+                type: string
+              providerRef:
+                description: ProviderRef references the ProviderConfig to use for
+                  Snowflake connectivity.
+                properties:
+                  name:
+                    default: default
+                    description: Name of the ProviderConfig to use.
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the ProviderConfig. Defaults to the namespace of the
+                      referring resource. Set this to reference a ProviderConfig in a
+                      different namespace (e.g. a shared system namespace).
+                    type: string
+                type: object
+              storageAWSExternalID:
+                description: |-
+                  StorageAWSExternalID optionally specifies an external ID that Snowflake
+                  uses to establish a trust relationship with AWS.  If omitted, Snowflake
+                  auto-generates one during CREATE.
+                type: string
+              storageAWSRoleARN:
+                description: |-
+                  StorageAWSRoleARN is the IAM role ARN that Snowflake assumes for S3 access.
+                  Required when storageProvider=S3.
+                type: string
+              storageAllowedLocations:
+                description: |-
+                  StorageAllowedLocations lists cloud storage locations (URIs) that the
+                  integration can access.
+                items:
+                  type: string
+                minItems: 1
+                type: array
+              storageBlockedLocations:
+                description: |-
+                  StorageBlockedLocations lists cloud storage locations (URIs) that the
+                  integration is explicitly denied access to.
+                items:
+                  type: string
+                type: array
+              storageProvider:
+                description: |-
+                  StorageProvider specifies the cloud provider (S3, GCS, AZURE).
+                  Immutable after creation because the provider-specific config changes shape.
+                enum:
+                - S3
+                - GCS
+                - AZURE
+                type: string
+              type:
+                default: EXTERNAL_STAGE
+                description: |-
+                  Type specifies the integration type (currently only EXTERNAL_STAGE).
+                  Immutable after creation.
+                enum:
+                - EXTERNAL_STAGE
+                type: string
+              useRole:
+                description: |-
+                  UseRole specifies the Snowflake role to activate via USE ROLE before
+                  CREATE/ALTER/DROP operations. In Snowflake's DAC model the role active
+                  at CREATE time becomes the object owner, so this field indirectly
+                  controls initial ownership.
+                  This field is immutable after the resource has been created in Snowflake.
+                minLength: 1
+                type: string
+            required:
+            - name
+            - providerRef
+            - storageAllowedLocations
+            - storageProvider
+            - type
+            type: object
+            x-kubernetes-validations:
+            - message: spec.name is immutable (delete and recreate the resource to
+                change)
+              rule: self.name == oldSelf.name
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
+            - message: spec.type is immutable (delete and recreate the resource to
+                change)
+              rule: self.type == oldSelf.type
+            - message: spec.storageProvider is immutable (delete and recreate the
+                resource to change)
+              rule: self.storageProvider == oldSelf.storageProvider
+          status:
+            description: StorageIntegrationStatus defines the observed state of a
+              StorageIntegration.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the resource's state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              fullyQualifiedName:
+                description: FullyQualifiedName is the Snowflake fully qualified identifier
+                  for this resource.
+                type: string
+              lastAppliedSpecHash:
+                description: |-
+                  LastAppliedSpecHash is the SHA-256 hash of the spec as of the last
+                  successful reconciliation. The reconciler uses this to distinguish
+                  spec changes (user edited the CR) from external drift (Snowflake
+                  state diverged without a spec change). This is more reliable than
+                  comparing ObservedGeneration vs Generation because metadata-only
+                  changes (labels, annotations) increment Generation without changing
+                  the spec.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              showOutput:
+                description: ShowOutput contains the raw SHOW STORAGE INTEGRATIONS
+                  output.
+                properties:
+                  category:
+                    description: Category is the integration category (STORAGE).
+                    type: string
+                  comment:
+                    description: Comment is the integration description.
+                    type: string
+                  createdOn:
+                    description: CreatedOn is the timestamp when the integration was
+                      created.
+                    type: string
+                  enabled:
+                    description: Enabled indicates whether the integration is active.
+                    type: boolean
+                  name:
+                    description: Name is the integration name as returned by Snowflake.
+                    type: string
+                  type:
+                    description: Type is the integration type.
+                    type: string
+                type: object
+              storageAWSExternalID:
+                description: StorageAWSExternalID is the external ID from DESCRIBE.
+                type: string
+              storageAWSIAMUserARN:
+                description: |-
+                  StorageAWSIAMUserARN is the Snowflake IAM user ARN (from DESCRIBE).
+                  Users need this to configure the IAM trust policy.
+                type: string
+              trackedParameters:
+                description: TrackedParameters tracks which optional spec fields have
+                  been actively SET.
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

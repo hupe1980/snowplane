@@ -40,6 +40,10 @@ Every Snowplane CRD carries a maturity label (`LabelMaturity` constant, key `sno
 | ResourceMonitor | alpha | Credit quota monitoring with triggers |
 | MaskingPolicy | alpha | Dynamic data masking for PII/PCI |
 | RowAccessPolicy | alpha | Row-level security policies |
+| StorageIntegration | alpha | External cloud storage integrations (S3, GCS, Azure) |
+| FileFormat | alpha | Named file format objects (CSV, JSON, Parquet, etc.) |
+| Pipe | alpha | Snowpipe continuous data loading |
+| DynamicTable | alpha | Declarative dynamic tables with auto-refresh |
 | FieldExport | alpha | Cross-resource data export to ConfigMaps/Secrets |
 | ProviderConfig | stable | Core infrastructure, always required |
 

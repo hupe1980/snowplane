@@ -1,0 +1,16 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: FileFormat
+metadata:
+  name: my-csv-format
+spec:
+  name: MY_CSV_FORMAT
+  providerRef:
+    name: default
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  type: CSV
+  fieldDelimiter: ","
+  skipHeader: 1
+  comment: "CSV file format managed by Snowplane"

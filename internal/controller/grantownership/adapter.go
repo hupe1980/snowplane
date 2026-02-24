@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -44,7 +45,7 @@ func (a *adapter) PreReconcile(ctx context.Context, g *snowplanev1alpha1.GrantOw
 	if ref := g.Spec.AccountRoleRef; ref != nil {
 		name, err := refresolver.ResolveAccountRoleRef(ctx, a.client, g.Namespace, *ref)
 		if err != nil {
-			a.recorder.Eventf(g, "Warning", "RefResolutionFailed",
+			a.recorder.Eventf(g, corev1.EventTypeWarning, snowplanev1alpha1.ReasonRefResolutionFailed,
 				"AccountRole ref %q resolution failed: %v", ref.Name, err)
 			return err
 		}
@@ -57,7 +58,7 @@ func (a *adapter) PreReconcile(ctx context.Context, g *snowplanev1alpha1.GrantOw
 	if ref := g.Spec.DatabaseRoleRef; ref != nil {
 		name, err := refresolver.ResolveDatabaseRoleRef(ctx, a.client, g.Namespace, *ref)
 		if err != nil {
-			a.recorder.Eventf(g, "Warning", "RefResolutionFailed",
+			a.recorder.Eventf(g, corev1.EventTypeWarning, snowplanev1alpha1.ReasonRefResolutionFailed,
 				"DatabaseRole ref %q resolution failed: %v", ref.Name, err)
 			return err
 		}
@@ -123,7 +124,7 @@ func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
 	}
 }
 
-func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation, error) {
+func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation[*snowflake.GrantOwnershipObservation], error) {
 	oid, err := reconciler.AssertIdentifier[snowflake.GrantOwnershipIdentifier](id)
 	if err != nil {
 		return nil, err
@@ -134,7 +135,7 @@ func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identi
 		return nil, err
 	}
 
-	return &reconciler.Observation{Exists: obs.Exists, Detail: obs}, nil
+	return &reconciler.Observation[*snowflake.GrantOwnershipObservation]{Exists: obs.Exists, Detail: obs}, nil
 }
 
 func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha1.GrantOwnership, _ reconciler.Identifier) error {
@@ -188,17 +189,13 @@ func (a *adapter) ValidateImmutableFields(_ context.Context, g *snowplanev1alpha
 	return nil
 }
 
-func (a *adapter) BuildAlterOptions(_ context.Context, _ *snowplanev1alpha1.GrantOwnership, _ reconciler.Identifier, _ *reconciler.Observation) (reconciler.AlterOptions, error) {
+func (a *adapter) BuildAlterOptions(_ context.Context, _ *snowplanev1alpha1.GrantOwnership, _ reconciler.Identifier, _ *reconciler.Observation[*snowflake.GrantOwnershipObservation]) (reconciler.AlterOptions, error) {
 	// Return no-change alter options — all fields are immutable.
 	return &ownershipAlterOptions{}, nil
 }
 
-func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.GrantOwnership, obs *reconciler.Observation) {
-	detail, ok := obs.Detail.(*snowflake.GrantOwnershipObservation)
-	if !ok {
-		return
-	}
-
+func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.GrantOwnership, obs *reconciler.Observation[*snowflake.GrantOwnershipObservation]) {
+	detail := obs.Detail
 	applyObservation(obj, detail)
 }
 
@@ -206,12 +203,8 @@ func (a *adapter) ComputeTrackedParameters(_ *snowplanev1alpha1.GrantOwnership) 
 	return nil
 }
 
-func (a *adapter) DetectDrift(obj *snowplanev1alpha1.GrantOwnership, obs *reconciler.Observation) *drift.Result {
-	detail, ok := obs.Detail.(*snowflake.GrantOwnershipObservation)
-	if !ok {
-		return drift.New().Result()
-	}
-
+func (a *adapter) DetectDrift(obj *snowplanev1alpha1.GrantOwnership, obs *reconciler.Observation[*snowflake.GrantOwnershipObservation]) *drift.Result {
+	detail := obs.Detail
 	return detectDrift(obj, detail)
 }
 
@@ -220,4 +213,4 @@ func (a *adapter) PostUpdate(_ *snowplanev1alpha1.GrantOwnership, _ bool, _ reco
 }
 func (a *adapter) SupportsCreateOrAlter() bool { return false }
 
-var _ reconciler.ResourceAdapter[*snowplanev1alpha1.GrantOwnership, Service] = (*adapter)(nil)
+var _ reconciler.ResourceAdapter[*snowplanev1alpha1.GrantOwnership, Service, *snowflake.GrantOwnershipObservation] = (*adapter)(nil)

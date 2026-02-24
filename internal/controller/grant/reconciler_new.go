@@ -66,9 +66,9 @@ func (s *grantService) Revoke(ctx context.Context, opts snowflake.RevokeGrantOpt
 // ---------------------------------------------------------------------------
 
 // NewAccountRoleGrantReconciler returns a new reconciler for AccountRoleGrant.
-func NewAccountRoleGrantReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service] {
+func NewAccountRoleGrantReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service, *snowflake.GrantObservation] {
 	a := &accountRoleGrantAdapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service, *snowflake.GrantObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,
@@ -84,9 +84,9 @@ func NewAccountRoleGrantReconcilerWithServiceFactory(
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
-) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service] {
+) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service, *snowflake.GrantObservation] {
 	a := &accountRoleGrantAdapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service, *snowflake.GrantObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,
@@ -100,9 +100,9 @@ func NewAccountRoleGrantReconcilerWithServiceFactory(
 // ---------------------------------------------------------------------------
 
 // NewDatabaseRoleGrantReconciler returns a new reconciler for DatabaseRoleGrant.
-func NewDatabaseRoleGrantReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRoleGrant, Service] {
+func NewDatabaseRoleGrantReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRoleGrant, Service, *snowflake.GrantObservation] {
 	a := &databaseRoleGrantAdapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRoleGrant, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRoleGrant, Service, *snowflake.GrantObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,
@@ -118,9 +118,9 @@ func NewDatabaseRoleGrantReconcilerWithServiceFactory(
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
-) *reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRoleGrant, Service] {
+) *reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRoleGrant, Service, *snowflake.GrantObservation] {
 	a := &databaseRoleGrantAdapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRoleGrant, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRoleGrant, Service, *snowflake.GrantObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,
@@ -134,9 +134,9 @@ func NewDatabaseRoleGrantReconcilerWithServiceFactory(
 // ---------------------------------------------------------------------------
 
 // NewShareGrantReconciler returns a new reconciler for ShareGrant.
-func NewShareGrantReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.ShareGrant, Service] {
+func NewShareGrantReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.ShareGrant, Service, *snowflake.GrantObservation] {
 	a := &shareGrantAdapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.ShareGrant, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.ShareGrant, Service, *snowflake.GrantObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,
@@ -152,9 +152,9 @@ func NewShareGrantReconcilerWithServiceFactory(
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
-) *reconciler.GenericReconciler[*snowplanev1alpha1.ShareGrant, Service] {
+) *reconciler.GenericReconciler[*snowplanev1alpha1.ShareGrant, Service, *snowflake.GrantObservation] {
 	a := &shareGrantAdapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.ShareGrant, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.ShareGrant, Service, *snowflake.GrantObservation]{
 		Client:      c,
 		Factory:     factory,
 		Recorder:    recorder,

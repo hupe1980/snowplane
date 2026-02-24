@@ -36,6 +36,10 @@ Drift detection is supported on all resource types:
 | ResourceMonitor | ✅ | ✅ | `name` |
 | MaskingPolicy | ✅ | ✅ | `name`, `database`, `schema`, `signature` |
 | RowAccessPolicy | ✅ | ✅ | `name`, `database`, `schema`, `signature` |
+| StorageIntegration | ✅ | ✅ | `name` |
+| FileFormat | ✅ | ✅ | `name`, `database`, `schema`, `type` |
+| Pipe | ✅ | ✅ | `name`, `database`, `schema`, `definition`, `integration` |
+| DynamicTable | ✅ | ✅ | `name`, `database`, `schema`, `query`, `refreshMode` |
 
 ### Immutable Field Violations
 

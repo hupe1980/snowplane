@@ -96,7 +96,7 @@ func successfulObservation() *snowflake.TagObservation {
 	}
 }
 
-func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Tag, Service] {
+func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Tag, Service, *snowflake.TagObservation] {
 	scheme := testutil.TestScheme()
 
 	cb := fake.NewClientBuilder().WithScheme(scheme).
@@ -109,7 +109,7 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	factory := clientfactory.NewClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Tag, Service]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.Tag, Service, *snowflake.TagObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: rec,

@@ -461,6 +461,30 @@ func TestSetClauses_BuildAlter_PropagatError(t *testing.T) {
 	assert.Contains(t, err.Error(), "SetClauses.Keyword")
 }
 
+func TestBuilder_AccumulatesMultipleErrors(t *testing.T) {
+	t.Parallel()
+	var b Builder
+	bad1 := `EVIL"; DROP`
+	bad2 := `BAD'; INJECT`
+	b.SetKeyword("SIZE", &bad1)
+	b.SetKeyword("TYPE", &bad2)
+	require.Error(t, b.Err())
+	assert.Contains(t, b.Err().Error(), "SIZE")
+	assert.Contains(t, b.Err().Error(), "TYPE")
+}
+
+func TestSetClauses_AccumulatesMultipleErrors(t *testing.T) {
+	t.Parallel()
+	sc := &SetClauses{}
+	bad1 := `EVIL"; DROP`
+	bad2 := `BAD'; INJECT`
+	sc.Keyword("SIZE", &bad1)
+	sc.Keyword("TYPE", &bad2)
+	require.Error(t, sc.Err())
+	assert.Contains(t, sc.Err().Error(), "SIZE")
+	assert.Contains(t, sc.Err().Error(), "TYPE")
+}
+
 // ---------------------------------------------------------------------------
 // ValidateColumnType
 // ---------------------------------------------------------------------------
@@ -550,7 +574,18 @@ func TestValidateFileFormat(t *testing.T) {
 		require.NoError(t, ValidateFileFormat(v), "expected valid: %s", v)
 	}
 
-	invalid := []string{"", "TYPE = CSV; DROP TABLE x", "FORMAT_NAME = 'x' -- comment", strings.Repeat("x", 2049)}
+	invalid := []string{
+		"",
+		"TYPE = CSV; DROP TABLE x",
+		"FORMAT_NAME = 'x' -- comment",
+		"TYPE = CSV /* block comment */",
+		"TYPE = CSV $$ dollar $$",
+		"TYPE = CSV COPY INTO x",
+		"TYPE = CSV EXECUTE IMMEDIATE",
+		"TYPE = CSV CALL proc()",
+		"TYPE = CSV SYSTEM$TYPEOF(x)",
+		strings.Repeat("x", 2049),
+	}
 	for _, v := range invalid {
 		require.Error(t, ValidateFileFormat(v), "expected invalid: %s", v)
 	}
