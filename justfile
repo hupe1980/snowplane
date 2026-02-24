@@ -21,10 +21,6 @@ test-short:
 test-integration:
     KUBEBUILDER_ASSETS="$(setup-envtest use -p path)" go test -tags integration -v -timeout 180s -count=1 ./test/integration/
 
-# Run webhook integration tests (requires setup-envtest)
-test-webhook-integration:
-    KUBEBUILDER_ASSETS="$(setup-envtest use -p path)" go test -tags integration -v -timeout 180s -count=1 ./internal/webhook/
-
 # Run E2E tests (self-contained: spins up a k3s testcontainer automatically)
 test-e2e:
     go test -tags e2e -v -timeout 20m -count=1 ./test/e2e/
@@ -97,10 +93,6 @@ helm-template:
 # Verify Helm chart lints and templates render cleanly (CI check)
 verify-helm: helm-lint
     @helm template snowplane charts/snowplane/ > /dev/null
-
-# Run fuzz tests (short duration)
-fuzz duration='10s':
-    go test -fuzz=. -fuzztime={{duration}} ./internal/webhook/
 
 # Clean build artifacts
 clean:

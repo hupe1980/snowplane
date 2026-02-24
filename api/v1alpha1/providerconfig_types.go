@@ -34,8 +34,16 @@ const (
 )
 
 // ProviderConfigSpec defines the desired state of ProviderConfig.
+//
+// +kubebuilder:validation:XValidation:rule="self.authenticationType != 'KeyPair' || (has(self.credentials) && has(self.credentials.secretRef) && self.credentials.secretRef.name != ” && self.credentials.secretRef.key != ”)",message="spec.credentials.secretRef (name and key) is required for KeyPair authentication"
+// +kubebuilder:validation:XValidation:rule="self.authenticationType != 'UsernamePassword' || (has(self.credentials) && has(self.credentials.secretRef) && self.credentials.secretRef.name != ” && self.credentials.secretRef.key != ”)",message="spec.credentials.secretRef (name and key) is required for UsernamePassword authentication"
+// +kubebuilder:validation:XValidation:rule="self.authenticationType != 'WorkloadIdentity' || has(self.workloadIdentity)",message="spec.workloadIdentity is required for WorkloadIdentity authentication"
+// +kubebuilder:validation:XValidation:rule="self.authenticationType != 'WorkloadIdentity' || !has(self.credentials) || !has(self.credentials.secretRef) || self.credentials.secretRef.name == ”",message="spec.credentials.secretRef must not be set for WorkloadIdentity authentication"
+// +kubebuilder:validation:XValidation:rule="self.account == oldSelf.account",message="spec.account is immutable (changing would redirect to a different Snowflake account)"
+// +kubebuilder:validation:XValidation:rule="self.user == oldSelf.user",message="spec.user is immutable (changing would redirect to a different Snowflake user)"
 type ProviderConfigSpec struct {
 	// Account is the Snowflake account identifier (e.g. "xy12345" or "orgname-accountname").
+	// +kubebuilder:validation:MinLength=1
 	Account string `json:"account"`
 
 	// Region is the Snowflake cloud region (e.g. "us-east-1", "eu-west-1").
@@ -46,6 +54,7 @@ type ProviderConfigSpec struct {
 	Region string `json:"region,omitempty"`
 
 	// User is the Snowflake user for authentication.
+	// +kubebuilder:validation:MinLength=1
 	User string `json:"user"`
 
 	// Role is the Snowflake role to assume. Defaults to the user's default role.

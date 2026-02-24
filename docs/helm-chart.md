@@ -68,21 +68,6 @@ helm upgrade snowplane charts/snowplane/ \
 |-----------|---------|-------------|
 | `healthProbes.containerPort` | `8081` | Container port for health probe endpoint |
 
-### Webhooks
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `webhooks.enabled` | `false` | Enable admission webhooks |
-| `webhooks.port` | `9443` | Webhook server port |
-| `webhooks.failurePolicy` | `Fail` | Admission failure policy (`Fail` or `Ignore`) |
-| `webhooks.certManager.duration` | `8760h` | Certificate lifetime (1 year) |
-| `webhooks.certManager.renewBefore` | `360h` | Renew this long before expiry |
-| `webhooks.certManager.issuerRef` | `nil` | Override the default self-signed Issuer with an external one |
-
-> **Note:** Webhooks require [cert-manager](https://cert-manager.io/) to be installed in the cluster for automatic TLS certificate provisioning. When `webhooks.enabled=true`, the chart creates a self-signed Issuer and Certificate by default, or you can point to an existing ClusterIssuer via `webhooks.certManager.issuerRef`.
-
-> **HA guidance:** With `failurePolicy: Fail` (the default), all CRD create/update operations are blocked when the webhook pod is unavailable. For production deployments with webhooks enabled, set `replicaCount >= 2` to ensure the webhook stays available during rolling updates and node drains. Alternatively, set `webhooks.failurePolicy: Ignore` to allow mutations through during transient webhook downtime at the cost of skipping admission validation.
-
 ### Logging
 
 | Parameter | Default | Description |
@@ -146,10 +131,6 @@ The chart includes the following templates:
 | `servicemonitor.yaml` | Prometheus ServiceMonitor (optional) |
 | `pdb.yaml` | PodDisruptionBudget (optional) |
 | `networkpolicy.yaml` | NetworkPolicy restricting traffic (optional) |
-| `webhook-service.yaml` | Service routing HTTPS to webhook port (when webhooks enabled) |
-| `webhook-cert.yaml` | cert-manager Certificate and Issuer for webhook TLS (when webhooks enabled) |
-| `webhook-validating.yaml` | ValidatingWebhookConfiguration for all 22 resources (when webhooks enabled) |
-| `webhook-mutating.yaml` | MutatingWebhookConfiguration for all 22 resources (when webhooks enabled) |
 | `grafana-dashboard.yaml` | ConfigMap with Grafana dashboard JSON for sidecar provisioning (optional) |
 | `NOTES.txt` | Post-install instructions |
 
@@ -204,7 +185,6 @@ helm install snowplane charts/snowplane/ \
   --set replicaCount=2 \
   --set controller.maxConcurrentReconciles=5 \
   --set rateLimit.qps=20 \
-  --set webhooks.enabled=true \
   --set metrics.serviceMonitor.enabled=true \
   --set networkPolicy.enabled=true \
   --set priorityClassName=system-cluster-critical \

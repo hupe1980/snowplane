@@ -89,6 +89,7 @@ spec:
                   Snowflake connectivity.
                 properties:
                   name:
+                    default: default
                     description: Name of the ProviderConfig to use.
                     minLength: 1
                     type: string
@@ -98,8 +99,6 @@ spec:
                       referring resource. Set this to reference a ProviderConfig in a
                       different namespace (e.g. a shared system namespace).
                     type: string
-                required:
-                - name
                 type: object
               share:
                 description: Share is the name of the share to grant the privilege
@@ -113,6 +112,7 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                minLength: 1
                 type: string
             required:
             - objectName
@@ -121,6 +121,23 @@ spec:
             - providerRef
             - share
             type: object
+            x-kubernetes-validations:
+            - message: spec.privilege is immutable (delete and recreate the resource
+                to change)
+              rule: self.privilege == oldSelf.privilege
+            - message: spec.objectType is immutable (delete and recreate the resource
+                to change)
+              rule: self.objectType == oldSelf.objectType
+            - message: spec.objectName is immutable (delete and recreate the resource
+                to change)
+              rule: self.objectName == oldSelf.objectName
+            - message: spec.share is immutable (delete and recreate the resource to
+                change)
+              rule: self.share == oldSelf.share
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
           status:
             description: ShareGrantStatus defines the observed state of a ShareGrant.
             properties:

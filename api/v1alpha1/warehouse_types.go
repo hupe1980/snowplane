@@ -71,6 +71,8 @@ const (
 )
 
 // WarehouseSpec defines the desired state of a Warehouse.
+// +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 type WarehouseSpec struct {
 	CommonSpec `json:",inline"`
 

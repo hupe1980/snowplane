@@ -22,6 +22,14 @@ const (
 // GrantOwnershipSpec defines the desired state of a GrantOwnership.
 // All fields are immutable after creation — changing any field requires
 // deleting and recreating the resource.
+//
+// +kubebuilder:validation:XValidation:rule="self.objectType == oldSelf.objectType",message="spec.objectType is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.objectName == oldSelf.objectName",message="spec.objectName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.accountRole == oldSelf.accountRole",message="spec.accountRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.accountRoleRef) == has(self.accountRoleRef) && (!has(self.accountRoleRef) || self.accountRoleRef == oldSelf.accountRoleRef)",message="spec.accountRoleRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.databaseRole == oldSelf.databaseRole",message="spec.databaseRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRoleRef) == has(self.databaseRoleRef) && (!has(self.databaseRoleRef) || self.databaseRoleRef == oldSelf.databaseRoleRef)",message="spec.databaseRoleRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 type GrantOwnershipSpec struct {
 	CommonSpec `json:",inline"`
 

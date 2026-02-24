@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -492,36 +493,20 @@ func TestSchema_ImmutableDatabaseRef(t *testing.T) {
 		return conditions.IsTrue(&obj, snowplanev1alpha1.TypeReady)
 	}, defaultTimeout, defaultInterval)
 
+	// CEL validation now rejects immutable field changes at the API-server level.
 	var current snowplanev1alpha1.Schema
-	require.NoError(t, k8sClient.Get(ctx, schemaKey, &current))
 
-	current.Spec.DatabaseRef = &snowplanev1alpha1.LocalObjectReference{Name: dbName2}
-
-	// Without CEL rules, the update is accepted by the API server.
-	// The reconciler's ValidateImmutableFields detects the violation and
-	// sets a terminal condition.
-	require.NoError(t, k8sClient.Update(ctx, &current))
-
-	require.Eventually(t, func() bool {
-		var obj snowplanev1alpha1.Schema
-		if err := k8sClient.Get(ctx, schemaKey, &obj); err != nil {
-			return false
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if getErr := k8sClient.Get(ctx, schemaKey, &current); getErr != nil {
+			return getErr
 		}
 
-		if !conditions.IsTerminal(&obj) {
-			return false
-		}
+		current.Spec.DatabaseRef = &snowplanev1alpha1.LocalObjectReference{Name: dbName2}
 
-		c := conditions.Get(&obj, snowplanev1alpha1.TypeReady)
-
-		return c != nil && c.Status == metav1.ConditionFalse &&
-			c.Reason == snowplanev1alpha1.ReasonImmutableField
-	}, defaultTimeout, defaultInterval, "Terminal condition should be set for immutable databaseRef change")
-
-	// Revert the databaseRef so cleanup can proceed.
-	require.NoError(t, k8sClient.Get(ctx, schemaKey, &current))
-	current.Spec.DatabaseRef = &snowplanev1alpha1.LocalObjectReference{Name: dbName1}
-	require.NoError(t, k8sClient.Update(ctx, &current))
+		return k8sClient.Update(ctx, &current)
+	})
+	require.Error(t, err, "Update should be rejected by CEL validation")
+	assert.Contains(t, err.Error(), "spec.databaseRef is immutable")
 
 	// Cleanup.
 	schemaMockSvc.SetDrop(func(_ context.Context, _ snowflake.DatabaseObjectIdentifier) error { return nil })

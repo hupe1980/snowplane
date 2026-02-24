@@ -36,7 +36,8 @@ type SecretKeyReference struct {
 type ProviderReference struct {
 	// Name of the ProviderConfig to use.
 	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
+	// +kubebuilder:default="default"
+	Name string `json:"name,omitempty"`
 
 	// Namespace of the ProviderConfig. Defaults to the namespace of the
 	// referring resource. Set this to reference a ProviderConfig in a
@@ -74,6 +75,7 @@ type CommonSpec struct {
 	// controls initial ownership.
 	// This field is immutable after the resource has been created in Snowflake.
 	// +optional
+	// +kubebuilder:validation:MinLength=1
 	UseRole *string `json:"useRole,omitempty"`
 }
 

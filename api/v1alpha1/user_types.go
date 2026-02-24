@@ -15,6 +15,9 @@ const (
 )
 
 // UserSpec defines the desired state of a User.
+// +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.type) == has(self.type) && (!has(self.type) || self.type == oldSelf.type)",message="spec.type is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 type UserSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -55,6 +58,7 @@ type UserSpec struct {
 	// Type specifies the user type: PERSON, SERVICE, or LEGACY_SERVICE.
 	// Defaults to PERSON. Immutable after creation.
 	// +kubebuilder:validation:Enum=PERSON;SERVICE;LEGACY_SERVICE
+	// +kubebuilder:default=PERSON
 	Type *UserType `json:"type,omitempty"`
 
 	// DefaultRole is the default role assigned to the user on login.

@@ -269,7 +269,6 @@ func TestMain(m *testing.M) {
 		"--set", "leaderElection.enabled=false",
 		"--set", "controller.requeueInterval=10s",
 		"--set", "controller.enableAlphaResources=true",
-		"--set", "webhooks.enabled=false",
 		"--set", "rbac.secrets.write=true",
 		"--set", "rbac.configMaps.write=true",
 		"--wait", "--timeout", "120s",

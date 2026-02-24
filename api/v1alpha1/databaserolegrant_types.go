@@ -8,7 +8,14 @@ import (
 
 // DatabaseRoleGrantSpec defines the desired state of a DatabaseRoleGrant.
 // All grant fields are immutable after creation — changing any field requires
-// a REVOKE + re-GRANT (use the force-new annotation to trigger recreation).
+// a REVOKE + re-GRANT (delete and recreate the resource to change).
+//
+// +kubebuilder:validation:XValidation:rule="self.privilege == oldSelf.privilege",message="spec.privilege is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.on == oldSelf.on",message="spec.on is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.databaseRole == oldSelf.databaseRole",message="spec.databaseRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRoleRef) == has(self.databaseRoleRef) && (!has(self.databaseRoleRef) || self.databaseRoleRef == oldSelf.databaseRoleRef)",message="spec.databaseRoleRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.withGrantOption == oldSelf.withGrantOption",message="spec.withGrantOption is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 type DatabaseRoleGrantSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -33,6 +40,7 @@ type DatabaseRoleGrantSpec struct {
 
 	// WithGrantOption allows the grantee to re-grant the privilege to other roles.
 	// +optional
+	// +kubebuilder:default=false
 	WithGrantOption bool `json:"withGrantOption,omitempty"`
 }
 

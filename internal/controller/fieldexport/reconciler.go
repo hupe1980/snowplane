@@ -86,7 +86,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
-	// Defense-in-depth: validate spec even when webhooks are disabled (R8-2).
+	// Defense-in-depth: validate spec beyond what CEL rules enforce (R8-2).
 	if err := fe.Spec.Validate(); err != nil {
 		conditions.SetNotReady(&fe, snowplanev1alpha1.ReasonValidationFailed, err.Error())
 		conditions.SetNotSynced(&fe, snowplanev1alpha1.ReasonValidationFailed, err.Error())

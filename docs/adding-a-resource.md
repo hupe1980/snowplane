@@ -16,7 +16,7 @@ This guide walks through every step needed to add a new Snowflake resource to Sn
 6. [Create the Snowflake Client](#6-create-the-snowflake-client)
 7. [Create the Reconciler Package](#7-create-the-reconciler-package)
 8. [Wire into the Manager](#8-wire-into-the-manager)
-9. [Add Admission Webhooks](#9-add-admission-webhooks)
+9. [Add CEL Validation Markers](#9-add-cel-validation-markers)
 10. [Add Sample Manifests](#10-add-sample-manifests)
 11. [Write Tests](#11-write-tests)
 12. [Final Checklist](#12-final-checklist)
@@ -562,32 +562,40 @@ In `cmd/manager/main.go`, add RBAC markers for the new resource:
 
 ---
 
-## 9. Add Admission Webhooks
+## 9. Add CEL Validation Markers
 
-### Mutating Webhook
+Add `+kubebuilder:validation:XValidation` markers to the **Spec struct** for immutable fields and business rules. CEL transition rules replace admission webhooks — no webhook pod or cert-manager required.
 
-Add the resource name to the mutating webhook loop in `cmd/manager/main.go`:
+### Immutable Fields
 
+For required fields:
 ```go
-for _, res := range []string{"database", "schema", ..., "thing"} {
+//+kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate the resource to change)"
+type ThingSpec struct {
+    Name string `json:"name"`
+}
 ```
 
-### Validating Webhook
+For optional pointer fields:
+```go
+//+kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable"
+```
 
-1. Create `webhook.NewThingValidator(scheme)` in `internal/webhook/`.
-2. Register in `cmd/manager/main.go`:
-   ```go
-   hookServer.Register(
-       "/validate-snowplane-v1alpha1-thing",
-       &ctrlwebhook.Admission{Handler: webhook.NewThingValidator(scheme)},
-   )
-   ```
-3. Add webhook configuration to `config/webhook/validating-webhook-configuration.yaml`.
+### Schema Defaults
 
-The validator must:
-- Call `spec.Validate()` on CREATE
-- Check immutable fields on UPDATE (unless `force-new` annotation is set)
-- Always allow DELETE
+CRD defaults replace the mutating webhook. `CommonSpec` already defaults `deletionPolicy` to `Delete` and `providerRef.name` to `"default"`. Add defaults for resource-specific fields:
+
+```go
+//+kubebuilder:default=false
+Transient bool `json:"transient"`
+```
+
+### Regenerate
+
+After adding markers, regenerate CRDs:
+```bash
+just generate && just sync-crds
+```
 
 ---
 
@@ -639,7 +647,6 @@ spec:
 | `api/v1alpha1/deepcopy_test.go` | Add mutation test for new pointer fields |
 | `internal/clients/snowflake/<resource>_test.go` | SQL generation, option validation, error handling |
 | `internal/controller/<resource>/reconciler_test.go` | Full reconcile loop with mock service, conditions, status, ref resolution |
-| `internal/webhook/validators_test.go` | Immutable field rejection, allow on no change, CREATE passthrough |
 
 **Important:** All `DatabaseRef` and `SchemaRef` fields use pointer syntax in tests:
 
@@ -660,7 +667,7 @@ Add tests in `test/integration/<resource>_test.go` covering:
 - Delete with orphan policy
 - Drift detection
 - Wait for parent reference to become Ready (database/schema-level)
-- Immutable field rejection
+- Immutable field rejection (CEL)
 
 ### Run All Tests
 
@@ -668,11 +675,8 @@ Add tests in `test/integration/<resource>_test.go` covering:
 # Unit tests
 just test
 
-# Integration tests
+# Integration tests (includes CEL validation tests)
 just test-integration
-
-# Webhook integration tests
-just test-webhook-integration
 ```
 
 ---
@@ -694,9 +698,9 @@ Use this checklist to verify completeness:
 - [ ] **Reconciler:** `NewReconciler` + `defaultServiceFactory` + helper functions
 - [ ] **Drift detection:** `detectDrift` includes all immutable fields (`name`, `useRole`, container refs, type fields) with `immutable=true`, plus all mutable spec fields
 - [ ] **Manager wiring:** Import alias, controller registration with maturity/alpha/disabled flags, RBAC markers
-- [ ] **Webhooks:** Mutating (defaults) + validating (immutable fields + spec validation)
+- [ ] **CEL validation:** Immutable field markers + business rules on Spec struct (`just generate && just sync-crds`)
 - [ ] **Samples:** CR YAML with both `databaseRef` and `databaseName` variants
-- [ ] **Tests:** Unit + integration + webhook integration
+- [ ] **Tests:** Unit + integration (including CEL validation)
 - [ ] **Interface assertion:** `var _ reconciler.ResourceAdapter[...] = (*adapter)(nil)`
 - [ ] **Safe type assertions:** Use `reconciler.AssertIdentifier[I]` / `AssertDetail[D]` / `AssertAlterOptions[A]` in error-returning methods; comma-ok pattern in non-error-returning methods (never bare `x.(T)` assertions)
 - [ ] **ProviderConfig in-use guard:** Add the new type to the in-use check in `internal/controller/providerconfig/adapter.go`

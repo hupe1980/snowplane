@@ -93,7 +93,7 @@ func TestMain(m *testing.M) {
 		panic("failed to create test ProviderConfig: " + err.Error())
 	}
 
-	// envtest doesn't run webhooks/controllers yet — manually set Ready condition on PC.
+	// envtest doesn't run controllers — manually set Ready condition on PC.
 	pc.Status.Conditions = testutil.NewTestPC(testNamespace).Status.Conditions
 	if err := k8sClient.Status().Update(ctx, pc); err != nil {
 		panic("failed to update ProviderConfig status: " + err.Error())

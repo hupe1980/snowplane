@@ -35,7 +35,7 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 - 🔄 **Observe-Diff-Apply Reconciliation** — Only altered fields are pushed to Snowflake, minimizing API calls
 - 🔍 **Drift Detection & Correction** — Field-level drift detection with structured reporting, detect-only policy option
 - 🏷️ **Resource Adoption** — Adopt pre-existing Snowflake resources via `adoption-policy: adopt` annotation
-- 🔒 **Immutable Field Enforcement** — Three layers: CRD schema (CEL `self == oldSelf`), validating webhooks, reconciler-level errors
+- 🔒 **Immutable Field Enforcement** — Two layers: CRD schema (CEL `self == oldSelf`), reconciler-level errors
 - 🛡️ **Dangerous Grant Protection** — Blocks grants to ACCOUNTADMIN/SECURITYADMIN/ORGADMIN and dangerous privileges by default
 - 🛡️ **Policy Body Validation** — Blocklist-based SQL injection prevention for MaskingPolicy and RowAccessPolicy `body` fields
 - 🏷️ **Ownership Conflict Detection** — Prevents duplicate CRs from managing the same Snowflake object via label-based conflict detection
@@ -49,8 +49,8 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 - 🔑 **Username/Password** — Password auth via Kubernetes Secrets
 - 🌐 **Workload Identity Federation** — EKS IRSA, GKE WI, AKS WI via projected ServiceAccount tokens
 - 🔒 **Sensitive Field Redaction** — Passwords, PEM keys, tokens `[REDACTED]` in all logs and events
-- 🛡️ **Validating Webhooks** — Immutable field enforcement, enum/range validation, dangerous-grant blocking
-- 🔧 **Mutating Webhooks** — Auto-defaults for `deletionPolicy`, `providerRef`, User `type`
+- 🛡️ **CEL Validation Rules** — Immutable field enforcement, enum/range validation, dangerous-grant blocking at the CRD level
+- 🔧 **CRD Schema Defaults** — Auto-defaults for `deletionPolicy`, `providerRef`, User `type` via CRD schema
 
 ### 📈 Observability & Operations
 
@@ -192,8 +192,6 @@ kubectl get databases
 | `--max-concurrent-reconciles` | `3` | Max concurrent reconciles per controller |
 | `--rate-limit-qps` | `10` | Sustained queries/sec to Snowflake per provider (0 = disabled) |
 | `--rate-limit-burst` | `20` | Max burst size for Snowflake API rate limiter |
-| `--enable-webhooks` | `false` | Enable admission webhooks |
-| `--webhook-port` | `9443` | Webhook server port |
 | `--requeue-interval` | `5m` | Drift detection re-observe interval |
 | `--enable-alpha-resources` | `true` | Enable alpha-maturity controllers |
 | `--disable-controllers` | `""` | Comma-separated controllers to disable (e.g. `accountrolegrant,stage,view`) |
@@ -244,8 +242,6 @@ helm install snowplane charts/snowplane/ \
 | `leaderElection.enabled` | `true` | Enable leader election |
 | `metrics.serviceMonitor.enabled` | `false` | Create Prometheus ServiceMonitor |
 | `grafana.dashboard.enabled` | `false` | Deploy Grafana dashboard ConfigMap |
-| `webhooks.enabled` | `false` | Enable admission webhooks |
-| `webhooks.allowCrossNamespaceFieldExport` | `false` | Allow FieldExport to target ConfigMaps/Secrets in other namespaces |
 | `watchNamespaces` | `""` | Namespaces to watch (empty = all) |
 | `priorityClassName` | `""` | Pod PriorityClass name |
 | `topologySpreadConstraints` | `[]` | Topology spread constraints |
@@ -768,8 +764,7 @@ Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped a
 │   ├── grafana/            # Grafana dashboard JSON
 │   ├── manager/            # Deployment, PDB, NetworkPolicy
 │   ├── rbac/               # RBAC roles and bindings
-│   ├── samples/            # Example CR YAML files
-│   └── webhook/            # Webhook configurations
+│   └── samples/            # Example CR YAML files
 ├── charts/snowplane/       # Helm chart
 ├── docs/                   # Documentation
 ├── hack/                   # Dev & codegen scripts
@@ -783,7 +778,6 @@ Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped a
 │   ├── provider/           # Provider config builder & client resolution
 │   ├── ratelimit/          # Per-provider token-bucket rate limiter
 │   ├── sfretry/            # Retry wrapper for transient Snowflake errors
-│   ├── webhook/            # Admission webhook handlers
 │   └── utils/              # Conditions, finalizers, sanitizers
 └── test/
     ├── e2e/                # End-to-end tests (kind + real Snowflake)

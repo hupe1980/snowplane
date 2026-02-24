@@ -531,6 +531,13 @@ func TestDatabaseSpec_Validate_InvalidTraceLevel(t *testing.T) {
 
 // --- Schema enum validation (same types as Database) ---
 
+func TestSchemaSpec_Validate_MaxDataExtensionOutOfRange(t *testing.T) {
+	t.Parallel()
+	err := (&SchemaSpec{Name: "S", DatabaseRef: &LocalObjectReference{Name: "db"}, MaxDataExtensionTimeInDays: ptrInt32(100)}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.maxDataExtensionTimeInDays must be between 0 and 90")
+}
+
 func TestSchemaSpec_Validate_InvalidStorageSerializationPolicy(t *testing.T) {
 	t.Parallel()
 	bad := StorageSerializationPolicy("CUSTOM")
@@ -1415,6 +1422,52 @@ func TestTableSpec_Validate_ConstraintFKMissingRef(t *testing.T) {
 	}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "foreignKey is required")
+}
+
+func TestTableSpec_Validate_ConstraintFKEmptyTable(t *testing.T) {
+	t.Parallel()
+	dbName := "DB"
+	schemaName := "SCH"
+	err := (&TableSpec{
+		CommonSpec:   CommonSpec{ProviderRef: ProviderReference{Name: "default"}},
+		Name:         "t",
+		DatabaseName: &dbName,
+		SchemaName:   &schemaName,
+		Columns:      []ColumnDefinition{{Name: "ID", Type: "NUMBER"}},
+		Constraints: []TableConstraint{
+			{
+				Name:       "fk",
+				Type:       TableConstraintForeignKey,
+				Columns:    []string{"ID"},
+				ForeignKey: &ForeignKeyReference{Table: "", Columns: []string{"ID"}},
+			},
+		},
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "foreignKey.table is required")
+}
+
+func TestTableSpec_Validate_ConstraintFKEmptyColumns(t *testing.T) {
+	t.Parallel()
+	dbName := "DB"
+	schemaName := "SCH"
+	err := (&TableSpec{
+		CommonSpec:   CommonSpec{ProviderRef: ProviderReference{Name: "default"}},
+		Name:         "t",
+		DatabaseName: &dbName,
+		SchemaName:   &schemaName,
+		Columns:      []ColumnDefinition{{Name: "ID", Type: "NUMBER"}},
+		Constraints: []TableConstraint{
+			{
+				Name:       "fk",
+				Type:       TableConstraintForeignKey,
+				Columns:    []string{"ID"},
+				ForeignKey: &ForeignKeyReference{Table: "PARENT", Columns: nil},
+			},
+		},
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "foreignKey.columns must have at least one column")
 }
 
 func TestTableSpec_Validate_ConstraintFKColumnMismatch(t *testing.T) {
@@ -2416,7 +2469,7 @@ func TestFieldExportSpec_Validate_PathArrayIndexing(t *testing.T) {
 
 func TestFieldExportSpec_Validate_AllSourceKinds(t *testing.T) {
 	t.Parallel()
-	for _, kind := range []string{"Database", "Schema", "Warehouse", "User", "AccountRole", "DatabaseRole", "AccountRoleGrant", "DatabaseRoleGrant", "ShareGrant", "Table", "View", "Stage"} {
+	for _, kind := range []string{"Database", "Schema", "Warehouse", "User", "AccountRole", "DatabaseRole", "AccountRoleGrant", "DatabaseRoleGrant", "ShareGrant", "Table", "View", "Stage", "Task", "Stream", "Tag", "NetworkPolicy", "ResourceMonitor", "MaskingPolicy", "RowAccessPolicy", "GrantOwnership"} {
 		spec := FieldExportSpec{
 			From: FieldExportSource{
 				Resource: FieldExportResourceRef{Kind: kind, Name: "test"},
@@ -2468,6 +2521,42 @@ func TestDatabaseRoleGrantSpec_Validate_RoleAndRefMutuallyExclusive(t *testing.T
 	err := spec.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "databaseRole and databaseRoleRef are mutually exclusive")
+}
+
+func TestDatabaseRoleGrantSpec_Validate_EmptyPrivilege(t *testing.T) {
+	t.Parallel()
+	spec := validDatabaseRoleGrantSpec()
+	spec.Privilege = ""
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.privilege is required")
+}
+
+func TestDatabaseRoleGrantSpec_Validate_NoRoleOrRef(t *testing.T) {
+	t.Parallel()
+	spec := validDatabaseRoleGrantSpec()
+	spec.DatabaseRole = ""
+	spec.DatabaseRoleRef = nil
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of databaseRole or databaseRoleRef must be set")
+}
+
+func TestDatabaseRoleGrantSpec_Validate_OnNoneSet(t *testing.T) {
+	t.Parallel()
+	spec := validDatabaseRoleGrantSpec()
+	spec.On = GrantOn{}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of")
+}
+
+func TestDatabaseRoleGrantSpec_Validate_ValidWithRef(t *testing.T) {
+	t.Parallel()
+	spec := validDatabaseRoleGrantSpec()
+	spec.DatabaseRole = ""
+	spec.DatabaseRoleRef = &LocalObjectReference{Name: "my-role"}
+	assert.NoError(t, spec.Validate())
 }
 
 // --------------------------------------------------------------------------
@@ -2770,4 +2859,600 @@ func TestJoinPrivileges_Sorted(t *testing.T) {
 	}
 	result := joinPrivileges(privs)
 	assert.Equal(t, "ALPHA, MIDDLE, ZEBRA", result)
+}
+
+// ---------------------------------------------------------------------------
+// MaskingPolicySpec
+// ---------------------------------------------------------------------------
+
+func validMaskingPolicySpec() *MaskingPolicySpec {
+	return &MaskingPolicySpec{
+		CommonSpec:   validCommonSpec(),
+		Name:         "MY_POLICY",
+		DatabaseName: ptrStr("DB"),
+		SchemaName:   ptrStr("SCH"),
+		Signature:    []MaskingPolicyArgument{{Name: "val", Type: "VARCHAR"}},
+		Body:         "CASE WHEN true THEN val END",
+	}
+}
+
+func TestMaskingPolicySpec_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validMaskingPolicySpec().Validate())
+}
+
+func TestMaskingPolicySpec_Validate_EmptyName(t *testing.T) {
+	t.Parallel()
+	s := validMaskingPolicySpec()
+	s.Name = ""
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.name is required")
+}
+
+func TestMaskingPolicySpec_Validate_EmptySignature(t *testing.T) {
+	t.Parallel()
+	s := validMaskingPolicySpec()
+	s.Signature = nil
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.signature requires at least one argument")
+}
+
+func TestMaskingPolicySpec_Validate_EmptyBody(t *testing.T) {
+	t.Parallel()
+	s := validMaskingPolicySpec()
+	s.Body = ""
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.body is required")
+}
+
+func TestMaskingPolicySpec_Validate_NoDatabaseSource(t *testing.T) {
+	t.Parallel()
+	s := validMaskingPolicySpec()
+	s.DatabaseName = nil
+	s.DatabaseRef = nil
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "databaseRef")
+}
+
+func TestMaskingPolicySpec_Validate_NoSchemaSource(t *testing.T) {
+	t.Parallel()
+	s := validMaskingPolicySpec()
+	s.SchemaName = nil
+	s.SchemaRef = nil
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "schemaRef")
+}
+
+func TestMaskingPolicySpec_Validate_BothDatabaseSources(t *testing.T) {
+	t.Parallel()
+	s := validMaskingPolicySpec()
+	s.DatabaseRef = &LocalObjectReference{Name: "db-cr"}
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "databaseRef")
+}
+
+func TestMaskingPolicySpec_Validate_MultipleErrors(t *testing.T) {
+	t.Parallel()
+	err := (&MaskingPolicySpec{}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.name is required")
+	assert.Contains(t, err.Error(), "spec.signature requires at least one argument")
+	assert.Contains(t, err.Error(), "spec.body is required")
+}
+
+// ---------------------------------------------------------------------------
+// RowAccessPolicySpec
+// ---------------------------------------------------------------------------
+
+func validRowAccessPolicySpec() *RowAccessPolicySpec {
+	return &RowAccessPolicySpec{
+		CommonSpec:   validCommonSpec(),
+		Name:         "MY_RAP",
+		DatabaseName: ptrStr("DB"),
+		SchemaName:   ptrStr("SCH"),
+		Signature:    []RowAccessPolicyArgument{{Name: "col", Type: "VARCHAR"}},
+		Body:         "true",
+	}
+}
+
+func TestRowAccessPolicySpec_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validRowAccessPolicySpec().Validate())
+}
+
+func TestRowAccessPolicySpec_Validate_EmptyName(t *testing.T) {
+	t.Parallel()
+	s := validRowAccessPolicySpec()
+	s.Name = ""
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.name is required")
+}
+
+func TestRowAccessPolicySpec_Validate_EmptySignature(t *testing.T) {
+	t.Parallel()
+	s := validRowAccessPolicySpec()
+	s.Signature = nil
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.signature requires at least one argument")
+}
+
+func TestRowAccessPolicySpec_Validate_EmptyBody(t *testing.T) {
+	t.Parallel()
+	s := validRowAccessPolicySpec()
+	s.Body = ""
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.body is required")
+}
+
+func TestRowAccessPolicySpec_Validate_NoDatabaseSource(t *testing.T) {
+	t.Parallel()
+	s := validRowAccessPolicySpec()
+	s.DatabaseName = nil
+	s.DatabaseRef = nil
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "databaseRef")
+}
+
+func TestRowAccessPolicySpec_Validate_NoSchemaSource(t *testing.T) {
+	t.Parallel()
+	s := validRowAccessPolicySpec()
+	s.SchemaName = nil
+	s.SchemaRef = nil
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "schemaRef")
+}
+
+func TestRowAccessPolicySpec_Validate_MultipleErrors(t *testing.T) {
+	t.Parallel()
+	err := (&RowAccessPolicySpec{}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.name is required")
+	assert.Contains(t, err.Error(), "spec.signature requires at least one argument")
+	assert.Contains(t, err.Error(), "spec.body is required")
+}
+
+// ---------------------------------------------------------------------------
+// TagSpec
+// ---------------------------------------------------------------------------
+
+func validTagSpec() *TagSpec {
+	return &TagSpec{
+		CommonSpec:   validCommonSpec(),
+		Name:         "MY_TAG",
+		DatabaseName: ptrStr("DB"),
+		SchemaName:   ptrStr("SCH"),
+	}
+}
+
+func TestTagSpec_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validTagSpec().Validate())
+}
+
+func TestTagSpec_Validate_EmptyName(t *testing.T) {
+	t.Parallel()
+	s := validTagSpec()
+	s.Name = ""
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.name is required")
+}
+
+func TestTagSpec_Validate_NoDatabaseSource(t *testing.T) {
+	t.Parallel()
+	s := validTagSpec()
+	s.DatabaseName = nil
+	s.DatabaseRef = nil
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "databaseRef")
+}
+
+func TestTagSpec_Validate_NoSchemaSource(t *testing.T) {
+	t.Parallel()
+	s := validTagSpec()
+	s.SchemaName = nil
+	s.SchemaRef = nil
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "schemaRef")
+}
+
+func TestTagSpec_Validate_BothDatabaseSources(t *testing.T) {
+	t.Parallel()
+	s := validTagSpec()
+	s.DatabaseRef = &LocalObjectReference{Name: "db-cr"}
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "databaseRef")
+}
+
+func TestValidateDatabaseSource_EmptyRefName(t *testing.T) {
+	t.Parallel()
+	err := validateDatabaseSource(&LocalObjectReference{Name: ""}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of spec.databaseRef or spec.databaseName must be set")
+}
+
+func TestValidateSchemaSource_EmptyRefName(t *testing.T) {
+	t.Parallel()
+	err := validateSchemaSource(&LocalObjectReference{Name: ""}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of spec.schemaRef or spec.schemaName must be set")
+}
+
+// ---------------------------------------------------------------------------
+// StreamSpec
+// ---------------------------------------------------------------------------
+
+func ptrBool(b bool) *bool { return &b }
+
+func validStreamSpec() *StreamSpec {
+	return &StreamSpec{
+		CommonSpec:   validCommonSpec(),
+		Name:         "MY_STREAM",
+		DatabaseName: ptrStr("DB"),
+		SchemaName:   ptrStr("SCH"),
+		SourceType:   StreamSourceTable,
+		SourceName:   `"DB"."SCH"."MY_TABLE"`,
+	}
+}
+
+func TestStreamSpec_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validStreamSpec().Validate())
+}
+
+func TestStreamSpec_Validate_EmptyName(t *testing.T) {
+	t.Parallel()
+	s := validStreamSpec()
+	s.Name = ""
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.name is required")
+}
+
+func TestStreamSpec_Validate_EmptySourceName(t *testing.T) {
+	t.Parallel()
+	s := validStreamSpec()
+	s.SourceName = ""
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.sourceName is required")
+}
+
+func TestStreamSpec_Validate_NoDatabaseSource(t *testing.T) {
+	t.Parallel()
+	s := validStreamSpec()
+	s.DatabaseName = nil
+	s.DatabaseRef = nil
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "databaseRef")
+}
+
+func TestStreamSpec_Validate_NoSchemaSource(t *testing.T) {
+	t.Parallel()
+	s := validStreamSpec()
+	s.SchemaName = nil
+	s.SchemaRef = nil
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "schemaRef")
+}
+
+func TestStreamSpec_Validate_AppendOnlyInvalidSourceType(t *testing.T) {
+	t.Parallel()
+	s := validStreamSpec()
+	s.SourceType = StreamSourceExternalTable
+	s.AppendOnly = ptrBool(true)
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.appendOnly is only valid for TABLE or VIEW streams")
+}
+
+func TestStreamSpec_Validate_AppendOnlyValidForView(t *testing.T) {
+	t.Parallel()
+	s := validStreamSpec()
+	s.SourceType = StreamSourceView
+	s.AppendOnly = ptrBool(true)
+	assert.NoError(t, s.Validate())
+}
+
+func TestStreamSpec_Validate_InsertOnlyInvalidSourceType(t *testing.T) {
+	t.Parallel()
+	s := validStreamSpec()
+	s.SourceType = StreamSourceTable
+	s.InsertOnly = ptrBool(true)
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.insertOnly is only valid for EXTERNAL_TABLE streams")
+}
+
+func TestStreamSpec_Validate_InsertOnlyValidForExternalTable(t *testing.T) {
+	t.Parallel()
+	s := validStreamSpec()
+	s.SourceType = StreamSourceExternalTable
+	s.InsertOnly = ptrBool(true)
+	assert.NoError(t, s.Validate())
+}
+
+func TestStreamSpec_Validate_AppendOnlyAndInsertOnlyMutuallyExclusive(t *testing.T) {
+	t.Parallel()
+	s := validStreamSpec()
+	s.SourceType = StreamSourceTable
+	s.AppendOnly = ptrBool(true)
+	s.InsertOnly = ptrBool(true)
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.appendOnly and spec.insertOnly are mutually exclusive")
+}
+
+func TestStreamSpec_Validate_ShowInitialRowsInvalidSourceType(t *testing.T) {
+	t.Parallel()
+	s := validStreamSpec()
+	s.SourceType = StreamSourceStage
+	s.ShowInitialRows = ptrBool(true)
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.showInitialRows is only valid for TABLE or VIEW streams")
+}
+
+// ---------------------------------------------------------------------------
+// TaskSpec
+// ---------------------------------------------------------------------------
+
+func validTaskSpec() *TaskSpec {
+	return &TaskSpec{
+		CommonSpec:   validCommonSpec(),
+		Name:         "MY_TASK",
+		DatabaseName: ptrStr("DB"),
+		SchemaName:   ptrStr("SCH"),
+		SQLStatement: "SELECT 1",
+	}
+}
+
+func TestTaskSpec_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validTaskSpec().Validate())
+}
+
+func TestTaskSpec_Validate_EmptyName(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.Name = ""
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.name is required")
+}
+
+func TestTaskSpec_Validate_EmptySQLStatement(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.SQLStatement = ""
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.sqlStatement is required")
+}
+
+func TestTaskSpec_Validate_NoDatabaseSource(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.DatabaseName = nil
+	s.DatabaseRef = nil
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "databaseRef")
+}
+
+func TestTaskSpec_Validate_NoSchemaSource(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.SchemaName = nil
+	s.SchemaRef = nil
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "schemaRef")
+}
+
+func TestTaskSpec_Validate_WarehouseMutualExclusion(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.Warehouse = ptrStr("WH")
+	size := "SMALL"
+	s.UserTaskManagedInitialWarehouseSize = &size
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.warehouse and spec.userTaskManagedInitialWarehouseSize are mutually exclusive")
+}
+
+func TestTaskSpec_Validate_TimeoutTooLarge(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.UserTaskTimeoutMs = ptrInt32(700000000)
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.userTaskTimeoutMs must be between 0 and 604800000")
+}
+
+func TestTaskSpec_Validate_TimeoutNegative(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.UserTaskTimeoutMs = ptrInt32(-1)
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.userTaskTimeoutMs must be between 0 and 604800000")
+}
+
+func TestTaskSpec_Validate_RetryAttemptsTooLarge(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.TaskAutoRetryAttempts = ptrInt32(31)
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.taskAutoRetryAttempts must be between 0 and 30")
+}
+
+func TestTaskSpec_Validate_RetryAttemptsNegative(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.TaskAutoRetryAttempts = ptrInt32(-1)
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.taskAutoRetryAttempts must be between 0 and 30")
+}
+
+func TestTaskSpec_Validate_ValidTimeoutAndRetry(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.UserTaskTimeoutMs = ptrInt32(60000)
+	s.TaskAutoRetryAttempts = ptrInt32(3)
+	assert.NoError(t, s.Validate())
+}
+
+// ---------------------------------------------------------------------------
+// NetworkPolicySpec
+// ---------------------------------------------------------------------------
+
+func TestNetworkPolicySpec_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, (&NetworkPolicySpec{CommonSpec: validCommonSpec(), Name: "MY_NP"}).Validate())
+}
+
+func TestNetworkPolicySpec_Validate_EmptyName(t *testing.T) {
+	t.Parallel()
+	err := (&NetworkPolicySpec{}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.name is required")
+}
+
+// ---------------------------------------------------------------------------
+// ResourceMonitorSpec
+// ---------------------------------------------------------------------------
+
+func TestResourceMonitorSpec_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	freq := ResourceMonitorFrequencyMonthly
+	assert.NoError(t, (&ResourceMonitorSpec{
+		CommonSpec:     validCommonSpec(),
+		Name:           "MY_MONITOR",
+		Frequency:      &freq,
+		StartTimestamp: ptrStr("IMMEDIATELY"),
+	}).Validate())
+}
+
+func TestResourceMonitorSpec_Validate_EmptyName(t *testing.T) {
+	t.Parallel()
+	err := (&ResourceMonitorSpec{}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.name is required")
+}
+
+func TestResourceMonitorSpec_Validate_FrequencyWithoutStartTimestamp(t *testing.T) {
+	t.Parallel()
+	freq := ResourceMonitorFrequencyDaily
+	err := (&ResourceMonitorSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_MONITOR",
+		Frequency:  &freq,
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.frequency and spec.startTimestamp must both be set or both be omitted")
+}
+
+func TestResourceMonitorSpec_Validate_StartTimestampWithoutFrequency(t *testing.T) {
+	t.Parallel()
+	err := (&ResourceMonitorSpec{
+		CommonSpec:     validCommonSpec(),
+		Name:           "MY_MONITOR",
+		StartTimestamp: ptrStr("2024-01-01"),
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.frequency and spec.startTimestamp must both be set or both be omitted")
+}
+
+func TestResourceMonitorSpec_Validate_NeitherFrequencyNorStartTimestamp(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, (&ResourceMonitorSpec{CommonSpec: validCommonSpec(), Name: "MY_MONITOR"}).Validate())
+}
+
+// ---------------------------------------------------------------------------
+// GrantOwnershipSpec
+// ---------------------------------------------------------------------------
+
+func validGrantOwnershipSpec() *GrantOwnershipSpec {
+	return &GrantOwnershipSpec{
+		CommonSpec:  validCommonSpec(),
+		ObjectType:  "TABLE",
+		ObjectName:  `"DB"."SCH"."MY_TABLE"`,
+		AccountRole: "SYSADMIN",
+	}
+}
+
+func TestGrantOwnershipSpec_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validGrantOwnershipSpec().Validate())
+}
+
+func TestGrantOwnershipSpec_Validate_EmptyObjectType(t *testing.T) {
+	t.Parallel()
+	s := validGrantOwnershipSpec()
+	s.ObjectType = ""
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.objectType is required")
+}
+
+func TestGrantOwnershipSpec_Validate_EmptyObjectName(t *testing.T) {
+	t.Parallel()
+	s := validGrantOwnershipSpec()
+	s.ObjectName = ""
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.objectName is required")
+}
+
+func TestGrantOwnershipSpec_Validate_NoRoleSet(t *testing.T) {
+	t.Parallel()
+	s := validGrantOwnershipSpec()
+	s.AccountRole = ""
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of accountRole, accountRoleRef, databaseRole, or databaseRoleRef must be set")
+}
+
+func TestGrantOwnershipSpec_Validate_MultipleRolesSet(t *testing.T) {
+	t.Parallel()
+	s := validGrantOwnershipSpec()
+	s.DatabaseRole = "DB_ROLE"
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of accountRole, accountRoleRef, databaseRole, or databaseRoleRef must be set")
+}
+
+func TestGrantOwnershipSpec_Validate_AccountRoleRef(t *testing.T) {
+	t.Parallel()
+	s := validGrantOwnershipSpec()
+	s.AccountRole = ""
+	s.AccountRoleRef = &LocalObjectReference{Name: "my-role"}
+	assert.NoError(t, s.Validate())
+}
+
+func TestGrantOwnershipSpec_Validate_DatabaseRoleRef(t *testing.T) {
+	t.Parallel()
+	s := validGrantOwnershipSpec()
+	s.AccountRole = ""
+	s.DatabaseRoleRef = &LocalObjectReference{Name: "my-db-role"}
+	assert.NoError(t, s.Validate())
 }

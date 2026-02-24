@@ -1,6 +1,6 @@
 package v1alpha1
 
-// Annotation and label keys used by Snowplane controllers, webhooks, and CRDs.
+// Annotation and label keys used by Snowplane controllers and CRDs.
 const (
 	// AnnotationForceNew signals the controller to delete and recreate the
 	// Snowflake resource when an immutable field changes. Without this

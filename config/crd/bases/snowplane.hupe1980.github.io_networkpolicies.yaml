@@ -101,6 +101,7 @@ spec:
                   Snowflake connectivity.
                 properties:
                   name:
+                    default: default
                     description: Name of the ProviderConfig to use.
                     minLength: 1
                     type: string
@@ -110,8 +111,6 @@ spec:
                       referring resource. Set this to reference a ProviderConfig in a
                       different namespace (e.g. a shared system namespace).
                     type: string
-                required:
-                - name
                 type: object
               useRole:
                 description: |-
@@ -120,11 +119,20 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                minLength: 1
                 type: string
             required:
             - name
             - providerRef
             type: object
+            x-kubernetes-validations:
+            - message: spec.name is immutable (delete and recreate the resource to
+                change)
+              rule: self.name == oldSelf.name
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
           status:
             description: NetworkPolicyStatus defines the observed state of a NetworkPolicy.
             properties:

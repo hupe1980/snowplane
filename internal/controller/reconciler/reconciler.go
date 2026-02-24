@@ -287,7 +287,7 @@ func (r *GenericReconciler[T, S]) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
-	// Defense-in-depth: validate spec even when webhooks are disabled.
+	// Defense-in-depth: validate spec beyond what CEL rules enforce.
 	if err := obj.ValidateSpec(); err != nil {
 		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonValidationFailed, err.Error())
 		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonValidationFailed, err.Error())

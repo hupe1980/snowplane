@@ -107,6 +107,7 @@ spec:
                   Snowflake connectivity.
                 properties:
                   name:
+                    default: default
                     description: Name of the ProviderConfig to use.
                     minLength: 1
                     type: string
@@ -116,8 +117,6 @@ spec:
                       referring resource. Set this to reference a ProviderConfig in a
                       different namespace (e.g. a shared system namespace).
                     type: string
-                required:
-                - name
                 type: object
               schemaName:
                 description: |-
@@ -165,6 +164,7 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                minLength: 1
                 type: string
             required:
             - name
@@ -173,6 +173,35 @@ spec:
             - sourceType
             type: object
             x-kubernetes-validations:
+            - message: spec.name is immutable (delete and recreate the resource to
+                change)
+              rule: self.name == oldSelf.name
+            - message: spec.databaseRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.databaseRef) == has(self.databaseRef) && (!has(self.databaseRef)
+                || self.databaseRef == oldSelf.databaseRef)
+            - message: spec.databaseName is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName)
+                || self.databaseName == oldSelf.databaseName)
+            - message: spec.schemaRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef)
+                || self.schemaRef == oldSelf.schemaRef)
+            - message: spec.schemaName is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName)
+                || self.schemaName == oldSelf.schemaName)
+            - message: spec.sourceType is immutable (delete and recreate the resource
+                to change)
+              rule: self.sourceType == oldSelf.sourceType
+            - message: spec.sourceName is immutable (delete and recreate the resource
+                to change)
+              rule: self.sourceName == oldSelf.sourceName
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
             - message: exactly one of spec.databaseRef or spec.databaseName must be
                 set
               rule: (has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef)

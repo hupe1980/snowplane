@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
@@ -396,34 +397,24 @@ func TestDatabase_ImmutableFieldRejection(t *testing.T) {
 		return conditions.IsTrue(&obj, snowplanev1alpha1.TypeReady)
 	}, defaultTimeout, defaultInterval)
 
+	// CEL validation now rejects immutable field changes at the API-server level.
 	var current snowplanev1alpha1.Database
-	require.NoError(t, k8sClient.Get(ctx, key, &current))
 
-	current.Spec.Transient = true
-	require.NoError(t, k8sClient.Update(ctx, &current))
-
-	require.Eventually(t, func() bool {
-		var obj snowplanev1alpha1.Database
-		if err := k8sClient.Get(ctx, key, &obj); err != nil {
-			return false
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if getErr := k8sClient.Get(ctx, key, &current); getErr != nil {
+			return getErr
 		}
 
-		if !conditions.IsTerminal(&obj) {
-			return false
-		}
+		current.Spec.Transient = true
 
-		c := conditions.Get(&obj, snowplanev1alpha1.TypeReady)
-
-		return c != nil && c.Status == metav1.ConditionFalse &&
-			c.Reason == snowplanev1alpha1.ReasonImmutableField
-	}, defaultTimeout, defaultInterval, "Terminal condition should be set for immutable field violation")
+		return k8sClient.Update(ctx, &current)
+	})
+	require.Error(t, err, "Update should be rejected by CEL validation")
+	assert.Contains(t, err.Error(), "spec.transient is immutable")
 
 	assert.False(t, altered.Load(), "ALTER should NOT be called for immutable field change")
 
-	require.NoError(t, k8sClient.Get(ctx, key, &current))
-	current.Spec.Transient = false
-	require.NoError(t, k8sClient.Update(ctx, &current))
-
+	// Cleanup.
 	dbMockSvc.SetDrop(func(_ context.Context, _ snowflake.AccountObjectIdentifier) error { return nil })
 
 	require.NoError(t, k8sClient.Get(ctx, key, &current))

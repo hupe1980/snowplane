@@ -136,6 +136,7 @@ spec:
                   Snowflake connectivity.
                 properties:
                   name:
+                    default: default
                     description: Name of the ProviderConfig to use.
                     minLength: 1
                     type: string
@@ -145,8 +146,6 @@ spec:
                       referring resource. Set this to reference a ProviderConfig in a
                       different namespace (e.g. a shared system namespace).
                     type: string
-                required:
-                - name
                 type: object
               rsaPublicKey:
                 description: |-
@@ -191,6 +190,7 @@ spec:
                 - name
                 type: object
               type:
+                default: PERSON
                 description: |-
                   Type specifies the user type: PERSON, SERVICE, or LEGACY_SERVICE.
                   Defaults to PERSON. Immutable after creation.
@@ -206,11 +206,24 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                minLength: 1
                 type: string
             required:
             - name
             - providerRef
             type: object
+            x-kubernetes-validations:
+            - message: spec.name is immutable (delete and recreate the resource to
+                change)
+              rule: self.name == oldSelf.name
+            - message: spec.type is immutable (delete and recreate the resource to
+                change)
+              rule: has(oldSelf.type) == has(self.type) && (!has(self.type) || self.type
+                == oldSelf.type)
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
           status:
             description: UserStatus defines the observed state of a User.
             properties:

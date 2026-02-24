@@ -9,6 +9,12 @@ import (
 // ShareGrantSpec defines the desired state of a ShareGrant.
 // Share grants are simpler than role grants: they only support specific named
 // objects (no ALL/FUTURE bulk grants) and do not support WITH GRANT OPTION.
+//
+// +kubebuilder:validation:XValidation:rule="self.privilege == oldSelf.privilege",message="spec.privilege is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.objectType == oldSelf.objectType",message="spec.objectType is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.objectName == oldSelf.objectName",message="spec.objectName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.share == oldSelf.share",message="spec.share is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 type ShareGrantSpec struct {
 	CommonSpec `json:",inline"`
 

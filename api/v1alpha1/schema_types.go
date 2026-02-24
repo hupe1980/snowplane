@@ -6,6 +6,11 @@ import (
 
 // SchemaSpec defines the desired state of a Schema.
 //
+// +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRef) == has(self.databaseRef) && (!has(self.databaseRef) || self.databaseRef == oldSelf.databaseRef)",message="spec.databaseRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName) || self.databaseName == oldSelf.databaseName)",message="spec.databaseName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.transient == oldSelf.transient",message="spec.transient is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 type SchemaSpec struct {
 	CommonSpec `json:",inline"`
@@ -37,6 +42,7 @@ type SchemaSpec struct {
 	MaxDataExtensionTimeInDays *int32 `json:"maxDataExtensionTimeInDays,omitempty"`
 
 	// Transient indicates this is a transient schema (no Fail-safe). Immutable after creation.
+	// +kubebuilder:default=false
 	Transient bool `json:"transient,omitempty"`
 
 	// ManagedAccess enables managed access mode for the schema.

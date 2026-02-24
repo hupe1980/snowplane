@@ -17,8 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/circuitbreaker"
@@ -46,7 +44,6 @@ import (
 	warehousectl "github.com/hupe1980/snowplane/internal/controller/warehouse"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/utils/sanitize"
-	"github.com/hupe1980/snowplane/internal/webhook"
 
 	// Register Prometheus metrics in controller-runtime's registry.
 	_ "github.com/hupe1980/snowplane/internal/metrics"
@@ -122,8 +119,6 @@ func main() {
 	var maxConcurrentReconciles int
 	var rateLimitQPS float64
 	var rateLimitBurst int
-	var enableWebhooks bool
-	var webhookPort int
 	var requeueInterval time.Duration
 	var enableAlphaResources bool
 	var disableControllers string
@@ -142,10 +137,6 @@ func main() {
 		"Maximum sustained queries per second to Snowflake per provider (0 = disabled).")
 	flag.IntVar(&rateLimitBurst, "rate-limit-burst", 20,
 		"Maximum burst size for Snowflake API rate limiter.")
-	flag.BoolVar(&enableWebhooks, "enable-webhooks", true,
-		"Enable admission webhooks for validation and defaulting (requires cert-manager). Set to false for development.")
-	flag.IntVar(&webhookPort, "webhook-port", 9443,
-		"The port the webhook server binds to.")
 	flag.DurationVar(&requeueInterval, "requeue-interval", 5*time.Minute,
 		"How often each reconciler re-observes Snowflake state for drift detection.")
 	flag.BoolVar(&enableAlphaResources, "enable-alpha-resources", true,
@@ -191,12 +182,6 @@ func main() {
 
 			setupLog.Info("restricting watch to namespaces", "namespaces", watchNamespaces)
 		}
-	}
-
-	if enableWebhooks {
-		mgrOpts.WebhookServer = ctrlwebhook.NewServer(ctrlwebhook.Options{
-			Port: webhookPort,
-		})
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), mgrOpts)
@@ -303,66 +288,6 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "FieldExport")
 			os.Exit(1)
 		}
-	}
-
-	// Register admission webhooks.
-	if enableWebhooks {
-		hookServer := mgr.GetWebhookServer()
-
-		// Mutating webhooks (defaults injection).
-		defaultsMutator := webhook.NewDefaultsMutator(scheme)
-		for _, res := range []string{"database", "schema", "warehouse", "accountrole", "databaserole", "accountrolegrant", "databaserolegrant", "sharegrant", "user", "table", "view", "stage", "task", "stream", "tag", "networkpolicy", "resourcemonitor", "maskingpolicy", "rowaccesspolicy", "grantownership"} {
-			hookServer.Register(
-				"/mutate-snowplane-v1alpha1-"+res,
-				&ctrlwebhook.Admission{Handler: defaultsMutator},
-			)
-		}
-
-		// Validating webhooks — table-driven registration.
-		validators := []struct {
-			name    string
-			handler admission.Handler
-		}{
-			{"database", webhook.NewDatabaseValidator(scheme)},
-			{"schema", webhook.NewSchemaValidator(scheme)},
-			{"warehouse", webhook.NewWarehouseValidator(scheme)},
-			{"accountrole", webhook.NewAccountRoleValidator(scheme)},
-			{"databaserole", webhook.NewDatabaseRoleValidator(scheme)},
-			{"accountrolegrant", webhook.NewAccountRoleGrantValidator(scheme)},
-			{"databaserolegrant", webhook.NewDatabaseRoleGrantValidator(scheme)},
-			{"sharegrant", webhook.NewShareGrantValidator(scheme)},
-			{"user", webhook.NewUserValidator(scheme)},
-			{"table", webhook.NewTableValidator(scheme)},
-			{"view", webhook.NewViewValidator(scheme)},
-			{"stage", webhook.NewStageValidator(scheme)},
-			{"task", webhook.NewTaskValidator(scheme)},
-			{"stream", webhook.NewStreamValidator(scheme)},
-			{"tag", webhook.NewTagValidator(scheme)},
-			{"networkpolicy", webhook.NewNetworkPolicyValidator(scheme)},
-			{"resourcemonitor", webhook.NewResourceMonitorValidator(scheme)},
-			{"maskingpolicy", webhook.NewMaskingPolicyValidator(scheme)},
-			{"rowaccesspolicy", webhook.NewRowAccessPolicyValidator(scheme)},
-			{"grantownership", webhook.NewGrantOwnershipValidator(scheme)},
-			{"providerconfig", webhook.NewProviderConfigValidator(scheme)},
-			{"fieldexport", webhook.NewFieldExportValidator(scheme)},
-		}
-
-		for _, v := range validators {
-			hookServer.Register(
-				"/validate-snowplane-v1alpha1-"+v.name,
-				&ctrlwebhook.Admission{Handler: v.handler},
-			)
-		}
-
-		validatorNames := make([]string, 0, len(validators))
-		for _, v := range validators {
-			validatorNames = append(validatorNames, v.name)
-		}
-
-		setupLog.Info("webhooks enabled",
-			"mutating", "/mutate-snowplane-v1alpha1-{...}",
-			"validating", validatorNames,
-		)
 	}
 
 	// Health checks.

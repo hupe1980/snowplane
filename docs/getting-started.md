@@ -323,91 +323,46 @@ When `Recoverable=True`, the controller is automatically retrying with exponenti
 
 ## Operational Features
 
-### Admission Webhooks
+### CRD-Level Validation (CEL Rules)
 
-Snowplane includes **mutating** and **validating** admission webhooks that intercept CREATE and UPDATE requests before the reconciler runs.
+Snowplane uses **CRD-embedded CEL validation rules** (`x-kubernetes-validations`) to enforce field constraints directly at the Kubernetes API server level — no webhooks or cert-manager required.
 
-#### Mutating Webhook (Defaults Injection)
+#### Schema Defaults
 
-The mutating webhook injects sensible defaults at admission time:
+The CRD schema automatically injects sensible defaults:
 
 - `spec.deletionPolicy` defaults to `Delete` if unset
 - `spec.providerRef.name` defaults to `"default"` if unset
 - `spec.type` defaults to `PERSON` for User resources if unset
+- Boolean fields (`transient`, `withGrantOption`) default to `false`
 
 This means you can submit minimal CRs and still get correct behavior.
 
-#### Validating Webhook
+#### CEL Validation Rules
 
-The validating webhook prevents invalid mutations with immediate API errors:
+CEL transition rules prevent invalid mutations with immediate API errors:
 
-- **Spec validation**: Required fields, enum values, range bounds (e.g., `dataRetentionTimeInDays` must be 0–90)
-- **Immutable field enforcement**: `spec.name`, `spec.transient`, `spec.warehouseType`, `spec.type`, `spec.databaseRef` are rejected on UPDATE
-- **Multi-error aggregation**: All violations are returned at once via `errors.Join`, not just the first
+- **Immutable field enforcement**: `spec.name`, `spec.transient`, `spec.warehouseType`, `spec.type`, `spec.databaseRef` are rejected on UPDATE with clear error messages
+- **Policy body blocklist**: SQL injection patterns in MaskingPolicy/RowAccessPolicy bodies are rejected at creation time
+- **FieldExport path validation**: Only `.status.*` paths are allowed, bracket notation is rejected
+- **Mutual exclusion**: Exactly one of `databaseRef` or `databaseName` must be set
+- **ProviderConfig auth validation**: Required credentials are enforced per authentication type
 
-Enable webhooks with the `--enable-webhooks` flag:
-
-```bash
-# In your controller Deployment
-args:
-  - --enable-webhooks
-  - --webhook-port=9443   # default
-```
-
-Deploy the webhook configuration from `config/webhook/`:
-
-```bash
-kubectl apply -f config/webhook/service.yaml
-kubectl apply -f config/webhook/mutating-webhook-configuration.yaml
-kubectl apply -f config/webhook/validating-webhook-configuration.yaml
-```
+All rules run server-side — they work even without the controller deployed.
 
 #### ForceNew — Opt-in Delete+Recreate
 
-When an immutable field change is required, annotate the resource with `snowplane.hupe1980.github.io/force-new: "true"` to bypass the immutable-field rejection:
+When an immutable field change is required, delete and recreate the resource:
 
-```yaml
-metadata:
-  annotations:
-    snowplane.hupe1980.github.io/force-new: "true"
-spec:
-  name: NEW_NAME  # normally rejected as immutable
+```bash
+kubectl delete database my-db
+# Modify the YAML with the new immutable field value, then:
+kubectl apply -f my-db.yaml
 ```
 
-The webhook allows the change through; the reconciler detects the `force-new` annotation and bypasses its own immutable-field check, proceeding with delete+recreate. This works at both the webhook *and* reconciler level as defense-in-depth — even if webhooks are disabled, the annotation is honored. Without the annotation, the change is rejected with a clear error message at both layers.
-
-> **Defense-in-Depth:** Immutable fields are enforced at three layers:
-> 1. **CRD schema** — CEL validation rules (`x-kubernetes-validations: self == oldSelf`) reject changes at the API server level, even without webhooks installed. Requires Kubernetes 1.25+.
-> 2. **Validating webhook** — Checks `ObservedGeneration > 0` to ensure the resource was reconciled before enforcing immutability. Supports the `force-new` bypass annotation.
-> 3. **Reconciler** — Detects immutable field changes as a terminal error if the webhook layer is bypassed.
-
-#### Webhook Availability & failurePolicy
-
-By default, webhook configurations use `failurePolicy: Fail`, meaning **all CRD create/update operations are blocked** if the webhook pod is unavailable (e.g., during rollouts, node drains, or OOM kills). This is the safest setting but has availability implications:
-
-| Scenario | `failurePolicy: Fail` | `failurePolicy: Ignore` |
-|----------|----------------------|------------------------|
-| Webhook pod is down | CRD mutations **blocked** | CRD mutations **allowed** (skipping validation) |
-| Invalid spec submitted | Rejected immediately | Accepted — caught by reconciler later |
-| Single replica (`replicaCount: 1`) | Risky during rollouts | Safe, but validation gaps possible |
-
-**Production recommendation:** When webhooks are enabled with `failurePolicy: Fail`, set `replicaCount: 2` (or higher) to ensure at least one webhook pod is always available:
-
-```yaml
-# values.yaml
-replicaCount: 2
-webhooks:
-  enabled: true
-  failurePolicy: Fail  # default — blocks on unavailability
-```
-
-For non-production environments or clusters where brief validation gaps are acceptable:
-
-```yaml
-webhooks:
-  enabled: true
-  failurePolicy: Ignore  # allows mutations through during downtime
-```
+> **Defense-in-Depth:** Immutable fields are enforced at two layers:
+> 1. **CRD schema** — CEL validation rules (`x-kubernetes-validations: self == oldSelf`) reject changes at the API server level. Requires Kubernetes 1.25+.
+> 2. **Reconciler** — Detects immutable field changes as a terminal error if the CEL layer is somehow bypassed.
 
 ### Rate Limiting
 

@@ -53,7 +53,7 @@ A CRD graduates from alpha to beta when **all** of the following are met:
 2. **Test Coverage** — Integration tests cover create, update, delete, drift detection, adoption, and edge cases.
 3. **Documentation** — Complete user-facing documentation with examples.
 4. **Production Usage** — At least one production deployment has validated the resource.
-5. **Validation** — CEL validation rules and admission webhooks are complete.
+5. **Validation** — CEL validation rules are complete.
 6. **Error Handling** — All error paths produce meaningful conditions and events.
 
 ### Beta to Stable

@@ -59,6 +59,15 @@ type FieldExportTarget struct {
 }
 
 // FieldExportSpec defines the desired state of FieldExport.
+//
+// +kubebuilder:validation:XValidation:rule="self.from.path.startsWith('.status.')",message="spec.from.path must start with '.status.'"
+// +kubebuilder:validation:XValidation:rule="!self.from.path.contains('[')",message="spec.from.path does not support array indexing"
+// +kubebuilder:validation:XValidation:rule="self.from.resource.kind in ['Database','Schema','Warehouse','User','AccountRole','DatabaseRole','AccountRoleGrant','DatabaseRoleGrant','ShareGrant','Table','View','Stage','Task','Stream','Tag','NetworkPolicy','ResourceMonitor','MaskingPolicy','RowAccessPolicy','GrantOwnership']",message="spec.from.resource.kind must be a supported Snowplane resource kind"
+// +kubebuilder:validation:XValidation:rule="self.from.resource.kind == oldSelf.from.resource.kind",message="spec.from.resource.kind is immutable"
+// +kubebuilder:validation:XValidation:rule="self.from.resource.name == oldSelf.from.resource.name",message="spec.from.resource.name is immutable"
+// +kubebuilder:validation:XValidation:rule="self.to.kind == oldSelf.to.kind",message="spec.to.kind is immutable"
+// +kubebuilder:validation:XValidation:rule="self.to.name == oldSelf.to.name",message="spec.to.name is immutable"
+// +kubebuilder:validation:XValidation:rule="self.to.key == oldSelf.to.key",message="spec.to.key is immutable"
 type FieldExportSpec struct {
 	// From specifies the source resource and field path.
 	From FieldExportSource `json:"from"`

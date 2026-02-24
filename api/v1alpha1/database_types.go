@@ -47,6 +47,9 @@ const (
 )
 
 // DatabaseSpec defines the desired state of a Database.
+// +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.transient == oldSelf.transient",message="spec.transient is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 type DatabaseSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -65,6 +68,7 @@ type DatabaseSpec struct {
 	MaxDataExtensionTimeInDays *int32 `json:"maxDataExtensionTimeInDays,omitempty"`
 
 	// Transient indicates this is a transient database (no Fail-safe). Immutable after creation.
+	// +kubebuilder:default=false
 	Transient bool `json:"transient,omitempty"`
 
 	// Catalog specifies an Apache Iceberg catalog integration name.

@@ -117,28 +117,6 @@ healthProbes:
   # -- Container port for health probes (must match port in bindAddress)
   containerPort: 8081
 
-webhooks:
-  # -- Enable admission webhooks (requires cert-manager).
-  # When enabled with failurePolicy=Fail, use replicaCount >= 2 for HA.
-  # Set to false only for development or environments without cert-manager.
-  enabled: true
-  # -- Webhook server port
-  port: 9443
-  # -- Failure policy for admission webhooks.
-  # "Fail" blocks mutations when the webhook is unavailable (safest but requires HA).
-  # "Ignore" allows mutations through when the webhook is unavailable (less safe but tolerates single-replica downtime).
-  failurePolicy: Fail
-  # -- cert-manager configuration for webhook TLS
-  certManager:
-    # -- Certificate duration (default: 1 year)
-    duration: 8760h
-    # -- Renew before expiry (default: 30 days)
-    renewBefore: 720h
-    # -- Issuer reference (defaults to self-signed issuer created by the chart)
-    issuerRef:
-      name: ""
-      kind: Issuer
-
 rateLimit:
   # -- Maximum sustained queries per second to Snowflake per provider (0 = disabled)
   qps: 10

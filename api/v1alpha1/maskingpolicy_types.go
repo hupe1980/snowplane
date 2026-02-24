@@ -22,6 +22,14 @@ type MaskingPolicyArgument struct {
 //
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
+// +kubebuilder:validation:XValidation:rule="!self.body.contains(';') && !self.body.upperAscii().contains('SYSTEM$') && !self.body.upperAscii().contains('EXECUTE IMMEDIATE') && !self.body.upperAscii().contains('CALL ') && !self.body.upperAscii().contains('CREATE ') && !self.body.upperAscii().contains('ALTER ') && !self.body.upperAscii().contains('DROP ') && !self.body.upperAscii().contains('GRANT ') && !self.body.upperAscii().contains('REVOKE ') && !self.body.upperAscii().contains('INSERT ') && !self.body.upperAscii().contains('UPDATE ') && !self.body.upperAscii().contains('DELETE ') && !self.body.upperAscii().contains('MERGE ') && !self.body.upperAscii().contains('COPY INTO') && !self.body.upperAscii().contains('PUT ') && !self.body.upperAscii().contains('GET ') && !self.body.upperAscii().contains('REMOVE ')",message="spec.body contains a blocked SQL pattern (potential privilege escalation)"
+// +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRef) == has(self.databaseRef) && (!has(self.databaseRef) || self.databaseRef == oldSelf.databaseRef)",message="spec.databaseRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName) || self.databaseName == oldSelf.databaseName)",message="spec.databaseName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef) || self.schemaRef == oldSelf.schemaRef)",message="spec.schemaRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName) || self.schemaName == oldSelf.schemaName)",message="spec.schemaName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.signature == oldSelf.signature",message="spec.signature is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 type MaskingPolicySpec struct {
 	CommonSpec `json:",inline"`
 
@@ -59,6 +67,7 @@ type MaskingPolicySpec struct {
 
 	// Body is the SQL expression that transforms the data.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=65536
 	Body string `json:"body"`
 
 	// ExemptOtherPolicies specifies whether other policies can reference a masked column.

@@ -54,7 +54,7 @@ spec:
             description: |-
               AccountRoleGrantSpec defines the desired state of an AccountRoleGrant.
               All grant fields are immutable after creation — changing any field requires
-              a REVOKE + re-GRANT (use the force-new annotation to trigger recreation).
+              a REVOKE + re-GRANT (delete and recreate the resource to change).
             properties:
               accountRole:
                 description: |-
@@ -283,6 +283,7 @@ spec:
                   Snowflake connectivity.
                 properties:
                   name:
+                    default: default
                     description: Name of the ProviderConfig to use.
                     minLength: 1
                     type: string
@@ -292,8 +293,6 @@ spec:
                       referring resource. Set this to reference a ProviderConfig in a
                       different namespace (e.g. a shared system namespace).
                     type: string
-                required:
-                - name
                 type: object
               useRole:
                 description: |-
@@ -302,8 +301,10 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                minLength: 1
                 type: string
               withGrantOption:
+                default: false
                 description: |-
                   WithGrantOption allows the grantee to re-grant the privilege to other roles.
 
@@ -316,6 +317,26 @@ spec:
             - privilege
             - providerRef
             type: object
+            x-kubernetes-validations:
+            - message: spec.privilege is immutable (delete and recreate the resource
+                to change)
+              rule: self.privilege == oldSelf.privilege
+            - message: spec.on is immutable (delete and recreate the resource to change)
+              rule: self.on == oldSelf.on
+            - message: spec.accountRole is immutable (delete and recreate the resource
+                to change)
+              rule: self.accountRole == oldSelf.accountRole
+            - message: spec.accountRoleRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.accountRoleRef) == has(self.accountRoleRef) && (!has(self.accountRoleRef)
+                || self.accountRoleRef == oldSelf.accountRoleRef)
+            - message: spec.withGrantOption is immutable (delete and recreate the
+                resource to change)
+              rule: self.withGrantOption == oldSelf.withGrantOption
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
           status:
             description: AccountRoleGrantStatus defines the observed state of an AccountRoleGrant.
             properties:

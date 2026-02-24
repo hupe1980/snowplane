@@ -50,8 +50,7 @@ This guide explains the project layout, conventions, and workflow for contributi
 │   ├── crd/bases/             # CRD YAML manifests (22 resource types including all managed resources, ProviderConfig, FieldExport)
 │   ├── manager/               # Controller Deployment, PDB, NetworkPolicy
 │   ├── rbac/                  # RBAC roles and bindings
-│   ├── samples/               # Example CR YAML files (incl. WIF, OAuth, detect-only examples)
-│   └── webhook/               # Validating & Mutating WebhookConfigurations, Service
+│   └── samples/               # Example CR YAML files (incl. WIF, OAuth, detect-only examples)
 ├── hack/                      # Development & code-generation scripts
 ├── internal/
 │   ├── clients/
@@ -86,11 +85,7 @@ This guide explains the project layout, conventions, and workflow for contributi
 │   ├── circuitbreaker/        # Per-provider circuit breaker for failure isolation
 │   ├── sfretry/               # Retry wrapper for transient Snowflake errors (IsRetryable, Do)
 │   ├── testutil/              # Shared test helpers (PtrString, TestScheme, NewTestPC, etc.)
-│   ├── utils/
-│   │   ├── conditions/        # Kubernetes condition helpers
-│   │   ├── finalizers/        # Finalizer management helpers
-│   │   └── sanitize/          # SafeRecorder — strips SQL/DSN from Kubernetes event messages
-│   └── webhook/               # Validating & mutating admission webhook handlers (all 22 resource kinds)
+│   └── utils/
 ├── test/
 │   ├── e2e/                   # End-to-end tests (k3s testcontainer + real Snowflake, build tag: e2e)
 │   └── integration/           # envtest integration tests (build tag: integration)
@@ -109,9 +104,6 @@ just test
 
 # Run integration tests (requires setup-envtest)
 just test-integration
-
-# Run webhook integration tests (requires setup-envtest)
-just test-webhook-integration
 
 # Run linter
 just lint
@@ -232,7 +224,7 @@ When immutable fields drift externally, the reconciler emits a distinct `Immutab
 
 Fields like `spec.transient` and `spec.name` are immutable after creation. The reconciler validates these against `status.showOutput` and sets a `Terminal` condition if a change is detected. Immutable field violations are **terminal** — the reconciler returns `ctrl.Result{}` (no requeue, no error) to avoid infinite exponential backoff retries for an unfixable condition. The user must revert the field or use the `force-new` annotation.
 
-The `force-new` annotation (`snowplane.hupe1980.github.io/force-new: "true"`) bypasses immutability checks at both the webhook *and* reconciler level. When set, the reconciler's `validateImmutableFields()` returns early, allowing the reconciler to proceed with delete+recreate. This ensures ForceNew works even when webhooks are disabled.
+The `force-new` annotation (`snowplane.hupe1980.github.io/force-new: "true"`) bypasses immutability checks at the reconciler level. When set, the reconciler's `validateImmutableFields()` returns early, allowing the reconciler to proceed with delete+recreate.
 
 ### Cross-Resource Reference Resolution
 
@@ -290,7 +282,7 @@ This prevents finalizer deadlocks in cascading delete scenarios.
 
 ### Defense-in-Depth Validation
 
-Every reconciler calls `spec.Validate()` as the first step of reconciliation, *before* resolving the Snowflake client or making any API calls. This is a defense-in-depth layer that catches invalid specs even when webhooks are disabled (e.g., during development, in CI, or when bypass paths are used).
+Every reconciler calls `spec.Validate()` as the first step of reconciliation, *before* resolving the Snowflake client or making any API calls. This is a defense-in-depth layer that catches invalid specs that bypass CEL validation.
 
 On validation failure, the reconciler:
 1. Sets `Terminal=True` with reason `ValidationFailed` and the aggregated error message.
@@ -298,7 +290,7 @@ On validation failure, the reconciler:
 3. Emits a `ValidationFailed` warning event.
 4. Returns `ctrl.Result{}` (no requeue) — the user must fix the spec.
 
-This complements the webhook-level validation: webhooks provide fast API-level rejection, while reconciler-level validation acts as a safety net.
+This complements the CRD-level CEL validation: CEL rules provide fast API-level rejection, while reconciler-level validation acts as a safety net.
 
 ### Input Validation
 
@@ -374,25 +366,28 @@ Internally `GenericReconciler` has a `requeueOverride` field set via the `WithRe
 - **Metrics:** `snowplane_circuit_breaker_trips_total` (counter per provider) and `snowplane_circuit_breaker_state` (gauge: 0=closed, 1=open, 2=half-open).
 - **Thread-safe:** All operations are guarded by `sync.RWMutex`. The clock is injectable for deterministic testing.
 
-### Validating & Mutating Admission Webhooks
+### CRD-Level CEL Validation Rules
 
-`internal/webhook/` implements `admission.Handler` for all 22 resource kinds (Database, Schema, Warehouse, AccountRole, DatabaseRole, User, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, GrantOwnership, Table, View, Stage, Task, Stream, Tag, NetworkPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, ProviderConfig, FieldExport):
+All 22 CRD types include `x-kubernetes-validations` rules at the **spec** level, using CEL transition rules (`oldSelf`) that the Kubernetes API server evaluates on every UPDATE request — no webhook pod or cert-manager required.
 
-**Mutating webhook** (`DefaultsMutator`):
-- Injects `deletionPolicy: Delete` and `providerRef.name: default` when unset.
-- Defaults `User.type` to `PERSON`.
-- Registered at `/mutate-snowplane-v1alpha1-<resource>` paths.
+**Immutable field rules** (`self.X == oldSelf.X`):
+- Applied to all fields that must not change after creation (e.g., `spec.name`, `spec.transient`, `spec.databaseRef`).
+- Transition rules are only evaluated on UPDATE, not CREATE, so initial values are always accepted.
+- For optional pointer fields, the pattern is: `has(oldSelf.X) == has(self.X) && (!has(self.X) || self.X == oldSelf.X)`.
 
-**Validating webhooks** (per-resource validators):
-- Each validator calls `spec.Validate()` for field-level validation (required fields, enum values, range bounds).
-- On UPDATE, checks immutable fields unless the `force-new` annotation is set.
-- Uses `errors.Join` to aggregate all violations into a single denial response.
-- **Database:** `name`, `transient`, `useRole` are immutable. **Schema:** `name`, `databaseRef`, `transient`, `useRole` are immutable. **Warehouse:** `name`, `useRole` are immutable. **AccountRole:** `name`, `useRole` are immutable. **DatabaseRole:** `name`, `databaseRef`, `useRole` are immutable. **User:** `name`, `type`, `useRole` are immutable. **AccountRoleGrant / DatabaseRoleGrant / ShareGrant:** all spec fields are immutable (grants are immutable — revoke and re-grant). **GrantOwnership:** all spec fields are immutable. **Table:** `name`, `databaseRef`, `schemaRef`, `useRole` are immutable. **View:** `name`, `databaseRef`, `schemaRef`, `useRole` are immutable. **Stage:** `name`, `databaseRef`, `schemaRef`, `stageType`, `useRole` are immutable. **Task:** `name`, `databaseRef`, `schemaRef` are immutable. **Stream:** `name`, `databaseRef`, `schemaRef`, `sourceType`, `sourceName` are immutable. **Tag:** `name`, `databaseRef`, `schemaRef` are immutable. **NetworkPolicy:** `name` is immutable. **ResourceMonitor:** `name` is immutable. **MaskingPolicy:** `name`, `databaseRef`, `schemaRef`, `signature` are immutable. **RowAccessPolicy:** `name`, `databaseRef`, `schemaRef`, `signature` are immutable. **ProviderConfig:** `account`, `user` are immutable (guarded by `ObservedGeneration > 0`, consistent with all other validators).
-- ForceNew annotation (`snowplane.hupe1980.github.io/force-new: "true"`) bypasses immutability checks, allowing the reconciler to handle delete+recreate.
-- **Policy body validation:** MaskingPolicy and RowAccessPolicy validators include blocklist-based SQL injection prevention on `spec.body`. The blocklist rejects semicolons and 16 dangerous patterns (SYSTEM$, EXECUTE IMMEDIATE, CALL, CREATE, ALTER, DROP, GRANT, REVOKE, INSERT, UPDATE, DELETE, MERGE, COPY INTO, PUT, GET, REMOVE). This is defense-in-depth; RBAC should still restrict who can author policies.
-- **FieldExport same-namespace restriction:** FieldExport only operates within its own namespace — the source resource, target ConfigMap/Secret, and the FieldExport itself must all be in the same namespace. The `Namespace` field was removed from the API types entirely, making cross-namespace writes structurally impossible (following the ACK model).
-- Webhooks are optional — enabled via `--enable-webhooks` flag in the controller.
-- Webhook configuration YAML is in `config/webhook/`.
+**Schema defaults** (replaces mutating webhook):
+- `deletionPolicy` defaults to `Delete`, `providerRef.name` defaults to `"default"`, `User.type` defaults to `PERSON`.
+- Boolean fields (`transient`, `withGrantOption`) default to `false` to prevent CEL "no such key" errors.
+
+**Validation rules** (replaces validating webhook):
+- **Policy body blocklist:** Semicolons and 16 dangerous SQL patterns blocked via `!self.body.contains(';') && !self.body.upperAscii().contains('SYSTEM$') && ...`.
+- **FieldExport path:** Must start with `.status.`, must not contain `[`.
+- **FieldExport kind:** Must be one of the supported resource kinds.
+- **Mutual exclusion:** Exactly one of `databaseRef` or `databaseName` must be set.
+- **ProviderConfig auth:** Required credentials enforced per authentication type.
+- **Stage type:** External/internal type cannot change (URL presence is immutable).
+
+**Dangerous grant checks** remain in the reconciler's `ValidateSpec()` because they need annotation-based bypass (`allow-dangerous-grant`), which CEL cannot access from the spec level.
 
 ### Workload Identity Federation (WIF)
 
@@ -406,16 +401,16 @@ Snowplane supports native Workload Identity Federation (WIF) via `gosnowflake.Au
 
 ## Adding a New Managed Resource
 
-See **[docs/adding-a-resource.md](adding-a-resource.md)** for the comprehensive step-by-step guide with code examples covering CRD types, dual ref/name patterns, validation, adapter wiring, webhooks, and tests.
+See **[docs/adding-a-resource.md](adding-a-resource.md)** for the comprehensive step-by-step guide with code examples covering CRD types, dual ref/name patterns, validation, adapter wiring, CEL validation rules, and tests.
 
 Quick checklist (details in the linked guide):
 
 1. Define CRD types in `api/v1alpha1/<resource>_types.go` — implement `ManagedResource`
 2. Add `Validate()` in `validation.go` using `validateDatabaseSource`/`validateSchemaSource` helpers
-3. Create Snowflake client in `internal/clients/snowflake/<resource>.go`
-4. Create adapter (`ResourceAdapter[T]`) + reconciler in `internal/controller/<resource>/`
-5. Wire into `cmd/manager/main.go` (controller + RBAC markers)
-6. Add webhooks (mutating defaults + validating immutability)
+3. Add CEL validation markers (`+kubebuilder:validation:XValidation`) for immutable fields and business rules
+4. Create Snowflake client in `internal/clients/snowflake/<resource>.go`
+5. Create adapter (`ResourceAdapter[T]`) + reconciler in `internal/controller/<resource>/`
+6. Wire into `cmd/manager/main.go` (controller + RBAC markers)
 7. Add CRD manifest (`just generate && just sync-crds`), sample CRs, and tests
 8. Add the new type to the ProviderConfig in-use guard
 
@@ -430,7 +425,7 @@ Quick checklist (details in the linked guide):
 | Metrics | Counter/histogram/gauge registration and recording | `testing` + `prometheus/testutil` |
 | Rate limiter | Token bucket behaviour, per-provider isolation, concurrency | `testing` + `testify` |
 | Drift detector | Field-level comparisons, immutable violations, nil-means-unmanaged | `testing` + `testify` |
-| Webhooks | Immutable field rejection, allow on no change, CREATE passthrough | `testing` + `admission` |
+| CEL validation | Immutable field rejection, schema defaults, mutual exclusion, body blocklist | envtest |
 | Retry wrapper | Retryable classification, attempt exhaustion, context cancellation | `testing` + `testify` |
 | Utilities | Conditions, finalizers | `testing` + `testify` |
 | Test helpers | Shared setup code (scheme, PC, secret, request builders) | `internal/testutil` |
@@ -478,18 +473,21 @@ Integration tests use the `//go:build integration` build tag and are excluded fr
 | **Stage** (6) | `CreateLifecycle`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy`, `DriftDetection`, `WaitForSchemaReady`, `ImmutableStageType` | Internal/external stages, stage type immutability, file format options |
 | **FieldExport** (3) | `CreateLifecycle`, `ExportToConfigMap`, `ExportToSecret` | FieldExport lifecycle, cross-resource data export |
 
-### Webhook Integration Tests (envtest + WebhookInstallOptions)
+### CEL Validation Integration Tests
 
-The `internal/webhook/integration_test.go` file contains integration tests that validate admission webhooks against a real kube-apiserver with TLS. These tests exercise:
+The `test/integration/cel_validation_test.go` file contains integration tests that validate CRD-level CEL validation rules against a real kube-apiserver via envtest. These tests exercise:
 
-- **Validating webhooks:** CREATE rejection for invalid specs, UPDATE immutability enforcement, force-new bypass
-- **Mutating webhooks:** Default injection (e.g., `deletionPolicy: Delete`)
-- **DELETE passthrough:** Deletion always allowed regardless of validation rules
-- **All 22 resource types** covered (Database, Schema, Warehouse, AccountRole, DatabaseRole, User, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, GrantOwnership, Table, View, Stage, Task, Stream, Tag, NetworkPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, ProviderConfig, FieldExport)
+- **Immutable field enforcement:** UPDATE rejection for immutable fields (spec.name, spec.transient, spec.databaseRef, etc.)
+- **Mutable field acceptance:** Non-immutable fields can be changed freely
+- **Schema defaults:** `deletionPolicy`, `providerRef.name`, User `type` are defaulted
+- **Policy body blocklist:** SQL injection patterns are rejected on CREATE
+- **FieldExport validation:** Path and kind constraints are enforced
+- **Mutual exclusion:** Exactly one of databaseRef/databaseName required
+- **ProviderConfig auth:** Credential requirements enforced per auth type
 
 ```bash
-# Run webhook integration tests
-KUBEBUILDER_ASSETS="$(setup-envtest use -p path)" go test -tags integration -v -timeout 180s -count=1 ./internal/webhook/
+# Run CEL validation tests (included in the standard integration suite)
+just test-integration
 ```
 
 ## Code Style

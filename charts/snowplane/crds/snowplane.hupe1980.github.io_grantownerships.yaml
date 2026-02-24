@@ -134,6 +134,7 @@ spec:
                   Snowflake connectivity.
                 properties:
                   name:
+                    default: default
                     description: Name of the ProviderConfig to use.
                     minLength: 1
                     type: string
@@ -143,8 +144,6 @@ spec:
                       referring resource. Set this to reference a ProviderConfig in a
                       different namespace (e.g. a shared system namespace).
                     type: string
-                required:
-                - name
                 type: object
               useRole:
                 description: |-
@@ -153,12 +152,38 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                minLength: 1
                 type: string
             required:
             - objectName
             - objectType
             - providerRef
             type: object
+            x-kubernetes-validations:
+            - message: spec.objectType is immutable (delete and recreate the resource
+                to change)
+              rule: self.objectType == oldSelf.objectType
+            - message: spec.objectName is immutable (delete and recreate the resource
+                to change)
+              rule: self.objectName == oldSelf.objectName
+            - message: spec.accountRole is immutable (delete and recreate the resource
+                to change)
+              rule: self.accountRole == oldSelf.accountRole
+            - message: spec.accountRoleRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.accountRoleRef) == has(self.accountRoleRef) && (!has(self.accountRoleRef)
+                || self.accountRoleRef == oldSelf.accountRoleRef)
+            - message: spec.databaseRole is immutable (delete and recreate the resource
+                to change)
+              rule: self.databaseRole == oldSelf.databaseRole
+            - message: spec.databaseRoleRef is immutable (delete and recreate the
+                resource to change)
+              rule: has(oldSelf.databaseRoleRef) == has(self.databaseRoleRef) && (!has(self.databaseRoleRef)
+                || self.databaseRoleRef == oldSelf.databaseRoleRef)
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
           status:
             description: GrantOwnershipStatus defines the observed state of a GrantOwnership.
             properties:

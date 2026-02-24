@@ -82,7 +82,6 @@ helm upgrade --install snowplane "${REPO_ROOT}/charts/snowplane" \
   --set leaderElection.enabled=false \
   --set controller.requeueInterval=10s \
   --set controller.enableAlphaResources=true \
-  --set webhooks.enabled=false \
   --wait --timeout 120s
 
 # ── Wait for operator pod to be ready ─────────────────────────────────────────

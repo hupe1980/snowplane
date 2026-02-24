@@ -58,6 +58,7 @@ spec:
               account:
                 description: Account is the Snowflake account identifier (e.g. "xy12345"
                   or "orgname-accountname").
+                minLength: 1
                 type: string
               allowedNamespaces:
                 description: |-
@@ -118,6 +119,7 @@ spec:
                 type: string
               user:
                 description: User is the Snowflake user for authentication.
+                minLength: 1
                 type: string
               warehouse:
                 description: Warehouse is the default warehouse for the session.
@@ -160,6 +162,30 @@ spec:
             - account
             - user
             type: object
+            x-kubernetes-validations:
+            - message: spec.credentials.secretRef (name and key) is required for KeyPair
+                authentication
+              rule: self.authenticationType != 'KeyPair' || (has(self.credentials)
+                && has(self.credentials.secretRef) && self.credentials.secretRef.name
+                != '' && self.credentials.secretRef.key != '')
+            - message: spec.credentials.secretRef (name and key) is required for UsernamePassword
+                authentication
+              rule: self.authenticationType != 'UsernamePassword' || (has(self.credentials)
+                && has(self.credentials.secretRef) && self.credentials.secretRef.name
+                != '' && self.credentials.secretRef.key != '')
+            - message: spec.workloadIdentity is required for WorkloadIdentity authentication
+              rule: self.authenticationType != 'WorkloadIdentity' || has(self.workloadIdentity)
+            - message: spec.credentials.secretRef must not be set for WorkloadIdentity
+                authentication
+              rule: self.authenticationType != 'WorkloadIdentity' || !has(self.credentials)
+                || !has(self.credentials.secretRef) || self.credentials.secretRef.name
+                == ''
+            - message: spec.account is immutable (changing would redirect to a different
+                Snowflake account)
+              rule: self.account == oldSelf.account
+            - message: spec.user is immutable (changing would redirect to a different
+                Snowflake user)
+              rule: self.user == oldSelf.user
           status:
             description: ProviderConfigStatus defines the observed state of ProviderConfig.
             properties:

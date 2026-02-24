@@ -125,6 +125,24 @@ spec:
             - from
             - to
             type: object
+            x-kubernetes-validations:
+            - message: spec.from.path must start with '.status.'
+              rule: self.from.path.startsWith('.status.')
+            - message: spec.from.path does not support array indexing
+              rule: '!self.from.path.contains(''['')'
+            - message: spec.from.resource.kind must be a supported Snowplane resource
+                kind
+              rule: self.from.resource.kind in ['Database','Schema','Warehouse','User','AccountRole','DatabaseRole','AccountRoleGrant','DatabaseRoleGrant','ShareGrant','Table','View','Stage','Task','Stream','Tag','NetworkPolicy','ResourceMonitor','MaskingPolicy','RowAccessPolicy','GrantOwnership']
+            - message: spec.from.resource.kind is immutable
+              rule: self.from.resource.kind == oldSelf.from.resource.kind
+            - message: spec.from.resource.name is immutable
+              rule: self.from.resource.name == oldSelf.from.resource.name
+            - message: spec.to.kind is immutable
+              rule: self.to.kind == oldSelf.to.kind
+            - message: spec.to.name is immutable
+              rule: self.to.name == oldSelf.to.name
+            - message: spec.to.key is immutable
+              rule: self.to.key == oldSelf.to.key
           status:
             description: FieldExportStatus defines the observed state of FieldExport.
             properties:
