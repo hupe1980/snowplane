@@ -1,194 +1,192 @@
-# Workload Identity Federation Guide
+---
+layout: default
+title: Workload Identity
+parent: Guides
+nav_order: 3
+description: "Configure passwordless authentication to Snowflake using Workload Identity Federation."
+---
 
-This guide explains how to configure Snowplane to use **Workload Identity Federation (WIF)** for passwordless authentication to Snowflake. WIF eliminates the need to manage Snowflake credentials as Kubernetes Secrets.
+# Workload Identity Federation
+{: .fs-8 }
+
+Passwordless authentication to Snowflake — no passwords, private keys, or static credentials stored anywhere.
+{: .fs-5 .fw-300 }
+
+---
 
 ## How It Works
 
-1. Kubernetes projects a short-lived OIDC token from the cluster's ServiceAccount into the operator pod.
-2. The gosnowflake driver reads the OIDC token from the projected volume path (`TokenFilePath`) on each new connection.
-3. The driver performs native Workload Identity Federation attestation exchange with Snowflake using `AuthTypeWorkloadIdentityFederation`.
-4. Snowflake validates the token against the configured OIDC issuer and grants access.
-5. Kubelet automatically refreshes the projected token before expiry — the driver re-reads the latest token on each connection.
+1. Kubernetes projects a short-lived OIDC token from the cluster's ServiceAccount into the operator pod
+2. The gosnowflake driver reads the token from the projected volume path on each new connection
+3. The driver performs native WIF attestation exchange with Snowflake
+4. Snowflake validates the token against the configured OIDC issuer
+5. Kubelet automatically refreshes the token before expiry
 
-No passwords, private keys, or static credentials are stored anywhere. The driver handles token reading, refresh, and attestation natively.
+---
 
 ## Prerequisites
 
-- Kubernetes cluster with OIDC issuer configured (EKS, GKE, and AKS have this by default).
-- A Snowflake account with External OAuth support.
-- A SERVICE-type user in Snowflake (no password required).
-- Access to create Security Integrations in Snowflake.
+- Kubernetes cluster with OIDC issuer (EKS, GKE, AKS have this by default)
+- Snowflake account with External OAuth support
+- A SERVICE-type user in Snowflake
+- Access to create Security Integrations
 
-## Step 1: Create a SERVICE User in Snowflake
+---
 
-WIF requires a SERVICE-type user (not a regular user):
+## Create a SERVICE User
 
-    USE ROLE ACCOUNTADMIN;
+```sql
+USE ROLE ACCOUNTADMIN;
 
-    CREATE USER IF NOT EXISTS SVC_SNOWPLANE
-        DEFAULT_ROLE = SNOWPLANE_ROLE
-        TYPE = SERVICE
-        COMMENT = 'Snowplane WIF service user';
+CREATE USER IF NOT EXISTS SVC_SNOWPLANE
+    DEFAULT_ROLE = SNOWPLANE_ROLE
+    TYPE = SERVICE
+    COMMENT = 'Snowplane WIF service user';
 
-    GRANT ROLE SNOWPLANE_ROLE TO USER SVC_SNOWPLANE;
+GRANT ROLE SNOWPLANE_ROLE TO USER SVC_SNOWPLANE;
+```
 
-See [Snowflake Role Setup Guide](snowflake-role-setup.md) for configuring the required role privileges.
+See [Snowflake Role Setup]({% link snowflake-role-setup.md %}) for configuring role privileges.
 
-## Step 2: Create a Security Integration
+---
+
+## Create a Security Integration
 
 ### EKS (IRSA)
 
-Discover your EKS OIDC issuer URL:
+```bash
+aws eks describe-cluster --name <cluster-name> \
+  --query "cluster.identity.oidc.issuer" --output text
+```
 
-    aws eks describe-cluster --name <cluster-name> --query "cluster.identity.oidc.issuer" --output text
-
-Example output: `https://oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE1234567890`
-
-Create the Snowflake security integration:
-
-    CREATE SECURITY INTEGRATION IF NOT EXISTS SNOWPLANE_EKS_WIF
-        TYPE = EXTERNAL_OAUTH
-        ENABLED = TRUE
-        EXTERNAL_OAUTH_TYPE = CUSTOM
-        EXTERNAL_OAUTH_ISSUER = 'https://oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE1234567890'
-        EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM = 'sub'
-        EXTERNAL_OAUTH_SNOWFLAKE_USER_MAPPING_ATTRIBUTE = 'LOGIN_NAME'
-        EXTERNAL_OAUTH_ANY_ROLE_MODE = 'ENABLE'
-        EXTERNAL_OAUTH_AUDIENCE_LIST = ('https://<orgname>-<accountname>.snowflakecomputing.com')
-        EXTERNAL_OAUTH_JWS_KEYS_URL = 'https://oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE1234567890/.well-known/openid-configuration';
+```sql
+CREATE SECURITY INTEGRATION IF NOT EXISTS SNOWPLANE_EKS_WIF
+    TYPE = EXTERNAL_OAUTH
+    ENABLED = TRUE
+    EXTERNAL_OAUTH_TYPE = CUSTOM
+    EXTERNAL_OAUTH_ISSUER = 'https://oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE1234567890'
+    EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM = 'sub'
+    EXTERNAL_OAUTH_SNOWFLAKE_USER_MAPPING_ATTRIBUTE = 'LOGIN_NAME'
+    EXTERNAL_OAUTH_ANY_ROLE_MODE = 'ENABLE'
+    EXTERNAL_OAUTH_AUDIENCE_LIST = ('https://<orgname>-<accountname>.snowflakecomputing.com')
+    EXTERNAL_OAUTH_JWS_KEYS_URL = 'https://oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE1234567890/.well-known/openid-configuration';
+```
 
 ### GKE (Workload Identity)
 
-Discover your GKE OIDC issuer:
+```bash
+gcloud container clusters describe <cluster-name> --zone <zone> \
+  --format="value(selfLink)"
+```
 
-    gcloud container clusters describe <cluster-name> --zone <zone> --format="value(selfLink)"
-
-GKE OIDC issuer format: `https://container.googleapis.com/v1/projects/<project>/locations/<zone>/clusters/<cluster>`
-
-Create the Snowflake security integration:
-
-    CREATE SECURITY INTEGRATION IF NOT EXISTS SNOWPLANE_GKE_WIF
-        TYPE = EXTERNAL_OAUTH
-        ENABLED = TRUE
-        EXTERNAL_OAUTH_TYPE = CUSTOM
-        EXTERNAL_OAUTH_ISSUER = 'https://container.googleapis.com/v1/projects/<project>/locations/<zone>/clusters/<cluster>'
-        EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM = 'sub'
-        EXTERNAL_OAUTH_SNOWFLAKE_USER_MAPPING_ATTRIBUTE = 'LOGIN_NAME'
-        EXTERNAL_OAUTH_ANY_ROLE_MODE = 'ENABLE'
-        EXTERNAL_OAUTH_AUDIENCE_LIST = ('https://<orgname>-<accountname>.snowflakecomputing.com')
-        EXTERNAL_OAUTH_JWS_KEYS_URL = 'https://container.googleapis.com/v1/projects/<project>/locations/<zone>/clusters/<cluster>/jwks';
+```sql
+CREATE SECURITY INTEGRATION IF NOT EXISTS SNOWPLANE_GKE_WIF
+    TYPE = EXTERNAL_OAUTH
+    ENABLED = TRUE
+    EXTERNAL_OAUTH_TYPE = CUSTOM
+    EXTERNAL_OAUTH_ISSUER = 'https://container.googleapis.com/v1/projects/<project>/locations/<zone>/clusters/<cluster>'
+    EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM = 'sub'
+    EXTERNAL_OAUTH_SNOWFLAKE_USER_MAPPING_ATTRIBUTE = 'LOGIN_NAME'
+    EXTERNAL_OAUTH_ANY_ROLE_MODE = 'ENABLE'
+    EXTERNAL_OAUTH_AUDIENCE_LIST = ('https://<orgname>-<accountname>.snowflakecomputing.com')
+    EXTERNAL_OAUTH_JWS_KEYS_URL = 'https://container.googleapis.com/v1/projects/<project>/locations/<zone>/clusters/<cluster>/jwks';
+```
 
 ### AKS (Workload Identity)
 
-For AKS clusters with OIDC issuer enabled:
+```bash
+az aks show -g <resource-group> -n <cluster-name> \
+  --query "oidcIssuerProfile.issuerUrl" -o tsv
+```
 
-    az aks show -g <resource-group> -n <cluster-name> --query "oidcIssuerProfile.issuerUrl" -o tsv
+```sql
+CREATE SECURITY INTEGRATION IF NOT EXISTS SNOWPLANE_AKS_WIF
+    TYPE = EXTERNAL_OAUTH
+    ENABLED = TRUE
+    EXTERNAL_OAUTH_TYPE = CUSTOM
+    EXTERNAL_OAUTH_ISSUER = 'https://oidc.prod-aks.azure.com/<tenant-id>/'
+    EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM = 'sub'
+    EXTERNAL_OAUTH_SNOWFLAKE_USER_MAPPING_ATTRIBUTE = 'LOGIN_NAME'
+    EXTERNAL_OAUTH_ANY_ROLE_MODE = 'ENABLE'
+    EXTERNAL_OAUTH_AUDIENCE_LIST = ('https://<orgname>-<accountname>.snowflakecomputing.com')
+    EXTERNAL_OAUTH_JWS_KEYS_URL = 'https://oidc.prod-aks.azure.com/<tenant-id>/discovery/v2.0/keys';
+```
 
-Create the Snowflake security integration:
+---
 
-    CREATE SECURITY INTEGRATION IF NOT EXISTS SNOWPLANE_AKS_WIF
-        TYPE = EXTERNAL_OAUTH
-        ENABLED = TRUE
-        EXTERNAL_OAUTH_TYPE = CUSTOM
-        EXTERNAL_OAUTH_ISSUER = 'https://oidc.prod-aks.azure.com/<tenant-id>/'
-        EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM = 'sub'
-        EXTERNAL_OAUTH_SNOWFLAKE_USER_MAPPING_ATTRIBUTE = 'LOGIN_NAME'
-        EXTERNAL_OAUTH_ANY_ROLE_MODE = 'ENABLE'
-        EXTERNAL_OAUTH_AUDIENCE_LIST = ('https://<orgname>-<accountname>.snowflakecomputing.com')
-        EXTERNAL_OAUTH_JWS_KEYS_URL = 'https://oidc.prod-aks.azure.com/<tenant-id>/discovery/v2.0/keys';
-
-## Step 3: Map Kubernetes ServiceAccount to Snowflake User
+## Map ServiceAccount to Snowflake User
 
 The projected token's `sub` claim is typically `system:serviceaccount:<namespace>:<serviceaccount>`.
 
-Set the Snowflake user's `LOGIN_NAME` to match:
+```sql
+ALTER USER SVC_SNOWPLANE SET LOGIN_NAME = 'system:serviceaccount:snowplane-system:snowplane';
+```
 
-    ALTER USER SVC_SNOWPLANE SET LOGIN_NAME = 'system:serviceaccount:snowplane-system:snowplane';
+---
 
-Or set a custom mapping depending on your OIDC provider configuration.
-
-## Step 4: Deploy Snowplane with WIF
+## Deploy Snowplane with WIF
 
 ### Helm Values
 
-Configure the Helm chart with WIF enabled:
+```yaml
+# values-wif.yaml
+serviceAccount:
+  create: true
+  annotations:
+    # EKS: eks.amazonaws.com/role-arn: arn:aws:iam::<account-id>:role/<role-name>
+    # GKE: iam.gke.io/gcp-service-account: <gsa>@<project>.iam.gserviceaccount.com
+    # AKS: azure.workload.identity/client-id: <client-id>
 
-    # values-wif.yaml
-    serviceAccount:
-      create: true
-      annotations:
-        # EKS: eks.amazonaws.com/role-arn: arn:aws:iam::<account-id>:role/<role-name>
-        # GKE: iam.gke.io/gcp-service-account: <gsa>@<project>.iam.gserviceaccount.com
-        # AKS: azure.workload.identity/client-id: <client-id>
+workloadIdentity:
+  enabled: true
+  audience: "https://<orgname>-<accountname>.snowflakecomputing.com"
+  expirationSeconds: 3600
+  mountPath: /var/run/secrets/snowflake
+  tokenFileName: token
+```
 
-    workloadIdentity:
-      enabled: true
-      audience: "https://<orgname>-<accountname>.snowflakecomputing.com"
-      expirationSeconds: 3600
-      mountPath: /var/run/secrets/snowflake
-      tokenFileName: token
-
-Install:
-
-    helm upgrade --install snowplane charts/snowplane \
-      -n snowplane-system --create-namespace \
-      -f values-wif.yaml
+```bash
+helm upgrade --install snowplane charts/snowplane \
+  -n snowplane-system --create-namespace \
+  -f values-wif.yaml
+```
 
 ### ProviderConfig
 
-Create a ProviderConfig using WorkloadIdentity authentication:
+```yaml
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: production
+spec:
+  account: "orgname-accountname"
+  user: "SVC_SNOWPLANE"
+  role: "SNOWPLANE_ROLE"
+  warehouse: "COMPUTE_WH"
+  authenticationType: WorkloadIdentity
+  credentials: {}
+  workloadIdentity:
+    audience: "https://orgname-accountname.snowflakecomputing.com"
+```
 
-    apiVersion: snowplane.hupe1980.github.io/v1alpha1
-    kind: ProviderConfig
-    metadata:
-      name: production
-      namespace: snowplane-system
-    spec:
-      account: "orgname-accountname"
-      user: "SVC_SNOWPLANE"
-      role: "SNOWPLANE_ROLE"
-      warehouse: "COMPUTE_WH"
-      authenticationType: WorkloadIdentity
-      credentials: {}
-      workloadIdentity:
-        audience: "https://orgname-accountname.snowflakecomputing.com"
-        # tokenFilePath defaults to /var/run/secrets/snowflake/token
+---
 
 ## Troubleshooting
 
-### Token file not found
+| Problem | Fix |
+|:--------|:----|
+| **Token file not found** | Ensure `workloadIdentity.enabled: true` in Helm values |
+| **Token audience mismatch** | Match `audience` in Helm values, ProviderConfig, and Snowflake integration |
+| **User mapping failure** | Check `sub` claim matches Snowflake user's `LOGIN_NAME`. Decode: `cat /var/run/secrets/snowflake/token \| cut -d. -f2 \| base64 -d \| jq .` |
+| **ProviderConfig NotReady** | `kubectl describe providerconfig production` |
 
-The operator logs: `reading WIF token file "/var/run/secrets/snowflake/token": open ... no such file`
-
-**Fix:** Ensure `workloadIdentity.enabled: true` is set in Helm values so the projected volume is mounted.
-
-### Token audience mismatch
-
-Snowflake rejects the token with an audience error.
-
-**Fix:** Ensure the `workloadIdentity.audience` in Helm values and ProviderConfig matches the `EXTERNAL_OAUTH_AUDIENCE_LIST` in the Snowflake security integration.
-
-### User mapping failure
-
-Snowflake cannot map the token to a user.
-
-**Fix:** Check the `sub` claim in the projected token and ensure the Snowflake user's `LOGIN_NAME` matches. Decode the token to inspect claims:
-
-    cat /var/run/secrets/snowflake/token | cut -d. -f2 | base64 -d | jq .
-
-### ProviderConfig shows NotReady
-
-Check the ProviderConfig status conditions:
-
-    kubectl describe providerconfig production -n snowplane-system
-
-Look for the `Ready` condition's `Reason` and `Message` for specific error details.
+---
 
 ## Security Considerations
 
-1. **Token lifetime** — Projected tokens are short-lived (default: 1 hour). Kubelet refreshes them automatically before expiry.
-2. **No static credentials** — No passwords or private keys are stored in Kubernetes Secrets.
-3. **Automatic rotation** — Token refresh is handled by kubelet. The gosnowflake driver re-reads the latest token from `TokenFilePath` on each new connection.
-4. **Multi-cloud providers** — Native support for OIDC (any K8s cluster), AWS (IRSA/Pod Identity), GCP (Workload Identity), and Azure (AKS IMDS) via the `provider` field.
-5. **Least privilege** — Combine WIF with a restricted `SNOWPLANE_ROLE` (see [Role Setup Guide](snowflake-role-setup.md)).
-6. **Namespace isolation** — Use `spec.allowedNamespaces` on ProviderConfig to restrict which teams can use each Snowflake account.
+1. **Token lifetime** — Projected tokens are short-lived (default: 1 hour), kubelet refreshes automatically
+2. **No static credentials** — No passwords or private keys in Kubernetes Secrets
+3. **Automatic rotation** — Token refresh handled by kubelet, driver re-reads on each connection
+4. **Multi-cloud providers** — Native support for OIDC, AWS, GCP, Azure via the `provider` field
+5. **Least privilege** — Combine WIF with a restricted `SNOWPLANE_ROLE`
+6. **Namespace isolation** — Use `spec.allowedNamespaces` on ProviderConfig

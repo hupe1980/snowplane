@@ -1,10 +1,22 @@
-# GitOps with Argo CD
+---
+layout: default
+title: GitOps with Argo CD
+parent: Guides
+nav_order: 4
+description: "Manage Snowplane resources using Argo CD with custom health checks and sync waves."
+---
 
-This guide describes how to manage Snowplane resources using [Argo CD](https://argo-cd.readthedocs.io/).
+# GitOps with Argo CD
+{: .fs-8 }
+
+Manage Snowplane resources using [Argo CD](https://argo-cd.readthedocs.io/) with custom health checks, sync waves, and ignorable differences.
+{: .fs-5 .fw-300 }
+
+---
 
 ## Health Checks
 
-Argo CD needs custom health checks to understand when Snowplane CRDs are healthy. Add the following Lua scripts to your `argocd-cm` ConfigMap:
+Argo CD needs custom health checks to understand when Snowplane CRDs are healthy. Add the following to your `argocd-cm` ConfigMap — the wildcard pattern works for **all** Snowplane CRDs since they all use the standard `Ready` condition:
 
 ```yaml
 apiVersion: v1
@@ -13,30 +25,6 @@ metadata:
   name: argocd-cm
   namespace: argocd
 data:
-  resource.customizations.health.snowplane.hupe1980.github.io_Database: |
-    hs = {}
-    if obj.status ~= nil and obj.status.conditions ~= nil then
-      for _, condition in ipairs(obj.status.conditions) do
-        if condition.type == "Ready" then
-          if condition.status == "True" then
-            hs.status = "Healthy"
-            hs.message = condition.message
-          else
-            hs.status = "Degraded"
-            hs.message = condition.message
-          end
-          return hs
-        end
-      end
-    end
-    hs.status = "Progressing"
-    hs.message = "Waiting for reconciliation"
-    return hs
-```
-
-The same health check pattern works for **all** Snowplane CRDs since they all use the standard `Ready` condition. You can apply it to all types at once using a wildcard:
-
-```yaml
   resource.customizations.health.snowplane.hupe1980.github.io_*: |
     hs = {}
     if obj.status ~= nil and obj.status.conditions ~= nil then
@@ -58,9 +46,11 @@ The same health check pattern works for **all** Snowplane CRDs since they all us
     return hs
 ```
 
+---
+
 ## Sync Waves
 
-Use Argo CD [sync waves](https://argo-cd.readthedocs.io/en/stable/user-guide/sync-waves/) to control the order of resource creation. Snowplane resources often have dependencies (e.g., Schema depends on Database).
+Use [sync waves](https://argo-cd.readthedocs.io/en/stable/user-guide/sync-waves/) to control resource creation order:
 
 ```yaml
 # Wave 0: Provider configuration
@@ -82,7 +72,7 @@ spec:
       name: snowflake-creds
       key: privateKey
 ---
-# Wave 1: Account-level resources (databases, warehouses, roles)
+# Wave 1: Account-level resources
 apiVersion: snowplane.hupe1980.github.io/v1alpha1
 kind: Database
 metadata:
@@ -94,19 +84,7 @@ spec:
   providerRef:
     name: default
 ---
-apiVersion: snowplane.hupe1980.github.io/v1alpha1
-kind: Warehouse
-metadata:
-  name: compute-wh
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  name: COMPUTE_WH
-  warehouseSize: XSMALL
-  providerRef:
-    name: default
----
-# Wave 2: Database-scoped resources (schemas, database roles)
+# Wave 2: Database-scoped resources
 apiVersion: snowplane.hupe1980.github.io/v1alpha1
 kind: Schema
 metadata:
@@ -120,7 +98,7 @@ spec:
   providerRef:
     name: default
 ---
-# Wave 3: Schema-scoped resources (tables, views, stages)
+# Wave 3: Schema-scoped resources
 apiVersion: snowplane.hupe1980.github.io/v1alpha1
 kind: Table
 metadata:
@@ -159,30 +137,16 @@ spec:
   accountRole: ANALYST_ROLE
   providerRef:
     name: default
----
-apiVersion: snowplane.hupe1980.github.io/v1alpha1
-kind: FieldExport
-metadata:
-  name: db-name-export
-  annotations:
-    argocd.argoproj.io/sync-wave: "4"
-spec:
-  from:
-    resource:
-      kind: Database
-      name: analytics-db
-    path: ".status.showOutput.name"
-  to:
-    kind: ConfigMap
-    name: snowplane-exports
-    key: database-name
 ```
 
-> **Note:** Snowplane controllers already handle dependency ordering via `databaseRef` / `schemaRef` resolution (waiting for parents to become Ready). Sync waves are complementary — they prevent Argo CD from showing false sync failures while dependencies are being created.
+{: .note }
+> Snowplane controllers already handle dependency ordering via `databaseRef`/`schemaRef` resolution. Sync waves are complementary — they prevent Argo CD from showing false sync failures while dependencies are being created.
+
+---
 
 ## Ignorable Differences
 
-Snowplane controllers manage `status`, `metadata.finalizers`, and `metadata.annotations` (tracked parameters). Tell Argo CD to ignore these:
+Tell Argo CD to ignore controller-managed fields:
 
 ```yaml
 apiVersion: v1
@@ -198,6 +162,8 @@ data:
       - .metadata.annotations["snowplane.hupe1980.github.io/tracked-parameters"]
       - .metadata.annotations["snowplane.hupe1980.github.io/last-applied-spec-hash"]
 ```
+
+---
 
 ## Application Example
 
@@ -230,9 +196,11 @@ spec:
         maxDuration: 3m
 ```
 
+---
+
 ## Directory Structure
 
-A recommended repository layout for GitOps-managed Snowflake infrastructure:
+Recommended repository layout:
 
 ```
 snowflake-gitops/
@@ -254,8 +222,8 @@ snowflake-gitops/
 │       └── db-name.yaml
 ├── environments/
 │   ├── production/
-│   │   └── kustomization.yaml     # patches for prod
+│   │   └── kustomization.yaml
 │   └── staging/
-│       └── kustomization.yaml     # patches for staging
+│       └── kustomization.yaml
 └── README.md
 ```

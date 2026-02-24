@@ -1,163 +1,102 @@
-# Development Guide
+---
+layout: default
+title: Development Guide
+parent: Development
+nav_order: 1
+description: "Project layout, architecture principles, conventions, and workflow for contributing to Snowplane."
+---
 
-This guide explains the project layout, conventions, and workflow for contributing to Snowplane.
+# Development Guide
+{: .fs-8 }
+
+Project layout, architecture principles, conventions, and workflow for contributing to Snowplane.
+{: .fs-5 .fw-300 }
+
+---
 
 ## Prerequisites
 
 | Tool | Min Version |
-|------|-------------|
+|:-----|:------------|
 | Go | 1.25+ |
 | kubectl | 1.27+ |
 | [just](https://github.com/casey/just) | 1.0+ |
 | golangci-lint | 2.0+ |
+
+---
 
 ## Project Layout
 
 ```
 .
 ├── api/v1alpha1/              # CRD type definitions
-│   ├── common_types.go        # Shared types (CommonSpec, CommonStatus, DeletionPolicy, ProviderReference)
-│   ├── conditions.go          # Condition type & reason constants (incl. ReferencesResolved, DriftDetected, LateInitialized)
-│   ├── annotations.go         # Annotation & label constants (AnnotationForceNew, AnnotationAdoptionPolicy, AnnotationDriftPolicy, LabelMaturity)
-│   ├── validation.go          # Validate() methods on all spec types (errors.Join aggregation)
-│   ├── database_types.go      # Database spec, status, show output
-│   ├── schema_types.go        # Schema spec, status, show output (databaseRef)
-│   ├── warehouse_types.go     # Warehouse spec, status, show output
-│   ├── accountrole_types.go   # AccountRole spec, status, show output
-│   ├── databaserole_types.go  # DatabaseRole spec, status, show output (databaseRef)
-│   ├── user_types.go          # User spec, status, show output (secret-referenced credentials)
-│   ├── accountrolegrant_types.go # AccountRoleGrant spec, status (privilege grants to account roles)
-│   ├── databaserolegrant_types.go # DatabaseRoleGrant spec, status (privilege grants to database roles)
-│   ├── sharegrant_types.go    # ShareGrant spec, status (privilege grants to shares)
-│   ├── grantownership_types.go # GrantOwnership spec, status (ownership transfer)
-│   ├── table_types.go         # Table spec, status, show output (columns, clustering)
-│   ├── view_types.go          # View spec, status, show output (AS query, secure)
-│   ├── stage_types.go         # Stage spec, status, show output (internal/external stages)
-│   ├── task_types.go          # Task spec, status, show output (scheduled SQL, DAG)
-│   ├── stream_types.go        # Stream spec, status, show output (CDC)
-│   ├── storageintegration_types.go # StorageIntegration spec, status (S3/GCS/Azure, account-level)
-│   ├── fileformat_types.go    # FileFormat spec, status (CSV/JSON/AVRO/ORC/PARQUET/XML)
-│   ├── pipe_types.go          # Pipe spec, status (continuous ingestion, AutoIngest)
-│   ├── dynamictable_types.go  # DynamicTable spec, status (streaming materialisation)
-│   ├── tag_types.go           # Tag spec, status, show output (data governance)
-│   ├── networkpolicy_types.go # NetworkPolicy spec, status, show output (IP allow/block)
-│   ├── resourcemonitor_types.go # ResourceMonitor spec, status, show output (credit quotas)
-│   ├── maskingpolicy_types.go # MaskingPolicy spec, status, show output (dynamic masking)
-│   ├── rowaccesspolicy_types.go # RowAccessPolicy spec, status, show output (row-level security)
-│   ├── fieldexport_types.go   # FieldExport spec, status (cross-resource data export)
-│   ├── providerconfig_types.go # ProviderConfig spec & status (incl. WorkloadIdentity, WIF providers)
-│   ├── groupversion_info.go   # API group registration + kubebuilder markers
-│   ├── deepcopy_test.go       # Mutation-based DeepCopy correctness tests
-│   ├── zz_generated.deepcopy.go # Auto-generated DeepCopy (controller-gen)
-│   └── zz_generated_accessors.go # Auto-generated ManagedResource accessors (hack/gen-accessors)
+│   ├── common_types.go        # Shared types (CommonSpec, CommonStatus)
+│   ├── conditions.go          # Condition type & reason constants
+│   ├── annotations.go         # Annotation & label constants
+│   ├── validation.go          # Validate() methods (errors.Join)
+│   ├── *_types.go             # Per-resource spec, status, show output
+│   ├── zz_generated.deepcopy.go    # Auto-generated DeepCopy
+│   └── zz_generated_accessors.go   # Auto-generated ManagedResource accessors
 ├── cmd/manager/               # Controller manager entrypoint
 ├── config/
-│   ├── crd/bases/             # CRD YAML manifests (26 resource types including all managed resources, ProviderConfig, FieldExport)
-│   ├── manager/               # Controller Deployment, PDB, NetworkPolicy
+│   ├── crd/bases/             # CRD YAML manifests (26 types)
+│   ├── manager/               # Deployment, PDB, NetworkPolicy
 │   ├── rbac/                  # RBAC roles and bindings
-│   └── samples/               # Example CR YAML files (incl. WIF, OAuth, detect-only examples)
-├── hack/                      # Development & code-generation scripts
+│   └── samples/               # Example CR YAML files
 ├── internal/
 │   ├── clients/
-│   │   ├── clientfactory/     # Snowflake client cache with SHA-256 hash-based rotation, O(1) LRU eviction, idle TTL, Close error logging, multi-error CheckHealth, snapshot-under-lock CollectDBStats
-│   │   └── snowflake/         # Snowflake SDK wrapper (client, all resource ops, identifiers, errors, closeRows helper)
+│   │   ├── clientfactory/     # Snowflake client cache with LRU eviction
+│   │   └── snowflake/         # Snowflake SDK wrapper
 │   ├── controller/
-│   │   ├── reconciler/        # Generic reconciler framework (GenericReconciler[T,S,D], ResourceAdapter[T,S,D], ownership conflict detection)
-│   │   ├── accountrole/       # AccountRole reconciler (adapter + helpers)
-│   │   ├── database/          # Database reconciler (adapter + helpers)
-│   │   ├── databaserole/      # DatabaseRole reconciler with databaseRef resolution (adapter + helpers)
-│   │   ├── grant/             # Grant reconciler — AccountRoleGrant, DatabaseRoleGrant, ShareGrant (immutable grant/revoke lifecycle)
-│   │   ├── grantownership/    # GrantOwnership reconciler — ownership transfer, no-op on delete
-│   │   ├── maskingpolicy/     # MaskingPolicy reconciler with signature + body management
-│   │   ├── networkpolicy/     # NetworkPolicy reconciler — IP allow/block lists
-│   │   ├── providerconfig/    # ProviderConfig reconciler
-│   │   ├── refresolver/       # Cross-resource reference resolver
-│   │   ├── resourcemonitor/   # ResourceMonitor reconciler — credit quotas + triggers
-│   │   ├── rowaccesspolicy/   # RowAccessPolicy reconciler — row-level security
-│   │   ├── schema/            # Schema reconciler with dependency resolution (adapter + helpers)
-│   │   ├── stage/             # Stage reconciler with schema/database ref resolution (adapter + helpers)
-│   │   ├── stream/            # Stream reconciler — CDC on tables/views/stages
-│   │   ├── storageintegration/ # StorageIntegration reconciler — account-level S3/GCS/Azure
-│   │   ├── fileformat/        # FileFormat reconciler — schema-level file format management
-│   │   ├── pipe/              # Pipe reconciler — continuous data ingestion
-│   │   ├── dynamictable/      # DynamicTable reconciler — streaming materialisation
-│   │   ├── table/             # Table reconciler with column management (adapter + helpers)
-│   │   ├── tag/               # Tag reconciler — data governance tags
-│   │   ├── task/              # Task reconciler — scheduled SQL + DAG scheduling
-│   │   ├── user/              # User reconciler with secret-referenced credentials (adapter + helpers)
-│   │   ├── view/              # View reconciler with AS query management (adapter + helpers)
-│   │   └── warehouse/         # Warehouse reconciler with drift detection (adapter + helpers)
-│   ├── drift/                 # Generic field-level drift detection engine
-│   ├── metrics/               # Custom Prometheus metrics (counters, histograms, gauges)
-│   ├── provider/              # Shared config builder & hash (BuildSnowflakeConfig, ComputeHash)
+│   │   ├── reconciler/        # Generic reconciler framework
+│   │   └── <resource>/        # 24 resource-specific controllers
+│   ├── drift/                 # Generic field-level drift engine
+│   ├── metrics/               # Custom Prometheus metrics
+│   ├── provider/              # Config builder & hash
 │   ├── ratelimit/             # Per-provider token-bucket rate limiter
-│   ├── circuitbreaker/        # Per-provider circuit breaker for failure isolation
-│   ├── sfretry/               # Retry wrapper for transient Snowflake errors (IsRetryable, Do)
-│   ├── testutil/              # Shared test helpers (PtrString, TestScheme, NewTestPC, etc.)
-│   └── utils/
+│   ├── circuitbreaker/        # Per-provider circuit breaker
+│   ├── sfretry/               # Retry wrapper for transient errors
+│   └── utils/                 # Sanitization, conditions, finalizers
 ├── test/
-│   ├── e2e/                   # End-to-end tests (k3s testcontainer + real Snowflake, build tag: e2e)
-│   └── integration/           # envtest integration tests (build tag: integration)
-│       └── snowflake/         # Real Snowflake client integration tests
-└── docs/                      # Documentation
+│   ├── e2e/                   # E2E tests (k3s + real Snowflake)
+│   └── integration/           # envtest integration tests
+└── docs/                      # Documentation (this site)
 ```
+
+---
 
 ## Day-to-day Workflow
 
 ```bash
-# Regenerate DeepCopy methods + CRD manifests
-just generate
-
-# Run tests (with race detection)
-just test
-
-# Run integration tests (requires setup-envtest)
-just test-integration
-
-# Run linter
-just lint
-
-# Run go vet
-just vet
-
-# Build binary
-just build
-
-# Full CI pipeline (lint + vet + test + build)
-just ci
-
-# Run fuzz tests (default: 10s)
-just fuzz
-just fuzz 30s
+just generate          # Regenerate DeepCopy + CRD manifests + accessors
+just test              # Run tests (with race detection)
+just test-integration  # Integration tests (requires setup-envtest)
+just lint              # Run linter
+just vet               # Run go vet
+just build             # Build binary
+just ci                # Full pipeline (lint + vet + test + build)
+just fuzz              # Run fuzz tests (default: 10s)
 ```
 
 ### Code Generation
 
-Two kinds of code are auto-generated. After modifying any type in `api/v1alpha1/`, run:
+After modifying any type in `api/v1alpha1/`:
 
 ```bash
-just generate     # Regenerate DeepCopy + CRD YAMLs + ManagedResource accessors
-just sync-crds    # Copy CRDs into the Helm chart directory
-```
-
-To verify CRDs and Helm chart are consistent:
-
-```bash
-just verify-crds  # Fails if Helm CRDs are out-of-sync with config/crd/bases/
-just verify-helm  # Runs helm lint + helm template
+just generate     # DeepCopy + CRD YAMLs + ManagedResource accessors
+just sync-crds    # Copy CRDs into Helm chart
+just verify-crds  # CI check: fails if out-of-sync
 ```
 
 **Generated files (never edit manually):**
 
 | File | Generator | Purpose |
-|------|-----------|----------|
-| `zz_generated.deepcopy.go` | `controller-gen` | `DeepCopyObject` / `DeepCopyInto` methods |
-| `zz_generated_accessors.go` | `hack/gen-accessors/main.go` | 380 ManagedResource interface methods (16 per type × 24 types) |
-| `config/crd/bases/*.yaml` | `controller-gen` | CRD manifests with CEL validation rules |
+|:-----|:----------|:--------|
+| `zz_generated.deepcopy.go` | `controller-gen` | DeepCopy methods |
+| `zz_generated_accessors.go` | `hack/gen-accessors` | 380 ManagedResource methods (16 per type × 24 types) |
+| `config/crd/bases/*.yaml` | `controller-gen` | CRD manifests with CEL rules |
 
-The accessor generator reads type definitions from `hack/gen-accessors/main.go` and produces all 16 ManagedResource methods per CRD type. Output is fully deterministic (no timestamps) — regeneration produces identical output when the input is unchanged. String-based enum comparison (`OwnerString()`, `TrackedParamsString()`) makes the template robust against iota reordering. The generator has 9 dedicated tests in `hack/gen-accessors/gen_accessors_test/` covering idempotency, valid Go parsing, method counts, pattern correctness, and receiver collision safety. To add a new type, register it in the generator's `types` slice and run `just generate`. See [Adding a New Managed Resource](adding-a-resource.md#4-implement-the-managedresource-interface) for details.
-
-The DeepCopy mutation-based test suite in `deepcopy_test.go` validates that generated code correctly isolates all pointer fields.
+---
 
 ## Architecture Principles
 
@@ -165,500 +104,146 @@ The DeepCopy mutation-based test suite in `deepcopy_test.go` validates that gene
 
 Every reconciler follows the same lifecycle:
 
-1. **Observe** — Query Snowflake for the current state of the resource
-2. **Diff** — Compare the observed state with the desired spec
-3. **Apply** — Execute only the SQL statements needed to reach desired state
+1. **Observe** — Query Snowflake for the current state
+2. **Diff** — Compare observed state with desired spec
+3. **Apply** — Execute only the SQL statements needed
 
 This minimises Snowflake API calls and avoids unnecessary mutations.
 
 ### Generic Reconciler Framework
 
-All twenty-four Snowflake resource reconcilers (AccountRole, Database, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, GrantOwnership, Schema, Stage, Stream, Table, Tag, Task, User, View, Warehouse, NetworkPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, StorageIntegration, FileFormat, Pipe, DynamicTable) share the same Observe-Diff-Apply state machine. To eliminate ~80% code duplication, the shared logic lives in `internal/controller/reconciler/`:
+All 24 resource reconcilers share the same state machine via `internal/controller/reconciler/`:
 
-- **`GenericReconciler[T ManagedResource, S any, D any]`** — A type-parameterised reconciler with three type parameters: `T` (the CRD type), `S` (the Snowflake service interface), and `D` (the observation detail type, e.g. `*snowflake.DatabaseObservation`). Implements the full lifecycle: finalizer management, ProviderConfig resolution, client caching, service creation, status patching via Server-Side Apply (SSA) with `ForceOwnership`, condition management, rate limiting, retry, metrics, and drift detection. After provider resolution, the logger is enriched with `provider` and `account` structured fields for multi-account log correlation.
-- **`ResourceAdapter[T ManagedResource, S any, D any]`** — An interface that each resource package implements to provide resource-specific behaviour. The `D` type parameter eliminates runtime type assertions — `Observe` returns `*Observation[D]` and all methods that consume observations receive the concrete type directly. Methods: `Observe`, `Create`, `Alter`, `Drop`, `BuildAlterOptions`, `ValidateImmutableFields`, `ApplyObservation`, `DetectDrift`, `ComputeTrackedParameters`, `PreReconcile`, `PostCreate`, `PostUpdate`, `SetupWatches`, `ServiceFromClient`, `BuildIdentifier`, `NewObject`, `ResourceName`, `FinalizerName`.
-- **`Observation[D any]`** — A typed observation struct with `Exists bool` and `Detail D`. The type parameter `D` ensures compile-time safety — no `any` casts or `AssertDetail` helpers needed.
-- **`ManagedResource`** — A constraint interface that all CRD types satisfy, providing access to spec fields (`GetSpecName`, `GetDeletionPolicy`, `GetUseRole`, `GetProviderRef`), status fields (`GetConditions`, `SetConditions`, `GetObservedGeneration`, `SetObservedGeneration`, `GetLastAppliedSpecHash`, `SetLastAppliedSpecHash`), and Kubernetes object methods. All 16 methods are code-generated in `zz_generated_accessors.go`.
-- **`WithUseRole`** — A shared helper for `ServiceFactory` boilerplate that handles SnowflakeClient type assertion and optional role switching.
+- **`GenericReconciler[T, S, D]`** — Type-parameterised reconciler handling finalizers, ProviderConfig resolution, client caching, SSA status patching, conditions, rate limiting, retry, metrics, and drift detection
+- **`ResourceAdapter[T, S, D]`** — Interface each resource implements for resource-specific behaviour
+- **`Observation[D]`** — Typed observation struct (`Exists bool`, `Detail D`) with compile-time safety
+- **`ManagedResource`** — Constraint interface with 16 code-generated accessor methods
 
 Each resource package provides:
-1. **`adapter.go`** — Implements `ResourceAdapter[T, S, D]` with resource-specific logic (e.g., Schema's `PreReconcile` resolves `databaseRef`, User tracks password hashes). The `D` parameter is the concrete observation type (e.g., `*snowflake.DatabaseObservation`), giving type-safe access to `obs.Detail` without casts.
-2. **`reconciler.go`** — A slim file (~100-400 lines) that defines the `Service` interface, `NewReconciler` constructor, and standalone helper functions (`applyObservation`, `buildCreateOptions`, `buildAlterOptions`, `computeUnsetFields`, `computeTrackedParameters`, `detectDrift`).
+1. **`adapter.go`** — Implements `ResourceAdapter` with resource-specific logic
+2. **`reconciler.go`** — Service interface, constructor, helper functions
 
-This architecture reduces each reconciler from ~800 lines to ~200-400 lines of resource-specific code, while the ~980-line generic framework handles all shared concerns.
-
-#### Safe Type Assertions
-
-The `Observation[D]` type parameter eliminates the need for runtime type assertions on observation details — `obs.Detail` is always the concrete type (e.g., `*snowflake.DatabaseObservation`).
-
-For identifiers and alter options, use the generic assertion helpers from `reconciler/assert.go`:
-
-```go
-// In error-returning methods (Observe, Create, Alter, Drop, BuildAlterOptions):
-aid, err := reconciler.AssertIdentifier[snowflake.AccountObjectIdentifier](id)
-ao, err := reconciler.AssertAlterOptions[*AlterOptions](opts)
-
-// Observation detail is type-safe — no assertion needed:
-detail := obs.Detail  // Already *snowflake.DatabaseObservation
-```
-
-#### Reconciler Helpers
-
-The generic reconciler provides shared methods that eliminate repetitive patterns:
-
-- **`finalizeSpec(ctx, obj)`** — Computes and stores the spec hash, updates the tracked-parameters list, and handles errors with terminal conditions + best-effort status patch. Called after every successful create/update/adopt.
-- **`executeSnowflakeOp(ctx, opCtx, obj, opName, opVerb, opFn)`** — Runs a Snowflake operation (CREATE, ALTER, CoA) with metrics, retries, and standard terminal/non-terminal error classification.
-
-#### PreReconcile Reference Resolution Helpers
-
-For resources that reference a parent database or schema, use the helpers from `refresolver/helpers.go`:
-
-```go
-// Database-only resources (Schema, DatabaseRole):
-dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, a.client, a.recorder, obj,
-    obj.Namespace, obj.Spec.DatabaseRef, obj.Spec.DatabaseName, obj.Status.DatabaseName)
-
-// Database+Schema resources (Table, View, Stage):
-schemaFQN, err := refresolver.PreReconcileSchemaRef(ctx, a.client, a.recorder, obj,
-    obj.Namespace, obj.Spec.SchemaRef, obj.Spec.SchemaName, obj.Status.SchemaName)
-```
-
-These encapsulate the full resolution → deletion-timestamp fallback → reference-not-found logging pattern.
+This reduces each reconciler from ~800 lines to ~200-400 lines of resource-specific code.
 
 ### Drift Correction
 
-The reconciler computes diffs on every loop — not just when `metadata.generation` changes. This means out-of-band changes made directly in Snowflake (e.g., via the Snowflake UI or SQL) are automatically corrected.
+The reconciler computes diffs on every loop — not just when `metadata.generation` changes. Out-of-band changes in Snowflake are automatically corrected.
 
-Drift detection is powered by the generic **Drift Detector** engine in `internal/drift/`:
+The generic drift engine (`internal/drift/`) provides a fluent builder:
 
-- `drift.New()` returns a fluent builder that accumulates field-level comparisons via `CompareString()`, `CompareInt32()`, `CompareBool()`, etc.
-- Each comparison accepts an `immutable` flag — immutable violations are surfaced separately.
-- Nil-means-unmanaged: if the desired value is `nil`, no drift is reported (the user hasn't declared intent for that field).
-- The final `.Result()` returns `HasDrift`, `HasImmutableViolation`, `Changes []FieldChange`, and `Summary()` / `FieldDiffs()` / `ImmutableDiffs()` / `ImmutableSummary()` helpers.
-
-When drift is detected, reconcilers set the `DriftDetected` condition and emit Kubernetes events. A **detect-only** policy is supported via the `snowplane.hupe1980.github.io/drift-policy: detect-only` annotation — drift is reported but not corrected. See `docs/drift-detection.md` for full details.
-
-When immutable fields drift externally, the reconciler emits a distinct `ImmutableField` warning event and skips ALTER when only immutable fields have drifted (ALTER can't fix them). When both mutable and immutable drift exist, mutable fields are corrected via ALTER while the immutable violation is reported.
-
-### Immutable Field Enforcement
-
-Fields like `spec.transient` and `spec.name` are immutable after creation. The reconciler validates these against `status.showOutput` and sets a `Terminal` condition if a change is detected. Immutable field violations are **terminal** — the reconciler returns `ctrl.Result{}` (no requeue, no error) to avoid infinite exponential backoff retries for an unfixable condition. The user must revert the field or use the `force-new` annotation.
-
-The `force-new` annotation (`snowplane.hupe1980.github.io/force-new: "true"`) bypasses immutability checks at the reconciler level. When set, the reconciler's `validateImmutableFields()` returns early, allowing the reconciler to proceed with delete+recreate.
+```go
+result := drift.New().
+    CompareString("COMMENT", spec.Comment, obs.Comment, false).
+    CompareInt32("RETENTION", spec.Retention, obs.Retention, false).
+    Result()
+```
 
 ### Cross-Resource Reference Resolution
 
-Schema-level resources reference their parent Database via `databaseRef`. The `ReferenceResolver` (in `internal/controller/refresolver/`) provides a centralised lookup mechanism:
+Schema-level resources reference parents via `databaseRef`. The `ReferenceResolver` in `internal/controller/refresolver/` handles lookup, Ready checks, and watch-based requeue.
 
-1. **Resolve** — Looks up the referenced CR, checks `Ready=True`, returns `fullyQualifiedName`
-2. **Wait** — If the dependency is not Ready, sets `ReferencesResolved=False` with `DependencyNotReady` reason and returns the error to controller-runtime for exponential backoff
-3. **Watch** — The Schema reconciler watches Database CRs via `EnqueueRequestsFromMapFunc`, so when a Database transitions to Ready, all dependent Schemas are requeued automatically
-
-The `ReferenceResolver` is a shared component — all schema-level resources (Schema, Table, View, Stage, DatabaseRole) use it for parent reference resolution.
+```go
+dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, a.client, a.recorder, obj,
+    obj.Namespace, obj.Spec.DatabaseRef, obj.Spec.DatabaseName, obj.Status.DatabaseName)
+```
 
 ### Interface-Driven Testing
 
-All Snowflake operations are behind interfaces (`Service`, `SnowflakeClient`). Unit tests inject mocks via `ServiceFactory`, so no real Snowflake connections are needed.
+All Snowflake operations are behind interfaces. Unit tests inject mocks via `ServiceFactory`.
 
-### Shared Provider Package
+---
 
-`internal/provider/` contains `BuildSnowflakeConfig()` and `ComputeHash()` — shared between all reconcilers that need to resolve a ProviderConfig into a Snowflake connection. This prevents code duplication while keeping each reconciler self-contained.
+## Advanced Patterns
 
-### Condition Constants
+### UNSET Support & TrackedParameters
 
-All condition types (`Ready`, `Synced`, `Terminal`, `Recoverable`, `ReferencesResolved`, `CredentialsInvalid`, `DriftDetected`) and reasons (`Available`, `ReconcileSuccess`, `DependencyNotReady`, `TransientError`, `DriftDetected`, `DriftCorrected`, `RateLimited`, `ValidationFailed`, `ImmutableField`, etc.) are defined as constants in `api/v1alpha1/conditions.go` and reused through the `conditions` utility package.
+Pointer fields use nil-means-unmanaged. When a user removes a field, `computeUnsetFields()` compares spec against `status.trackedParameters` and generates `ALTER ... UNSET` statements.
 
-### UNSET Support & TrackedParameters Tracking
+### Recoverable vs Terminal Conditions
 
-Pointer fields use nil-means-unmanaged semantics. When a user sets a field (e.g., `dataRetentionTimeInDays: 14`) and later removes it from the spec, the reconciler must issue `ALTER ... UNSET` to revert to Snowflake defaults.
+| Condition | Meaning | User Action |
+|:----------|:--------|:------------|
+| `Recoverable=True` | Transient error (timeout, rate limit) | None — auto-retry |
+| `Terminal=True` | Invalid config, immutable field violation | Fix the spec |
 
-This is powered by **TrackedParameters** tracking in resource status:
+### Deletion Resilience
 
-1. On every successful Create or Update, the reconciler computes which spec fields are non-nil and saves their Snowflake parameter names in `status.trackedParameters`.
-2. On subsequent reconciliations, `computeUnsetFields()` compares current spec (nil fields) against `status.trackedParameters` — any field present in `trackedParameters` but nil in spec needs an UNSET.
-3. The SQL builders (`buildAlterStatements()`, `buildAlterSchemaStatements()`) generate separate `ALTER ... SET` and `ALTER ... UNSET` statements.
-
-When adding a new managed resource with pointer fields, implement the corresponding `computeTrackedParameters()` and `computeUnsetFields()` functions in the reconciler.
-
-### Recoverable Condition
-
-The `Recoverable` condition distinguishes transient errors (timeouts, rate limits) from terminal errors (invalid config, immutable field violation):
-
-- **Set** `Recoverable=True` with reason `TransientError` when a Snowflake operation fails with a retryable error.
-- **Clear** `Recoverable` on every successful reconciliation.
-- **Terminal** errors use the existing `Terminal` condition and do not set `Recoverable`.
-
-This enables monitoring systems and alert rules to distinguish "will fix itself" from "needs user intervention."
-
-### Deletion Resilience (Cascading Delete)
-
-When a parent resource (Database CR or ProviderConfig) is deleted before its dependents, the dependent reconcilers handle it gracefully:
-
-- **Schema → Database deleted:** The schema reconciler falls back to `status.databaseName` (cached from the last successful observe) instead of requiring `databaseRef` resolution. This allows the Snowflake DROP to proceed.
-- **Any resource → ProviderConfig deleted:** If `resolveClient` fails during deletion, the reconciler removes the finalizer and lets Kubernetes garbage-collect the CR, since the Snowflake resource is already inaccessible.
-- **ProviderConfig in-use guard:** ProviderConfig uses a `providerconfig.snowplane.hupe1980.github.io/in-use` finalizer. On deletion, the reconciler checks all 24 resource types for references. If any managed resource still references the ProviderConfig, deletion is blocked with an `InUse` warning event and the ProviderConfig is requeued after 30s. Once all references are removed, the finalizer is cleared and the ProviderConfig is deleted.
-
-This prevents finalizer deadlocks in cascading delete scenarios.
+- **Schema → Database deleted:** Reconciler falls back to `status.databaseName`
+- **Any → ProviderConfig deleted:** Finalizer removed, Kubernetes garbage-collects
+- **ProviderConfig in-use guard:** Blocks deletion while resources reference it
 
 ### Defense-in-Depth Validation
 
-Every reconciler calls `spec.Validate()` as the first step of reconciliation, *before* resolving the Snowflake client or making any API calls. This is a defense-in-depth layer that catches invalid specs that bypass CEL validation.
-
-On validation failure, the reconciler:
-1. Sets `Terminal=True` with reason `ValidationFailed` and the aggregated error message.
-2. Sets `Synced=False` with the same reason.
-3. Emits a `ValidationFailed` warning event.
-4. Returns `ctrl.Result{}` (no requeue) — the user must fix the spec.
-
-This complements the CRD-level CEL validation: CEL rules provide fast API-level rejection, while reconciler-level validation acts as a safety net.
-
-### Input Validation
-
-Snowflake parameter ranges are validated early in `Validate()` methods:
-
-- `MaxDataExtensionTimeInDays` must be 0–90 per Snowflake documentation.
-- `UserSpec.Email` is validated via `net/mail.ParseAddress()` when non-nil and non-empty.
-- `escapeLikePattern()` escapes `\`, `%`, and `_` for safe LIKE queries.
-- Identifiers reject empty/whitespace names via `ValidObjectIdentifier()`.
-- `fileFormatDenyRe` blocks `; -- /* */ $$ COPY EXECUTE CALL SYSTEM$` (case-insensitive, aligned with `columnDefaultDenyRe`).
-- `Builder` and `SetClauses` accumulate all validation errors via `errors.Join` — callers see every invalid field, not just the first.
-- `Raw()` requires explicit caller validation (documented `SAFETY:` contract).
-- `closeRows()` (in `internal/clients/snowflake/closerows.go`) replaces all `_ = rows.Close()` suppressions with debug-level error logging via `slog.Debug`.
-
-Validation errors are returned before any SQL is generated, giving clear error messages.
-
-### Custom Prometheus Metrics
-
-`internal/metrics/` defines eleven custom Prometheus metrics that provide operational visibility:
-
-- **Reconciliation metrics** (`snowplane_reconcile_total`, `snowplane_reconcile_duration_seconds`) — Track reconciliation throughput and latency per resource type.
-- **Snowflake API metrics** (`snowplane_snowflake_operation_total`, `snowplane_snowflake_operation_duration_seconds`) — Track Snowflake operations by type (create, alter, drop, observe, ping).
-- **Resource gauges** (`snowplane_managed_resources`) — Track managed resource counts by type and status (ready, not_ready, terminal).
-- **Client pool gauge** (`snowplane_client_pool_size`) — Track the number of cached Snowflake client connections (capped by configurable `maxSize` with O(1) LRU eviction via `container/list`). `CollectDBStats` snapshots providers under `RLock` and iterates outside the lock to avoid holding the mutex during Prometheus gauge updates.
-- **Rate limiter** (`snowplane_rate_limit_waits_total`) — Count rate limiter wait events per controller.
-- **Adoption** (`snowplane_adoption_total`) — Count resource adoption outcomes (adopted / rejected).
-- **Drift** (`snowplane_drift_detected_total`) — Count drift detection events per controller.
-- **Circuit breaker** (`snowplane_circuit_breaker_trips_total`, `snowplane_circuit_breaker_state`) — Track circuit breaker trips and current state per provider.
-
-Metrics are registered via `init()` and exposed on the standard `/metrics` endpoint. The `ObserveSnowflakeOp()`, `RecordReconcile()`, `RecordDriftDetected()`, `RecordCircuitBreakerTrip()` and `SetCircuitBreakerState()` helpers are called from reconcilers and the circuit breaker to instrument operations.
+Every reconciler calls `spec.Validate()` before resolving the client — a safety net complementing CEL validation.
 
 ### Rate Limiting
 
-`internal/ratelimit/` provides per-provider token-bucket rate limiting for Snowflake API calls:
+Per-provider `rate.Limiter` from `golang.org/x/time/rate`. Configurable via `--rate-limit-qps` and `--rate-limit-burst`.
 
-- Each ProviderConfig gets its own `rate.Limiter` (from `golang.org/x/time/rate`).
-- The `Wait(ctx, providerName)` method blocks until a token is available or the context expires.
-- Limiters are created lazily and cached in a `sync.Map` for lock-free concurrent access.
-- QPS and burst size are configurable via `--rate-limit-qps` and `--rate-limit-burst` flags.
-- When rate-limited, reconcilers set `Recoverable=True` with reason `RateLimited`.
+### Retry for Transient Errors
 
-### Retry for Transient Snowflake Errors
+`sfretry.Do()` retries up to 3 times with 2s backoff. Classifies errors as retryable (timeouts, connections) or terminal (permissions, SQL compilation). All retried operations are idempotent.
 
-`internal/sfretry/` provides a thin retry wrapper for transient Snowflake errors:
+### Circuit Breaker
 
-- `IsRetryable(err)` classifies errors — connection failures, timeouts, and context errors are retryable; permission denied, already-exists, role-switch failures, SQL compilation errors (code 1003), and quota limits are terminal (non-retryable).
-- `Do(ctx, opts, fn)` runs `fn` up to `opts.MaxAttempts` times with a fixed back-off (`opts.Backoff`) between retries. It short-circuits on non-retryable errors or context cancellation.
-- `DefaultOptions()` returns `MaxAttempts=3, Backoff=2s`.
-- Each retry is logged at debug level (`logger.V(1)`) with attempt count, max attempts, back-off, and error message.
-- All mutating Snowflake operations (CREATE, ALTER, DROP) in every resource reconciler are wrapped in `sfretry.Do` inside the existing `metrics.ObserveSnowflakeOp` call.
+Per-provider failure isolation. Opens after 5 consecutive failures, probes after 60s. Resources using other ProviderConfigs are unaffected.
 
-**Idempotency Safety:** All retried operations are inherently idempotent:
-- **CREATE** — If the object already exists, `ErrObjectAlreadyExists` is classified as non-retryable and the loop stops immediately.
-- **ALTER** — Applying the same desired state twice is a no-op.
-- **DROP** — "Object not found" after a partial drop is treated as success, not an error.
-- **GRANT/REVOKE** — Single-target grant/revoke statements are idempotent in Snowflake (granting an already-held privilege is a no-op).
+### CEL Validation Rules
 
-### Configurable Requeue Interval
+All 26 CRD types include `x-kubernetes-validations` rules — evaluated server-side on UPDATE, no webhook required. Covers immutable fields, schema defaults, policy body blocklists, mutual exclusion, and auth validation.
 
-By default every reconciler re-observes Snowflake state every **5 minutes** (`DefaultRequeueInterval` in the `reconciler` package). This interval can be overridden at startup with the `--requeue-interval` flag:
+### Resource Adoption
 
+Adopt pre-existing Snowflake resources via annotation:
+
+| Annotation Value | Behaviour |
+|:-----------------|:----------|
+| *(absent)* / `fail-if-exists` | Terminal error — prevents accidental takeover |
+| `adopt` | Populates status from current state, sets `LateInitialized` |
+
+### Terraform Migration Tool
+
+`cmd/tfimport` reads Terraform state and generates Kubernetes manifests with `adopt` annotation:
+
+```bash
+./tfimport -state terraform.tfstate -namespace snowflake > manifests.yaml
 ```
---requeue-interval 2m   # re-observe every 2 minutes
-```
 
-Internally `GenericReconciler` has a `requeueOverride` field set via the `WithRequeueInterval(d)` builder. The private `getRequeueInterval()` helper returns the override when non-zero, falling back to the compile-time default.
-
-### Circuit Breaker (Failure Isolation)
-
-`internal/circuitbreaker/` provides a per-provider circuit breaker that prevents one failing ProviderConfig from impacting resources managed by healthy ProviderConfigs:
-
-- **Three states:** Closed (normal), Open (rejecting calls), HalfOpen (probing after cooldown).
-- **Threshold:** Opens after N consecutive failures (default: 5). Configurable via `Options.FailureThreshold`.
-- **Reset timeout:** Stays open for a configurable duration (default: 60s) before transitioning to half-open. In half-open state, a single probe call is allowed — success resets to closed, failure reopens.
-- **Per-provider isolation:** Each ProviderConfig gets an independent breaker. Failures on `provider-a` don't affect `provider-b`.
-- **Integration:** The `GenericReconciler` calls `RecordSuccess` / `RecordFailure` in its defer block after every reconciliation that involves Snowflake I/O (observe, create, alter, drop). Both the create/update path and the delete path (`reconcileDelete` → `Drop`) correctly set `snowflakeOpAttempted` so the circuit breaker tracks all Snowflake operations. The `ResolveClient` function calls `cb.Allow(providerName)` to check the breaker before creating a Snowflake client — if the breaker is open, the resource gets a `DependencyNotReady` condition and is requeued.
-- **Metrics:** `snowplane_circuit_breaker_trips_total` (counter per provider) and `snowplane_circuit_breaker_state` (gauge: 0=closed, 1=open, 2=half-open).
-- **Thread-safe:** All operations are guarded by `sync.RWMutex`. The clock is injectable for deterministic testing.
-
-### CRD-Level CEL Validation Rules
-
-All 26 CRD types include `x-kubernetes-validations` rules at the **spec** level, using CEL transition rules (`oldSelf`) that the Kubernetes API server evaluates on every UPDATE request — no webhook pod or cert-manager required.
-
-**Immutable field rules** (`self.X == oldSelf.X`):
-- Applied to all fields that must not change after creation (e.g., `spec.name`, `spec.transient`, `spec.databaseRef`).
-- Transition rules are only evaluated on UPDATE, not CREATE, so initial values are always accepted.
-- For optional pointer fields, the pattern is: `has(oldSelf.X) == has(self.X) && (!has(self.X) || self.X == oldSelf.X)`.
-
-**Schema defaults** (replaces mutating webhook):
-- `deletionPolicy` defaults to `Delete`, `providerRef.name` defaults to `"default"`, `User.type` defaults to `PERSON`.
-- Boolean fields (`transient`, `withGrantOption`) default to `false` to prevent CEL "no such key" errors.
-
-**Validation rules** (replaces validating webhook):
-- **Policy body blocklist:** Semicolons and 16 dangerous SQL patterns blocked via `!self.body.contains(';') && !self.body.upperAscii().contains('SYSTEM$') && ...`.
-- **FieldExport path:** Must start with `.status.`, must not contain `[`.
-- **FieldExport kind:** Must be one of the supported resource kinds.
-- **Mutual exclusion:** Exactly one of `databaseRef` or `databaseName` must be set.
-- **ProviderConfig auth:** Required credentials enforced per authentication type.
-- **Stage type:** External/internal type cannot change (URL presence is immutable).
-
-**Dangerous grant checks** remain in the reconciler's `ValidateSpec()` because they need annotation-based bypass (`allow-dangerous-grant`), which CEL cannot access from the spec level.
-
-### Workload Identity Federation (WIF)
-
-Snowplane supports native Workload Identity Federation (WIF) via `gosnowflake.AuthTypeWorkloadIdentityFederation`:
-
-- `authenticationType: WorkloadIdentity` uses the gosnowflake driver's native WIF support.
-- The driver handles OIDC attestation exchange, token reading, and automatic refresh — the operator just provides `TokenFilePath` and `WorkloadIdentityProvider`.
-- **Multi-cloud providers**: `OIDC` (any K8s cluster with projected SA tokens), `AWS` (IRSA/Pod Identity), `GCP` (GKE metadata), `Azure` (AKS IMDS). Defaults to `OIDC` if not specified.
-- No Secret is needed — the token file is mounted via a projected service account token volume.
-- `ComputeHash()` includes `TokenFilePath` and `WorkloadIdentityProvider` (stable config), not the volatile token value.
-
-## Adding a New Managed Resource
-
-See **[docs/adding-a-resource.md](adding-a-resource.md)** for the comprehensive step-by-step guide with code examples covering CRD types, dual ref/name patterns, validation, adapter wiring, CEL validation rules, and tests.
-
-Quick checklist (details in the linked guide):
-
-1. Define CRD types in `api/v1alpha1/<resource>_types.go` — implement `ManagedResource`
-2. Add `Validate()` in `validation.go` using `validateDatabaseSource`/`validateSchemaSource` helpers
-3. Add CEL validation markers (`+kubebuilder:validation:XValidation`) for immutable fields and business rules
-4. Create Snowflake client in `internal/clients/snowflake/<resource>.go`
-5. Create adapter (`ResourceAdapter[T, S, D]`) + reconciler in `internal/controller/<resource>/`
-6. Wire into `cmd/manager/main.go` (controller + RBAC markers)
-7. Add CRD manifest (`just generate && just sync-crds`), sample CRs, and tests
-8. Add the new type to the ProviderConfig in-use guard
+---
 
 ## Testing Strategy
 
-| Layer | What to test | Tool |
-|-------|-------------|------|
-| Snowflake client | SQL generation, option validation, error handling | `testing` + `testify` |
-| Reconciler | Full loop with mock service, conditions, status, ref resolution | `testing` + fake `client.Client` |
-| Reference resolver | Cross-resource lookup, Ready/NotReady, missing refs | `testing` + fake `client.Client` |
-| Shared provider | Config building, hash determinism, WIF token file handling | `testing` + `testify` |
-| Metrics | Counter/histogram/gauge registration and recording | `testing` + `prometheus/testutil` |
-| Rate limiter | Token bucket behaviour, per-provider isolation, concurrency | `testing` + `testify` |
-| Drift detector | Field-level comparisons, immutable violations, nil-means-unmanaged | `testing` + `testify` |
-| CEL validation | Immutable field rejection, schema defaults, mutual exclusion, body blocklist | envtest |
-| Retry wrapper | Retryable classification, attempt exhaustion, context cancellation | `testing` + `testify` |
-| Utilities | Conditions, finalizers | `testing` + `testify` |
-| Test helpers | Shared setup code (scheme, PC, secret, request builders) | `internal/testutil` |
-| Integration | Full CRD → reconciler pipeline against real kube-apiserver | envtest |
+| Layer | What to Test | Tool |
+|:------|:-------------|:-----|
+| Snowflake client | SQL generation, options, errors | `testing` + `testify` |
+| Reconciler | Full loop, conditions, status, refs | `testing` + fake `client.Client` |
+| CEL validation | Immutable fields, defaults, blocklists | envtest |
+| Integration | Full CRD → reconciler pipeline | envtest (59 tests, 11 resources) |
+| E2E | Real Snowflake + k3s testcontainer | 17 tests |
 
-### Integration Tests (envtest)
-
-The `test/integration/` package contains integration tests that run against a real Kubernetes API server using [envtest](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/envtest). These tests validate the full reconciliation loop — from CR creation through status patching, drift detection, and deletion — with mock Snowflake services.
-
-**Prerequisites:**
+### Integration Tests
 
 ```bash
 # Install setup-envtest (one-time)
 go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-
-# Download API server binaries (one-time)
 setup-envtest use
-```
 
-**Running integration tests:**
-
-```bash
-# Via just
-just test-integration
-
-# Via go test directly
-KUBEBUILDER_ASSETS="$(setup-envtest use -p path)" go test -tags integration -v -timeout 180s -count=1 ./test/integration/
-```
-
-Integration tests use the `//go:build integration` build tag and are excluded from `just test`.
-
-**Test coverage (59 tests across 11 resources):**
-
-| Resource | Tests | What they validate |
-|----------|-------|--------------------|
-| **Database** (12) | `CreateLifecycle`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy`, `FinalizerAddedOnCreate`, `DriftDetection`, `ImmutableFieldRejection`, `ObservedGenerationUpdated`, `TrackedParametersTracking`, `StatusSubresourcePatch`, `Adoption_FailIfExists`, `Adoption_AdoptSuccess`, `Adoption_ExplicitFailIfExists` | Full lifecycle, CEL immutability, spec hash, tracked parameters tracking, status subresource, adoption flow |
-| **Schema** (5) | `CreateWithDatabaseRef`, `WaitForDatabaseReady`, `UpdateTriggersAlter`, `DeleteWithDatabaseGone`, `ImmutableDatabaseRef` | Parent ref resolution, dependency waiting, cascading delete, CEL immutability |
-| **Warehouse** (6) | `CreateLifecycle`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy`, `DriftDetection`, `Adoption_FailIfExists`, `Adoption_AdoptSuccess` | Account-level lifecycle, drift correction, orphan policy, adoption flow |
-| **User** (3) | `CreateLifecycle`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy` | Account-level lifecycle, secret-referenced credentials |
-| **AccountRole** (4) | `CreateLifecycle`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy`, `DriftDetection` | Simplest resource lifecycle, comment-only drift |
-| **DatabaseRole** (5) | `CreateLifecycle`, `WaitForDatabaseReady`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy`, `DriftDetection` | Two-part identifier, parent Database dependency, drift correction |
-| **Grant** (3) | `CreateLifecycle`, `WithGrantOption`, `DeleteWithOrphanPolicy` | AccountRoleGrant/DatabaseRoleGrant/ShareGrant lifecycle (no ALTER), grant option flag, immutable spec |
-| **Table** (5) | `CreateLifecycle`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy`, `DriftDetection`, `WaitForSchemaReady` | Column management, schema-level ref resolution, drift correction |
-| **View** (5) | `CreateLifecycle`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy`, `DriftDetection`, `WaitForSchemaReady` | AS query management (CREATE OR REPLACE on statement change), secure views, schema-level ref resolution |
-| **Stage** (6) | `CreateLifecycle`, `UpdateTriggersAlter`, `DeleteWithOrphanPolicy`, `DriftDetection`, `WaitForSchemaReady`, `ImmutableStageType` | Internal/external stages, stage type immutability, file format options |
-| **FieldExport** (3) | `CreateLifecycle`, `ExportToConfigMap`, `ExportToSecret` | FieldExport lifecycle, cross-resource data export |
-
-### CEL Validation Integration Tests
-
-The `test/integration/cel_validation_test.go` file contains integration tests that validate CRD-level CEL validation rules against a real kube-apiserver via envtest. These tests exercise:
-
-- **Immutable field enforcement:** UPDATE rejection for immutable fields (spec.name, spec.transient, spec.databaseRef, etc.)
-- **Mutable field acceptance:** Non-immutable fields can be changed freely
-- **Schema defaults:** `deletionPolicy`, `providerRef.name`, User `type` are defaulted
-- **Policy body blocklist:** SQL injection patterns are rejected on CREATE
-- **FieldExport validation:** Path and kind constraints are enforced
-- **Mutual exclusion:** Exactly one of databaseRef/databaseName required
-- **ProviderConfig auth:** Credential requirements enforced per auth type
-
-```bash
-# Run CEL validation tests (included in the standard integration suite)
+# Run
 just test-integration
 ```
+
+### E2E Tests
+
+```bash
+# Requires .env with SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, etc.
+just test-e2e
+```
+
+---
 
 ## Code Style
 
-- `golangci-lint` enforces style (see `.golangci.yml`)
+- `golangci-lint` enforces style (`.golangci.yml`)
 - All exported functions have doc comments
 - All tests are parallelised (`t.Parallel()`)
-- No magic strings — use constants from `api/v1alpha1/conditions.go`
-
-## Resource Adoption
-
-Snowplane supports adopting pre-existing Snowflake resources into Kubernetes management. This is useful when migrating from manual management or Terraform.
-
-### How It Works
-
-When a CRD is created and the corresponding Snowflake resource already exists, the reconciler checks the `adoption-policy` annotation:
-
-| Annotation Value | Behaviour |
-|------------------|-----------|
-| *(absent)* | Terminal error with `ReasonResourceExists` — prevents accidental takeover |
-| `fail-if-exists` | Same as absent — explicit opt-out |
-| `adopt` | Reconciler adopts the resource: populates status from current state, sets `LateInitialized` condition |
-| *(invalid value)* | Logged as warning, defaults to `fail-if-exists` behaviour |
-
-### Detection Mechanism
-
-Adoption is detected when:
-1. `Observe()` returns `Exists: true`
-2. `ObservedGeneration == 0` (first reconciliation)
-
-This combination means the Snowflake resource exists but the CRD has never been successfully reconciled.
-
-### Example
-
-```yaml
-apiVersion: snowplane.hupe1980.github.io/v1alpha1
-kind: Database
-metadata:
-  name: adopted-database
-  annotations:
-    snowplane.hupe1980.github.io/adoption-policy: adopt
-spec:
-  name: EXISTING_DATABASE
-  providerRef:
-    name: default
-```
-
-After the first reconciliation, the resource will have:
-- `Ready: True`
-- `Synced: True`
-- `LateInitialized: True` — indicates status was populated from existing state
-- `status.showOutput` populated with the current Snowflake configuration
-
-### Code References
-
-- Annotation constants: `api/v1alpha1/annotations.go` (`AnnotationAdoptionPolicy`, `AdoptionPolicyAdopt`, `AdoptionPolicyFailIfExists`)
-- Condition type: `api/v1alpha1/conditions.go` (`TypeLateInitialized`, `ReasonAdopted`, `ReasonResourceExists`)
-- Reconciler logic: `internal/controller/reconciler/reconciler.go` (`reconcileAdoptOrReject`, `getAdoptionPolicy`)
-- Ownership conflict detection: `internal/controller/reconciler/ownership.go` (`ComputeExternalNameHash`, `checkOwnershipConflict`, `setExternalNameLabel`)
-- Metrics: `internal/metrics/metrics.go` (`AdoptionTotal`, `RecordAdoption`, `RecordAdoptionRejected`, `OwnershipConflictsTotal`)
-- Unit tests: `internal/controller/reconciler/reconciler_test.go` (5 adoption tests), `internal/controller/reconciler/ownership_test.go` (5 ownership tests)
-- Integration tests: `test/integration/database_test.go` (3 tests), `test/integration/warehouse_test.go` (2 tests)
-
-## Maturity Classification
-
-All CRDs carry a maturity label (`snowplane.hupe1980.github.io/maturity`) indicating their stability level:
-
-| Level | Guarantees | Flag Control |
-|-------|-----------|-------------|
-| `alpha` | No stability guarantees; API may change | Gated by `--enable-alpha-resources` (default: `true`) |
-| `beta` | Backwards-compatible changes expected | Always enabled |
-| `stable` | Full backwards-compatibility | Always enabled |
-
-### Controller Gating
-
-The `GenericReconciler` supports maturity-based and per-controller feature gating:
-
-```go
-database.NewReconciler(...)
-    .WithRequeueInterval(requeueInterval)
-    .WithMaturity("alpha")
-    .WithAlphaEnabled(enableAlphaResources)
-    .WithDisabled(disabled["database"])
-    .SetupWithManager(mgr, maxConcurrentReconciles)
-```
-
-When `--enable-alpha-resources=false`, alpha controllers are silently skipped during manager startup — they log a message and return without registering the controller.
-
-For fine-grained per-controller control, the `--disable-controllers` flag accepts a comma-separated list of controller names to skip regardless of maturity:
-
-```bash
-# Disable specific controllers
---disable-controllers=accountrolegrant,stage,view
-
-# Valid controller names: database, schema, warehouse, accountrole, databaserole, user, table, view, stage,
-#   accountrolegrant, databaserolegrant, sharegrant, grantownership, task, stream, tag,
-#   networkpolicy, resourcemonitor, maskingpolicy, rowaccesspolicy, fieldexport
-```
-
-The `WithDisabled(true)` setting takes precedence over maturity — a disabled stable controller is still skipped.
-
-### Current Classification
-
-All resource CRDs are currently classified as `alpha` (v1alpha1 API version). The `ProviderConfig` CRD is `stable` since it is always required for operator functionality.
-
-### CRD Labels
-
-Maturity labels are also applied to CRD YAML manifests in `config/crd/bases/`:
-
-```yaml
-metadata:
-  labels:
-    snowplane.hupe1980.github.io/maturity: alpha
-```
-
-## Terraform Migration Tool (`tfimport`)
-
-The `cmd/tfimport` CLI tool automates migrating Snowflake resources from Terraform (or OpenTofu) to Snowplane CRDs. It reads a Terraform state file and generates Kubernetes manifests with the `adopt` annotation, so the operator adopts existing Snowflake objects instead of recreating them.
-
-### Quick Start
-
-```bash
-# Build
-go build -o tfimport ./cmd/tfimport
-
-# Generate manifests
-./tfimport -state terraform.tfstate -namespace snowflake -provider prod > manifests.yaml
-
-# Apply to cluster
-kubectl apply -f manifests.yaml
-```
-
-### State-Removal Script
-
-After migrating, remove the resources from Terraform state so they are no longer dual-managed:
-
-```bash
-# Generate manifests + removal script
-./tfimport -state terraform.tfstate -remove-script remove.sh > manifests.yaml
-
-# Dry run
-bash remove.sh --dry-run
-
-# Execute (for OpenTofu: TF_CMD=tofu bash remove.sh)
-bash remove.sh
-```
-
-### Supported Resources
-
-12 Terraform resource types are supported — see [`cmd/tfimport/README.md`](../cmd/tfimport/README.md) for the full list and detailed usage.
+- Constants from `api/v1alpha1/conditions.go` — no magic strings

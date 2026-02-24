@@ -1,10 +1,22 @@
-# GitOps with Flux
+---
+layout: default
+title: GitOps with Flux
+parent: Guides
+nav_order: 5
+description: "Manage Snowplane resources using Flux with native health checks and dependency ordering."
+---
 
-This guide describes how to manage Snowplane resources using [Flux](https://fluxcd.io/).
+# GitOps with Flux
+{: .fs-8 }
+
+Manage Snowplane resources using [Flux](https://fluxcd.io/) with native health checks, `dependsOn` ordering, and notifications.
+{: .fs-5 .fw-300 }
+
+---
 
 ## Health Checks
 
-Flux natively supports Kubernetes-standard `status.conditions` with `type: Ready`. Since all Snowplane CRDs follow this convention, health checks work automatically when you set `spec.healthChecks` on your Kustomization:
+Flux natively supports `status.conditions` with `type: Ready`. Since all Snowplane CRDs follow this convention, health checks work automatically:
 
 ```yaml
 apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -27,14 +39,14 @@ spec:
   timeout: 10m
 ```
 
-Flux will wait for the `Ready` condition to become `True` before marking the Kustomization as ready.
+---
 
-## Dependency Ordering with `dependsOn`
+## Dependency Ordering
 
-Use Flux [Kustomization dependencies](https://fluxcd.io/flux/components/kustomize/kustomizations/#dependencies) to ensure resources are created in the correct order. Split your resources into separate Kustomizations and wire them with `dependsOn`:
+Use [Kustomization dependencies](https://fluxcd.io/flux/components/kustomize/kustomizations/#dependencies) to control creation order:
 
 ```yaml
-# 1. Provider configuration — no dependencies
+# 1. Provider configuration
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
@@ -54,7 +66,7 @@ spec:
       namespace: snowplane-system
   timeout: 5m
 ---
-# 2. Account-level resources — depends on provider
+# 2. Account-level resources
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
@@ -76,7 +88,7 @@ spec:
       namespace: snowplane-system
   timeout: 10m
 ---
-# 3. Database-scoped resources — depends on databases
+# 3. Database-scoped resources
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
@@ -91,14 +103,9 @@ spec:
     name: snowflake-infra
   path: ./schemas
   prune: true
-  healthChecks:
-    - apiVersion: snowplane.hupe1980.github.io/v1alpha1
-      kind: Schema
-      name: raw-schema
-      namespace: snowplane-system
   timeout: 10m
 ---
-# 4. Schema-scoped resources — depends on schemas
+# 4. Schema-scoped resources
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
@@ -113,14 +120,9 @@ spec:
     name: snowflake-infra
   path: ./tables
   prune: true
-  healthChecks:
-    - apiVersion: snowplane.hupe1980.github.io/v1alpha1
-      kind: Table
-      name: events-table
-      namespace: snowplane-system
   timeout: 10m
 ---
-# 5. Grants and field exports — depends on all resource types
+# 5. Grants and field exports
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
@@ -138,27 +140,12 @@ spec:
   path: ./grants
   prune: true
   timeout: 10m
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: snowflake-fieldexports
-  namespace: flux-system
-spec:
-  dependsOn:
-    - name: snowflake-databases
-    - name: snowflake-schemas
-    - name: snowflake-tables
-  interval: 5m
-  sourceRef:
-    kind: GitRepository
-    name: snowflake-infra
-  path: ./fieldexports
-  prune: true
-  timeout: 10m
 ```
 
-> **Note:** Snowplane controllers already handle dependency ordering internally (e.g., Schema waits for its Database to become Ready). Flux `dependsOn` is complementary — it prevents Flux from applying manifests before their dependencies exist, avoiding transient reconciliation errors.
+{: .note }
+> Snowplane controllers already handle dependency ordering internally. Flux `dependsOn` is complementary — it prevents Flux from applying manifests before their dependencies exist.
+
+---
 
 ## GitRepository Source
 
@@ -174,12 +161,14 @@ spec:
   ref:
     branch: main
   secretRef:
-    name: snowflake-gitops-auth  # optional: for private repos
+    name: snowflake-gitops-auth
 ```
 
-## Notifications and Alerts
+---
 
-Configure Flux notifications to alert on Snowplane resource failures:
+## Notifications
+
+Configure alerts for Snowplane resource failures:
 
 ```yaml
 apiVersion: notification.toolkit.fluxcd.io/v1beta3
@@ -209,9 +198,47 @@ spec:
     name: slack-webhook-url
 ```
 
+---
+
+## Using FieldExport with Flux
+
+FieldExport passes data between Snowplane resources and other Kubernetes workloads without hard-coding values:
+
+```yaml
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: FieldExport
+metadata:
+  name: db-name-export
+spec:
+  from:
+    resource:
+      kind: Database
+      name: analytics-db
+    path: ".status.showOutput.name"
+  to:
+    kind: ConfigMap
+    name: app-config
+    key: SNOWFLAKE_DATABASE
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-pipeline
+spec:
+  template:
+    spec:
+      containers:
+        - name: pipeline
+          envFrom:
+            - configMapRef:
+                name: app-config
+```
+
+---
+
 ## Directory Structure
 
-A recommended repository layout for Flux-managed Snowflake infrastructure:
+Recommended repository layout:
 
 ```
 snowflake-gitops/
@@ -234,45 +261,7 @@ snowflake-gitops/
 │   └── db-name.yaml
 ├── clusters/
 │   └── production/
-│       ├── kustomization.yaml    # Flux Kustomizations for this cluster
-│       └── patches/              # Environment-specific patches
+│       ├── kustomization.yaml
+│       └── patches/
 └── README.md
 ```
-
-## Using FieldExport with Flux
-
-FieldExport is particularly useful in GitOps workflows where you need to pass data between Snowplane resources and other Kubernetes workloads without hard-coding values:
-
-```yaml
-# Export the database name to a ConfigMap
-apiVersion: snowplane.hupe1980.github.io/v1alpha1
-kind: FieldExport
-metadata:
-  name: db-name-export
-spec:
-  from:
-    resource:
-      kind: Database
-      name: analytics-db
-    path: ".status.showOutput.name"
-  to:
-    kind: ConfigMap
-    name: app-config
-    key: SNOWFLAKE_DATABASE
----
-# Your application can then mount the ConfigMap
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: data-pipeline
-spec:
-  template:
-    spec:
-      containers:
-        - name: pipeline
-          envFrom:
-            - configMapRef:
-                name: app-config
-```
-
-This approach keeps your application configuration fully declarative and automatically synchronized with the actual Snowflake infrastructure state.

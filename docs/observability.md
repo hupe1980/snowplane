@@ -1,6 +1,18 @@
-# Observability
+---
+layout: default
+title: Observability
+parent: Concepts
+nav_order: 2
+description: "Prometheus metrics, structured logging, Kubernetes events, and Grafana dashboards."
+---
 
-Snowplane provides comprehensive observability through Prometheus metrics, structured logging, Kubernetes events, health probes, and a pre-built Grafana dashboard.
+# Observability
+{: .fs-8 }
+
+Comprehensive observability through Prometheus metrics, structured logging, Kubernetes events, health probes, and a pre-built Grafana dashboard.
+{: .fs-5 .fw-300 }
+
+---
 
 ## Prometheus Metrics
 
@@ -9,71 +21,74 @@ All metrics use the `snowplane_` namespace and are exposed on the controller's m
 ### Reconciliation
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `snowplane_reconcile_total` | Counter | `controller`, `result` | Total reconciliation attempts (`success` / `error`) |
-| `snowplane_reconcile_duration_seconds` | Histogram | `controller` | Duration of each reconciliation loop |
+|:-------|:-----|:-------|:------------|
+| `snowplane_reconcile_total` | Counter | `controller`, `result` | Total reconciliation attempts |
+| `snowplane_reconcile_duration_seconds` | Histogram | `controller` | Duration of each reconciliation |
 
 ### Snowflake API
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `snowplane_snowflake_operation_total` | Counter | `controller`, `operation`, `result` | Snowflake API calls by operation (`observe`, `create`, `alter`, `drop`, `ping`) |
+|:-------|:-----|:-------|:------------|
+| `snowplane_snowflake_operation_total` | Counter | `controller`, `operation`, `result` | Snowflake API calls by operation |
 | `snowplane_snowflake_operation_duration_seconds` | Histogram | `controller`, `operation` | Snowflake API call latencies |
-| `snowplane_client_pool_size` | Gauge | — | Active Snowflake clients in the connection pool (O(1) LRU eviction via doubly-linked list when configurable max size is reached) |
-| `snowplane_rate_limit_waits_total` | Counter | `controller` | Number of times a reconciler waited for the rate limiter |
+| `snowplane_client_pool_size` | Gauge | — | Active Snowflake clients in the connection pool |
+| `snowplane_rate_limit_waits_total` | Counter | `controller` | Rate limiter wait events |
 
-> **Cardinality Bounds:** The `operation` label is bounded to a fixed set of values: `observe`, `create`, `alter`, `drop`, `create_or_alter`, and `ping`. The `controller` label is bounded by the number of registered controllers (currently 26). The `result` label is bounded to `success` and `error`. Total cardinality for operation metrics is at most ~312 series (26 controllers × 6 operations × 2 results), well within Prometheus best practices.
+{: .note }
+> **Cardinality Bounds:** The `operation` label is bounded to `observe`, `create`, `alter`, `drop`, `create_or_alter`, `ping`. The `controller` label is bounded by 26 controllers. Total cardinality for operation metrics is at most ~312 series.
 
 ### Resource Management
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `snowplane_managed_resources` | Gauge | `controller`, `state` | Managed resources by controller and state (`ready`, `not_ready`, `terminal`) |
-| `snowplane_adoption_total` | Counter | `controller`, `result` | Resource adoption outcomes (`adopted` / `rejected`) |
+|:-------|:-----|:-------|:------------|
+| `snowplane_managed_resources` | Gauge | `controller`, `state` | Resources by controller and state |
+| `snowplane_adoption_total` | Counter | `controller`, `result` | Resource adoption outcomes |
 | `snowplane_drift_detected_total` | Counter | `controller` | Drift detection events |
-| `snowplane_orphaned_resources_total` | Counter | `controller` | Orphan-policy deletions (Snowflake resource intentionally left intact) |
-| `snowplane_ownership_conflicts_total` | Counter | `controller` | Ownership conflicts detected — another CR already manages the same Snowflake object |
+| `snowplane_orphaned_resources_total` | Counter | `controller` | Orphan-policy deletions |
+| `snowplane_ownership_conflicts_total` | Counter | `controller` | Ownership conflicts detected |
 
 ### Circuit Breaker
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `snowplane_circuit_breaker_trips_total` | Counter | `provider` | Number of times the circuit breaker opened for a provider |
-| `snowplane_circuit_breaker_state` | Gauge | `provider` | Current state per provider: 0 = closed, 1 = open, 2 = half-open |
+|:-------|:-----|:-------|:------------|
+| `snowplane_circuit_breaker_trips_total` | Counter | `provider` | Circuit breaker open events |
+| `snowplane_circuit_breaker_state` | Gauge | `provider` | 0 = closed, 1 = open, 2 = half-open |
 
 ### ProviderConfig Health
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `snowplane_providerconfig_healthy` | Gauge | `provider`, `account` | Whether a ProviderConfig is healthy (1 = connected, 0 = unhealthy). Cleaned up when the ProviderConfig is deleted. |
+|:-------|:-----|:-------|:------------|
+| `snowplane_providerconfig_healthy` | Gauge | `provider`, `account` | 1 = connected, 0 = unhealthy |
 
-### Connection Pool (database/sql)
+### Connection Pool
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `snowplane_db_max_open_conns` | Gauge | `provider` | Maximum number of open connections allowed |
-| `snowplane_db_open_conns` | Gauge | `provider` | Current number of open connections |
+|:-------|:-----|:-------|:------------|
+| `snowplane_db_max_open_conns` | Gauge | `provider` | Maximum open connections allowed |
+| `snowplane_db_open_conns` | Gauge | `provider` | Current open connections |
 | `snowplane_db_in_use_conns` | Gauge | `provider` | Connections currently in use |
 | `snowplane_db_idle_conns` | Gauge | `provider` | Connections currently idle |
 | `snowplane_db_wait_count` | Gauge | `provider` | Total connections waited for |
-| `snowplane_db_wait_duration_seconds` | Gauge | `provider` | Total time blocked waiting for connections |
+| `snowplane_db_wait_duration_seconds` | Gauge | `provider` | Time blocked waiting for connections |
 
-These metrics are collected from `database/sql.DBStats` for each cached Snowflake client. They are recorded periodically via `ClientFactory.CollectDBStats()` and expose connection pool pressure per provider.
+---
 
-### Prometheus ServiceMonitor
+## ServiceMonitor
 
-When using the Helm chart, enable automatic Prometheus scraping:
+Enable automatic Prometheus scraping with the Helm chart:
 
 ```yaml
 metrics:
   serviceMonitor:
     enabled: true
     additionalLabels:
-      release: prometheus  # match your Prometheus operator's labels
+      release: prometheus
     interval: 30s
 ```
 
-### Example Alert Rules
+---
+
+## Example Alert Rules
 
 ```yaml
 groups:
@@ -104,18 +119,18 @@ groups:
           summary: "High Snowflake API latency for {{ $labels.operation }}"
 ```
 
+---
+
 ## Structured Logging
 
-Snowplane uses `logr` backed by `zap` for structured JSON logging in production.
+Snowplane uses `logr` backed by `zap` for structured JSON logging.
 
 ### Log Levels
 
 | Level | Content |
-|-------|---------|
+|:------|:--------|
 | `V(0)` (info) | Lifecycle transitions: creating, updating, deleting, drift detected, adoption |
 | `V(1)` (debug) | Snowflake API calls, operation details, retry attempts, field-level diffs |
-
-Configure with `--zap-log-level`:
 
 ```bash
 --zap-log-level=info   # V(0) only (default)
@@ -124,99 +139,84 @@ Configure with `--zap-log-level`:
 
 ### Standard Fields
 
-Every log line includes:
-
-- `controller` — Resource type (e.g., `database`, `schema`)
-- `namespace` — CR namespace
-- `name` — CR name
-- `reconcileID` — Unique ID for the reconciliation loop (from controller-runtime)
+Every log line includes: `controller`, `namespace`, `name`, `reconcileID`.
 
 ### Sensitive Field Redaction
 
-All log output is sanitized to prevent secrets from appearing in logs:
-
-- **PEM keys** (`-----BEGIN ... -----END ...`) → `[REDACTED]`
-- **Password/token fields** (`password=...`, `rsaPublicKey=...`, `token=...`) → field name `=[REDACTED]`
-- **Connection strings** (`user@account.snowflakecomputing.com`) → `[connection redacted]`
+All log output is sanitized:
+- **PEM keys** → `[REDACTED]`
+- **Password/token fields** → `=[REDACTED]`
+- **Connection strings** → `[connection redacted]`
 - **Snowflake hostnames** → `[host redacted]`
 
-The `ForLog()` function in `internal/utils/sanitize/` sanitizes log messages while preserving SQL statements (useful for debugging). The `ForEvent()` function additionally strips SQL and truncates to 1024 characters for Kubernetes Events.
+---
 
 ## Kubernetes Events
-
-Snowplane emits Kubernetes events on CRs for all significant lifecycle transitions. View them with `kubectl describe <resource>` or `kubectl get events`.
 
 ### Normal Events
 
 | Reason | Description |
-|--------|-------------|
+|:-------|:------------|
 | `Created` | Resource created in Snowflake |
 | `Updated` | Resource updated (spec change applied) |
-| `Deleted` / `Orphaned` | Resource dropped or orphaned in Snowflake |
-| `AdoptedExisting` | Pre-existing Snowflake resource adopted |
-| `DriftCorrected` | Out-of-band change automatically corrected |
+| `Deleted` / `Orphaned` | Resource dropped or orphaned |
+| `AdoptedExisting` | Pre-existing resource adopted |
+| `DriftCorrected` | Out-of-band change corrected |
 
 ### Warning Events
 
 | Reason | Description |
-|--------|-------------|
-| `DriftDetected` | Out-of-band change detected (logged before correction or detect-only) |
-| `ReconcileError` | Transient error during reconciliation (will be retried) |
-| `TerminalError` | Non-retryable error (requires user intervention) |
-| `DependencyNotReady` | A ProviderConfig or parent resource is not ready |
-| `ValidationFailed` | Spec validation failure (defense-in-depth) |
+|:-------|:------------|
+| `DriftDetected` | Out-of-band change detected |
+| `ReconcileError` | Transient error (will be retried) |
+| `TerminalError` | Non-retryable error |
+| `DependencyNotReady` | ProviderConfig or parent not ready |
 | `ImmutableField` | Attempt to modify an immutable field |
-| `OrphanedResource` | Resource deleted with `Orphan` deletion policy — Snowflake object left intact |
-| `ConflictDetected` | Another CR already manages the same Snowflake object (ownership conflict) |
-| `CreateOrAlterFallback` | `CREATE OR ALTER` not supported by the Snowflake edition; falling back to `ALTER` |
+| `ConflictDetected` | Another CR manages the same Snowflake object |
 
-### SafeRecorder
+All event messages pass through `SafeRecorder`, which sanitizes via `ForEvent()` before emitting.
 
-All event messages pass through `SafeRecorder`, which wraps the standard `record.EventRecorder` and sanitizes messages via `ForEvent()` before emitting. This ensures no SQL, passwords, or connection strings appear in Kubernetes events.
+---
 
 ## Health Probes
 
 | Endpoint | Check | Description |
-|----------|-------|-------------|
-| `/healthz` | Ping | Returns 200 if the manager process is running |
-| `/readyz` | Snowflake connectivity | Pings all cached Snowflake clients via `SELECT 1`; returns 200 when all are reachable |
+|:---------|:------|:------------|
+| `/healthz` | Ping | 200 if manager process is running |
+| `/readyz` | Snowflake connectivity | Pings all cached clients via `SELECT 1` |
 
 Configure with `--health-probe-bind-address` (default `:8081`).
 
-The readiness probe uses `ClientFactory.CheckHealth()`, which iterates all cached Snowflake connections and executes a `SELECT 1` with a 5-second timeout. If no clients are cached (e.g., before the first ProviderConfig is reconciled), the probe returns healthy.
+A configurable **startup grace period** (default 30s) allows the readiness probe to pass during initial startup before any Snowflake client is cached.
 
-A configurable **startup grace period** (`WithStartupGrace`, default 30 seconds) allows the readiness probe to pass during initial startup before any ProviderConfig has been reconciled and a Snowflake client cached. This prevents Kubernetes from killing the pod before it has had a chance to establish its first connection.
+---
 
 ## Grafana Dashboard
 
-A pre-built Grafana dashboard is available at `config/grafana/snowplane-dashboard.json`.
+A pre-built dashboard is available at `config/grafana/snowplane-dashboard.json`.
 
 ### Helm Chart Provisioning
-
-The Helm chart can automatically deploy the dashboard as a ConfigMap for Grafana sidecar provisioning:
 
 ```yaml
 grafana:
   dashboard:
     enabled: true
     labels:
-      grafana_dashboard: "1"  # standard sidecar discovery label
+      grafana_dashboard: "1"
 ```
 
 ### Panels
 
 - **Reconcile Rate** — Success/error rate per controller
-- **Reconcile Duration** — P50/P95/P99 percentiles per controller
-- **Reconcile Error Rate** — Error-only rate per controller
+- **Reconcile Duration** — P50/P95/P99 percentiles
 - **Snowflake API Latency** — P50/P95/P99 per operation
-- **Snowflake API Operations** — Operation counts (success/error)
-- **Client Pool Size** — Cached Snowflake connections
+- **Snowflake API Operations** — Operation counts
+- **Client Pool Size** — Cached connections
 - **Rate Limit Waits** — Throttling frequency
-- **Drift Detection Frequency** — Drift events per controller
-- **Adoption Outcomes** — Adopted/rejected per controller
-- **Managed Resources** — Resources by controller and state
+- **Drift Detection Frequency** — Events per controller
+- **Adoption Outcomes** — Adopted/rejected
+- **Managed Resources** — By controller and state
 - **Circuit Breaker State** — Current state per provider
-- **Circuit Breaker Trips** — Trip frequency per provider
 
 ### Manual Installation
 
@@ -225,33 +225,21 @@ grafana:
 3. Select your Prometheus datasource
 4. Use the `Controller` dropdown to filter by resource type
 
+---
+
 ## Circuit Breaker
 
-The circuit breaker in `internal/circuitbreaker/` provides per-provider failure isolation. If a ProviderConfig's Snowflake account is unreachable, the circuit breaker prevents cascading failures to other providers.
-
-### States
+Per-provider failure isolation in `internal/circuitbreaker/`:
 
 | State | Behavior |
-|-------|----------|
-| **Closed** | Normal operation — all calls pass through |
-| **Open** | After N consecutive failures — calls are rejected immediately with `DependencyNotReady` |
-| **Half-Open** | After the reset timeout — a single probe call is allowed; success resets to closed, failure reopens |
-
-### Configuration
-
-The circuit breaker uses sensible defaults:
+|:------|:---------|
+| **Closed** | Normal operation |
+| **Open** | After N failures — calls rejected with `DependencyNotReady` |
+| **Half-Open** | After reset timeout — single probe allowed |
 
 | Option | Default | Description |
-|--------|---------|-------------|
+|:-------|:--------|:------------|
 | `FailureThreshold` | 5 | Consecutive failures before opening |
-| `ResetTimeout` | 60s | Duration to stay open before probing |
-
-### How It Works
-
-1. Each reconciliation records success/failure via the circuit breaker
-2. After `FailureThreshold` consecutive failures, the breaker opens for that provider
-3. While open, resources referencing the failing provider get `DependencyNotReady` condition
-4. After `ResetTimeout`, the breaker transitions to half-open and allows one probe
-5. Successful probe resets to closed; failed probe reopens
+| `ResetTimeout` | 60s | Duration before probing |
 
 Resources using other ProviderConfigs are completely unaffected.
