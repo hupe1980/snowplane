@@ -520,21 +520,21 @@ spec:
 
 ## CREATE OR ALTER
 
-For Database and Warehouse, opt into Snowflake's atomic `CREATE OR ALTER`:
+For Database, Schema, Table, Warehouse, Task, and Tag, `CREATE OR ALTER` is **enabled by default**. To opt out and use the legacy `CREATE IF NOT EXISTS` + `ALTER` two-step flow:
 
 ```yaml
 metadata:
   annotations:
-    snowplane.hupe1980.github.io/use-create-or-alter: "true"
+    snowplane.hupe1980.github.io/use-create-or-alter: "false"
 ```
 
 {: .note }
-> `CREATE OR ALTER` is a Snowflake preview feature.
+> `CREATE OR ALTER` is a Snowflake preview feature. If Snowflake returns an unsupported-feature error, the controller automatically falls back to the two-step flow.
 
 ---
 
 ## What's Next
 
-Snowplane manages **25 resource types** including Task, Stream, Tag, NetworkPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, StorageIntegration, FileFormat, Pipe, and DynamicTable.
+Snowplane manages **28 resource types** including Task, Stream, Tag, NetworkPolicy, NetworkRule, PasswordPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, StorageIntegration, SecurityIntegration, FileFormat, Pipe, and DynamicTable.
 
 See `config/samples/` for example CRs of every resource type.

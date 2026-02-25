@@ -24,6 +24,7 @@ rules:
   - secrets
   verbs:
   - create
+  - update
   - patch
   - delete
 {{- end }}
@@ -38,6 +39,7 @@ rules:
   - watch
 {{- if .Values.rbac.configMaps.write }}
   - create
+  - update
   - patch
   - delete
 {{- end }}
@@ -77,6 +79,9 @@ rules:
   - fileformats
   - pipes
   - storageintegrations
+  - securityintegrations
+  - passwordpolicies
+  - networkrules
   - fieldexports
   - providerconfigs
   verbs:
@@ -114,6 +119,9 @@ rules:
   - fileformats/status
   - pipes/status
   - storageintegrations/status
+  - securityintegrations/status
+  - passwordpolicies/status
+  - networkrules/status
   - fieldexports/status
   - providerconfigs/status
   verbs:
@@ -147,6 +155,9 @@ rules:
   - fileformats/finalizers
   - pipes/finalizers
   - storageintegrations/finalizers
+  - securityintegrations/finalizers
+  - passwordpolicies/finalizers
+  - networkrules/finalizers
   - fieldexports/finalizers
   - providerconfigs/finalizers
   verbs:
@@ -237,6 +248,9 @@ rules:
   - fileformats
   - pipes
   - storageintegrations
+  - securityintegrations
+  - passwordpolicies
+  - networkrules
   - fieldexports
   - providerconfigs
   verbs:
@@ -270,6 +284,9 @@ rules:
   - fileformats/status
   - pipes/status
   - storageintegrations/status
+  - securityintegrations/status
+  - passwordpolicies/status
+  - networkrules/status
   - fieldexports/status
   - providerconfigs/status
   verbs:
@@ -311,6 +328,9 @@ rules:
   - fileformats
   - pipes
   - storageintegrations
+  - securityintegrations
+  - passwordpolicies
+  - networkrules
   - fieldexports
   - providerconfigs
   verbs:
@@ -348,6 +368,9 @@ rules:
   - fileformats/status
   - pipes/status
   - storageintegrations/status
+  - securityintegrations/status
+  - passwordpolicies/status
+  - networkrules/status
   - fieldexports/status
   - providerconfigs/status
   verbs:

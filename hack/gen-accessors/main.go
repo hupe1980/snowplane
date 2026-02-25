@@ -106,6 +106,11 @@ var types = []TypeDef{
 	{TypeName: "Pipe", Receiver: "p", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "DynamicTable", Receiver: "dt", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
 
+	// Phase 6 — Wave 2 resources
+	{TypeName: "SecurityIntegration", Receiver: "si", Owner: OwnerEmpty, OwnerComment: "SHOW SECURITY INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "PasswordPolicy", Receiver: "pp", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "NetworkRule", Receiver: "nr", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
+
 	// Pattern B — Grant resources (custom GetSpecName)
 	{TypeName: "AccountRoleGrant", Receiver: "r", SkipGetSpecName: true, Owner: OwnerFromShowOutputGrantedBy, TrackedParams: TrackedParamsNil},
 	{TypeName: "DatabaseRoleGrant", Receiver: "r", SkipGetSpecName: true, Owner: OwnerFromShowOutputGrantedBy, TrackedParams: TrackedParamsNil},

@@ -30,7 +30,7 @@ const (
 	// AnnotationUseCreateOrAlter controls whether CREATE OR ALTER is used
 	// instead of the default CREATE IF NOT EXISTS + ALTER two-step flow.
 	// CREATE OR ALTER is enabled by default for supported types (Database,
-	// Schema, Table, Warehouse). Set to "false" to opt out and use the
+	// Schema, Table, Warehouse, Task, Tag). Set to "false" to opt out and use the
 	// legacy two-step flow. For unsupported types the annotation is ignored.
 	AnnotationUseCreateOrAlter = "snowplane.hupe1980.github.io/use-create-or-alter"
 

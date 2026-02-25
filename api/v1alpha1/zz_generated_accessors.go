@@ -1516,6 +1516,231 @@ func (dt *DynamicTable) SetTrackedParametersList(val []string) {
 }
 
 // ---------------------------------------------------------------------------
+// SecurityIntegration
+// ---------------------------------------------------------------------------
+
+func (si *SecurityIntegration) GetConditions() []metav1.Condition {
+	return si.Status.Conditions
+}
+
+func (si *SecurityIntegration) SetConditions(conditions []metav1.Condition) {
+	si.Status.Conditions = conditions
+}
+
+func (si *SecurityIntegration) GetDeletionPolicy() DeletionPolicy {
+	if si.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return si.Spec.DeletionPolicy
+}
+
+func (si *SecurityIntegration) GetFullyQualifiedName() string {
+	return si.Status.FullyQualifiedName
+}
+
+func (si *SecurityIntegration) GetProviderRef() ProviderReference {
+	return si.Spec.ProviderRef
+}
+
+func (si *SecurityIntegration) GetSpecName() string {
+	return si.Spec.Name
+}
+
+func (si *SecurityIntegration) GetUseRole() *string {
+	return si.Spec.UseRole
+}
+
+func (si *SecurityIntegration) GetObservedGeneration() int64 {
+	return si.Status.ObservedGeneration
+}
+
+func (si *SecurityIntegration) SetObservedGeneration(val int64) {
+	si.Status.ObservedGeneration = val
+}
+
+func (si *SecurityIntegration) GetLastAppliedSpecHash() string {
+	return si.Status.LastAppliedSpecHash
+}
+
+func (si *SecurityIntegration) SetLastAppliedSpecHash(val string) {
+	si.Status.LastAppliedSpecHash = val
+}
+
+func (si *SecurityIntegration) ValidateSpec() error {
+	return si.Spec.Validate()
+}
+
+func (si *SecurityIntegration) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(si.Spec)
+}
+
+func (si *SecurityIntegration) GetOwner() string {
+	// SHOW SECURITY INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (si *SecurityIntegration) GetTrackedParametersList() []string {
+	return si.Status.TrackedParameters
+}
+
+func (si *SecurityIntegration) SetTrackedParametersList(val []string) {
+	si.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// PasswordPolicy
+// ---------------------------------------------------------------------------
+
+func (pp *PasswordPolicy) GetConditions() []metav1.Condition {
+	return pp.Status.Conditions
+}
+
+func (pp *PasswordPolicy) SetConditions(conditions []metav1.Condition) {
+	pp.Status.Conditions = conditions
+}
+
+func (pp *PasswordPolicy) GetDeletionPolicy() DeletionPolicy {
+	if pp.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return pp.Spec.DeletionPolicy
+}
+
+func (pp *PasswordPolicy) GetFullyQualifiedName() string {
+	return pp.Status.FullyQualifiedName
+}
+
+func (pp *PasswordPolicy) GetProviderRef() ProviderReference {
+	return pp.Spec.ProviderRef
+}
+
+func (pp *PasswordPolicy) GetSpecName() string {
+	return pp.Spec.Name
+}
+
+func (pp *PasswordPolicy) GetUseRole() *string {
+	return pp.Spec.UseRole
+}
+
+func (pp *PasswordPolicy) GetObservedGeneration() int64 {
+	return pp.Status.ObservedGeneration
+}
+
+func (pp *PasswordPolicy) SetObservedGeneration(val int64) {
+	pp.Status.ObservedGeneration = val
+}
+
+func (pp *PasswordPolicy) GetLastAppliedSpecHash() string {
+	return pp.Status.LastAppliedSpecHash
+}
+
+func (pp *PasswordPolicy) SetLastAppliedSpecHash(val string) {
+	pp.Status.LastAppliedSpecHash = val
+}
+
+func (pp *PasswordPolicy) ValidateSpec() error {
+	return pp.Spec.Validate()
+}
+
+func (pp *PasswordPolicy) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(pp.Spec)
+}
+
+func (pp *PasswordPolicy) GetOwner() string {
+	if pp.Status.ShowOutput != nil {
+		return pp.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (pp *PasswordPolicy) GetTrackedParametersList() []string {
+	return pp.Status.TrackedParameters
+}
+
+func (pp *PasswordPolicy) SetTrackedParametersList(val []string) {
+	pp.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// NetworkRule
+// ---------------------------------------------------------------------------
+
+func (nr *NetworkRule) GetConditions() []metav1.Condition {
+	return nr.Status.Conditions
+}
+
+func (nr *NetworkRule) SetConditions(conditions []metav1.Condition) {
+	nr.Status.Conditions = conditions
+}
+
+func (nr *NetworkRule) GetDeletionPolicy() DeletionPolicy {
+	if nr.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return nr.Spec.DeletionPolicy
+}
+
+func (nr *NetworkRule) GetFullyQualifiedName() string {
+	return nr.Status.FullyQualifiedName
+}
+
+func (nr *NetworkRule) GetProviderRef() ProviderReference {
+	return nr.Spec.ProviderRef
+}
+
+func (nr *NetworkRule) GetSpecName() string {
+	return nr.Spec.Name
+}
+
+func (nr *NetworkRule) GetUseRole() *string {
+	return nr.Spec.UseRole
+}
+
+func (nr *NetworkRule) GetObservedGeneration() int64 {
+	return nr.Status.ObservedGeneration
+}
+
+func (nr *NetworkRule) SetObservedGeneration(val int64) {
+	nr.Status.ObservedGeneration = val
+}
+
+func (nr *NetworkRule) GetLastAppliedSpecHash() string {
+	return nr.Status.LastAppliedSpecHash
+}
+
+func (nr *NetworkRule) SetLastAppliedSpecHash(val string) {
+	nr.Status.LastAppliedSpecHash = val
+}
+
+func (nr *NetworkRule) ValidateSpec() error {
+	return nr.Spec.Validate()
+}
+
+func (nr *NetworkRule) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(nr.Spec)
+}
+
+func (nr *NetworkRule) GetOwner() string {
+	if nr.Status.ShowOutput != nil {
+		return nr.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (nr *NetworkRule) GetTrackedParametersList() []string {
+	return nr.Status.TrackedParameters
+}
+
+func (nr *NetworkRule) SetTrackedParametersList(val []string) {
+	nr.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
 // AccountRoleGrant
 // ---------------------------------------------------------------------------
 

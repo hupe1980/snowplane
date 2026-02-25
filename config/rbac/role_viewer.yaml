@@ -34,6 +34,9 @@ rules:
   - fileformats
   - pipes
   - storageintegrations
+  - securityintegrations
+  - passwordpolicies
+  - networkrules
   - fieldexports
   - providerconfigs
   verbs:
@@ -67,6 +70,9 @@ rules:
   - fileformats/status
   - pipes/status
   - storageintegrations/status
+  - securityintegrations/status
+  - passwordpolicies/status
+  - networkrules/status
   - fieldexports/status
   - providerconfigs/status
   verbs:

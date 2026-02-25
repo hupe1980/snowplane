@@ -121,6 +121,9 @@ GRANT CREATE DYNAMIC TABLE ON SCHEMA <db>.<schema> TO ROLE SNOWPLANE_ROLE;
 | `CREATE MASKING POLICY ON SCHEMA` | MaskingPolicy CRD | Per-schema |
 | `CREATE ROW ACCESS POLICY ON SCHEMA` | RowAccessPolicy CRD | Per-schema |
 | `CREATE INTEGRATION ON ACCOUNT` | StorageIntegration CRD | Account |
+| `CREATE INTEGRATION ON ACCOUNT` | SecurityIntegration CRD | Account |
+| `CREATE PASSWORD POLICY ON SCHEMA` | PasswordPolicy CRD | Per-schema |
+| `CREATE NETWORK RULE ON SCHEMA` | NetworkRule CRD | Per-schema |
 | `CREATE FILE FORMAT ON SCHEMA` | FileFormat CRD | Per-schema |
 | `CREATE PIPE ON SCHEMA` | Pipe CRD | Per-schema |
 | `CREATE DYNAMIC TABLE ON SCHEMA` | DynamicTable CRD | Per-schema |

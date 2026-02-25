@@ -16,7 +16,7 @@
 
 ## ✨ Features
 
-### 🏗️ Resource Management (25 CRDs)
+### 🏗️ Resource Management (28 CRDs)
 
 | Category | Resources |
 |----------|-----------|
@@ -24,15 +24,15 @@
 | 📊 **Data Objects** | Table, View, Stage, Stream, DynamicTable, FileFormat, Pipe |
 | 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, GrantOwnership |
 | ⏰ **Orchestration** | Task (DAG scheduling, serverless or warehouse-backed) |
-| � **Integrations** | StorageIntegration |
-| �🛡️ **Security & Governance** | NetworkPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
+| 🔗 **Integrations** | StorageIntegration, SecurityIntegration |
+| 🛡️ **Security & Governance** | NetworkPolicy, NetworkRule, PasswordPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
 | 📤 **Utilities** | FieldExport (copy status fields into ConfigMaps/Secrets) |
 
 Every resource supports full lifecycle management (create, alter, drop), drift detection, adoption of pre-existing objects, and deletion policies. See the [API Reference](#-api-reference) below for detailed field documentation.
 
 ### 🔧 Operator Capabilities
 
-- 🔗 **Cross-Resource References** — Schemas → Databases; Tables, Views, Stages, FileFormats, Pipes, DynamicTables → Databases + Schemas with automatic dependency resolution and backoff
+- 🔗 **Cross-Resource References** — Schemas → Databases; Tables, Views, Stages, FileFormats, Pipes, DynamicTables, MaskingPolicies, PasswordPolicies, NetworkRules → Databases + Schemas with automatic dependency resolution and backoff
 - 🔄 **Observe-Diff-Apply Reconciliation** — Only altered fields are pushed to Snowflake, minimizing API calls
 - 🔍 **Drift Detection & Correction** — Field-level drift detection with structured reporting, detect-only policy option
 - 🏷️ **Resource Adoption** — Adopt pre-existing Snowflake resources via `adoption-policy: adopt` annotation
@@ -40,7 +40,7 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 - 🛡️ **Dangerous Grant Protection** — Blocks grants to ACCOUNTADMIN/SECURITYADMIN/ORGADMIN and dangerous privileges by default
 - 🛡️ **Policy Body Validation** — Blocklist-based SQL injection prevention for MaskingPolicy and RowAccessPolicy `body` fields
 - 🏷️ **Ownership Conflict Detection** — Prevents duplicate CRs from managing the same Snowflake object via label-based conflict detection
-- ⚛️ **CREATE OR ALTER** — Opt-in atomic `CREATE OR ALTER` for Database & Warehouse via annotation, with graceful fallback for unsupported Snowflake editions
+- ⚛️ **CREATE OR ALTER** — Atomic `CREATE OR ALTER` enabled by default for Database, Schema, Table, Warehouse, Task & Tag, with graceful fallback for unsupported Snowflake editions (opt out via annotation)
 - 🗑️ **Deletion Policies** — `Delete` (drop resource) or `Orphan` (leave intact)
 - 🏷️ **ForceNew Annotation** — Delete+recreate on immutable field changes
 
@@ -84,7 +84,7 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 │  │  └──────────────────────────────────────────┘  ││
 │  │                                                ││
 │  │  ┌──────────────────────────────────────────┐  ││
-│  │  │  25 Resource Controllers (see above)     │  ││
+│  │  │  28 Resource Controllers (see above)     │  ││
 │  │  │  Observe → Diff → Apply reconciliation   │  ││
 │  │  └──────────────────────────────────────────┘  ││
 │  │                                                ││
@@ -212,8 +212,8 @@ kubectl get databases
 |------------|---------|--------|-------------|
 | `snowplane.hupe1980.github.io/force-new` | `false` | `true` / `false` | Delete + recreate on immutable field change |
 | `snowplane.hupe1980.github.io/adoption-policy` | `fail-if-exists` | `adopt` / `fail-if-exists` | Control adoption of pre-existing resources |
-| `snowplane.hupe1980.github.io/drift-policy` | correct | `detect-only` | Report drift without correcting it |
-| `snowplane.hupe1980.github.io/use-create-or-alter` | `true` | `true` / `false` | Atomic `CREATE OR ALTER` (Database, Warehouse) |
+| `snowplane.hupe1980.github.io/drift-policy` | `correct` | `correct` / `detect-only` | Report drift without correcting it, or correct automatically |
+| `snowplane.hupe1980.github.io/use-create-or-alter` | `true` | `true` / `false` | Atomic `CREATE OR ALTER` (Database, Schema, Table, Warehouse, Task, Tag) |
 | `snowplane.hupe1980.github.io/allow-dangerous-grant` | `false` | `true` / `false` | Allow grants to system roles / dangerous privileges |
 
 ### 🏷️ CRD Labels
@@ -597,7 +597,26 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 </details>
 
 <details>
-<summary>📄 <strong>FileFormat</strong></summary>
+<summary>� <strong>SecurityIntegration</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Security integration name *(immutable)* |
+| `spec.type` | `enum` | Integration type: `EXTERNAL_OAUTH` / `SAML2` / `SCIM` / `API_AUTHENTICATION` *(immutable)* |
+| `spec.enabled` | `*bool` | Whether the integration is active |
+| `spec.externalOAuth` | `*ExternalOAuthConfig` | External OAuth config (when type=EXTERNAL_OAUTH) |
+| `spec.saml2` | `*SAML2Config` | SAML2 SSO config (when type=SAML2) |
+| `spec.scim` | `*SCIMConfig` | SCIM provisioning config (when type=SCIM) |
+| `spec.apiAuthentication` | `*APIAuthenticationConfig` | API Authentication config (when type=API_AUTHENTICATION) |
+| `spec.comment` | `*string` | Optional description |
+| `status.describeOutput` | `map[string]string` | Key-value pairs from DESCRIBE INTEGRATION |
+
+> 🔐 **SSO & Identity:** Security integrations configure federated authentication (SAML2, OAuth), automated user provisioning (SCIM), and programmatic API access. Each type has its own sub-config.
+
+</details>
+
+<details>
+<summary>�📄 <strong>FileFormat</strong></summary>
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -629,9 +648,10 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 | `spec.name` | `string` | Pipe name *(immutable)* |
 | `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
-| `spec.copyStatement` | `string` | COPY INTO statement defining pipe behavior |
-| `spec.autoIngest` | `*bool` | Enable automatic data loading on new files |
-| `spec.integration` | `*string` | Notification integration for auto-ingest *(required when autoIngest=true)* |
+| `spec.copyStatement` | `string` | COPY INTO statement defining pipe behavior *(immutable)* |
+| `spec.autoIngest` | `*bool` | Enable automatic data loading on new files *(immutable)* |
+| `spec.integration` | `*string` | Notification integration for auto-ingest *(required when autoIngest=true, immutable)* |
+| `spec.awsSnsTopic` | `*string` | Amazon SNS topic ARN for S3 auto-ingest *(immutable)* |
 | `spec.errorIntegration` | `*string` | Notification integration for error notifications |
 | `spec.comment` | `*string` | Optional description |
 | `status.notificationChannel` | `string` | Cloud notification channel (e.g. SQS ARN) — configure cloud event notifications |
@@ -648,11 +668,14 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 | `spec.name` | `string` | Dynamic table name *(immutable)* |
 | `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
-| `spec.query` | `string` | SQL query defining the dynamic table content |
+| `spec.query` | `string` | SQL query defining the dynamic table content *(immutable)* |
 | `spec.targetLag` | `string` | Maximum acceptable staleness (e.g. `"1 minute"`, `"DOWNSTREAM"`) |
 | `spec.warehouse` | `string` | Warehouse used for refreshing |
-| `spec.refreshMode` | `*enum` | Refresh strategy: `AUTO` / `FULL` / `INCREMENTAL` |
-| `spec.initialize` | `*enum` | Initial data population: `ON_CREATE` / `ON_SCHEDULE` |
+| `spec.refreshMode` | `*enum` | Refresh strategy: `AUTO` / `FULL` / `INCREMENTAL` *(immutable)* |
+| `spec.initialize` | `*enum` | Initial data population: `ON_CREATE` / `ON_SCHEDULE` *(immutable)* |
+| `spec.transient` | `bool` | Transient dynamic table — no Fail-safe *(immutable, default: false)* |
+| `spec.clusterBy` | `[]string` | Clustering key expressions |
+| `spec.dataRetentionTimeInDays` | `*int32` | Time Travel retention (0–90 days) |
 | `spec.comment` | `*string` | Optional description |
 
 > ⚡ **Declarative Pipelines:** Dynamic tables automatically refresh based on upstream changes. Use `targetLag` to control freshness and `DOWNSTREAM` for chained pipeline dependencies.
@@ -687,6 +710,48 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 | `spec.comment` | `*string` | Optional description |
 
 > 🛡️ **Security Perimeter:** Network policies control which IP addresses and network rules can access your Snowflake account.
+
+</details>
+
+<details>
+<summary>🌐 <strong>NetworkRule</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Network rule name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.type` | `enum` | Rule type: `IPV4` / `AWSVPCEID` / `AZURELINKID` / `GCPPSCID` / `HOST_PORT` / `PRIVATE_HOST_PORT` *(immutable)* |
+| `spec.mode` | `enum` | Rule mode: `INGRESS` / `INTERNAL_STAGE` / `EGRESS` *(immutable)* |
+| `spec.valueList` | `[]string` | Network identifiers (IPs, CIDR ranges, VPC endpoint IDs, etc.) |
+| `spec.comment` | `*string` | Optional description |
+
+> 🌐 **Network Identifiers:** Network rules define groups of network identifiers that can be used in network policies and security integrations. Type and mode are immutable after creation.
+
+</details>
+
+<details>
+<summary>🔒 <strong>PasswordPolicy</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Password policy name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.passwordMinLength` | `*int32` | Minimum password length (8–256) |
+| `spec.passwordMaxLength` | `*int32` | Maximum password length (8–256) |
+| `spec.passwordMinUpperCaseChars` | `*int32` | Minimum uppercase characters |
+| `spec.passwordMinLowerCaseChars` | `*int32` | Minimum lowercase characters |
+| `spec.passwordMinNumericChars` | `*int32` | Minimum numeric characters |
+| `spec.passwordMinSpecialChars` | `*int32` | Minimum special characters |
+| `spec.passwordMinAgeDays` | `*int32` | Days before password can be changed |
+| `spec.passwordMaxAgeDays` | `*int32` | Days before password must be changed |
+| `spec.passwordMaxRetries` | `*int32` | Login attempts before lockout |
+| `spec.passwordLockoutTimeMins` | `*int32` | Lockout duration in minutes |
+| `spec.passwordHistory` | `*int32` | Number of previous passwords to remember |
+| `spec.comment` | `*string` | Optional description |
+
+> 🔒 **Password Compliance:** Password policies enforce authentication strength requirements across your Snowflake account. Assign to users for compliance.
 
 </details>
 
@@ -853,10 +918,11 @@ Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped a
 ├── docs/                   # Documentation
 ├── hack/                   # Dev & codegen scripts
 ├── internal/
+│   ├── circuitbreaker/     # Per-provider 3-state failure isolation
 │   ├── clients/
 │   │   ├── clientfactory/  # Client cache with hash-based rotation
 │   │   └── snowflake/      # Snowflake SDK wrapper & SQL builder
-│   ├── controller/         # All reconcilers (24 managed resources + FieldExport + ProviderConfig)
+│   ├── controller/         # All reconcilers (27 managed resources + FieldExport + ProviderConfig)
 │   ├── drift/              # Field-level drift detection engine
 │   ├── metrics/            # Custom Prometheus metrics
 │   ├── provider/           # Provider config builder & client resolution

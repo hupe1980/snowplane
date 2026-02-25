@@ -51,6 +51,9 @@ All resource types support drift detection:
 | MaskingPolicy | `name`, `database`, `schema`, `signature` |
 | RowAccessPolicy | `name`, `database`, `schema`, `signature` |
 | StorageIntegration | `name` |
+| SecurityIntegration | `name`, `type` |
+| PasswordPolicy | `name`, `database`, `schema` |
+| NetworkRule | `name`, `database`, `schema`, `type`, `mode` |
 | FileFormat | `name`, `database`, `schema`, `type` |
 | Pipe | `name`, `database`, `schema`, `definition`, `integration` |
 | DynamicTable | `name`, `database`, `schema`, `query`, `refreshMode` |
@@ -104,6 +107,21 @@ Immutable violations require manual intervention — delete/recreate the CR.
 
 {: .note }
 > Password and RSA key fields are not drift-detected because Snowflake does not expose their current values. Password changes are tracked via `status.lastAppliedPasswordHash`.
+
+### SecurityIntegration
+{: .text-delta }
+
+`comment`, `enabled` (from SHOW), plus sub-type fields from DESCRIBE: ExternalOAuth (`jwsKeysURL`, `anyRoleMode`, `audienceList`, `allowedRoles`, `blockedRoles`, `networkPolicy`), SAML2 (`x509Cert`, `allowedEmailPatterns`, `allowedUserDomains`), SCIM (`networkPolicy`, `syncPassword`)
+
+### PasswordPolicy
+{: .text-delta }
+
+`comment` (from SHOW), plus all 11 numeric parameters from DESCRIBE: `passwordMinLength`, `passwordMaxLength`, `passwordMinUpperCaseChars`, `passwordMinLowerCaseChars`, `passwordMinNumericChars`, `passwordMinSpecialChars`, `passwordMinAgeDays`, `passwordMaxAgeDays`, `passwordMaxRetries`, `passwordLockoutTimeMins`, `passwordHistory`
+
+### NetworkRule
+{: .text-delta }
+
+`comment` (from SHOW), `valueList` (from DESCRIBE)
 
 ---
 

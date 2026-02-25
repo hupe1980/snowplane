@@ -1,0 +1,18 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: NetworkRule
+metadata:
+  name: office-ingress-rule
+spec:
+  providerRef:
+    name: default
+  name: OFFICE_INGRESS_RULE
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  type: IPV4
+  mode: INGRESS
+  valueList:
+    - "10.0.0.0/8"
+    - "192.168.1.0/24"
+  comment: "Allow office IP ranges managed by Snowplane"

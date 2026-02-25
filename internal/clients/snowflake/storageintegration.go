@@ -280,7 +280,7 @@ func (si *StorageIntegrationClient) Describe(ctx context.Context, name AccountOb
 	}
 	defer closeRows(rows)
 
-	return scanDescribeIntegration(rows)
+	return scanDescribeKeyValue(rows)
 }
 
 // Observe combines ShowByID and Describe into a StorageIntegrationObservation.
@@ -356,27 +356,4 @@ func scanStorageIntegrationShowOutput(rows *sql.Rows, name string) (*StorageInte
 	}
 
 	return nil, ErrObjectNotFound
-}
-
-// scanDescribeIntegration scans DESCRIBE INTEGRATION output into a key-value map.
-// The result columns are: property, property_type, property_value, property_default.
-func scanDescribeIntegration(rows *sql.Rows) (map[string]string, error) {
-	result := make(map[string]string)
-
-	for rows.Next() {
-		var prop, propType, propValue, propDefault sql.NullString
-		if err := rows.Scan(&prop, &propType, &propValue, &propDefault); err != nil {
-			return nil, fmt.Errorf("scanning describe row: %w", err)
-		}
-
-		if prop.Valid && propValue.Valid {
-			result[prop.String] = propValue.String
-		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating describe rows: %w", err)
-	}
-
-	return result, nil
 }

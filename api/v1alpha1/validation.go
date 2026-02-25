@@ -1348,35 +1348,180 @@ func (s *DynamicTableSpec) Validate() error {
 	return errors.Join(errs...)
 }
 
+// Validate checks the SecurityIntegrationSpec for configuration errors.
+func (s *SecurityIntegrationSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if s.Type == "" {
+		errs = append(errs, errors.New("spec.type is required"))
+	}
+
+	// Type-specific sub-config validation.
+	switch s.Type {
+	case SecurityIntegrationTypeExternalOAuth:
+		if s.ExternalOAuth == nil {
+			errs = append(errs, errors.New("spec.externalOAuth is required when type is EXTERNAL_OAUTH"))
+		} else {
+			if s.ExternalOAuth.Type == "" {
+				errs = append(errs, errors.New("spec.externalOAuth.type is required"))
+			}
+			if s.ExternalOAuth.Issuer == "" {
+				errs = append(errs, errors.New("spec.externalOAuth.issuer is required"))
+			}
+			if s.ExternalOAuth.TokenUserMappingClaim == "" {
+				errs = append(errs, errors.New("spec.externalOAuth.tokenUserMappingClaim is required"))
+			}
+		}
+	case SecurityIntegrationTypeSAML2:
+		if s.SAML2 == nil {
+			errs = append(errs, errors.New("spec.saml2 is required when type is SAML2"))
+		} else {
+			if s.SAML2.Issuer == "" {
+				errs = append(errs, errors.New("spec.saml2.issuer is required"))
+			}
+			if s.SAML2.SSOURL == "" {
+				errs = append(errs, errors.New("spec.saml2.ssoURL is required"))
+			}
+			if s.SAML2.Provider == "" {
+				errs = append(errs, errors.New("spec.saml2.provider is required"))
+			}
+			if s.SAML2.X509Cert == "" {
+				errs = append(errs, errors.New("spec.saml2.x509Cert is required"))
+			}
+		}
+	case SecurityIntegrationTypeSCIM:
+		if s.SCIM == nil {
+			errs = append(errs, errors.New("spec.scim is required when type is SCIM"))
+		} else {
+			if s.SCIM.SCIMClient == "" {
+				errs = append(errs, errors.New("spec.scim.scimClient is required"))
+			}
+			if s.SCIM.RunAsRole == "" {
+				errs = append(errs, errors.New("spec.scim.runAsRole is required"))
+			}
+		}
+	case SecurityIntegrationTypeAPIAuthentication:
+		if s.APIAuthentication == nil {
+			errs = append(errs, errors.New("spec.apiAuthentication is required when type is API_AUTHENTICATION"))
+		} else {
+			if s.APIAuthentication.OAuthClientID == "" {
+				errs = append(errs, errors.New("spec.apiAuthentication.oauthClientID is required"))
+			}
+			if s.APIAuthentication.OAuthClientSecret == "" {
+				errs = append(errs, errors.New("spec.apiAuthentication.oauthClientSecret is required"))
+			}
+			if s.APIAuthentication.OAuthTokenEndpoint == "" {
+				errs = append(errs, errors.New("spec.apiAuthentication.oauthTokenEndpoint is required"))
+			}
+		}
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the PasswordPolicySpec for configuration errors.
+func (s *PasswordPolicySpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Cross-field constraint: min <= max.
+	if s.PasswordMinLength != nil && s.PasswordMaxLength != nil && *s.PasswordMinLength > *s.PasswordMaxLength {
+		errs = append(errs, errors.New("spec.passwordMinLength must not exceed spec.passwordMaxLength"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the NetworkRuleSpec for configuration errors.
+func (s *NetworkRuleSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.Type == "" {
+		errs = append(errs, errors.New("spec.type is required"))
+	}
+
+	if s.Mode == "" {
+		errs = append(errs, errors.New("spec.mode is required"))
+	}
+
+	if len(s.ValueList) == 0 {
+		errs = append(errs, errors.New("spec.valueList must not be empty"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
 // ValidFieldExportSourceKinds enumerates the Snowplane managed resource kinds
 // supported as FieldExport sources.
 //
 //nolint:gochecknoglobals // package-level constant set
 var ValidFieldExportSourceKinds = map[string]struct{}{
-	"Database":           {},
-	"Schema":             {},
-	"Warehouse":          {},
-	"User":               {},
-	"AccountRole":        {},
-	"DatabaseRole":       {},
-	"AccountRoleGrant":   {},
-	"DatabaseRoleGrant":  {},
-	"ShareGrant":         {},
-	"Table":              {},
-	"View":               {},
-	"Stage":              {},
-	"Task":               {},
-	"Stream":             {},
-	"Tag":                {},
-	"NetworkPolicy":      {},
-	"ResourceMonitor":    {},
-	"MaskingPolicy":      {},
-	"RowAccessPolicy":    {},
-	"GrantOwnership":     {},
-	"StorageIntegration": {},
-	"FileFormat":         {},
-	"Pipe":               {},
-	"DynamicTable":       {},
+	"Database":            {},
+	"Schema":              {},
+	"Warehouse":           {},
+	"User":                {},
+	"AccountRole":         {},
+	"DatabaseRole":        {},
+	"AccountRoleGrant":    {},
+	"DatabaseRoleGrant":   {},
+	"ShareGrant":          {},
+	"Table":               {},
+	"View":                {},
+	"Stage":               {},
+	"Task":                {},
+	"Stream":              {},
+	"Tag":                 {},
+	"NetworkPolicy":       {},
+	"ResourceMonitor":     {},
+	"MaskingPolicy":       {},
+	"RowAccessPolicy":     {},
+	"GrantOwnership":      {},
+	"StorageIntegration":  {},
+	"SecurityIntegration": {},
+	"FileFormat":          {},
+	"Pipe":                {},
+	"DynamicTable":        {},
+	"PasswordPolicy":      {},
+	"NetworkRule":         {},
 }
 
 // Validate checks that the FieldExport spec fields are semantically valid.

@@ -51,6 +51,9 @@ Every Snowplane CRD carries a maturity label (`snowplane.hupe1980.github.io/matu
 | MaskingPolicy | alpha | Dynamic masking for PII/PCI |
 | RowAccessPolicy | alpha | Row-level security |
 | StorageIntegration | alpha | S3, GCS, Azure integrations |
+| SecurityIntegration | alpha | SAML2, OAuth, SCIM, API auth |
+| PasswordPolicy | alpha | Password compliance rules |
+| NetworkRule | alpha | Network identifier groups |
 | FileFormat | alpha | CSV, JSON, Parquet, etc. |
 | Pipe | alpha | Snowpipe continuous loading |
 | DynamicTable | alpha | Auto-refresh materialisation |
