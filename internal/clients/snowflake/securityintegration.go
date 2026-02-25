@@ -434,16 +434,16 @@ func buildAlterSecurityIntegrationStatements(opts AlterSecurityIntegrationOption
 			sc.String("EXTERNAL_OAUTH_JWS_KEYS_URL", opts.ExternalOAuthJWSKeysURL)
 		}
 		if opts.ExternalOAuthAudienceList != nil {
-			sc.Raw(buildStringListClause("EXTERNAL_OAUTH_AUDIENCE_LIST", *opts.ExternalOAuthAudienceList))
+			sc.UnsafeRaw(buildStringListClause("EXTERNAL_OAUTH_AUDIENCE_LIST", *opts.ExternalOAuthAudienceList))
 		}
 		if opts.ExternalOAuthAllowedRoles != nil {
-			sc.Raw(buildStringListClause("EXTERNAL_OAUTH_ALLOWED_ROLES_LIST", *opts.ExternalOAuthAllowedRoles))
+			sc.UnsafeRaw(buildStringListClause("EXTERNAL_OAUTH_ALLOWED_ROLES_LIST", *opts.ExternalOAuthAllowedRoles))
 		}
 		if opts.ExternalOAuthBlockedRoles != nil {
-			sc.Raw(buildStringListClause("EXTERNAL_OAUTH_BLOCKED_ROLES_LIST", *opts.ExternalOAuthBlockedRoles))
+			sc.UnsafeRaw(buildStringListClause("EXTERNAL_OAUTH_BLOCKED_ROLES_LIST", *opts.ExternalOAuthBlockedRoles))
 		}
 		if opts.ExternalOAuthAnyRoleMode != nil {
-			sc.Raw(fmt.Sprintf("EXTERNAL_OAUTH_ANY_ROLE_MODE = %s", *opts.ExternalOAuthAnyRoleMode))
+			sc.UnsafeRaw(fmt.Sprintf("EXTERNAL_OAUTH_ANY_ROLE_MODE = %s", *opts.ExternalOAuthAnyRoleMode))
 		}
 		if opts.ExternalOAuthScopeDelimiter != nil {
 			sc.String("EXTERNAL_OAUTH_SCOPE_DELIMITER", opts.ExternalOAuthScopeDelimiter)
@@ -456,10 +456,10 @@ func buildAlterSecurityIntegrationStatements(opts AlterSecurityIntegrationOption
 			sc.String("SAML2_X509_CERT", opts.SAML2X509Cert)
 		}
 		if opts.SAML2AllowedEmailPatterns != nil {
-			sc.Raw(buildStringListClause("ALLOWED_EMAIL_PATTERNS", *opts.SAML2AllowedEmailPatterns))
+			sc.UnsafeRaw(buildStringListClause("ALLOWED_EMAIL_PATTERNS", *opts.SAML2AllowedEmailPatterns))
 		}
 		if opts.SAML2AllowedUserDomains != nil {
-			sc.Raw(buildStringListClause("ALLOWED_USER_DOMAINS", *opts.SAML2AllowedUserDomains))
+			sc.UnsafeRaw(buildStringListClause("ALLOWED_USER_DOMAINS", *opts.SAML2AllowedUserDomains))
 		}
 		if opts.SAML2SPInitiatedLoginLabel != nil {
 			sc.String("SAML2_SP_INITIATED_LOGIN_PAGE_LABEL", opts.SAML2SPInitiatedLoginLabel)
@@ -485,7 +485,7 @@ func buildAlterSecurityIntegrationStatements(opts AlterSecurityIntegrationOption
 		}
 	case "API_AUTHENTICATION":
 		if opts.OAuthAllowedScopes != nil {
-			sc.Raw(buildStringListClause("OAUTH_ALLOWED_SCOPES", *opts.OAuthAllowedScopes))
+			sc.UnsafeRaw(buildStringListClause("OAUTH_ALLOWED_SCOPES", *opts.OAuthAllowedScopes))
 		}
 	}
 

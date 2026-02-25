@@ -30,8 +30,8 @@ func (a *adapter) PreReconcile(_ context.Context, _ *snowplanev1alpha1.StorageIn
 	return nil
 }
 
-func (a *adapter) BuildIdentifier(obj *snowplanev1alpha1.StorageIntegration) reconciler.Identifier {
-	return snowflake.NewAccountObjectIdentifier(obj.Spec.Name)
+func (a *adapter) BuildIdentifier(obj *snowplanev1alpha1.StorageIntegration) (reconciler.Identifier, error) {
+	return snowflake.NewAccountObjectIdentifier(obj.Spec.Name), nil
 }
 
 func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc { return nil }

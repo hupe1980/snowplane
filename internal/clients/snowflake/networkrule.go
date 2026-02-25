@@ -40,6 +40,10 @@ type CreateNetworkRuleOptions struct {
 	Mode      string // INGRESS, INTERNAL_STAGE, EGRESS
 	ValueList []string
 	Comment   *string
+
+	// UseCreateOrAlter emits CREATE OR ALTER NETWORK RULE instead of
+	// CREATE NETWORK RULE IF NOT EXISTS.
+	UseCreateOrAlter bool
 }
 
 // Validate checks the CreateNetworkRuleOptions for validity.
@@ -112,7 +116,12 @@ func buildValueListClause(vals []string) string {
 // buildCreateNetworkRuleSQL builds the CREATE NETWORK RULE SQL statement.
 func buildCreateNetworkRuleSQL(opts CreateNetworkRuleOptions) string {
 	var b sqlbuilder.Builder
-	b.WriteString("CREATE NETWORK RULE IF NOT EXISTS ")
+
+	if opts.UseCreateOrAlter {
+		b.WriteString("CREATE OR ALTER NETWORK RULE ")
+	} else {
+		b.WriteString("CREATE NETWORK RULE IF NOT EXISTS ")
+	}
 	b.WriteString(opts.Name.FullyQualifiedName())
 	fmt.Fprintf(&b.Builder, " TYPE = %s", opts.Type)
 	fmt.Fprintf(&b.Builder, " MODE = %s", opts.Mode)

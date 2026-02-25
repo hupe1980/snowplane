@@ -42,6 +42,10 @@ type CreateMaskingPolicyOptions struct {
 	Body                string
 	ExemptOtherPolicies *bool
 	Comment             *string
+
+	// UseCreateOrAlter emits CREATE OR ALTER MASKING POLICY instead of
+	// CREATE MASKING POLICY IF NOT EXISTS.
+	UseCreateOrAlter bool
 }
 
 // Validate checks the CreateMaskingPolicyOptions for validity.
@@ -112,7 +116,12 @@ func buildSignatureClause(args []MaskingPolicyArgument) string {
 // buildCreateMaskingPolicySQL builds the CREATE MASKING POLICY SQL statement.
 func buildCreateMaskingPolicySQL(opts CreateMaskingPolicyOptions) string {
 	var b sqlbuilder.Builder
-	b.WriteString("CREATE MASKING POLICY IF NOT EXISTS ")
+
+	if opts.UseCreateOrAlter {
+		b.WriteString("CREATE OR ALTER MASKING POLICY ")
+	} else {
+		b.WriteString("CREATE MASKING POLICY IF NOT EXISTS ")
+	}
 	b.WriteString(opts.Name.FullyQualifiedName())
 	b.WriteString(" ")
 	b.WriteString(buildSignatureClause(opts.Signature))

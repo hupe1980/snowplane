@@ -275,7 +275,15 @@ func (s *WarehouseSpec) Validate() error {
 	}
 
 	if err := validateEnum("spec.resourceConstraint", s.ResourceConstraint,
-		ResourceConstraintMemory); err != nil {
+		ResourceConstraintMemory,
+		ResourceConstraintStandardGen1,
+		ResourceConstraintStandardGen2,
+		ResourceConstraintMemory1X,
+		ResourceConstraintMemory1Xx86,
+		ResourceConstraintMemory16X,
+		ResourceConstraintMemory16Xx86,
+		ResourceConstraintMemory64X,
+		ResourceConstraintMemory64Xx86); err != nil {
 		errs = append(errs, err)
 	}
 

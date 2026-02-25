@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // --------------------------------------------------------------------------
@@ -183,76 +184,104 @@ func TestBuildOnClause(t *testing.T) {
 
 	t.Run("OnAccount", func(t *testing.T) {
 		t.Parallel()
-		got := BuildOnClause(OnClauseParams{Account: true})
+		got, err := BuildOnClause(OnClauseParams{Account: true})
+		require.NoError(t, err)
 		assert.Equal(t, "ON ACCOUNT", got)
 	})
 
 	t.Run("OnAccountObject", func(t *testing.T) {
 		t.Parallel()
-		got := BuildOnClause(OnClauseParams{AccountObjectType: "DATABASE", AccountObjectName: "MY_DB"})
+		got, err := BuildOnClause(OnClauseParams{AccountObjectType: "DATABASE", AccountObjectName: "MY_DB"})
+		require.NoError(t, err)
 		assert.Equal(t, `ON DATABASE "MY_DB"`, got)
 	})
 
 	t.Run("OnSchema", func(t *testing.T) {
 		t.Parallel()
-		got := BuildOnClause(OnClauseParams{SchemaName: "MY_DB.PUBLIC"})
+		got, err := BuildOnClause(OnClauseParams{SchemaName: "MY_DB.PUBLIC"})
+		require.NoError(t, err)
 		assert.Equal(t, `ON SCHEMA "MY_DB"."PUBLIC"`, got)
 	})
 
 	t.Run("AllSchemasInDatabase", func(t *testing.T) {
 		t.Parallel()
-		got := BuildOnClause(OnClauseParams{AllSchemasInDB: "MY_DB"})
+		got, err := BuildOnClause(OnClauseParams{AllSchemasInDB: "MY_DB"})
+		require.NoError(t, err)
 		assert.Equal(t, `ON ALL SCHEMAS IN DATABASE "MY_DB"`, got)
 	})
 
 	t.Run("FutureSchemasInDatabase", func(t *testing.T) {
 		t.Parallel()
-		got := BuildOnClause(OnClauseParams{FutureSchemasInDB: "MY_DB"})
+		got, err := BuildOnClause(OnClauseParams{FutureSchemasInDB: "MY_DB"})
+		require.NoError(t, err)
 		assert.Equal(t, `ON FUTURE SCHEMAS IN DATABASE "MY_DB"`, got)
 	})
 
 	t.Run("OnSchemaObject", func(t *testing.T) {
 		t.Parallel()
-		got := BuildOnClause(OnClauseParams{SchemaObjectType: "TABLE", SchemaObjectName: "DB.SCH.T1"})
+		got, err := BuildOnClause(OnClauseParams{SchemaObjectType: "TABLE", SchemaObjectName: "DB.SCH.T1"})
+		require.NoError(t, err)
 		assert.Equal(t, `ON TABLE "DB"."SCH"."T1"`, got)
 	})
 
 	t.Run("AllTablesInDatabase", func(t *testing.T) {
 		t.Parallel()
-		got := BuildOnClause(OnClauseParams{AllObjectsTypePlural: "TABLES", AllObjectsInDB: "MY_DB"})
+		got, err := BuildOnClause(OnClauseParams{AllObjectsTypePlural: "TABLES", AllObjectsInDB: "MY_DB"})
+		require.NoError(t, err)
 		assert.Equal(t, `ON ALL TABLES IN DATABASE "MY_DB"`, got)
 	})
 
 	t.Run("AllTablesInSchema", func(t *testing.T) {
 		t.Parallel()
-		got := BuildOnClause(OnClauseParams{AllObjectsTypePlural: "TABLES", AllObjectsInSchema: "MY_DB.PUBLIC"})
+		got, err := BuildOnClause(OnClauseParams{AllObjectsTypePlural: "TABLES", AllObjectsInSchema: "MY_DB.PUBLIC"})
+		require.NoError(t, err)
 		assert.Equal(t, `ON ALL TABLES IN SCHEMA "MY_DB"."PUBLIC"`, got)
 	})
 
 	t.Run("FutureTablesInDatabase", func(t *testing.T) {
 		t.Parallel()
-		got := BuildOnClause(OnClauseParams{FutureObjectsTypePlural: "TABLES", FutureObjectsInDB: "MY_DB"})
+		got, err := BuildOnClause(OnClauseParams{FutureObjectsTypePlural: "TABLES", FutureObjectsInDB: "MY_DB"})
+		require.NoError(t, err)
 		assert.Equal(t, `ON FUTURE TABLES IN DATABASE "MY_DB"`, got)
 	})
 
 	t.Run("FutureTablesInSchema", func(t *testing.T) {
 		t.Parallel()
-		got := BuildOnClause(OnClauseParams{FutureObjectsTypePlural: "TABLES", FutureObjectsInSchema: "MY_DB.PUBLIC"})
+		got, err := BuildOnClause(OnClauseParams{FutureObjectsTypePlural: "TABLES", FutureObjectsInSchema: "MY_DB.PUBLIC"})
+		require.NoError(t, err)
 		assert.Equal(t, `ON FUTURE TABLES IN SCHEMA "MY_DB"."PUBLIC"`, got)
 	})
 
 	t.Run("SQLInjectionPrevented", func(t *testing.T) {
 		t.Parallel()
-		got := BuildOnClause(OnClauseParams{
+		got, err := BuildOnClause(OnClauseParams{
 			AccountObjectType: "DATABASE",
 			AccountObjectName: `MY_DB"; DROP DATABASE PROD; --`,
 		})
+		require.NoError(t, err)
 		// The embedded double-quote is escaped to "" by QuoteIdentifier,
 		// producing a single safe identifier token.
 		assert.Equal(t, `ON DATABASE "MY_DB""; DROP DATABASE PROD; --"`, got)
 		// Verify the injection payload is contained within the quoted identifier.
 		assert.True(t, strings.HasPrefix(got, `ON DATABASE "`))
 		assert.True(t, strings.HasSuffix(got, `"`))
+	})
+
+	t.Run("InvalidObjectTypeRejected", func(t *testing.T) {
+		t.Parallel()
+		_, err := BuildOnClause(OnClauseParams{
+			AccountObjectType: "DROP TABLE;",
+			AccountObjectName: "MY_DB",
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid account object type")
+	})
+
+	t.Run("EmptyParams", func(t *testing.T) {
+		t.Parallel()
+		got, err := BuildOnClause(OnClauseParams{})
+		require.NoError(t, err)
+		assert.Equal(t, "", got)
 	})
 }
 
@@ -425,6 +454,16 @@ func TestCreateGrantOptionsValidation(t *testing.T) {
 		}
 		assert.ErrorContains(t, opts.Validate(), "toClause is required")
 	})
+
+	t.Run("InvalidPrivilege_Injection", func(t *testing.T) {
+		t.Parallel()
+		opts := CreateGrantOptions{
+			Privilege: "USAGE; DROP DATABASE",
+			OnClause:  `ON DATABASE "MY_DB"`,
+			ToClause:  `TO ROLE "ANALYST"`,
+		}
+		assert.ErrorContains(t, opts.Validate(), "invalid privilege")
+	})
 }
 
 func TestRevokeGrantOptionsValidation(t *testing.T) {
@@ -456,6 +495,16 @@ func TestRevokeGrantOptionsValidation(t *testing.T) {
 			OnClause:  `ON DATABASE "MY_DB"`,
 		}
 		assert.ErrorContains(t, opts.Validate(), "fromClause is required")
+	})
+
+	t.Run("InvalidPrivilege_Injection", func(t *testing.T) {
+		t.Parallel()
+		opts := RevokeGrantOptions{
+			Privilege:  "SELECT; --",
+			OnClause:   `ON DATABASE "MY_DB"`,
+			FromClause: `FROM ROLE "ANALYST"`,
+		}
+		assert.ErrorContains(t, opts.Validate(), "invalid privilege")
 	})
 }
 

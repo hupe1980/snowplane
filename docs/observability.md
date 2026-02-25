@@ -189,6 +189,8 @@ Configure with `--health-probe-bind-address` (default `:8081`).
 
 A configurable **startup grace period** (default 30s) allows the readiness probe to pass during initial startup before any Snowflake client is cached.
 
+The Helm deployment template includes a **startupProbe** (`httpGet /healthz:8081`, `failureThreshold: 30`, `periodSeconds: 2`) that provides a 60-second startup window before liveness takes over. This prevents the kubelet from killing the pod during slow initial Snowflake connections.
+
 ---
 
 ## Grafana Dashboard

@@ -87,6 +87,13 @@ controller:
   # -- Comma-separated list of controllers to disable (e.g. "grant,view")
   disableControllers: ""
 
+# -- Circuit breaker configuration for per-provider failure isolation
+circuitBreaker:
+  # -- Consecutive failures before the circuit opens
+  threshold: 5
+  # -- Duration the circuit stays open before allowing a probe request
+  resetTimeout: 60s
+
 leaderElection:
   # -- Enable leader election
   enabled: true
@@ -177,6 +184,16 @@ rbac:
 # -- Leader election identity. Override when running multiple Snowplane instances
 # in the same cluster to prevent leader election conflicts.
 leaderElectionID: "snowplane-leader-election"
+
+# -- Additional environment variables for the controller container
+extraEnv: []
+# -- Additional volumes for the pod
+extraVolumes: []
+# -- Additional volume mounts for the controller container
+extraVolumeMounts: []
+
+# -- Number of old ReplicaSets to retain for rollback
+revisionHistoryLimit: 3
 
 # -- Grafana dashboard provisioning
 grafana:

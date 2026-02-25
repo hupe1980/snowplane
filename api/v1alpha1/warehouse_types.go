@@ -107,9 +107,15 @@ type WarehouseSpec struct {
 	WarehouseSize *WarehouseSize `json:"warehouseSize,omitempty"`
 
 	// MinClusterCount is the minimum number of clusters (multi-cluster mode).
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=10
 	MinClusterCount *int32 `json:"minClusterCount,omitempty"`
 
 	// MaxClusterCount is the maximum number of clusters (multi-cluster mode).
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=10
 	MaxClusterCount *int32 `json:"maxClusterCount,omitempty"`
 
 	// ScalingPolicy controls multi-cluster scaling behavior.
@@ -136,9 +142,15 @@ type WarehouseSpec struct {
 	EnableQueryAcceleration *bool `json:"enableQueryAcceleration,omitempty"`
 
 	// QueryAccelerationMaxScaleFactor limits query acceleration scaling (0–100).
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
 	QueryAccelerationMaxScaleFactor *int32 `json:"queryAccelerationMaxScaleFactor,omitempty"`
 
 	// MaxConcurrencyLevel limits concurrent queries (1–32, default 8).
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=32
 	MaxConcurrencyLevel *int32 `json:"maxConcurrencyLevel,omitempty"`
 
 	// StatementQueuedTimeoutInSeconds controls how long queries queue before timing out.

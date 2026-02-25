@@ -57,11 +57,11 @@ func (a *adapter) PreReconcile(ctx context.Context, mp *snowplanev1alpha1.Maskin
 	return nil
 }
 
-func (a *adapter) BuildIdentifier(mp *snowplanev1alpha1.MaskingPolicy) reconciler.Identifier {
+func (a *adapter) BuildIdentifier(mp *snowplanev1alpha1.MaskingPolicy) (reconciler.Identifier, error) {
 	dbName := snowflake.ParseDatabaseNameFromFQN(mp.Status.DatabaseName)
 	schemaName := snowflake.ParseSchemaNameFromFQN(mp.Status.SchemaName)
 
-	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, mp.Spec.Name)
+	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, mp.Spec.Name), nil
 }
 
 func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
@@ -133,6 +133,8 @@ func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha
 	}
 
 	opts := buildCreateOptions(obj, sid)
+	opts.UseCreateOrAlter = snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
+
 	return svc.Create(ctx, opts)
 }
 
@@ -209,6 +211,6 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.MaskingPolicy, obs *reconci
 
 func (a *adapter) PostCreate(_ *snowplanev1alpha1.MaskingPolicy)                                    {}
 func (a *adapter) PostUpdate(_ *snowplanev1alpha1.MaskingPolicy, _ bool, _ reconciler.AlterOptions) {}
-func (a *adapter) SupportsCreateOrAlter() bool                                                      { return false }
+func (a *adapter) SupportsCreateOrAlter() bool                                                      { return true }
 
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.MaskingPolicy, Service, *snowflake.MaskingPolicyObservation] = (*adapter)(nil)

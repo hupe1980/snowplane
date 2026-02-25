@@ -33,7 +33,12 @@ type PasswordPolicyShowOutput struct {
 
 // CreatePasswordPolicyOptions holds the parameters for creating a password policy.
 type CreatePasswordPolicyOptions struct {
-	Name                    SchemaObjectIdentifier
+	Name SchemaObjectIdentifier
+
+	// UseCreateOrAlter emits CREATE OR ALTER PASSWORD POLICY instead of
+	// CREATE PASSWORD POLICY IF NOT EXISTS.
+	UseCreateOrAlter bool
+
 	PasswordMinLength       *int32
 	PasswordMaxLength       *int32
 	PasswordMinUpperCase    *int32
@@ -116,7 +121,12 @@ func NewPasswordPolicyClient(c SQLExecutor) *PasswordPolicyClient {
 // buildCreatePasswordPolicySQL builds the CREATE PASSWORD POLICY SQL statement.
 func buildCreatePasswordPolicySQL(opts CreatePasswordPolicyOptions) string {
 	var b sqlbuilder.Builder
-	b.WriteString("CREATE PASSWORD POLICY IF NOT EXISTS ")
+
+	if opts.UseCreateOrAlter {
+		b.WriteString("CREATE OR ALTER PASSWORD POLICY ")
+	} else {
+		b.WriteString("CREATE PASSWORD POLICY IF NOT EXISTS ")
+	}
 	b.WriteString(opts.Name.FullyQualifiedName())
 
 	b.SetInt32("PASSWORD_MIN_LENGTH", opts.PasswordMinLength)

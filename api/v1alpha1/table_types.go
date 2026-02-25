@@ -89,6 +89,7 @@ type TableConstraint struct {
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.constraints) || !has(self.constraints) || self.constraints == oldSelf.constraints",message="spec.constraints is immutable (delete and recreate the resource to change)"
 type TableSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -140,11 +141,15 @@ type TableSpec struct {
 
 	// DataRetentionTimeInDays specifies the Time Travel retention period (0–90 days).
 	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=90
 	DataRetentionTimeInDays *int32 `json:"dataRetentionTimeInDays,omitempty"`
 
 	// MaxDataExtensionTimeInDays specifies the maximum number of days Snowflake
 	// can extend the data retention period.
 	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=90
 	MaxDataExtensionTimeInDays *int32 `json:"maxDataExtensionTimeInDays,omitempty"`
 
 	// ChangeTracking enables change tracking on the table.

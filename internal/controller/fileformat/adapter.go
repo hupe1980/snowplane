@@ -57,11 +57,11 @@ func (a *adapter) PreReconcile(ctx context.Context, ff *snowplanev1alpha1.FileFo
 	return nil
 }
 
-func (a *adapter) BuildIdentifier(ff *snowplanev1alpha1.FileFormat) reconciler.Identifier {
+func (a *adapter) BuildIdentifier(ff *snowplanev1alpha1.FileFormat) (reconciler.Identifier, error) {
 	dbName := snowflake.ParseDatabaseNameFromFQN(ff.Status.DatabaseName)
 	schemaName := snowflake.ParseSchemaNameFromFQN(ff.Status.SchemaName)
 
-	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, ff.Spec.Name)
+	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, ff.Spec.Name), nil
 }
 
 func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
@@ -133,6 +133,8 @@ func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha
 	}
 
 	opts := buildCreateOptions(obj, sid)
+	opts.UseCreateOrAlter = snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
+
 	return svc.Create(ctx, opts)
 }
 
@@ -214,6 +216,6 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.FileFormat, obs *reconciler
 
 func (a *adapter) PostCreate(_ *snowplanev1alpha1.FileFormat)                                    {}
 func (a *adapter) PostUpdate(_ *snowplanev1alpha1.FileFormat, _ bool, _ reconciler.AlterOptions) {}
-func (a *adapter) SupportsCreateOrAlter() bool                                                   { return false }
+func (a *adapter) SupportsCreateOrAlter() bool                                                   { return true }
 
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.FileFormat, Service, *snowflake.FileFormatObservation] = (*adapter)(nil)

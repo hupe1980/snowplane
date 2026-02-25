@@ -32,6 +32,12 @@ kubectl create secret generic snowflake-creds \
   --from-file=privateKey=/path/to/your/rsa_key.p8 \
   -n default
 
+# Option A2: Key pair with encrypted private key (passphrase-protected)
+kubectl create secret generic snowflake-creds \
+  --from-file=privateKey=/path/to/your/encrypted_rsa_key.p8 \
+  --from-literal=passphrase='YourPassphrase' \
+  -n default
+
 # Option B: Username/password (simpler for development)
 echo -n 'YourPassword123!' > /tmp/sf-password.txt
 kubectl create secret generic snowflake-creds \
@@ -93,6 +99,9 @@ spec:
       name: snowflake-creds
       namespace: default
       key: privateKey
+    # Optional: for encrypted PKCS#8 private keys, specify the key
+    # within the same Secret that holds the passphrase.
+    # passphraseKey: passphrase
 ```
 
 ### Username/Password Authentication
@@ -520,7 +529,7 @@ spec:
 
 ## CREATE OR ALTER
 
-For Database, Schema, Table, Warehouse, Task, and Tag, `CREATE OR ALTER` is **enabled by default**. To opt out and use the legacy `CREATE IF NOT EXISTS` + `ALTER` two-step flow:
+For Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, NetworkRule, RowAccessPolicy, and User, `CREATE OR ALTER` is **enabled by default**. To opt out and use the legacy `CREATE IF NOT EXISTS` + `ALTER` two-step flow:
 
 ```yaml
 metadata:

@@ -62,6 +62,21 @@ func TestBuildCreateRowAccessPolicySQL(t *testing.T) {
 	})
 }
 
+func TestBuildCreateRowAccessPolicySQL_CreateOrAlter(t *testing.T) {
+	t.Parallel()
+
+	opts := CreateRowAccessPolicyOptions{
+		Name:             NewSchemaObjectIdentifier("DB", "SCH", "RAP_REGION"),
+		Signature:        []RowAccessPolicyArgument{{Name: "region", Type: "VARCHAR"}},
+		Body:             "current_role() IN ('ADMIN')",
+		UseCreateOrAlter: true,
+	}
+	got := buildCreateRowAccessPolicySQL(opts)
+	assert.Contains(t, got, `CREATE OR ALTER ROW ACCESS POLICY "DB"."SCH"."RAP_REGION"`)
+	assert.NotContains(t, got, "IF NOT EXISTS")
+	assert.Contains(t, got, "AS (region VARCHAR) RETURNS BOOLEAN")
+}
+
 func TestBuildAlterRowAccessPolicyStatements(t *testing.T) {
 	t.Parallel()
 

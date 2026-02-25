@@ -987,7 +987,7 @@ func main() {
 		if *removeScript == "-" {
 			fmt.Fprint(os.Stderr, script)
 		} else {
-			if err := os.WriteFile(*removeScript, []byte(script), 0o755); err != nil {
+			if err := os.WriteFile(*removeScript, []byte(script), 0o755); err != nil { //nolint:gosec // G306: script needs execute permission
 				log.Fatalf("Error writing remove script: %v", err)
 			}
 

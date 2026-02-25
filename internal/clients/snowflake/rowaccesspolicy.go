@@ -41,6 +41,10 @@ type CreateRowAccessPolicyOptions struct {
 	Signature []RowAccessPolicyArgument
 	Body      string
 	Comment   *string
+
+	// UseCreateOrAlter emits CREATE OR ALTER ROW ACCESS POLICY instead of
+	// CREATE ROW ACCESS POLICY IF NOT EXISTS.
+	UseCreateOrAlter bool
 }
 
 // Validate checks the CreateRowAccessPolicyOptions for validity.
@@ -109,7 +113,12 @@ func buildRAPSignatureClause(args []RowAccessPolicyArgument) string {
 // buildCreateRowAccessPolicySQL builds the CREATE ROW ACCESS POLICY SQL statement.
 func buildCreateRowAccessPolicySQL(opts CreateRowAccessPolicyOptions) string {
 	var b sqlbuilder.Builder
-	b.WriteString("CREATE ROW ACCESS POLICY IF NOT EXISTS ")
+
+	if opts.UseCreateOrAlter {
+		b.WriteString("CREATE OR ALTER ROW ACCESS POLICY ")
+	} else {
+		b.WriteString("CREATE ROW ACCESS POLICY IF NOT EXISTS ")
+	}
 	b.WriteString(opts.Name.FullyQualifiedName())
 	b.WriteString(" ")
 	b.WriteString(buildRAPSignatureClause(opts.Signature))

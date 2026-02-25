@@ -13,6 +13,7 @@ import (
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
@@ -70,12 +71,17 @@ func (a *adapter) PreReconcile(ctx context.Context, g *snowplanev1alpha1.GrantOw
 	return nil
 }
 
-func (a *adapter) BuildIdentifier(g *snowplanev1alpha1.GrantOwnership) reconciler.Identifier {
+func (a *adapter) BuildIdentifier(g *snowplanev1alpha1.GrantOwnership) (reconciler.Identifier, error) {
+	// Defense-in-depth: validate object type (CRD already validates).
+	if err := sqlbuilder.ValidateObjectType(g.Spec.ObjectType); err != nil {
+		return nil, fmt.Errorf("grantownership.BuildIdentifier: %w", err)
+	}
+
 	return snowflake.GrantOwnershipIdentifier{
 		ObjectType:  g.Spec.ObjectType,
-		ObjectName:  g.Spec.ObjectName,
+		ObjectName:  g.Spec.ObjectName, // pre-quoted from CRD; validated during Create
 		GranteeName: resolveGranteeName(g),
-	}
+	}, nil
 }
 
 func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {

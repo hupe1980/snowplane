@@ -226,15 +226,15 @@ func buildAlterStageStatements(opts AlterStageOptions) ([]string, error) {
 	var sc sqlbuilder.SetClauses
 
 	if opts.URL != nil {
-		sc.Raw(fmt.Sprintf("URL = '%s'", sqlbuilder.EscapeString(*opts.URL)))
+		sc.UnsafeRaw(fmt.Sprintf("URL = '%s'", sqlbuilder.EscapeString(*opts.URL)))
 	}
 
 	if opts.StorageIntegration != nil {
-		sc.Raw(fmt.Sprintf("STORAGE_INTEGRATION = %s", sqlbuilder.QuoteIdentifier(*opts.StorageIntegration)))
+		sc.UnsafeRaw(fmt.Sprintf("STORAGE_INTEGRATION = %s", sqlbuilder.QuoteIdentifier(*opts.StorageIntegration)))
 	}
 
 	if opts.FileFormat != nil {
-		sc.Raw(fmt.Sprintf("FILE_FORMAT = (%s)", *opts.FileFormat))
+		sc.UnsafeRaw(fmt.Sprintf("FILE_FORMAT = (%s)", *opts.FileFormat))
 	}
 
 	sc.String("COMMENT", opts.Comment)

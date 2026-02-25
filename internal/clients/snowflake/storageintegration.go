@@ -187,11 +187,11 @@ func buildAlterStorageIntegrationStatements(opts AlterStorageIntegrationOptions)
 	}
 
 	if opts.StorageAllowedLocations != nil {
-		sc.Raw("STORAGE_ALLOWED_LOCATIONS = " + buildLocationList(*opts.StorageAllowedLocations))
+		sc.UnsafeRaw("STORAGE_ALLOWED_LOCATIONS = " + buildLocationList(*opts.StorageAllowedLocations))
 	}
 
 	if opts.StorageBlockedLocations != nil {
-		sc.Raw("STORAGE_BLOCKED_LOCATIONS = " + buildLocationList(*opts.StorageBlockedLocations))
+		sc.UnsafeRaw("STORAGE_BLOCKED_LOCATIONS = " + buildLocationList(*opts.StorageBlockedLocations))
 	}
 
 	if opts.StorageAWSRoleARN != nil {

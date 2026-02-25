@@ -189,6 +189,10 @@ func TestView_UpdateTriggersAlter(t *testing.T) {
 		return nil
 	})
 	view := newTestView(viewK8s, sfView, dbK8s, schemaK8s)
+	// Disable CREATE OR ALTER so update goes through the ALTER path.
+	view.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
+	}
 	initComment := "initial view comment"
 	view.Spec.Comment = &initComment
 	require.NoError(t, k8sClient.Create(ctx, view))

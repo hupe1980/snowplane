@@ -304,6 +304,43 @@ func TestCreateTaskOptions_Validate(t *testing.T) {
 		}
 		assert.Error(t, opts.Validate())
 	})
+
+	t.Run("ConfigWithDollarQuoting", func(t *testing.T) {
+		t.Parallel()
+		cfg := `{"key": "value$$injection$$"}`
+		opts := CreateTaskOptions{
+			Name:         NewSchemaObjectIdentifier("DB", "SCH", "T"),
+			SQLStatement: "SELECT 1",
+			Config:       &cfg,
+		}
+		err := opts.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid config")
+	})
+
+	t.Run("ConfigWithSemicolon", func(t *testing.T) {
+		t.Parallel()
+		cfg := `{"key": "value"}; DROP TABLE x`
+		opts := CreateTaskOptions{
+			Name:         NewSchemaObjectIdentifier("DB", "SCH", "T"),
+			SQLStatement: "SELECT 1",
+			Config:       &cfg,
+		}
+		err := opts.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid config")
+	})
+
+	t.Run("ValidConfig", func(t *testing.T) {
+		t.Parallel()
+		cfg := `{"output_dir": "/temp/test_directory/", "learning_rate": 0.1}`
+		opts := CreateTaskOptions{
+			Name:         NewSchemaObjectIdentifier("DB", "SCH", "T"),
+			SQLStatement: "SELECT 1",
+			Config:       &cfg,
+		}
+		assert.NoError(t, opts.Validate())
+	})
 }
 
 func TestAlterTaskOptions_Validate(t *testing.T) {
@@ -331,6 +368,18 @@ func TestAlterTaskOptions_Validate(t *testing.T) {
 			UserTaskManagedInitialWarehouseSize: &size,
 		}
 		assert.Error(t, opts.Validate())
+	})
+
+	t.Run("ConfigWithDollarQuoting", func(t *testing.T) {
+		t.Parallel()
+		cfg := `value$$injection$$`
+		opts := AlterTaskOptions{
+			Name:   NewSchemaObjectIdentifier("DB", "SCH", "T"),
+			Config: &cfg,
+		}
+		err := opts.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid config")
 	})
 }
 

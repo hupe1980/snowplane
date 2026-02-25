@@ -68,6 +68,20 @@ func TestBuildCreatePasswordPolicySQL(t *testing.T) {
 	})
 }
 
+func TestBuildCreatePasswordPolicySQL_CreateOrAlter(t *testing.T) {
+	t.Parallel()
+
+	opts := CreatePasswordPolicyOptions{
+		Name:              NewSchemaObjectIdentifier("DB", "SCH", "MY_POLICY"),
+		PasswordMinLength: int32Ptr(10),
+		UseCreateOrAlter:  true,
+	}
+	got := buildCreatePasswordPolicySQL(opts)
+	assert.Contains(t, got, `CREATE OR ALTER PASSWORD POLICY "DB"."SCH"."MY_POLICY"`)
+	assert.NotContains(t, got, "IF NOT EXISTS")
+	assert.Contains(t, got, "PASSWORD_MIN_LENGTH = 10")
+}
+
 func TestBuildAlterPasswordPolicyStatements(t *testing.T) {
 	t.Parallel()
 

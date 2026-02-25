@@ -57,11 +57,11 @@ func (a *adapter) PreReconcile(ctx context.Context, nr *snowplanev1alpha1.Networ
 	return nil
 }
 
-func (a *adapter) BuildIdentifier(nr *snowplanev1alpha1.NetworkRule) reconciler.Identifier {
+func (a *adapter) BuildIdentifier(nr *snowplanev1alpha1.NetworkRule) (reconciler.Identifier, error) {
 	dbName := snowflake.ParseDatabaseNameFromFQN(nr.Status.DatabaseName)
 	schemaName := snowflake.ParseSchemaNameFromFQN(nr.Status.SchemaName)
 
-	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, nr.Spec.Name)
+	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, nr.Spec.Name), nil
 }
 
 func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
@@ -133,6 +133,8 @@ func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha
 	}
 
 	opts := buildCreateOptions(obj, sid)
+	opts.UseCreateOrAlter = snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
+
 	return svc.Create(ctx, opts)
 }
 
@@ -217,6 +219,6 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.NetworkRule, obs *reconcile
 
 func (a *adapter) PostCreate(_ *snowplanev1alpha1.NetworkRule)                                    {}
 func (a *adapter) PostUpdate(_ *snowplanev1alpha1.NetworkRule, _ bool, _ reconciler.AlterOptions) {}
-func (a *adapter) SupportsCreateOrAlter() bool                                                    { return false }
+func (a *adapter) SupportsCreateOrAlter() bool                                                    { return true }
 
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.NetworkRule, Service, *snowflake.NetworkRuleObservation] = (*adapter)(nil)

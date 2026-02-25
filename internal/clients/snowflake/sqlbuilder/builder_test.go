@@ -211,10 +211,10 @@ func TestSetClauses_NilValues(t *testing.T) {
 	assert.False(t, sc.HasClauses())
 }
 
-func TestSetClauses_Raw(t *testing.T) {
+func TestSetClauses_UnsafeRaw(t *testing.T) {
 	t.Parallel()
 	var sc SetClauses
-	sc.Raw("DEFAULT_SECONDARY_ROLES = ('ALL')")
+	sc.UnsafeRaw("DEFAULT_SECONDARY_ROLES = ('ALL')")
 	assert.True(t, sc.HasClauses())
 	result, err := sc.BuildAlter("USER", `"JDOE"`)
 	require.NoError(t, err)
@@ -607,4 +607,58 @@ func TestValidateUnsetField(t *testing.T) {
 	for _, v := range invalid {
 		require.Error(t, ValidateUnsetField(v), "expected invalid: %s", v)
 	}
+}
+
+func TestValidateDollarQuotedValue(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ValidPlainJSON", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidateDollarQuotedValue(`{"key": "value"}`))
+	})
+
+	t.Run("ValidEmpty", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidateDollarQuotedValue(""))
+	})
+
+	t.Run("ValidSingleDollar", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidateDollarQuotedValue("price is $10"))
+	})
+
+	t.Run("RejectDollarQuoting", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateDollarQuotedValue("value$$injection$$end")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "dollar-quoting")
+	})
+
+	t.Run("RejectSemicolon", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateDollarQuotedValue("value; DROP TABLE x")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "semicolons")
+	})
+
+	t.Run("RejectLineComment", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateDollarQuotedValue("value -- comment")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "comment")
+	})
+
+	t.Run("RejectBlockCommentOpen", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateDollarQuotedValue("value /* comment")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "comment")
+	})
+
+	t.Run("RejectBlockCommentClose", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateDollarQuotedValue("value */ end")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "comment")
+	})
 }

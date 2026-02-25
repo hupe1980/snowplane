@@ -364,6 +364,9 @@ func TestReconcile_UpdateWithChanges(t *testing.T) {
 	user.Status.ObservedGeneration = 1
 	user.Generation = 2
 	user.Spec.Email = testutil.PtrString("alice@newdomain.com")
+	user.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
+	}
 
 	var capturedAlterOpts snowflake.AlterUserOptions
 	mock := &mockService{
@@ -391,6 +394,9 @@ func TestReconcile_AlterFails(t *testing.T) {
 	user.Finalizers = []string{finalizerName}
 	user.Status.ObservedGeneration = 1
 	user.Spec.Email = testutil.PtrString("alice@example.com")
+	user.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
+	}
 
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.UserObservation, error) {
@@ -413,6 +419,9 @@ func TestReconcile_AlterTerminalError(t *testing.T) {
 	user.Finalizers = []string{finalizerName}
 	user.Status.ObservedGeneration = 1
 	user.Spec.Email = testutil.PtrString("alice@example.com")
+	user.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
+	}
 
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.UserObservation, error) {
@@ -1045,6 +1054,9 @@ func TestReconcile_DriftCorrection(t *testing.T) {
 	user.Status.ObservedGeneration = 1
 	user.Generation = 1
 	user.Spec.Email = testutil.PtrString("correct@example.com")
+	user.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
+	}
 	hash, err := snowplanev1alpha1.ComputeSpecHash(user.Spec)
 	require.NoError(t, err)
 	user.Status.LastAppliedSpecHash = hash
@@ -1244,6 +1256,9 @@ func TestReconcile_UnsetTriggered(t *testing.T) {
 	user.Finalizers = []string{finalizerName}
 	user.Status.ObservedGeneration = 1
 	user.Status.TrackedParameters = []string{"COMMENT"}
+	user.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
+	}
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"

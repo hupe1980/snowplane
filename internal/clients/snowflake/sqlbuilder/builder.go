@@ -245,6 +245,30 @@ func ValidateFileFormat(ff string) error {
 	return nil
 }
 
+// ValidateDollarQuotedValue validates a string that will be embedded inside
+// dollar-quoting delimiters ($$...$$). Rejects values containing $$ which
+// would prematurely terminate the dollar-quoted literal and allow SQL injection.
+// Also rejects semicolons and comment markers as defense-in-depth.
+func ValidateDollarQuotedValue(s string) error {
+	if strings.Contains(s, "$$") {
+		return fmt.Errorf("value must not contain dollar-quoting delimiter ($$)")
+	}
+
+	if strings.Contains(s, ";") {
+		return fmt.Errorf("value must not contain semicolons")
+	}
+
+	if strings.Contains(s, "--") {
+		return fmt.Errorf("value must not contain line comment markers (--)") //nolint:goconst // readability
+	}
+
+	if strings.Contains(s, "/*") || strings.Contains(s, "*/") {
+		return fmt.Errorf("value must not contain block comment markers")
+	}
+
+	return nil
+}
+
 // ValidateUnsetField validates a field name used in UNSET clauses.
 // Only allows uppercase letters, digits, and underscores — the format used
 // by Snowflake session and object parameter names.
@@ -405,14 +429,14 @@ func (sc *SetClauses) QuotedKeyword(key string, value *string) {
 	}
 }
 
-// Raw appends a pre-formatted clause string directly.
+// UnsafeRaw appends a pre-formatted clause string directly.
 // Use this for clauses with non-standard syntax that don't fit the other methods.
 //
-// SAFETY: Callers MUST validate the input before calling Raw().
+// SAFETY: Callers MUST validate the input before calling UnsafeRaw().
 // This method performs no escaping or validation — it trusts the caller
 // to have applied appropriate validation (e.g. ValidateFileFormat,
 // ValidateEncryptionType) before constructing the clause string.
-func (sc *SetClauses) Raw(clause string) {
+func (sc *SetClauses) UnsafeRaw(clause string) {
 	sc.clauses = append(sc.clauses, clause)
 }
 

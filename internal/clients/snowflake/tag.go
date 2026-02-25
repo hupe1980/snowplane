@@ -34,6 +34,10 @@ type CreateTagOptions struct {
 	Name          SchemaObjectIdentifier
 	AllowedValues []string
 	Comment       *string
+
+	// UseCreateOrAlter emits CREATE OR ALTER TAG instead of
+	// CREATE TAG IF NOT EXISTS.
+	UseCreateOrAlter bool
 }
 
 // Validate checks the CreateTagOptions for validity.
@@ -79,10 +83,16 @@ func NewTagClient(c SQLExecutor) *TagClient {
 	return &TagClient{client: c}
 }
 
-// buildCreateTagSQL builds the CREATE OR ALTER TAG SQL statement.
+// buildCreateTagSQL builds the CREATE TAG SQL statement.
 func buildCreateTagSQL(opts CreateTagOptions) string {
 	var b sqlbuilder.Builder
-	b.WriteString("CREATE OR ALTER TAG ")
+
+	if opts.UseCreateOrAlter {
+		b.WriteString("CREATE OR ALTER TAG ")
+	} else {
+		b.WriteString("CREATE TAG IF NOT EXISTS ")
+	}
+
 	b.WriteString(opts.Name.FullyQualifiedName())
 
 	// ALLOWED_VALUES must come before other parameters.

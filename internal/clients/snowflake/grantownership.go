@@ -64,12 +64,29 @@ func (o *CreateGrantOwnershipOptions) Validate() error {
 		return fmt.Errorf("object type is required")
 	}
 
+	// Defense-in-depth: validate object type against allowlist even though CRD validation fires first.
+	if err := sqlbuilder.ValidateObjectType(o.ObjectType); err != nil {
+		return fmt.Errorf("invalid object type: %w", err)
+	}
+
 	if o.ObjectName == "" {
 		return fmt.Errorf("object name is required")
 	}
 
+	// Defense-in-depth: reject dangerous SQL metacharacters in the pre-quoted object name.
+	if err := sqlbuilder.ValidateDollarQuotedValue(o.ObjectName); err != nil {
+		return fmt.Errorf("invalid object name: %w", err)
+	}
+
 	if o.ToRole == "" {
 		return fmt.Errorf("target role is required")
+	}
+
+	// Validate CurrentGrantsBehavior if set (must be a keyword-safe value).
+	if o.CurrentGrantsBehavior != "" {
+		if err := sqlbuilder.ValidateKeywordValue(o.CurrentGrantsBehavior); err != nil {
+			return fmt.Errorf("invalid current grants behavior: %w", err)
+		}
 	}
 
 	return nil
@@ -86,12 +103,13 @@ func NewGrantOwnershipClient(c SQLExecutor) *GrantOwnershipClient {
 }
 
 // buildGrantOwnershipSQL builds the GRANT OWNERSHIP SQL statement.
+// Callers must call Validate() first to ensure ObjectType is a known keyword.
 func buildGrantOwnershipSQL(opts CreateGrantOwnershipOptions) string {
 	var b sqlbuilder.Builder
 	b.WriteString("GRANT OWNERSHIP ON ")
 	b.WriteString(opts.ObjectType)
 	b.WriteString(" ")
-	b.WriteString(opts.ObjectName)
+	b.WriteString(opts.ObjectName) // pre-quoted from CRD; validated in Validate()
 	b.WriteString(" TO ")
 	b.WriteString(opts.ToRole)
 
@@ -131,7 +149,12 @@ func (g *GrantOwnershipClient) Observe(ctx context.Context, id GrantOwnershipIde
 		return nil, NewTerminalError(fmt.Errorf("object type and name are required"))
 	}
 
-	query := fmt.Sprintf("SHOW GRANTS ON %s %s", id.ObjectType, id.ObjectName)
+	// Defense-in-depth: validate object type even though CRD validates it.
+	if err := sqlbuilder.ValidateObjectType(id.ObjectType); err != nil {
+		return nil, NewTerminalError(fmt.Errorf("invalid object type: %w", err))
+	}
+
+	query := fmt.Sprintf("SHOW GRANTS ON %s %s", id.ObjectType, id.ObjectName) // ObjectName pre-quoted
 
 	rows, err := g.client.Query(ctx, query)
 	if err != nil {

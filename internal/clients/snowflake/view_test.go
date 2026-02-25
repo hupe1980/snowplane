@@ -64,6 +64,45 @@ func TestBuildCreateViewSQL(t *testing.T) {
 	}
 }
 
+func TestBuildCreateViewSQL_CreateOrAlter(t *testing.T) {
+	t.Parallel()
+
+	t.Run("basic", func(t *testing.T) {
+		t.Parallel()
+		got := buildCreateViewSQL(CreateViewOptions{
+			Name:             NewSchemaObjectIdentifier("DB", "S", "V"),
+			Statement:        "SELECT 1 AS ID",
+			UseCreateOrAlter: true,
+		})
+		assert.Equal(t, `CREATE OR ALTER VIEW "DB"."S"."V" AS SELECT 1 AS ID`, got)
+	})
+
+	t.Run("secure", func(t *testing.T) {
+		t.Parallel()
+		got := buildCreateViewSQL(CreateViewOptions{
+			Name:             NewSchemaObjectIdentifier("DB", "S", "V"),
+			Statement:        "SELECT 1",
+			Secure:           true,
+			UseCreateOrAlter: true,
+		})
+		assert.Equal(t, `CREATE OR ALTER SECURE VIEW "DB"."S"."V" AS SELECT 1`, got)
+	})
+
+	t.Run("ignores OrReplace when UseCreateOrAlter", func(t *testing.T) {
+		t.Parallel()
+		got := buildCreateViewSQL(CreateViewOptions{
+			Name:             NewSchemaObjectIdentifier("DB", "S", "V"),
+			Statement:        "SELECT 1",
+			OrReplace:        true,
+			UseCreateOrAlter: true,
+		})
+		// UseCreateOrAlter takes precedence over OrReplace
+		assert.Contains(t, got, "CREATE OR ALTER")
+		assert.NotContains(t, got, "OR REPLACE")
+		assert.NotContains(t, got, "IF NOT EXISTS")
+	})
+}
+
 func TestBuildAlterViewStatements(t *testing.T) {
 	t.Parallel()
 

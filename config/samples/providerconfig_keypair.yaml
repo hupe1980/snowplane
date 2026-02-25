@@ -16,3 +16,6 @@ spec:
       name: snowflake-keypair
       namespace: snowplane-system
       key: rsa_key.p8
+    # Optional: if your private key is encrypted (PKCS#8 with passphrase),
+    # specify the key name within the same Secret that holds the passphrase.
+    # passphraseKey: passphrase

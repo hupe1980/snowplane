@@ -40,13 +40,13 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 - 🛡️ **Dangerous Grant Protection** — Blocks grants to ACCOUNTADMIN/SECURITYADMIN/ORGADMIN and dangerous privileges by default
 - 🛡️ **Policy Body Validation** — Blocklist-based SQL injection prevention for MaskingPolicy and RowAccessPolicy `body` fields
 - 🏷️ **Ownership Conflict Detection** — Prevents duplicate CRs from managing the same Snowflake object via label-based conflict detection
-- ⚛️ **CREATE OR ALTER** — Atomic `CREATE OR ALTER` enabled by default for Database, Schema, Table, Warehouse, Task & Tag, with graceful fallback for unsupported Snowflake editions (opt out via annotation)
+- ⚛️ **CREATE OR ALTER** — Atomic `CREATE OR ALTER` enabled by default for Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, NetworkRule, RowAccessPolicy & User (13 resource types), with graceful fallback for unsupported Snowflake editions (opt out via annotation)
 - 🗑️ **Deletion Policies** — `Delete` (drop resource) or `Orphan` (leave intact)
 - 🏷️ **ForceNew Annotation** — Delete+recreate on immutable field changes
 
 ### 🔐 Security & Authentication
 
-- 🔑 **Key Pair Authentication** — RSA key pair auth via Kubernetes Secrets
+- 🔑 **Key Pair Authentication** — RSA key pair auth via Kubernetes Secrets (supports encrypted PKCS#8 with passphrase)
 - 🔑 **Username/Password** — Password auth via Kubernetes Secrets
 - 🌐 **Workload Identity Federation** — EKS IRSA, GKE WI, AKS WI via projected ServiceAccount tokens
 - 🔒 **Sensitive Field Redaction** — Passwords, PEM keys, tokens `[REDACTED]` in all logs and events
@@ -73,12 +73,12 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 │  │ ProviderConfig│   │   Snowflake Resource   │   │
 │  │      CR       │   │     Custom Resources   │   │
 │  └──────┬────────┘   └────────┬───────────────┘   │
-│         │                     │                    │
+│         │                     │                   │
 │  ┌──────▼─────────────────────▼──────────────────┐│
-│  │          Snowplane Controller Manager          ││
-│  │                                                ││
-│  │  ┌──────────────────────────────────────────┐  ││
-│  │  │  🔗 Reference Resolver                  │  ││
+│  │          Snowplane Controller Manager         ││
+│  │                                               ││
+│  │  ┌──────────────────────────────────────────┐ ││
+│  │  │  🔗 Reference Resolver                   │ ││
 │  │  │  Resolves databaseRef/schemaRef → FQN    │  ││
 │  │  │  Waits for dependency readiness          │  ││
 │  │  └──────────────────────────────────────────┘  ││
@@ -89,7 +89,7 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 │  │  └──────────────────────────────────────────┘  ││
 │  │                                                ││
 │  │  ┌──────────────────┐ ┌───────────────────┐   ││
-│  │  │ 📤 FieldExport  │ │ 🔍 Drift Engine  │   ││
+│  │  │ 📤 FieldExport    │ │ 🔍 Drift Engine  │   ││
 │  │  └──────────────────┘ └───────────────────┘   ││
 │  └────────────────────┬───────────────────────────┘│
 │                       │                            │
@@ -213,7 +213,7 @@ kubectl get databases
 | `snowplane.hupe1980.github.io/force-new` | `false` | `true` / `false` | Delete + recreate on immutable field change |
 | `snowplane.hupe1980.github.io/adoption-policy` | `fail-if-exists` | `adopt` / `fail-if-exists` | Control adoption of pre-existing resources |
 | `snowplane.hupe1980.github.io/drift-policy` | `correct` | `correct` / `detect-only` | Report drift without correcting it, or correct automatically |
-| `snowplane.hupe1980.github.io/use-create-or-alter` | `true` | `true` / `false` | Atomic `CREATE OR ALTER` (Database, Schema, Table, Warehouse, Task, Tag) |
+| `snowplane.hupe1980.github.io/use-create-or-alter` | `true` | `true` / `false` | Atomic `CREATE OR ALTER` (Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, NetworkRule, RowAccessPolicy, User) |
 | `snowplane.hupe1980.github.io/allow-dangerous-grant` | `false` | `true` / `false` | Allow grants to system roles / dangerous privileges |
 
 ### 🏷️ CRD Labels
@@ -240,12 +240,18 @@ helm install snowplane charts/snowplane/ \
 | `controller.enableAlphaResources` | `true` | Enable alpha-maturity controllers |
 | `rateLimit.qps` | `10` | Snowflake API rate limit per provider |
 | `rateLimit.burst` | `20` | Rate limit burst size |
+| `circuitBreaker.threshold` | `5` | Consecutive failures before circuit opens |
+| `circuitBreaker.resetTimeout` | `60s` | Backoff before half-open probe |
 | `leaderElection.enabled` | `true` | Enable leader election |
 | `metrics.serviceMonitor.enabled` | `false` | Create Prometheus ServiceMonitor |
 | `grafana.dashboard.enabled` | `false` | Deploy Grafana dashboard ConfigMap |
+| `revisionHistoryLimit` | `3` | ReplicaSet history limit |
 | `watchNamespaces` | `""` | Namespaces to watch (empty = all) |
 | `priorityClassName` | `""` | Pod PriorityClass name |
 | `topologySpreadConstraints` | `[]` | Topology spread constraints |
+| `extraEnv` | `[]` | Additional environment variables |
+| `extraVolumes` | `[]` | Additional volumes |
+| `extraVolumeMounts` | `[]` | Additional volume mounts |
 
 CRDs are automatically installed from `charts/snowplane/crds/` on first install.
 
@@ -302,6 +308,7 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 | `spec.warehouse` | `string` | Default warehouse |
 | `spec.authenticationType` | `enum` | `KeyPair` / `UsernamePassword` / `WorkloadIdentity` |
 | `spec.credentials.secretRef` | `SecretKeyReference` | Reference to credentials Secret |
+| `spec.credentials.passphraseKey` | `string` | Key within the same Secret that holds the passphrase for encrypted PKCS#8 private keys (KeyPair only) |
 | `spec.workloadIdentity.audience` | `string` | OIDC audience for WIF |
 | `spec.workloadIdentity.tokenFilePath` | `string` | Path to projected SA token file |
 | `spec.workloadIdentity.provider` | `enum` | `OIDC` (default) / `AWS` / `GCP` / `Azure` |
@@ -471,11 +478,15 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 | `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
 | `spec.columns` | `[]ColumnDefinition` | Column definitions (name, type, nullable, default, comment). Column drift is detected and corrected via ADD/DROP/ALTER COLUMN. |
+| `spec.constraints` | `[]TableConstraint` | Table constraints (PRIMARY KEY, UNIQUE, FOREIGN KEY) *(immutable)* |
 | `spec.transient` | `bool` | Transient table *(immutable)* |
 | `spec.dataRetentionTimeInDays` | `*int32` | Time Travel retention (0–90) |
+| `spec.maxDataExtensionTimeInDays` | `*int32` | Max data extension time (0–90) |
 | `spec.clusterBy` | `[]string` | Clustering key expressions |
 | `spec.changeTracking` | `*bool` | Enable change tracking |
 | `spec.enableSchemaEvolution` | `*bool` | Enable schema evolution |
+| `spec.defaultDdlCollation` | `*string` | Default DDL collation |
+| `spec.comment` | `*string` | Table comment |
 
 </details>
 
@@ -552,6 +563,8 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 | `spec.taskAutoRetryAttempts` | `*int32` | Automatic retry attempts (0–30) |
 
 > ⏰ **DAG Scheduling:** Use `after` to chain tasks into directed acyclic graphs. Root tasks require a `schedule`; child tasks inherit it from the root.
+
+> ⚠️ **Security:** The `sqlStatement`, `when`, and `config` fields are embedded into SQL statements. Ensure RBAC restricts Task CR access to trusted principals.
 
 </details>
 

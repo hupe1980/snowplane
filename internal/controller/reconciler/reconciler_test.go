@@ -81,6 +81,7 @@ type mockAdapter struct {
 	validateImmutableFn func(ctx context.Context, obj *snowplanev1alpha1.Database) error
 	buildAlterOptsFn    func(ctx context.Context, obj *snowplanev1alpha1.Database, id reconciler.Identifier, obs *reconciler.Observation[any]) (reconciler.AlterOptions, error)
 	preReconcileFn      func(ctx context.Context, obj *snowplanev1alpha1.Database) error
+	buildIdentifierFn   func(obj *snowplanev1alpha1.Database) (reconciler.Identifier, error)
 	detectDriftFn       func(obj *snowplanev1alpha1.Database, obs *reconciler.Observation[any]) *drift.Result
 
 	applyObservationCalled int
@@ -110,8 +111,12 @@ func (m *mockAdapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.D
 	return nil
 }
 
-func (m *mockAdapter) BuildIdentifier(_ *snowplanev1alpha1.Database) reconciler.Identifier {
-	return testID("test-id")
+func (m *mockAdapter) BuildIdentifier(obj *snowplanev1alpha1.Database) (reconciler.Identifier, error) {
+	if m.buildIdentifierFn != nil {
+		return m.buildIdentifierFn(obj)
+	}
+
+	return testID("test-id"), nil
 }
 
 func (m *mockAdapter) SetupWatches() reconciler.SetupWatchesFunc { return nil }
@@ -480,6 +485,26 @@ func TestReconcile_CreateError_ReturnsError(t *testing.T) {
 	_, err = r.Reconcile(context.Background(), reconcileReq())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "create failed")
+}
+
+// ---------------------------------------------------------------------------
+// Tests: BuildIdentifier error
+// ---------------------------------------------------------------------------
+
+func TestReconcile_BuildIdentifierError_ReturnsError(t *testing.T) {
+	t.Parallel()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	adapter := &mockAdapter{
+		buildIdentifierFn: func(_ *snowplanev1alpha1.Database) (reconciler.Identifier, error) {
+			return nil, errors.New("invalid object type")
+		},
+	}
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "building identifier")
+	assert.Contains(t, err.Error(), "invalid object type")
 }
 
 // ---------------------------------------------------------------------------

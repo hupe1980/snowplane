@@ -66,6 +66,47 @@ func TestBuildSnowflakeConfig_KeyPair(t *testing.T) {
 	assert.Empty(t, cfg.Password)
 }
 
+func TestBuildSnowflakeConfig_KeyPair_WithPassphrase(t *testing.T) {
+	t.Parallel()
+
+	pc := newPC()
+	pc.Spec.AuthenticationType = snowplanev1alpha1.AuthenticationTypeKeyPair
+	pc.Spec.Credentials.SecretRef.Key = "private-key"
+	pc.Spec.Credentials.PassphraseKey = "passphrase"
+
+	cfg, err := BuildSnowflakeConfig(pc, newSecret(map[string][]byte{
+		"private-key": []byte("-----BEGIN ENCRYPTED PRIVATE KEY-----\nfake\n-----END ENCRYPTED PRIVATE KEY-----"),
+		"passphrase":  []byte("my-secret-passphrase"),
+	}))
+	require.NoError(t, err)
+	assert.NotEmpty(t, cfg.PrivateKey)
+	assert.Equal(t, "my-secret-passphrase", cfg.Passphrase)
+}
+
+func TestBuildSnowflakeConfig_KeyPair_PassphraseMissing(t *testing.T) {
+	t.Parallel()
+
+	pc := newPC()
+	pc.Spec.AuthenticationType = snowplanev1alpha1.AuthenticationTypeKeyPair
+	pc.Spec.Credentials.SecretRef.Key = "private-key"
+	pc.Spec.Credentials.PassphraseKey = "passphrase"
+
+	_, err := BuildSnowflakeConfig(pc, newSecret(map[string][]byte{
+		"private-key": []byte("-----BEGIN ENCRYPTED PRIVATE KEY-----\nfake\n-----END ENCRYPTED PRIVATE KEY-----"),
+		// passphrase key missing from secret
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not contain passphrase key")
+}
+
+func TestComputeHash_PassphraseAffectsHash(t *testing.T) {
+	t.Parallel()
+
+	cfg1 := snowflake.Config{Account: "a", PrivateKey: "k"}
+	cfg2 := snowflake.Config{Account: "a", PrivateKey: "k", Passphrase: "pp"}
+	assert.NotEqual(t, ComputeHash(cfg1), ComputeHash(cfg2))
+}
+
 func TestBuildSnowflakeConfig_MissingKey(t *testing.T) {
 	t.Parallel()
 

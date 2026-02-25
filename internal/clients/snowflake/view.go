@@ -40,6 +40,10 @@ type CreateViewOptions struct {
 	Comment        *string
 	ChangeTracking *bool
 	OrReplace      bool
+
+	// UseCreateOrAlter emits CREATE OR ALTER VIEW instead of
+	// CREATE VIEW IF NOT EXISTS / CREATE OR REPLACE VIEW.
+	UseCreateOrAlter bool
 }
 
 // Validate checks the CreateViewOptions for validity.
@@ -114,10 +118,15 @@ func NewViewClient(c SQLExecutor) *ViewClient {
 // buildCreateViewSQL builds the CREATE VIEW SQL statement.
 func buildCreateViewSQL(opts CreateViewOptions) string {
 	var b sqlbuilder.Builder
-	b.WriteString("CREATE")
 
-	if opts.OrReplace {
-		b.WriteString(" OR REPLACE")
+	if opts.UseCreateOrAlter {
+		b.WriteString("CREATE OR ALTER")
+	} else {
+		b.WriteString("CREATE")
+
+		if opts.OrReplace {
+			b.WriteString(" OR REPLACE")
+		}
 	}
 
 	if opts.Secure {
@@ -126,7 +135,7 @@ func buildCreateViewSQL(opts CreateViewOptions) string {
 
 	b.WriteString(" VIEW")
 
-	if !opts.OrReplace {
+	if !opts.UseCreateOrAlter && !opts.OrReplace {
 		b.WriteString(" IF NOT EXISTS")
 	}
 

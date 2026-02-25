@@ -280,7 +280,7 @@ func TestResolveClient_ProviderConfigNotReady(t *testing.T) {
 
 	_, err := ResolveClient(context.Background(), c, factory, obj, ref, "default", nil, nil, "test")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "ProviderConfig not ready")
+	assert.ErrorIs(t, err, ErrProviderConfigNotReady)
 
 	cond := conditions.Get(obj, snowplanev1alpha1.TypeReady)
 	require.NotNil(t, cond)

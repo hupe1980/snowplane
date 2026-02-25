@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -79,6 +80,26 @@ func (s *GrantOwnershipSpec) Validate() error {
 
 	if s.ObjectType == "" {
 		errs = append(errs, fmt.Errorf("spec.objectType is required"))
+	} else {
+		// Validate that objectType contains only keyword-safe characters (letters, digits, underscores, spaces).
+		// This prevents SQL injection through free-text ObjectType without coupling to a specific allowlist.
+		for _, c := range s.ObjectType {
+			if (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '_' && c != ' ' {
+				errs = append(errs, fmt.Errorf("spec.objectType contains invalid character %q; must contain only letters, digits, underscores, and spaces", string(c)))
+
+				break
+			}
+		}
+
+		// Reject excessively long values.
+		if len(s.ObjectType) > 64 {
+			errs = append(errs, fmt.Errorf("spec.objectType too long (%d chars, max 64)", len(s.ObjectType)))
+		}
+
+		// Normalize and reject empty after trim.
+		if strings.TrimSpace(s.ObjectType) == "" {
+			errs = append(errs, fmt.Errorf("spec.objectType must not be blank"))
+		}
 	}
 
 	if s.ObjectName == "" {

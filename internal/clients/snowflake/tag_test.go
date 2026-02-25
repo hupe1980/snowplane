@@ -20,6 +20,16 @@ func TestBuildCreateTagSQL(t *testing.T) {
 			Name: NewSchemaObjectIdentifier("DB", "SCH", "MY_TAG"),
 		}
 		got := buildCreateTagSQL(opts)
+		assert.Equal(t, `CREATE TAG IF NOT EXISTS "DB"."SCH"."MY_TAG"`, got)
+	})
+
+	t.Run("BasicTag_CreateOrAlter", func(t *testing.T) {
+		t.Parallel()
+		opts := CreateTagOptions{
+			Name:             NewSchemaObjectIdentifier("DB", "SCH", "MY_TAG"),
+			UseCreateOrAlter: true,
+		}
+		got := buildCreateTagSQL(opts)
 		assert.Equal(t, `CREATE OR ALTER TAG "DB"."SCH"."MY_TAG"`, got)
 	})
 
@@ -58,9 +68,10 @@ func TestBuildCreateTagSQL(t *testing.T) {
 		t.Parallel()
 		comment := "full tag"
 		opts := CreateTagOptions{
-			Name:          NewSchemaObjectIdentifier("DB", "SCH", "FULL_TAG"),
-			AllowedValues: []string{"a", "b"},
-			Comment:       &comment,
+			Name:             NewSchemaObjectIdentifier("DB", "SCH", "FULL_TAG"),
+			AllowedValues:    []string{"a", "b"},
+			Comment:          &comment,
+			UseCreateOrAlter: true,
 		}
 		got := buildCreateTagSQL(opts)
 		assert.Contains(t, got, "CREATE OR ALTER TAG")

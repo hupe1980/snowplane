@@ -89,7 +89,7 @@ func (a *accountRoleGrantAdapter) PreReconcile(ctx context.Context, grant *snowp
 }
 
 // BuildIdentifier constructs a GrantIdentifier from the AccountRoleGrant spec.
-func (a *accountRoleGrantAdapter) BuildIdentifier(grant *snowplanev1alpha1.AccountRoleGrant) reconciler.Identifier {
+func (a *accountRoleGrantAdapter) BuildIdentifier(grant *snowplanev1alpha1.AccountRoleGrant) (reconciler.Identifier, error) {
 	role := grant.Spec.AccountRole
 	toClause := snowflake.BuildToClause(role, "", "")
 
@@ -201,9 +201,15 @@ func (a *accountRoleGrantAdapter) Observe(ctx context.Context, svc Service, id r
 // Create grants the privilege in Snowflake.
 func (a *accountRoleGrantAdapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha1.AccountRoleGrant, _ reconciler.Identifier) error {
 	on := onToParams(&obj.Spec.On)
+
+	onClause, err := snowflake.BuildOnClause(on)
+	if err != nil {
+		return fmt.Errorf("building ON clause: %w", err)
+	}
+
 	opts := snowflake.CreateGrantOptions{
 		Privilege:       obj.Spec.Privilege,
-		OnClause:        snowflake.BuildOnClause(on),
+		OnClause:        onClause,
 		ToClause:        snowflake.BuildToClause(obj.Spec.AccountRole, "", ""),
 		WithGrantOption: obj.Spec.WithGrantOption,
 	}
@@ -253,9 +259,13 @@ func (a *accountRoleGrantAdapter) ApplyObservation(obj *snowplanev1alpha1.Accoun
 	grantObs := obs.Detail
 	if grantObs.ShowOutput != nil {
 		on := onToParams(&obj.Spec.On)
-		onClause := snowflake.BuildOnClause(on)
-		toClause := snowflake.BuildToClause(obj.Spec.AccountRole, "", "")
-		obj.Status.FullyQualifiedName = fmt.Sprintf("GRANT %s %s %s", grantObs.ShowOutput.Privilege, onClause, toClause)
+
+		onClause, err := snowflake.BuildOnClause(on)
+		if err == nil {
+			toClause := snowflake.BuildToClause(obj.Spec.AccountRole, "", "")
+			obj.Status.FullyQualifiedName = fmt.Sprintf("GRANT %s %s %s", grantObs.ShowOutput.Privilege, onClause, toClause)
+		}
+
 		obj.Status.Kind = obj.Spec.ResolveKind()
 		obj.Status.ShowOutput = applyGrantShowOutput(grantObs)
 	}

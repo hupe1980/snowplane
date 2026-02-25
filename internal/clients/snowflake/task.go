@@ -94,6 +94,12 @@ func (o *CreateTaskOptions) Validate() error {
 		}
 	}
 
+	if o.Config != nil {
+		if err := sqlbuilder.ValidateDollarQuotedValue(*o.Config); err != nil {
+			errs = append(errs, fmt.Errorf("invalid config: %w", err))
+		}
+	}
+
 	return errors.Join(errs...)
 }
 
@@ -144,6 +150,12 @@ func (o *AlterTaskOptions) Validate() error {
 
 	if o.Warehouse != nil && o.UserTaskManagedInitialWarehouseSize != nil {
 		errs = append(errs, fmt.Errorf("warehouse and userTaskManagedInitialWarehouseSize are mutually exclusive"))
+	}
+
+	if o.Config != nil {
+		if err := sqlbuilder.ValidateDollarQuotedValue(*o.Config); err != nil {
+			errs = append(errs, fmt.Errorf("invalid config: %w", err))
+		}
 	}
 
 	return errors.Join(errs...)
@@ -352,7 +364,7 @@ func buildAlterTaskStatements(opts AlterTaskOptions) (statements []string, err e
 
 	if opts.Config != nil {
 		// CONFIG uses $$ delimiters, not single quotes.
-		sc.Raw(fmt.Sprintf("CONFIG = $$%s$$", *opts.Config))
+		sc.UnsafeRaw(fmt.Sprintf("CONFIG = $$%s$$", *opts.Config))
 	}
 
 	if opts.ErrorIntegration != nil {

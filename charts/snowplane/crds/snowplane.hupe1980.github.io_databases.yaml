@@ -65,6 +65,8 @@ spec:
                 description: DataRetentionTimeInDays specifies the Time Travel retention
                   period (0–90 days).
                 format: int32
+                maximum: 90
+                minimum: 0
                 type: integer
               defaultDdlCollation:
                 description: DefaultDDLCollation sets the default collation for string
@@ -99,6 +101,8 @@ spec:
                   MaxDataExtensionTimeInDays specifies the maximum number of days Snowflake
                   can extend the data retention period.
                 format: int32
+                maximum: 90
+                minimum: 0
                 type: integer
               metricLevel:
                 description: MetricLevel controls the metric collection level.

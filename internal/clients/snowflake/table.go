@@ -202,6 +202,44 @@ func (o *AlterTableOptions) Validate() error {
 		errs = append(errs, err)
 	}
 
+	// Validate AddColumns — same rules as CreateTableOptions.
+	for i, col := range o.AddColumns {
+		if col.Name == "" {
+			errs = append(errs, fmt.Errorf("addColumn %d: name is required", i))
+		}
+
+		if col.Type == "" {
+			errs = append(errs, fmt.Errorf("addColumn %d: type is required", i))
+		} else if err := sqlbuilder.ValidateColumnType(col.Type); err != nil {
+			errs = append(errs, fmt.Errorf("addColumn %d: %w", i, err))
+		}
+
+		if col.Default != nil {
+			if err := sqlbuilder.ValidateColumnDefault(*col.Default); err != nil {
+				errs = append(errs, fmt.Errorf("addColumn %d: %w", i, err))
+			}
+		}
+	}
+
+	// Validate AlterColumns — column type and default changes.
+	for i, ac := range o.AlterColumns {
+		if ac.Name == "" {
+			errs = append(errs, fmt.Errorf("alterColumn %d: name is required", i))
+		}
+
+		if ac.SetType != nil {
+			if err := sqlbuilder.ValidateColumnType(*ac.SetType); err != nil {
+				errs = append(errs, fmt.Errorf("alterColumn %d setType: %w", i, err))
+			}
+		}
+
+		if ac.SetDefault != nil {
+			if err := sqlbuilder.ValidateColumnDefault(*ac.SetDefault); err != nil {
+				errs = append(errs, fmt.Errorf("alterColumn %d setDefault: %w", i, err))
+			}
+		}
+	}
+
 	return errors.Join(errs...)
 }
 

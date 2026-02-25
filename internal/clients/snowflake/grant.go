@@ -120,6 +120,10 @@ func (o *CreateGrantOptions) Validate() error {
 		return fmt.Errorf("privilege is required")
 	}
 
+	if err := sqlbuilder.ValidateKeywordValue(o.Privilege); err != nil {
+		return fmt.Errorf("invalid privilege: %w", err)
+	}
+
 	if strings.TrimSpace(o.OnClause) == "" {
 		return fmt.Errorf("onClause is required")
 	}
@@ -149,6 +153,10 @@ type RevokeGrantOptions struct {
 func (o *RevokeGrantOptions) Validate() error {
 	if strings.TrimSpace(o.Privilege) == "" {
 		return fmt.Errorf("privilege is required")
+	}
+
+	if err := sqlbuilder.ValidateKeywordValue(o.Privilege); err != nil {
+		return fmt.Errorf("invalid privilege: %w", err)
 	}
 
 	if strings.TrimSpace(o.OnClause) == "" {
@@ -370,48 +378,64 @@ func scanGrantShowOutput(rows *sql.Rows, future bool) ([]*GrantShowOutput, error
 // All identifier names are quoted via QuoteIdentifierParts to prevent SQL injection.
 // Object type keywords are validated against an allowlist.
 // This is a helper used by the controller adapter to build CreateGrantOptions.OnClause.
-func BuildOnClause(on OnClauseParams) string {
+func BuildOnClause(on OnClauseParams) (string, error) {
 	if on.Account {
-		return "ON ACCOUNT"
+		return "ON ACCOUNT", nil
 	}
 
 	if on.AccountObjectType != "" {
-		return fmt.Sprintf("ON %s %s", on.AccountObjectType, sqlbuilder.QuoteIdentifierParts(on.AccountObjectName))
+		if err := sqlbuilder.ValidateObjectType(on.AccountObjectType); err != nil {
+			return "", fmt.Errorf("invalid account object type: %w", err)
+		}
+
+		return fmt.Sprintf("ON %s %s", on.AccountObjectType, sqlbuilder.QuoteIdentifierParts(on.AccountObjectName)), nil
 	}
 
 	if on.SchemaName != "" {
-		return "ON SCHEMA " + sqlbuilder.QuoteIdentifierParts(on.SchemaName)
+		return "ON SCHEMA " + sqlbuilder.QuoteIdentifierParts(on.SchemaName), nil
 	}
 
 	if on.AllSchemasInDB != "" {
-		return "ON ALL SCHEMAS IN DATABASE " + sqlbuilder.QuoteIdentifierParts(on.AllSchemasInDB)
+		return "ON ALL SCHEMAS IN DATABASE " + sqlbuilder.QuoteIdentifierParts(on.AllSchemasInDB), nil
 	}
 
 	if on.FutureSchemasInDB != "" {
-		return "ON FUTURE SCHEMAS IN DATABASE " + sqlbuilder.QuoteIdentifierParts(on.FutureSchemasInDB)
+		return "ON FUTURE SCHEMAS IN DATABASE " + sqlbuilder.QuoteIdentifierParts(on.FutureSchemasInDB), nil
 	}
 
 	if on.SchemaObjectType != "" && on.SchemaObjectName != "" {
-		return fmt.Sprintf("ON %s %s", on.SchemaObjectType, sqlbuilder.QuoteIdentifierParts(on.SchemaObjectName))
+		if err := sqlbuilder.ValidateObjectType(on.SchemaObjectType); err != nil {
+			return "", fmt.Errorf("invalid schema object type: %w", err)
+		}
+
+		return fmt.Sprintf("ON %s %s", on.SchemaObjectType, sqlbuilder.QuoteIdentifierParts(on.SchemaObjectName)), nil
 	}
 
 	if on.AllObjectsTypePlural != "" {
-		if on.AllObjectsInSchema != "" {
-			return fmt.Sprintf("ON ALL %s IN SCHEMA %s", on.AllObjectsTypePlural, sqlbuilder.QuoteIdentifierParts(on.AllObjectsInSchema))
+		if err := sqlbuilder.ValidateObjectType(on.AllObjectsTypePlural); err != nil {
+			return "", fmt.Errorf("invalid all-objects type plural: %w", err)
 		}
 
-		return fmt.Sprintf("ON ALL %s IN DATABASE %s", on.AllObjectsTypePlural, sqlbuilder.QuoteIdentifierParts(on.AllObjectsInDB))
+		if on.AllObjectsInSchema != "" {
+			return fmt.Sprintf("ON ALL %s IN SCHEMA %s", on.AllObjectsTypePlural, sqlbuilder.QuoteIdentifierParts(on.AllObjectsInSchema)), nil
+		}
+
+		return fmt.Sprintf("ON ALL %s IN DATABASE %s", on.AllObjectsTypePlural, sqlbuilder.QuoteIdentifierParts(on.AllObjectsInDB)), nil
 	}
 
 	if on.FutureObjectsTypePlural != "" {
-		if on.FutureObjectsInSchema != "" {
-			return fmt.Sprintf("ON FUTURE %s IN SCHEMA %s", on.FutureObjectsTypePlural, sqlbuilder.QuoteIdentifierParts(on.FutureObjectsInSchema))
+		if err := sqlbuilder.ValidateObjectType(on.FutureObjectsTypePlural); err != nil {
+			return "", fmt.Errorf("invalid future-objects type plural: %w", err)
 		}
 
-		return fmt.Sprintf("ON FUTURE %s IN DATABASE %s", on.FutureObjectsTypePlural, sqlbuilder.QuoteIdentifierParts(on.FutureObjectsInDB))
+		if on.FutureObjectsInSchema != "" {
+			return fmt.Sprintf("ON FUTURE %s IN SCHEMA %s", on.FutureObjectsTypePlural, sqlbuilder.QuoteIdentifierParts(on.FutureObjectsInSchema)), nil
+		}
+
+		return fmt.Sprintf("ON FUTURE %s IN DATABASE %s", on.FutureObjectsTypePlural, sqlbuilder.QuoteIdentifierParts(on.FutureObjectsInDB)), nil
 	}
 
-	return ""
+	return "", nil
 }
 
 // OnClauseParams is a flat struct that the controller populates from the GrantOn hierarchy.

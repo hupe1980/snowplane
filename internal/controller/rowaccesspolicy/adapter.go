@@ -57,11 +57,11 @@ func (a *adapter) PreReconcile(ctx context.Context, rap *snowplanev1alpha1.RowAc
 	return nil
 }
 
-func (a *adapter) BuildIdentifier(rap *snowplanev1alpha1.RowAccessPolicy) reconciler.Identifier {
+func (a *adapter) BuildIdentifier(rap *snowplanev1alpha1.RowAccessPolicy) (reconciler.Identifier, error) {
 	dbName := snowflake.ParseDatabaseNameFromFQN(rap.Status.DatabaseName)
 	schemaName := snowflake.ParseSchemaNameFromFQN(rap.Status.SchemaName)
 
-	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, rap.Spec.Name)
+	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, rap.Spec.Name), nil
 }
 
 func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
@@ -133,6 +133,8 @@ func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha
 	}
 
 	opts := buildCreateOptions(obj, sid)
+	opts.UseCreateOrAlter = snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
+
 	return svc.Create(ctx, opts)
 }
 
@@ -210,6 +212,6 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.RowAccessPolicy, obs *recon
 func (a *adapter) PostCreate(_ *snowplanev1alpha1.RowAccessPolicy) {}
 func (a *adapter) PostUpdate(_ *snowplanev1alpha1.RowAccessPolicy, _ bool, _ reconciler.AlterOptions) {
 }
-func (a *adapter) SupportsCreateOrAlter() bool { return false }
+func (a *adapter) SupportsCreateOrAlter() bool { return true }
 
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.RowAccessPolicy, Service, *snowflake.RowAccessPolicyObservation] = (*adapter)(nil)

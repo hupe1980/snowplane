@@ -57,11 +57,11 @@ func (a *adapter) PreReconcile(ctx context.Context, pp *snowplanev1alpha1.Passwo
 	return nil
 }
 
-func (a *adapter) BuildIdentifier(pp *snowplanev1alpha1.PasswordPolicy) reconciler.Identifier {
+func (a *adapter) BuildIdentifier(pp *snowplanev1alpha1.PasswordPolicy) (reconciler.Identifier, error) {
 	dbName := snowflake.ParseDatabaseNameFromFQN(pp.Status.DatabaseName)
 	schemaName := snowflake.ParseSchemaNameFromFQN(pp.Status.SchemaName)
 
-	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, pp.Spec.Name)
+	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, pp.Spec.Name), nil
 }
 
 func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
@@ -133,6 +133,8 @@ func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha
 	}
 
 	opts := buildCreateOptions(obj, sid)
+	opts.UseCreateOrAlter = snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
+
 	return svc.Create(ctx, opts)
 }
 
@@ -210,6 +212,6 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.PasswordPolicy, obs *reconc
 func (a *adapter) PostCreate(_ *snowplanev1alpha1.PasswordPolicy) {}
 func (a *adapter) PostUpdate(_ *snowplanev1alpha1.PasswordPolicy, _ bool, _ reconciler.AlterOptions) {
 }
-func (a *adapter) SupportsCreateOrAlter() bool { return false }
+func (a *adapter) SupportsCreateOrAlter() bool { return true }
 
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.PasswordPolicy, Service, *snowflake.PasswordPolicyObservation] = (*adapter)(nil)

@@ -7,8 +7,8 @@ spec:
     name: default
   name: MY_SCIM_INTEGRATION
   type: SCIM
-  scimConfig:
-    client: AZURE
+  scim:
+    scimClient: AZURE
     runAsRole: AAD_PROVISIONER
   enabled: true
   comment: "SCIM provisioning from Azure AD managed by Snowplane"

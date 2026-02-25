@@ -87,7 +87,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
-	// Defense-in-depth: validate spec beyond what CEL rules enforce (R8-2).
+	// Defense-in-depth: validate spec beyond what CEL rules enforce.
 	if err := fe.Spec.Validate(); err != nil {
 		conditions.SetNotReady(&fe, snowplanev1alpha1.ReasonValidationFailed, err.Error())
 		conditions.SetNotSynced(&fe, snowplanev1alpha1.ReasonValidationFailed, err.Error())
@@ -210,13 +210,13 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, fe *snowplanev1alpha1.
 // SetupWithManager registers the FieldExport controller with the manager.
 // GenerationChangedPredicate prevents status-only updates from triggering
 // reconciliation, avoiding self-triggering loops when patchStatus updates
-// .status.lastExportedValueHash (H-3 fix).
+// .status.lastExportedValueHash.
 //
-// Source resource watches (H-4): when a source Snowplane managed resource
+// Source resource watches: when a source Snowplane managed resource
 // transitions to Ready or its status changes, FieldExports referencing it
 // are immediately re-reconciled instead of waiting up to 2 minutes.
 //
-// Target watches (H-4): when a target ConfigMap/Secret managed by
+// Target watches: when a target ConfigMap/Secret managed by
 // snowplane-fieldexport is deleted or modified, FieldExports targeting it
 // are immediately re-reconciled to restore the exported value.
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrent int) error {
@@ -515,7 +515,7 @@ func (r *Reconciler) removeFromSecret(ctx context.Context, name, namespace, key 
 
 // patchStatus uses Server-Side Apply (SSA) to update the status subresource.
 // SSA eliminates the need for ResourceVersion-based conflict detection —
-// the server resolves ownership via managedFields instead (B-2).
+// the server resolves ownership via managedFields instead.
 func (r *Reconciler) patchStatus(ctx context.Context, fe *snowplanev1alpha1.FieldExport) error {
 	// SSA requires TypeMeta in the patch payload.
 	fe.SetGroupVersionKind(snowplanev1alpha1.GroupVersion.WithKind("FieldExport"))
@@ -523,7 +523,7 @@ func (r *Reconciler) patchStatus(ctx context.Context, fe *snowplanev1alpha1.Fiel
 	// SSA patch objects must not contain managedFields.
 	fe.SetManagedFields(nil)
 
-	return r.client.Status().Patch(ctx, fe, client.Apply, //nolint:staticcheck // TODO: migrate to client.SubResource("status").Apply() with ApplyConfiguration types
+	return r.client.SubResource("status").Patch(ctx, fe, client.Apply, //nolint:staticcheck // client.Apply removal requires generated ApplyConfiguration types
 		client.FieldOwner(reconciler.StatusFieldOwner),
 		client.ForceOwnership,
 	)
@@ -531,7 +531,7 @@ func (r *Reconciler) patchStatus(ctx context.Context, fe *snowplanev1alpha1.Fiel
 
 // bestEffortPatchStatus patches status and logs any error without
 // propagating it. Used when the primary reconcile result (requeue timing
-// or a different error) must not be defeated by a status-patch failure (FE-1).
+// or a different error) must not be defeated by a status-patch failure.
 func (r *Reconciler) bestEffortPatchStatus(ctx context.Context, fe *snowplanev1alpha1.FieldExport) {
 	if err := r.patchStatus(ctx, fe); err != nil {
 		log.FromContext(ctx).Error(err, "best-effort status patch failed",
@@ -540,7 +540,7 @@ func (r *Reconciler) bestEffortPatchStatus(ctx context.Context, fe *snowplanev1a
 }
 
 // ---------------------------------------------------------------------------
-// Watch infrastructure (H-4)
+// Watch infrastructure
 // ---------------------------------------------------------------------------
 
 // Field index keys for FieldExport cross-resource watches.

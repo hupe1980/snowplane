@@ -360,17 +360,123 @@ func TestCreateTableOptionsValidation(t *testing.T) {
 func TestAlterTableOptionsValidation(t *testing.T) {
 	t.Parallel()
 
-	err := (&AlterTableOptions{
-		Name:    NewSchemaObjectIdentifier("DB", "S", "T"),
-		Comment: ptrString("ok"),
-	}).Validate()
-	require.NoError(t, err)
+	t.Run("Valid", func(t *testing.T) {
+		t.Parallel()
+		err := (&AlterTableOptions{
+			Name:    NewSchemaObjectIdentifier("DB", "S", "T"),
+			Comment: ptrString("ok"),
+		}).Validate()
+		require.NoError(t, err)
+	})
 
-	err = (&AlterTableOptions{
-		Name:                    NewSchemaObjectIdentifier("DB", "S", "T"),
-		DataRetentionTimeInDays: ptrInt32(-1),
-	}).Validate()
-	require.Error(t, err)
+	t.Run("InvalidDataRetention", func(t *testing.T) {
+		t.Parallel()
+		err := (&AlterTableOptions{
+			Name:                    NewSchemaObjectIdentifier("DB", "S", "T"),
+			DataRetentionTimeInDays: ptrInt32(-1),
+		}).Validate()
+		require.Error(t, err)
+	})
+
+	t.Run("AddColumn_InvalidType", func(t *testing.T) {
+		t.Parallel()
+		err := (&AlterTableOptions{
+			Name: NewSchemaObjectIdentifier("DB", "S", "T"),
+			AddColumns: []CreateTableColumn{
+				{Name: "COL1", Type: "DROP TABLE; --"},
+			},
+		}).Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "addColumn 0")
+	})
+
+	t.Run("AddColumn_MissingName", func(t *testing.T) {
+		t.Parallel()
+		err := (&AlterTableOptions{
+			Name: NewSchemaObjectIdentifier("DB", "S", "T"),
+			AddColumns: []CreateTableColumn{
+				{Type: "INT"},
+			},
+		}).Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "addColumn 0: name is required")
+	})
+
+	t.Run("AddColumn_MissingType", func(t *testing.T) {
+		t.Parallel()
+		err := (&AlterTableOptions{
+			Name: NewSchemaObjectIdentifier("DB", "S", "T"),
+			AddColumns: []CreateTableColumn{
+				{Name: "COL1"},
+			},
+		}).Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "addColumn 0: type is required")
+	})
+
+	t.Run("AddColumn_InvalidDefault", func(t *testing.T) {
+		t.Parallel()
+		badDefault := "1; DROP TABLE T; --"
+		err := (&AlterTableOptions{
+			Name: NewSchemaObjectIdentifier("DB", "S", "T"),
+			AddColumns: []CreateTableColumn{
+				{Name: "COL1", Type: "INT", Default: &badDefault},
+			},
+		}).Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "addColumn 0")
+	})
+
+	t.Run("AlterColumn_InvalidSetType", func(t *testing.T) {
+		t.Parallel()
+		badType := "DROP TABLE; --"
+		err := (&AlterTableOptions{
+			Name: NewSchemaObjectIdentifier("DB", "S", "T"),
+			AlterColumns: []AlterColumnAction{
+				{Name: "COL1", SetType: &badType},
+			},
+		}).Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "alterColumn 0 setType")
+	})
+
+	t.Run("AlterColumn_InvalidSetDefault", func(t *testing.T) {
+		t.Parallel()
+		badDefault := "1; DROP TABLE T; --"
+		err := (&AlterTableOptions{
+			Name: NewSchemaObjectIdentifier("DB", "S", "T"),
+			AlterColumns: []AlterColumnAction{
+				{Name: "COL1", SetDefault: &badDefault},
+			},
+		}).Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "alterColumn 0 setDefault")
+	})
+
+	t.Run("AlterColumn_MissingName", func(t *testing.T) {
+		t.Parallel()
+		goodType := "VARCHAR(100)"
+		err := (&AlterTableOptions{
+			Name: NewSchemaObjectIdentifier("DB", "S", "T"),
+			AlterColumns: []AlterColumnAction{
+				{SetType: &goodType},
+			},
+		}).Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "alterColumn 0: name is required")
+	})
+
+	t.Run("AddColumn_ValidWithDefault", func(t *testing.T) {
+		t.Parallel()
+		goodDefault := "'ACTIVE'"
+		err := (&AlterTableOptions{
+			Name: NewSchemaObjectIdentifier("DB", "S", "T"),
+			AddColumns: []CreateTableColumn{
+				{Name: "STATUS", Type: "VARCHAR", Default: &goodDefault},
+			},
+		}).Validate()
+		require.NoError(t, err)
+	})
 }
 
 func TestAlterTableOptionsHasChanges(t *testing.T) {

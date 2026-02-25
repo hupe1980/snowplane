@@ -84,7 +84,7 @@ const providerRefIndex = ".spec.providerRef.name"
 
 // secretRefIndex is the virtual field path used by the field indexer for
 // efficient Secret→ProviderConfig reverse lookups (R9-4).
-const secretRefIndex = ".spec.credentials.secretRef"
+const secretRefIndex = ".spec.credentials.secretRef" //nolint:gosec // G101: index key, not a credential
 
 // secretRefKey builds the composite index key "namespace/name" for a secret.
 func secretRefKey(namespace, name string) string {
@@ -255,7 +255,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 
 	logger.Info("reconciling ProviderConfig", "name", pc.Name)
 
-	// Handle deletion with in-use guard (L-14).
+	// Handle deletion with in-use guard.
 	if !pc.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, pc)
 	}
@@ -387,14 +387,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 
 // patchStatus uses Server-Side Apply (SSA) to update the status subresource.
 // SSA eliminates the need for ResourceVersion-based conflict detection —
-// the server resolves ownership via managedFields instead (B-2).
+// the server resolves ownership via managedFields instead.
 func (r *Reconciler) patchStatus(ctx context.Context, pc *snowplanev1alpha1.ProviderConfig) error {
 	pc.SetGroupVersionKind(snowplanev1alpha1.GroupVersion.WithKind("ProviderConfig"))
 
 	// SSA patch objects must not contain managedFields.
 	pc.SetManagedFields(nil)
 
-	return r.client.Status().Patch(ctx, pc, client.Apply, //nolint:staticcheck // TODO: migrate to client.SubResource("status").Apply() with ApplyConfiguration types
+	return r.client.SubResource("status").Patch(ctx, pc, client.Apply, //nolint:staticcheck // client.Apply removal requires generated ApplyConfiguration types
 		client.FieldOwner(reconciler.StatusFieldOwner),
 		client.ForceOwnership,
 	)
@@ -408,7 +408,7 @@ func (r *Reconciler) bestEffortPatchStatus(ctx context.Context, pc *snowplanev1a
 	}
 }
 
-// reconcileDelete handles ProviderConfig deletion with an in-use guard (L-14).
+// reconcileDelete handles ProviderConfig deletion with an in-use guard.
 // If any managed resource still references this ProviderConfig, the finalizer
 // is not removed and a warning event is emitted.
 func (r *Reconciler) reconcileDelete(ctx context.Context, pc *snowplanev1alpha1.ProviderConfig) (ctrl.Result, error) {

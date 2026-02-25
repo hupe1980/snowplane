@@ -76,6 +76,19 @@ func BuildSnowflakeConfig(pc *snowplanev1alpha1.ProviderConfig, secret *corev1.S
 		switch pc.Spec.AuthenticationType {
 		case snowplanev1alpha1.AuthenticationTypeKeyPair:
 			cfg.PrivateKey = string(data)
+
+			// Optionally read the passphrase for encrypted PKCS#8 keys.
+			// The passphrase must be in the same Secret, referenced by key name.
+			if ppKey := pc.Spec.Credentials.PassphraseKey; ppKey != "" {
+				ppData, ppOK := secret.Data[ppKey]
+
+				if !ppOK {
+					return snowflake.Config{}, fmt.Errorf("secret %s/%s does not contain passphrase key %q",
+						secret.Namespace, secret.Name, ppKey)
+				}
+
+				cfg.Passphrase = string(ppData)
+			}
 		case snowplanev1alpha1.AuthenticationTypeUsernamePassword:
 			cfg.Password = string(data)
 		}
@@ -125,6 +138,7 @@ func ComputeHash(cfg snowflake.Config) string {
 		cfg.Warehouse,
 		cfg.Password,
 		cfg.PrivateKey,
+		cfg.Passphrase,
 		cfg.TokenFilePath,
 		cfg.WorkloadIdentityProvider,
 	} {

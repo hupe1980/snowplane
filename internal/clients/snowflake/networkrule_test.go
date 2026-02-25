@@ -88,6 +88,22 @@ func TestBuildCreateNetworkRuleSQL(t *testing.T) {
 	})
 }
 
+func TestBuildCreateNetworkRuleSQL_CreateOrAlter(t *testing.T) {
+	t.Parallel()
+
+	opts := CreateNetworkRuleOptions{
+		Name:             NewSchemaObjectIdentifier("DB", "SCH", "MY_RULE"),
+		Type:             "IPV4",
+		Mode:             "INGRESS",
+		ValueList:        []string{"1.2.3.4"},
+		UseCreateOrAlter: true,
+	}
+	got := buildCreateNetworkRuleSQL(opts)
+	assert.Contains(t, got, `CREATE OR ALTER NETWORK RULE "DB"."SCH"."MY_RULE"`)
+	assert.NotContains(t, got, "IF NOT EXISTS")
+	assert.Contains(t, got, "TYPE = IPV4")
+}
+
 func TestBuildAlterNetworkRuleStatements(t *testing.T) {
 	t.Parallel()
 

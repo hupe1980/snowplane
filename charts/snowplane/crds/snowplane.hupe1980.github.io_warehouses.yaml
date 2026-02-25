@@ -103,16 +103,22 @@ spec:
                 description: MaxClusterCount is the maximum number of clusters (multi-cluster
                   mode).
                 format: int32
+                maximum: 10
+                minimum: 1
                 type: integer
               maxConcurrencyLevel:
                 description: MaxConcurrencyLevel limits concurrent queries (1–32,
                   default 8).
                 format: int32
+                maximum: 32
+                minimum: 1
                 type: integer
               minClusterCount:
                 description: MinClusterCount is the minimum number of clusters (multi-cluster
                   mode).
                 format: int32
+                maximum: 10
+                minimum: 1
                 type: integer
               name:
                 description: Name is the Snowflake warehouse name. Immutable after
@@ -139,6 +145,8 @@ spec:
                 description: QueryAccelerationMaxScaleFactor limits query acceleration
                   scaling (0–100).
                 format: int32
+                maximum: 100
+                minimum: 0
                 type: integer
               resourceConstraint:
                 description: ResourceConstraint specifies resource constraints (e.g.,

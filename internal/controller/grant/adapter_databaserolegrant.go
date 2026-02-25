@@ -89,7 +89,7 @@ func (a *databaseRoleGrantAdapter) PreReconcile(ctx context.Context, grant *snow
 }
 
 // BuildIdentifier constructs a GrantIdentifier from the DatabaseRoleGrant spec.
-func (a *databaseRoleGrantAdapter) BuildIdentifier(grant *snowplanev1alpha1.DatabaseRoleGrant) reconciler.Identifier {
+func (a *databaseRoleGrantAdapter) BuildIdentifier(grant *snowplanev1alpha1.DatabaseRoleGrant) (reconciler.Identifier, error) {
 	role := grant.Spec.DatabaseRole
 	toClause := snowflake.BuildToClause("", role, "")
 
@@ -201,9 +201,15 @@ func (a *databaseRoleGrantAdapter) Observe(ctx context.Context, svc Service, id 
 // Create grants the privilege in Snowflake.
 func (a *databaseRoleGrantAdapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha1.DatabaseRoleGrant, _ reconciler.Identifier) error {
 	on := onToParams(&obj.Spec.On)
+
+	onClause, err := snowflake.BuildOnClause(on)
+	if err != nil {
+		return fmt.Errorf("building ON clause: %w", err)
+	}
+
 	opts := snowflake.CreateGrantOptions{
 		Privilege:       obj.Spec.Privilege,
-		OnClause:        snowflake.BuildOnClause(on),
+		OnClause:        onClause,
 		ToClause:        snowflake.BuildToClause("", obj.Spec.DatabaseRole, ""),
 		WithGrantOption: obj.Spec.WithGrantOption,
 	}
@@ -253,9 +259,13 @@ func (a *databaseRoleGrantAdapter) ApplyObservation(obj *snowplanev1alpha1.Datab
 	grantObs := obs.Detail
 	if grantObs.ShowOutput != nil {
 		on := onToParams(&obj.Spec.On)
-		onClause := snowflake.BuildOnClause(on)
-		toClause := snowflake.BuildToClause("", obj.Spec.DatabaseRole, "")
-		obj.Status.FullyQualifiedName = fmt.Sprintf("GRANT %s %s %s", grantObs.ShowOutput.Privilege, onClause, toClause)
+
+		onClause, err := snowflake.BuildOnClause(on)
+		if err == nil {
+			toClause := snowflake.BuildToClause("", obj.Spec.DatabaseRole, "")
+			obj.Status.FullyQualifiedName = fmt.Sprintf("GRANT %s %s %s", grantObs.ShowOutput.Privilege, onClause, toClause)
+		}
+
 		obj.Status.Kind = obj.Spec.ResolveKind()
 		obj.Status.ShowOutput = applyGrantShowOutput(grantObs)
 	}

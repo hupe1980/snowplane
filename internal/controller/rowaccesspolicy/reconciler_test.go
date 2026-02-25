@@ -293,6 +293,10 @@ func TestReconcile_UpdateCommentChanged(t *testing.T) {
 	rap.Status.SchemaName = "MY_SCHEMA"
 	rap.Spec.Comment = testutil.PtrString("updated")
 
+	rap.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
+	}
+
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
 
@@ -329,6 +333,10 @@ func TestReconcile_AlterFails(t *testing.T) {
 	rap.Status.DatabaseName = "MY_DB"
 	rap.Status.SchemaName = "MY_SCHEMA"
 	rap.Spec.Comment = testutil.PtrString("change")
+
+	rap.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
+	}
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"

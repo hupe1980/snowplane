@@ -50,14 +50,19 @@ type UserDescribeOutput struct {
 
 // CreateUserOptions holds the parameters for creating a user.
 type CreateUserOptions struct {
-	Name                  AccountObjectIdentifier
+	Name AccountObjectIdentifier
+
+	// UseCreateOrAlter emits CREATE OR ALTER USER instead of
+	// CREATE USER IF NOT EXISTS.
+	UseCreateOrAlter bool
+
 	LoginName             *string
 	DisplayName           *string
 	Email                 *string
 	FirstName             *string
 	LastName              *string
 	Comment               *string
-	Password              *string
+	Password              *string //nolint:gosec // G117: user creation requires password field
 	RSAPublicKey          *string
 	RSAPublicKey2         *string
 	Type                  *string
@@ -93,7 +98,7 @@ type AlterUserOptions struct {
 	FirstName             *string
 	LastName              *string
 	Comment               *string
-	Password              *string
+	Password              *string //nolint:gosec // G117: user alteration requires password field
 	RSAPublicKey          *string
 	RSAPublicKey2         *string
 	DefaultRole           *string
@@ -160,7 +165,11 @@ func NewUserClient(c SQLExecutor) *UserClient {
 func buildCreateUserSQL(opts CreateUserOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	b.WriteString("CREATE USER IF NOT EXISTS ")
+	if opts.UseCreateOrAlter {
+		b.WriteString("CREATE OR ALTER USER ")
+	} else {
+		b.WriteString("CREATE USER IF NOT EXISTS ")
+	}
 	b.WriteString(opts.Name.FullyQualifiedName())
 
 	b.SetString("PASSWORD", opts.Password)
@@ -232,9 +241,9 @@ func buildAlterUserStatements(opts AlterUserOptions) ([]string, error) {
 	// DEFAULT_SECONDARY_ROLES = ('ALL') is special syntax — not a simple quoted string.
 	if opts.DefaultSecondaryRoles != nil {
 		if strings.EqualFold(*opts.DefaultSecondaryRoles, "ALL") {
-			sc.Raw("DEFAULT_SECONDARY_ROLES = ('ALL')")
+			sc.UnsafeRaw("DEFAULT_SECONDARY_ROLES = ('ALL')")
 		} else {
-			sc.Raw(fmt.Sprintf("DEFAULT_SECONDARY_ROLES = ('%s')", sqlbuilder.EscapeString(*opts.DefaultSecondaryRoles)))
+			sc.UnsafeRaw(fmt.Sprintf("DEFAULT_SECONDARY_ROLES = ('%s')", sqlbuilder.EscapeString(*opts.DefaultSecondaryRoles)))
 		}
 	}
 

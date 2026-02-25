@@ -8,6 +8,7 @@ metadata:
     app.kubernetes.io/component: controller-manager
 spec:
   replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   selector:
     matchLabels:
       {{- include "snowplane.selectorLabels" . | nindent 6 }}
@@ -57,6 +58,8 @@ spec:
             {{- with .Values.controller.disableControllers }}
             - --disable-controllers={{ . }}
             {{- end }}
+            - --circuit-breaker-threshold={{ .Values.circuitBreaker.threshold }}
+            - --circuit-breaker-reset-timeout={{ .Values.circuitBreaker.resetTimeout }}
             - --zap-log-level={{ .Values.logging.level }}
           ports:
             - name: metrics
@@ -77,18 +80,34 @@ spec:
               port: health
             initialDelaySeconds: 5
             periodSeconds: 10
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            failureThreshold: 30
+            periodSeconds: 2
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          {{- if .Values.workloadIdentity.enabled }}
+          {{- with .Values.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if or .Values.workloadIdentity.enabled .Values.extraVolumeMounts }}
           volumeMounts:
+            {{- if .Values.workloadIdentity.enabled }}
             - name: snowflake-token
               mountPath: {{ .Values.workloadIdentity.mountPath }}
               readOnly: true
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
-      {{- if .Values.workloadIdentity.enabled }}
+      {{- if or .Values.workloadIdentity.enabled .Values.extraVolumes }}
       volumes:
+        {{- if .Values.workloadIdentity.enabled }}
         - name: snowflake-token
           projected:
             sources:
@@ -96,6 +115,10 @@ spec:
                   audience: {{ .Values.workloadIdentity.audience | quote }}
                   expirationSeconds: {{ .Values.workloadIdentity.expirationSeconds }}
                   path: {{ .Values.workloadIdentity.tokenFileName }}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

@@ -185,9 +185,14 @@ func buildGrantIdentifier(
 	granteeName string,
 	kind snowplanev1alpha1.GrantKind,
 	isShare bool,
-) snowflake.GrantIdentifier {
+) (snowflake.GrantIdentifier, error) {
 	params := onToParams(on)
-	onClause := snowflake.BuildOnClause(params)
+
+	onClause, err := snowflake.BuildOnClause(params)
+	if err != nil {
+		return snowflake.GrantIdentifier{}, fmt.Errorf("buildGrantIdentifier: %w", err)
+	}
+
 	showTarget, future := snowflake.BuildShowGrantsTarget(params, "")
 
 	if isShare {
@@ -210,7 +215,7 @@ func buildGrantIdentifier(
 		ToClause:         toClause,
 		GranteeName:      granteeName,
 		ShowGrantsTarget: showTarget,
-	}
+	}, nil
 }
 
 // applyGrantShowOutput populates grant show output fields from a GrantObservation.

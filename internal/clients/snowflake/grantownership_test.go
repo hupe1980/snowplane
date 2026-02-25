@@ -138,4 +138,64 @@ func TestCreateGrantOwnershipOptions_Validate(t *testing.T) {
 		}
 		assert.Error(t, opts.Validate())
 	})
+
+	t.Run("InvalidObjectType", func(t *testing.T) {
+		t.Parallel()
+		opts := CreateGrantOwnershipOptions{
+			ObjectType: "TABLE; DROP DATABASE X--",
+			ObjectName: `"MY_DB"`,
+			ToRole:     "ROLE ADMIN",
+		}
+		err := opts.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid object type")
+	})
+
+	t.Run("ObjectNameWithSemicolon", func(t *testing.T) {
+		t.Parallel()
+		opts := CreateGrantOwnershipOptions{
+			ObjectType: "DATABASE",
+			ObjectName: `"MY_DB"; DROP TABLE X--`,
+			ToRole:     "ROLE ADMIN",
+		}
+		err := opts.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid object name")
+	})
+
+	t.Run("ObjectNameWithDollarQuoting", func(t *testing.T) {
+		t.Parallel()
+		opts := CreateGrantOwnershipOptions{
+			ObjectType: "DATABASE",
+			ObjectName: `"MY_DB"$$injection$$`,
+			ToRole:     "ROLE ADMIN",
+		}
+		err := opts.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid object name")
+	})
+
+	t.Run("InvalidCurrentGrantsBehavior", func(t *testing.T) {
+		t.Parallel()
+		opts := CreateGrantOwnershipOptions{
+			ObjectType:            "TABLE",
+			ObjectName:            `"DB"."SCH"."T"`,
+			ToRole:                "ROLE ADMIN",
+			CurrentGrantsBehavior: "COPY; DROP",
+		}
+		err := opts.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid current grants behavior")
+	})
+
+	t.Run("ValidWithCopyBehavior", func(t *testing.T) {
+		t.Parallel()
+		opts := CreateGrantOwnershipOptions{
+			ObjectType:            "TABLE",
+			ObjectName:            `"DB"."SCH"."T"`,
+			ToRole:                "ROLE ADMIN",
+			CurrentGrantsBehavior: "COPY",
+		}
+		assert.NoError(t, opts.Validate())
+	})
 }

@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -683,6 +685,50 @@ func TestProviderConfigSpec_Validate_KeyPairMissingSecret(t *testing.T) {
 	}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "secretRef (name and key) is required for KeyPair")
+}
+
+func TestProviderConfigSpec_Validate_KeyPair_PassphraseKeyAllowed(t *testing.T) {
+	t.Parallel()
+	err := (&ProviderConfigSpec{
+		Account:            "xy12345",
+		User:               "admin",
+		AuthenticationType: AuthenticationTypeKeyPair,
+		Credentials: ProviderCredentials{
+			SecretRef:     &SecretKeyReference{Name: "my-secret", Key: "privateKey"},
+			PassphraseKey: "passphrase",
+		},
+	}).Validate()
+	assert.NoError(t, err)
+}
+
+func TestProviderConfigSpec_Validate_Password_PassphraseKeyRejected(t *testing.T) {
+	t.Parallel()
+	err := (&ProviderConfigSpec{
+		Account:            "xy12345",
+		User:               "admin",
+		AuthenticationType: AuthenticationTypeUsernamePassword,
+		Credentials: ProviderCredentials{
+			SecretRef:     &SecretKeyReference{Name: "my-secret", Key: "password"},
+			PassphraseKey: "passphrase",
+		},
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "passphraseKey is only valid for KeyPair")
+}
+
+func TestProviderConfigSpec_Validate_WorkloadIdentity_PassphraseKeyRejected(t *testing.T) {
+	t.Parallel()
+	err := (&ProviderConfigSpec{
+		Account:            "xy12345",
+		User:               "admin",
+		AuthenticationType: AuthenticationTypeWorkloadIdentity,
+		WorkloadIdentity:   &WorkloadIdentitySpec{Provider: WIFProviderOIDC},
+		Credentials: ProviderCredentials{
+			PassphraseKey: "passphrase",
+		},
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "passphraseKey is only valid for KeyPair")
 }
 
 func TestProviderConfigSpec_Validate_PasswordMissingSecret(t *testing.T) {
@@ -3455,4 +3501,47 @@ func TestGrantOwnershipSpec_Validate_DatabaseRoleRef(t *testing.T) {
 	s.AccountRole = ""
 	s.DatabaseRoleRef = &LocalObjectReference{Name: "my-db-role"}
 	assert.NoError(t, s.Validate())
+}
+
+// TestFieldExportCELListMatchesGoMap verifies that the CEL whitelist in
+// FieldExportSpec's kubebuilder marker stays in sync with the Go-level
+// ValidFieldExportSourceKinds map. If you add a new resource kind to the
+// Go map, this test will fail until you also add it to the CEL rule in
+// fieldexport_types.go (and vice versa).
+func TestFieldExportCELListMatchesGoMap(t *testing.T) {
+	t.Parallel()
+
+	// Read the CEL rule source from fieldexport_types.go.
+	// The CEL rule contains: self.from.resource.kind in ['Database','Schema',...]
+	// We parse the kinds from the file to avoid a fragile hardcoded duplicate.
+	src, err := os.ReadFile("fieldexport_types.go")
+	require.NoError(t, err, "reading fieldexport_types.go")
+
+	// Extract the list from the CEL rule:  in ['Kind1','Kind2',...]
+	re := regexp.MustCompile(`self\.from\.resource\.kind in \[([^\]]+)\]`)
+	matches := re.FindSubmatch(src)
+	require.NotNil(t, matches, "could not find CEL kind-in-list rule in fieldexport_types.go")
+
+	// Parse individual kinds from the captured group.
+	kindRe := regexp.MustCompile(`'([^']+)'`)
+	kindMatches := kindRe.FindAllSubmatch(matches[1], -1)
+	celKinds := make(map[string]struct{}, len(kindMatches))
+	for _, m := range kindMatches {
+		celKinds[string(m[1])] = struct{}{}
+	}
+
+	// Compare CEL kinds against Go map.
+	for kind := range ValidFieldExportSourceKinds {
+		_, ok := celKinds[kind]
+		assert.True(t, ok, "kind %q is in ValidFieldExportSourceKinds but missing from the CEL rule in fieldexport_types.go", kind)
+	}
+
+	for kind := range celKinds {
+		_, ok := ValidFieldExportSourceKinds[kind]
+		assert.True(t, ok, "kind %q is in the CEL rule but missing from ValidFieldExportSourceKinds in validation.go", kind)
+	}
+
+	// Ensure exact count match as a safety net.
+	assert.Equal(t, len(ValidFieldExportSourceKinds), len(celKinds),
+		"CEL whitelist has %d kinds but Go map has %d", len(celKinds), len(ValidFieldExportSourceKinds))
 }

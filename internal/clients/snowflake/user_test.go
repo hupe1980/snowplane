@@ -122,6 +122,34 @@ func TestBuildCreateUserSQL(t *testing.T) {
 	})
 }
 
+func TestBuildCreateUserSQL_CreateOrAlter(t *testing.T) {
+	t.Parallel()
+
+	t.Run("basic", func(t *testing.T) {
+		t.Parallel()
+		got, err := buildCreateUserSQL(CreateUserOptions{
+			Name:             NewAccountObjectIdentifier("ALICE"),
+			UseCreateOrAlter: true,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, `CREATE OR ALTER USER "ALICE"`, got)
+	})
+
+	t.Run("with fields", func(t *testing.T) {
+		t.Parallel()
+		email := "alice@example.com"
+		got, err := buildCreateUserSQL(CreateUserOptions{
+			Name:             NewAccountObjectIdentifier("ALICE"),
+			Email:            &email,
+			UseCreateOrAlter: true,
+		})
+		require.NoError(t, err)
+		assert.Contains(t, got, "CREATE OR ALTER USER")
+		assert.NotContains(t, got, "IF NOT EXISTS")
+		assert.Contains(t, got, "EMAIL = 'alice@example.com'")
+	})
+}
+
 func TestBuildAlterUserStatements(t *testing.T) {
 	t.Parallel()
 

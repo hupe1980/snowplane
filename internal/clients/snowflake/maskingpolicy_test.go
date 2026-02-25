@@ -93,6 +93,21 @@ func TestBuildCreateMaskingPolicySQL(t *testing.T) {
 	})
 }
 
+func TestBuildCreateMaskingPolicySQL_CreateOrAlter(t *testing.T) {
+	t.Parallel()
+
+	opts := CreateMaskingPolicyOptions{
+		Name:             NewSchemaObjectIdentifier("DB", "SCH", "MASK_EMAIL"),
+		Signature:        []MaskingPolicyArgument{{Name: "val", Type: "VARCHAR"}},
+		Body:             "CASE WHEN current_role() IN ('ADMIN') THEN val ELSE '***' END",
+		UseCreateOrAlter: true,
+	}
+	got := buildCreateMaskingPolicySQL(opts)
+	assert.Contains(t, got, `CREATE OR ALTER MASKING POLICY "DB"."SCH"."MASK_EMAIL"`)
+	assert.NotContains(t, got, "IF NOT EXISTS")
+	assert.Contains(t, got, "AS (val VARCHAR) RETURNS VARCHAR")
+}
+
 func TestBuildAlterMaskingPolicyStatements(t *testing.T) {
 	t.Parallel()
 

@@ -37,6 +37,9 @@ type StatsProvider interface {
 	Stats() sql.DBStats
 }
 
+// healthCheckTimeout is the maximum time allowed for a health check ping.
+const healthCheckTimeout = 5 * time.Second
+
 // ClientFactory creates and caches Snowflake clients keyed by a provider name
 // and a config hash. When the hash changes, the old client is closed and a new
 // one is created. An optional MaxSize limits the number of cached clients; when
@@ -302,7 +305,7 @@ func (f *ClientFactory) CheckHealth(r *http.Request) error {
 		baseCtx = r.Context()
 	}
 
-	ctx, cancel := context.WithTimeout(baseCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, healthCheckTimeout)
 	defer cancel()
 
 	var errs []error

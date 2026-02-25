@@ -11,7 +11,7 @@
 package circuitbreaker
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 	"time"
 
@@ -45,7 +45,7 @@ func (s State) String() string {
 }
 
 // ErrCircuitOpen is returned when a call is rejected because the breaker is open.
-var ErrCircuitOpen = fmt.Errorf("circuit breaker is open")
+var ErrCircuitOpen = errors.New("circuit breaker is open")
 
 // Options configures the circuit breaker behaviour.
 type Options struct {

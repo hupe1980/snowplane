@@ -176,7 +176,7 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 
 		// Only update circuit breaker when a Snowflake operation was actually
 		// attempted.  Validation-only or adoption-only paths should not
-		// inflate the success count and dilute the breaker's accuracy (R-2).
+		// inflate the success count and dilute the breaker's accuracy.
 		if r.CircuitBreaker != nil && providerName != "" && snowflakeOpAttempted {
 			if retErr != nil {
 				r.CircuitBreaker.RecordFailure(providerName)
@@ -208,7 +208,7 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDependencyNotReady, fmt.Sprintf("pre-reconcile failed: %v", err))
 		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonDependencyNotReady, err.Error())
 		r.bestEffortPatchStatus(ctx, obj)
-		// Return the error to controller-runtime for exponential backoff (L-13)
+		// Return the error to controller-runtime for exponential backoff
 		// instead of a fixed 10s requeue interval.
 		return ctrl.Result{}, err
 	}
@@ -274,7 +274,10 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 		defer cleanup(ctx)
 	}
 
-	id := r.Adapter.BuildIdentifier(obj)
+	id, err := r.Adapter.BuildIdentifier(obj)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("building identifier: %w", err)
+	}
 
 	// Handle deletion.
 	if !obj.GetDeletionTimestamp().IsZero() {
@@ -286,7 +289,7 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// Ensure finalizer — use PATCH to avoid conflict with concurrent spec
-	// changes (L-10).
+	// changes.
 	if finalizers.Add(obj, r.Adapter.FinalizerName()) {
 		patch := client.MergeFrom(statusBase.DeepCopyObject().(T))
 		if err := r.Client.Patch(ctx, obj, patch); err != nil {
@@ -316,7 +319,7 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil // Terminal — do not requeue.
 	}
 
-	// Audit trail: emit a warning event when force-new is active (M-8).
+	// Audit trail: emit a warning event when force-new is active.
 	if snowplanev1alpha1.IsForceNew(obj.GetAnnotations()) {
 		logger.Info("force-new annotation active, immutable field validation bypassed", "resource", resName)
 		r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonForceNewActive,
@@ -355,7 +358,7 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 
 	// First reconciliation with existing Snowflake resource: adoption check.
 	// Indicated by ObservedGeneration == 0 (never successfully reconciled).
-	// However, if we set the creation-initiated annotation ourselves (M-3),
+	// However, if we set the creation-initiated annotation ourselves,
 	// this is a post-crash continuation — skip adoption and finish setup.
 	if obj.GetObservedGeneration() == 0 {
 		if hasCreationInitiated(obj) {
@@ -376,11 +379,11 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 
 	// Mark creation-initiated before issuing the Snowflake CREATE so that
 	// a post-crash reconcile can distinguish "I created this" from
-	// "someone else created this" (M-3).
+	// "someone else created this".
 	if !hasCreationInitiated(obj) {
 		setCreationInitiated(obj)
 
-		// Stamp ownership label for same-cluster conflict detection (H-3).
+		// Stamp ownership label for same-cluster conflict detection.
 		fqn := id.FullyQualifiedName()
 		setExternalNameLabel(obj, ComputeExternalNameHash(fqn))
 
@@ -400,7 +403,7 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 	}
 
 	// Fresh timeout ensures the CREATE gets the full budget, independent of
-	// how much time the preceding Observe consumed (M-4).
+	// how much time the preceding Observe consumed.
 	opCtx, cancel := context.WithTimeout(ctx, snowflakeOpTimeout)
 	defer cancel()
 
@@ -424,7 +427,7 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonCreating, "awaiting post-create verification")
 
 		// Use bestEffortPatchStatus so that a patch error doesn't defeat
-		// the explicit 5-second fast requeue (R-3).
+		// the explicit 5-second fast requeue.
 		r.bestEffortPatchStatus(ctx, obj)
 
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
@@ -465,7 +468,7 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 	logger := log.FromContext(ctx)
 
 	// Fresh timeout ensures ALTER gets the full budget, independent of
-	// how much time the preceding Observe consumed (M-4).
+	// how much time the preceding Observe consumed.
 	opCtx, cancel := context.WithTimeout(ctx, snowflakeOpTimeout)
 	defer cancel()
 
@@ -648,7 +651,7 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 // reconcilePostCrashCreate handles the case where CREATE succeeded in Snowflake
 // but the controller crashed before status was committed. The creation-initiated
 // annotation proves we created this resource, so we skip the adoption path and
-// finish the normal post-create setup (M-3).
+// finish the normal post-create setup.
 func (r *GenericReconciler[T, S, D]) reconcilePostCrashCreate(ctx context.Context, obj T, statusBase T, obs *Observation[D]) (ctrl.Result, error) {
 	resName := r.Adapter.ResourceName()
 	logger := log.FromContext(ctx)
@@ -711,9 +714,13 @@ func (r *GenericReconciler[T, S, D]) reconcileAdoptOrReject(ctx context.Context,
 	// Adoption flow: take over management of the existing resource.
 	logger.Info("adopting existing "+resName, resName, obj.GetSpecName())
 
-	// Ownership conflict detection (H-3): before adopting, check whether
+	// Ownership conflict detection: before adopting, check whether
 	// another CR in this cluster already manages the same Snowflake resource.
-	id := r.Adapter.BuildIdentifier(obj)
+	id, err := r.Adapter.BuildIdentifier(obj)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("building identifier for adoption: %w", err)
+	}
+
 	fqn := id.FullyQualifiedName()
 	hash := ComputeExternalNameHash(fqn)
 
@@ -820,13 +827,13 @@ func (r *GenericReconciler[T, S, D]) reconcileDelete(ctx context.Context, obj T,
 	}
 
 	// Take a snapshot before removing the finalizer so that MergeFrom
-	// produces a diff containing the removal (L-10).
+	// produces a diff containing the removal.
 	patchBase := obj.DeepCopyObject().(T)
 
 	finalizers.Remove(obj, r.Adapter.FinalizerName())
 
 	// Use PATCH for finalizer removal to avoid conflict with concurrent
-	// spec changes (L-10).
+	// spec changes.
 	if err := r.Client.Patch(ctx, obj, client.MergeFrom(patchBase)); err != nil {
 		return ctrl.Result{}, fmt.Errorf("removing finalizer: %w", err)
 	}
@@ -838,7 +845,7 @@ func (r *GenericReconciler[T, S, D]) reconcileDelete(ctx context.Context, obj T,
 // SSA eliminates the need for ResourceVersion-based conflict detection and
 // retry loops — the server resolves ownership via managedFields instead.
 // ForceOwnership ensures the controller takes exclusive ownership of .status
-// fields even if another field manager previously owned them (B-2).
+// fields even if another field manager previously owned them.
 func (r *GenericReconciler[T, S, D]) patchStatus(ctx context.Context, obj T) error {
 	// SSA requires TypeMeta (apiVersion + kind) in the patch payload.
 	// controller-runtime's Get() strips TypeMeta from typed objects,
@@ -851,7 +858,7 @@ func (r *GenericReconciler[T, S, D]) patchStatus(ctx context.Context, obj T) err
 	// server to reject the patch with "metadata.managedFields must be nil".
 	obj.SetManagedFields(nil)
 
-	return r.Client.Status().Patch(ctx, obj, client.Apply, //nolint:staticcheck // TODO: migrate to client.SubResource("status").Apply() with ApplyConfiguration types
+	return r.Client.SubResource("status").Patch(ctx, obj, client.Apply, //nolint:staticcheck // client.Apply removal requires generated ApplyConfiguration types
 		client.FieldOwner(StatusFieldOwner),
 		client.ForceOwnership,
 	)

@@ -4,6 +4,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,6 +20,10 @@ import (
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
+
+// ErrProviderConfigNotReady is returned when the referenced ProviderConfig
+// exists but has not reached the Ready condition.
+var ErrProviderConfigNotReady = errors.New("ProviderConfig not ready")
 
 // ResolvedProvider contains the resolved Snowflake client along with
 // provider metadata useful for structured logging and metrics.
@@ -79,7 +84,7 @@ func ResolveClient(
 		msg := fmt.Sprintf("ProviderConfig %q is not ready", providerRef.Name)
 		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDependencyWait, msg)
 
-		return nil, fmt.Errorf("ProviderConfig not ready")
+		return nil, ErrProviderConfigNotReady
 	}
 
 	// Circuit breaker: skip providers with many consecutive failures.

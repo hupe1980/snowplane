@@ -33,8 +33,8 @@ func (a *adapter) PreReconcile(_ context.Context, _ *snowplanev1alpha1.User) err
 	return nil
 }
 
-func (a *adapter) BuildIdentifier(obj *snowplanev1alpha1.User) reconciler.Identifier {
-	return snowflake.NewAccountObjectIdentifier(obj.Spec.Name)
+func (a *adapter) BuildIdentifier(obj *snowplanev1alpha1.User) (reconciler.Identifier, error) {
+	return snowflake.NewAccountObjectIdentifier(obj.Spec.Name), nil
 }
 
 func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc { return nil }
@@ -63,6 +63,8 @@ func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha
 	if err != nil {
 		return err
 	}
+
+	opts.UseCreateOrAlter = snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
 
 	if err := svc.Create(ctx, opts); err != nil {
 		return err
@@ -191,6 +193,6 @@ func (a *adapter) PostUpdate(user *snowplanev1alpha1.User, altered bool, alterOp
 	}
 }
 
-func (a *adapter) SupportsCreateOrAlter() bool { return false }
+func (a *adapter) SupportsCreateOrAlter() bool { return true }
 
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.User, Service, *snowflake.UserObservation] = (*adapter)(nil)

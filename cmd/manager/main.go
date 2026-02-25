@@ -137,6 +137,8 @@ func main() {
 	var enableAlphaResources bool
 	var disableControllers string
 	var watchNamespaces string
+	var cbFailureThreshold int
+	var cbResetTimeout time.Duration
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -162,6 +164,10 @@ func main() {
 		"Comma-separated list of namespaces to watch. If empty, all namespaces are watched.")
 	flag.StringVar(&leaderElectionID, "leader-election-id", "snowplane-leader-election",
 		"The name of the resource used for leader election.")
+	flag.IntVar(&cbFailureThreshold, "circuit-breaker-threshold", 5,
+		"Number of consecutive Snowflake API failures before the circuit breaker opens (per-provider).")
+	flag.DurationVar(&cbResetTimeout, "circuit-breaker-reset-timeout", 60*time.Second,
+		"How long the circuit breaker stays open before allowing a probe request.")
 
 	opts := zap.Options{Development: developmentMode}
 	opts.BindFlags(flag.CommandLine)
@@ -216,7 +222,10 @@ func main() {
 	})
 
 	// Create shared circuit breaker for provider failure isolation.
-	cb := circuitbreaker.New(circuitbreaker.DefaultOptions())
+	cb := circuitbreaker.New(circuitbreaker.Options{
+		FailureThreshold: cbFailureThreshold,
+		ResetTimeout:     cbResetTimeout,
+	})
 
 	// Parse per-controller disable set.
 	disabled, err := parseDisabledControllers(disableControllers)

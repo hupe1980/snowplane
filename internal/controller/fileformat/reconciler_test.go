@@ -447,6 +447,10 @@ func TestReconcile_UpdateComment(t *testing.T) {
 	ff.Status.DatabaseName = "MY_DB"
 	ff.Status.SchemaName = "MY_SCHEMA"
 
+	ff.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
+	}
+
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old comment"
 

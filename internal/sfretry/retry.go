@@ -112,7 +112,7 @@ func Do(ctx context.Context, opts Options, fn func() error) error {
 		if attempt < opts.MaxAttempts {
 			// Add jitter: sleep for 50-100% of the configured backoff
 			// to spread retries across concurrent reconciliations.
-			jitteredBackoff := opts.Backoff/2 + time.Duration(rand.Int64N(int64(opts.Backoff/2+1)))
+			jitteredBackoff := opts.Backoff/2 + time.Duration(rand.Int64N(int64(opts.Backoff/2+1))) //nolint:gosec // G404: math/rand is fine for jitter
 
 			logger.V(1).Info("retrying transient Snowflake error",
 				"attempt", attempt,

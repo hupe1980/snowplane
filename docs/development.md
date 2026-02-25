@@ -39,7 +39,7 @@ Project layout, architecture principles, conventions, and workflow for contribut
 │   └── zz_generated_accessors.go   # Auto-generated ManagedResource accessors
 ├── cmd/manager/               # Controller manager entrypoint
 ├── config/
-│   ├── crd/bases/             # CRD YAML manifests (26 types)
+│   ├── crd/bases/             # CRD YAML manifests (29 types)
 │   ├── manager/               # Deployment, PDB, NetworkPolicy
 │   ├── rbac/                  # RBAC roles and bindings
 │   └── samples/               # Example CR YAML files
@@ -49,7 +49,7 @@ Project layout, architecture principles, conventions, and workflow for contribut
 │   │   └── snowflake/         # Snowflake SDK wrapper
 │   ├── controller/
 │   │   ├── reconciler/        # Generic reconciler framework
-│   │   └── <resource>/        # 24 resource-specific controllers
+│   │   └── <resource>/        # 27 resource-specific controllers
 │   ├── drift/                 # Generic field-level drift engine
 │   ├── metrics/               # Custom Prometheus metrics
 │   ├── provider/              # Config builder & hash
@@ -93,7 +93,7 @@ just verify-crds  # CI check: fails if out-of-sync
 | File | Generator | Purpose |
 |:-----|:----------|:--------|
 | `zz_generated.deepcopy.go` | `controller-gen` | DeepCopy methods |
-| `zz_generated_accessors.go` | `hack/gen-accessors` | 380 ManagedResource methods (16 per type × 24 types) |
+| `zz_generated_accessors.go` | `hack/gen-accessors` | 428 ManagedResource methods across 27 types |
 | `config/crd/bases/*.yaml` | `controller-gen` | CRD manifests with CEL rules |
 
 ---
@@ -112,7 +112,7 @@ This minimises Snowflake API calls and avoids unnecessary mutations.
 
 ### Generic Reconciler Framework
 
-All 24 resource reconcilers share the same state machine via `internal/controller/reconciler/`:
+All 27 resource reconcilers share the same state machine via `internal/controller/reconciler/`:
 
 - **`GenericReconciler[T, S, D]`** — Type-parameterised reconciler handling finalizers, ProviderConfig resolution, client caching, SSA status patching, conditions, rate limiting, retry, metrics, and drift detection
 - **`ResourceAdapter[T, S, D]`** — Interface each resource implements for resource-specific behaviour
@@ -190,7 +190,7 @@ Per-provider failure isolation. Opens after 5 consecutive failures, probes after
 
 ### CEL Validation Rules
 
-All 26 CRD types include `x-kubernetes-validations` rules — evaluated server-side on UPDATE, no webhook required. Covers immutable fields, schema defaults, policy body blocklists, mutual exclusion, and auth validation.
+All 29 CRD types include `x-kubernetes-validations` rules — evaluated server-side on UPDATE, no webhook required. Covers immutable fields, schema defaults, policy body blocklists, mutual exclusion, and auth validation.
 
 ### Resource Adoption
 
@@ -217,6 +217,7 @@ Adopt pre-existing Snowflake resources via annotation:
 |:------|:-------------|:-----|
 | Snowflake client | SQL generation, options, errors | `testing` + `testify` |
 | Reconciler | Full loop, conditions, status, refs | `testing` + fake `client.Client` |
+| Fuzz | Denylist validators, escaping functions | Go built-in `testing.F` |
 | CEL validation | Immutable fields, defaults, blocklists | envtest |
 | Integration | Full CRD → reconciler pipeline | envtest (59 tests, 11 resources) |
 | E2E | Real Snowflake + k3s testcontainer | 17 tests |
@@ -243,7 +244,7 @@ just test-e2e
 
 ## Code Style
 
-- `golangci-lint` enforces style (`.golangci.yml`)
+- `golangci-lint` enforces style (`.golangci.yml`) — includes `gosec` (security), `errorlint` (error wrapping), `gofmt`, `goimports`
 - All exported functions have doc comments
 - All tests are parallelised (`t.Parallel()`)
 - Constants from `api/v1alpha1/conditions.go` — no magic strings

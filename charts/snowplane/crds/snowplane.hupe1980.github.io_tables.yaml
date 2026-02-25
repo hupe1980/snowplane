@@ -159,6 +159,8 @@ spec:
                 description: DataRetentionTimeInDays specifies the Time Travel retention
                   period (0–90 days).
                 format: int32
+                maximum: 90
+                minimum: 0
                 type: integer
               databaseName:
                 description: |-
@@ -200,6 +202,8 @@ spec:
                   MaxDataExtensionTimeInDays specifies the maximum number of days Snowflake
                   can extend the data retention period.
                 format: int32
+                maximum: 90
+                minimum: 0
                 type: integer
               name:
                 description: Name is the Snowflake table name. Immutable after creation.
@@ -293,6 +297,10 @@ spec:
             - message: exactly one of spec.schemaRef or spec.schemaName must be set
               rule: (has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef)
                 && has(self.schemaName))
+            - message: spec.constraints is immutable (delete and recreate the resource
+                to change)
+              rule: '!has(oldSelf.constraints) || !has(self.constraints) || self.constraints
+                == oldSelf.constraints'
           status:
             description: TableStatus defines the observed state of a Table.
             properties:

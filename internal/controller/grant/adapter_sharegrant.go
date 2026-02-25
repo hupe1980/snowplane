@@ -9,6 +9,7 @@ import (
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 )
@@ -45,13 +46,17 @@ func (a *shareGrantAdapter) PreReconcile(_ context.Context, _ *snowplanev1alpha1
 }
 
 // BuildIdentifier constructs a GrantIdentifier from the ShareGrant spec.
-func (a *shareGrantAdapter) BuildIdentifier(grant *snowplanev1alpha1.ShareGrant) reconciler.Identifier {
-	// Build ON clause from flat objectType/objectName.
-	onClause := fmt.Sprintf("ON %s %s", grant.Spec.ObjectType, grant.Spec.ObjectName)
+func (a *shareGrantAdapter) BuildIdentifier(grant *snowplanev1alpha1.ShareGrant) (reconciler.Identifier, error) {
+	// Defense-in-depth: validate object type (CRD already validates).
+	if err := sqlbuilder.ValidateObjectType(grant.Spec.ObjectType); err != nil {
+		return nil, fmt.Errorf("shareGrantAdapter.BuildIdentifier: %w", err)
+	}
+
+	onClause := fmt.Sprintf("ON %s %s", grant.Spec.ObjectType, sqlbuilder.QuoteIdentifierParts(grant.Spec.ObjectName))
 	toClause := snowflake.BuildToClause("", "", grant.Spec.Share)
 
 	// Build show target for share grants.
-	showTarget := fmt.Sprintf("TO SHARE %s", grant.Spec.Share)
+	showTarget := "TO SHARE " + sqlbuilder.QuoteIdentifier(grant.Spec.Share)
 
 	return snowflake.GrantIdentifier{
 		Kind:             snowflake.GrantKindShare,
@@ -60,7 +65,7 @@ func (a *shareGrantAdapter) BuildIdentifier(grant *snowplanev1alpha1.ShareGrant)
 		ToClause:         toClause,
 		GranteeName:      grant.Spec.Share,
 		ShowGrantsTarget: showTarget,
-	}
+	}, nil
 }
 
 // SetupWatches returns nil — ShareGrant has no refs to watch.
@@ -75,7 +80,11 @@ func (a *shareGrantAdapter) Observe(ctx context.Context, svc Service, id reconci
 
 // Create grants the privilege in Snowflake.
 func (a *shareGrantAdapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha1.ShareGrant, _ reconciler.Identifier) error {
-	onClause := fmt.Sprintf("ON %s %s", obj.Spec.ObjectType, obj.Spec.ObjectName)
+	if err := sqlbuilder.ValidateObjectType(obj.Spec.ObjectType); err != nil {
+		return fmt.Errorf("invalid object type: %w", err)
+	}
+
+	onClause := fmt.Sprintf("ON %s %s", obj.Spec.ObjectType, sqlbuilder.QuoteIdentifierParts(obj.Spec.ObjectName))
 	opts := snowflake.CreateGrantOptions{
 		Privilege:       obj.Spec.Privilege,
 		OnClause:        onClause,
@@ -122,7 +131,8 @@ func (a *shareGrantAdapter) BuildAlterOptions(_ context.Context, _ *snowplanev1a
 func (a *shareGrantAdapter) ApplyObservation(obj *snowplanev1alpha1.ShareGrant, obs *reconciler.Observation[*snowflake.GrantObservation]) {
 	grantObs := obs.Detail
 	if grantObs.ShowOutput != nil {
-		onClause := fmt.Sprintf("ON %s %s", obj.Spec.ObjectType, obj.Spec.ObjectName)
+		// Object type is CRD-validated; QuoteIdentifierParts provides SQL-safe quoting.
+		onClause := fmt.Sprintf("ON %s %s", obj.Spec.ObjectType, sqlbuilder.QuoteIdentifierParts(obj.Spec.ObjectName))
 		toClause := snowflake.BuildToClause("", "", obj.Spec.Share)
 		obj.Status.FullyQualifiedName = fmt.Sprintf("GRANT %s %s %s", grantObs.ShowOutput.Privilege, onClause, toClause)
 		obj.Status.ShowOutput = applyGrantShowOutput(grantObs)

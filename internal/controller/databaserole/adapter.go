@@ -49,9 +49,9 @@ func (a *adapter) PreReconcile(ctx context.Context, role *snowplanev1alpha1.Data
 	return nil
 }
 
-func (a *adapter) BuildIdentifier(role *snowplanev1alpha1.DatabaseRole) reconciler.Identifier {
+func (a *adapter) BuildIdentifier(role *snowplanev1alpha1.DatabaseRole) (reconciler.Identifier, error) {
 	dbName := snowflake.ParseDatabaseNameFromFQN(role.Status.DatabaseName)
-	return snowflake.NewDatabaseObjectIdentifier(dbName, role.Spec.Name)
+	return snowflake.NewDatabaseObjectIdentifier(dbName, role.Spec.Name), nil
 }
 
 func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {

@@ -83,6 +83,14 @@ spec:
                   Required for KeyPair and UsernamePassword authentication.
                   Must not be set for WorkloadIdentity authentication.
                 properties:
+                  passphraseKey:
+                    description: |-
+                      PassphraseKey optionally specifies the key within the same Secret
+                      (referenced by SecretRef) that contains the passphrase for an encrypted
+                      PKCS#8 private key. Only valid with KeyPair authentication when the
+                      private key is encrypted (PEM type "ENCRYPTED PRIVATE KEY").
+                      The passphrase must be stored in the same Secret as the private key.
+                    type: string
                   secretRef:
                     description: |-
                       SecretRef references a Secret containing Snowflake credentials.
@@ -180,6 +188,10 @@ spec:
               rule: self.authenticationType != 'WorkloadIdentity' || !has(self.credentials)
                 || !has(self.credentials.secretRef) || size(self.credentials.secretRef.name)
                 == 0
+            - message: spec.credentials.passphraseKey is only valid for KeyPair authentication
+              rule: '!has(self.credentials) || !has(self.credentials.passphraseKey)
+                || size(self.credentials.passphraseKey) == 0 || self.authenticationType
+                == ''KeyPair'''
             - message: spec.account is immutable (changing would redirect to a different
                 Snowflake account)
               rule: self.account == oldSelf.account

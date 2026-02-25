@@ -57,11 +57,11 @@ func (a *adapter) PreReconcile(ctx context.Context, stage *snowplanev1alpha1.Sta
 	return nil
 }
 
-func (a *adapter) BuildIdentifier(stage *snowplanev1alpha1.Stage) reconciler.Identifier {
+func (a *adapter) BuildIdentifier(stage *snowplanev1alpha1.Stage) (reconciler.Identifier, error) {
 	dbName := snowflake.ParseDatabaseNameFromFQN(stage.Status.DatabaseName)
 	schemaName := snowflake.ParseSchemaNameFromFQN(stage.Status.SchemaName)
 
-	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, stage.Spec.Name)
+	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, stage.Spec.Name), nil
 }
 
 func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {

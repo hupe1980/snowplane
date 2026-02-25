@@ -32,8 +32,12 @@ type FileFormatShowOutput struct {
 
 // CreateFileFormatOptions holds the parameters for creating a file format.
 type CreateFileFormatOptions struct {
-	Name                       SchemaObjectIdentifier
-	Type                       string // CSV, JSON, AVRO, ORC, PARQUET, XML
+	Name SchemaObjectIdentifier
+	Type string // CSV, JSON, AVRO, ORC, PARQUET, XML
+
+	// UseCreateOrAlter emits CREATE OR ALTER FILE FORMAT instead of
+	// CREATE FILE FORMAT IF NOT EXISTS.
+	UseCreateOrAlter           bool
 	FieldDelimiter             *string
 	RecordDelimiter            *string
 	SkipHeader                 *int32
@@ -186,7 +190,12 @@ func NewFileFormatClient(c SQLExecutor) *FileFormatClient {
 func buildCreateFileFormatSQL(opts CreateFileFormatOptions) string {
 	var b sqlbuilder.Builder
 
-	b.WriteString("CREATE FILE FORMAT IF NOT EXISTS ")
+	if opts.UseCreateOrAlter {
+		b.WriteString("CREATE OR ALTER FILE FORMAT ")
+	} else {
+		b.WriteString("CREATE FILE FORMAT IF NOT EXISTS ")
+	}
+
 	b.WriteString(opts.Name.FullyQualifiedName())
 	fmt.Fprintf(&b.Builder, " TYPE = '%s'", opts.Type)
 
@@ -303,7 +312,7 @@ func buildAlterFileFormatStatements(opts AlterFileFormatOptions) ([]string, erro
 			quoted[i] = fmt.Sprintf("'%s'", sqlbuilder.EscapeString(v))
 		}
 
-		sc.Raw(fmt.Sprintf("NULL_IF = (%s)", strings.Join(quoted, ", ")))
+		sc.UnsafeRaw(fmt.Sprintf("NULL_IF = (%s)", strings.Join(quoted, ", ")))
 	}
 
 	return sqlbuilder.BuildAlterStatements("FILE FORMAT", fqn, &sc, opts.UnsetFields)

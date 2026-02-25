@@ -57,11 +57,11 @@ func (a *adapter) PreReconcile(ctx context.Context, view *snowplanev1alpha1.View
 	return nil
 }
 
-func (a *adapter) BuildIdentifier(view *snowplanev1alpha1.View) reconciler.Identifier {
+func (a *adapter) BuildIdentifier(view *snowplanev1alpha1.View) (reconciler.Identifier, error) {
 	dbName := snowflake.ParseDatabaseNameFromFQN(view.Status.DatabaseName)
 	schemaName := snowflake.ParseSchemaNameFromFQN(view.Status.SchemaName)
 
-	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, view.Spec.Name)
+	return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, view.Spec.Name), nil
 }
 
 func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
@@ -133,6 +133,8 @@ func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha
 	}
 
 	opts := buildCreateOptions(obj, sid)
+	opts.UseCreateOrAlter = snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
+
 	return svc.Create(ctx, opts)
 }
 
@@ -216,6 +218,6 @@ func (a *adapter) PostUpdate(_ *snowplanev1alpha1.View, specChanged bool, opts r
 	// Snowflake client layer (R9-1).
 }
 
-func (a *adapter) SupportsCreateOrAlter() bool { return false }
+func (a *adapter) SupportsCreateOrAlter() bool { return true }
 
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.View, Service, *snowflake.ViewObservation] = (*adapter)(nil)

@@ -63,6 +63,13 @@ helm upgrade snowplane charts/snowplane/ \
 | `rateLimit.qps` | `10` | Sustained QPS to Snowflake per provider |
 | `rateLimit.burst` | `20` | Burst size for the rate limiter |
 
+### Circuit Breaker
+
+| Parameter | Default | Description |
+|:----------|:--------|:------------|
+| `circuitBreaker.threshold` | `5` | Number of consecutive failures before the circuit opens |
+| `circuitBreaker.resetTimeout` | `60s` | Duration the circuit stays open before allowing a probe request |
+
 ### Metrics & Monitoring
 
 | Parameter | Default | Description |
@@ -98,6 +105,12 @@ helm upgrade snowplane charts/snowplane/ \
 | `podDisruptionBudget.enabled` | `true` | Create a PodDisruptionBudget |
 | `podDisruptionBudget.maxUnavailable` | `1` | Maximum unavailable pods during disruptions |
 
+### Deployment
+
+| Parameter | Default | Description |
+|:----------|:--------|:------------|
+| `revisionHistoryLimit` | `3` | Number of old ReplicaSets to retain |
+
 ### Scheduling
 
 | Parameter | Default | Description |
@@ -107,6 +120,14 @@ helm upgrade snowplane charts/snowplane/ \
 | `affinity` | `{}` | Pod affinity rules |
 | `topologySpreadConstraints` | `[]` | Topology spread constraints |
 | `priorityClassName` | `""` | PriorityClass name |
+
+### Extensibility
+
+| Parameter | Default | Description |
+|:----------|:--------|:------------|
+| `extraEnv` | `[]` | Additional environment variables for the controller container |
+| `extraVolumes` | `[]` | Additional volumes to attach to the pod |
+| `extraVolumeMounts` | `[]` | Additional volume mounts for the controller container |
 
 ### Namespace Scoping
 

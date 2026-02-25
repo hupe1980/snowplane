@@ -108,7 +108,7 @@ type ResourceAdapter[T ManagedResource, S any, D any] interface {
 	PreReconcile(ctx context.Context, obj T) error
 
 	// BuildIdentifier constructs the Snowflake identifier from the object.
-	BuildIdentifier(obj T) Identifier
+	BuildIdentifier(obj T) (Identifier, error)
 
 	// SetupWatches allows resource-specific watch configuration beyond the
 	// primary For() watch. Schema adds Database watches here.

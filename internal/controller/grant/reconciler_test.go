@@ -548,7 +548,9 @@ func TestBuildIdentifier(t *testing.T) {
 	grant := newTestAccountRoleGrant("my-grant", "default")
 	grant.Spec.WithGrantOption = true
 
-	id := a.BuildIdentifier(grant)
+	id, err := a.BuildIdentifier(grant)
+	require.NoError(t, err)
+
 	grantID, ok := id.(snowflake.GrantIdentifier)
 	require.True(t, ok)
 

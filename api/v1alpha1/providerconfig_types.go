@@ -39,6 +39,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="self.authenticationType != 'UsernamePassword' || (has(self.credentials) && has(self.credentials.secretRef) && size(self.credentials.secretRef.name) > 0 && size(self.credentials.secretRef.key) > 0)",message="spec.credentials.secretRef (name and key) is required for UsernamePassword authentication"
 // +kubebuilder:validation:XValidation:rule="self.authenticationType != 'WorkloadIdentity' || has(self.workloadIdentity)",message="spec.workloadIdentity is required for WorkloadIdentity authentication"
 // +kubebuilder:validation:XValidation:rule="self.authenticationType != 'WorkloadIdentity' || !has(self.credentials) || !has(self.credentials.secretRef) || size(self.credentials.secretRef.name) == 0",message="spec.credentials.secretRef must not be set for WorkloadIdentity authentication"
+// +kubebuilder:validation:XValidation:rule="!has(self.credentials) || !has(self.credentials.passphraseKey) || size(self.credentials.passphraseKey) == 0 || self.authenticationType == 'KeyPair'",message="spec.credentials.passphraseKey is only valid for KeyPair authentication"
 // +kubebuilder:validation:XValidation:rule="self.account == oldSelf.account",message="spec.account is immutable (changing would redirect to a different Snowflake account)"
 // +kubebuilder:validation:XValidation:rule="self.user == oldSelf.user",message="spec.user is immutable (changing would redirect to a different Snowflake user)"
 type ProviderConfigSpec struct {
@@ -93,6 +94,14 @@ type ProviderCredentials struct {
 	// For UsernamePassword auth, the Secret must contain a password.
 	// +optional
 	SecretRef *SecretKeyReference `json:"secretRef,omitempty"`
+
+	// PassphraseKey optionally specifies the key within the same Secret
+	// (referenced by SecretRef) that contains the passphrase for an encrypted
+	// PKCS#8 private key. Only valid with KeyPair authentication when the
+	// private key is encrypted (PEM type "ENCRYPTED PRIVATE KEY").
+	// The passphrase must be stored in the same Secret as the private key.
+	// +optional
+	PassphraseKey string `json:"passphraseKey,omitempty"`
 }
 
 // WorkloadIdentitySpec configures Workload Identity Federation (WIF) for passwordless
@@ -125,7 +134,7 @@ type WorkloadIdentitySpec struct {
 }
 
 // DefaultTokenFilePath is the default path for projected SA tokens.
-const DefaultTokenFilePath = "/var/run/secrets/snowflake/token"
+const DefaultTokenFilePath = "/var/run/secrets/snowflake/token" //nolint:gosec // G101: not a credential, it's a fixed mount path
 
 // GetTokenFilePath returns the effective token file path, applying the default.
 func (w *WorkloadIdentitySpec) GetTokenFilePath() string {
@@ -203,10 +212,17 @@ func (s *ProviderConfigSpec) Validate() error {
 			errs = append(errs, errors.New("spec.credentials.secretRef (name and key) is required for KeyPair authentication"))
 		}
 	case AuthenticationTypeUsernamePassword:
+		if s.Credentials.PassphraseKey != "" {
+			errs = append(errs, errors.New("spec.credentials.passphraseKey is only valid for KeyPair authentication"))
+		}
 		if s.Credentials.SecretRef == nil || s.Credentials.SecretRef.Name == "" || s.Credentials.SecretRef.Key == "" {
 			errs = append(errs, errors.New("spec.credentials.secretRef (name and key) is required for UsernamePassword authentication"))
 		}
 	case AuthenticationTypeWorkloadIdentity:
+		if s.Credentials.PassphraseKey != "" {
+			errs = append(errs, errors.New("spec.credentials.passphraseKey is only valid for KeyPair authentication"))
+		}
+
 		if s.WorkloadIdentity == nil {
 			errs = append(errs, errors.New("spec.workloadIdentity is required for WorkloadIdentity authentication"))
 		} else {

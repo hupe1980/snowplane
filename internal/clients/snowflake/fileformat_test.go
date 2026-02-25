@@ -120,6 +120,37 @@ func TestCreateFileFormatOptions_Validate(t *testing.T) {
 	})
 }
 
+func TestBuildCreateFileFormatSQL_CreateOrAlter(t *testing.T) {
+	t.Parallel()
+
+	t.Run("basic", func(t *testing.T) {
+		t.Parallel()
+		opts := CreateFileFormatOptions{
+			Name:             NewSchemaObjectIdentifier("DB", "SCH", "MY_CSV"),
+			Type:             "CSV",
+			UseCreateOrAlter: true,
+		}
+		got := buildCreateFileFormatSQL(opts)
+		assert.Contains(t, got, `CREATE OR ALTER FILE FORMAT "DB"."SCH"."MY_CSV"`)
+		assert.NotContains(t, got, "IF NOT EXISTS")
+		assert.Contains(t, got, "TYPE = 'CSV'")
+	})
+
+	t.Run("with options", func(t *testing.T) {
+		t.Parallel()
+		comment := "managed format"
+		opts := CreateFileFormatOptions{
+			Name:             NewSchemaObjectIdentifier("DB", "SCH", "FMT"),
+			Type:             "JSON",
+			Comment:          &comment,
+			UseCreateOrAlter: true,
+		}
+		got := buildCreateFileFormatSQL(opts)
+		assert.Contains(t, got, "CREATE OR ALTER FILE FORMAT")
+		assert.Contains(t, got, "COMMENT = 'managed format'")
+	})
+}
+
 func TestBuildAlterFileFormatStatements(t *testing.T) {
 	t.Parallel()
 
