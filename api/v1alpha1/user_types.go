@@ -79,6 +79,36 @@ type UserSpec struct {
 
 	// Disabled controls whether the user is disabled.
 	Disabled *bool `json:"disabled,omitempty"`
+
+	// MiddleName is the user's middle name.
+	MiddleName *string `json:"middleName,omitempty"`
+
+	// DaysToExpiry sets the number of days after which the user's login
+	// credentials (password) expire. After expiry the user must reset their
+	// password before logging in. 0 means no expiry.
+	// +kubebuilder:validation:Minimum=0
+	DaysToExpiry *int32 `json:"daysToExpiry,omitempty"`
+
+	// MinsToUnlock sets the number of minutes until a locked user account
+	// is automatically unlocked. 0 means the account remains locked until
+	// an administrator unlocks it.
+	// +kubebuilder:validation:Minimum=0
+	MinsToUnlock *int32 `json:"minsToUnlock,omitempty"`
+
+	// MinsToBypassMFA sets the number of minutes to temporarily bypass
+	// multi-factor authentication. Use this when a user has lost their MFA
+	// device and needs temporary access.
+	// +kubebuilder:validation:Minimum=0
+	MinsToBypassMFA *int32 `json:"minsToBypassMFA,omitempty"`
+
+	// NetworkPolicy assigns a user-level network policy that overrides the
+	// account-level network policy. Set to the name of an existing Snowflake
+	// network policy.
+	NetworkPolicy *string `json:"networkPolicy,omitempty"`
+
+	// DisableMFA disables multi-factor authentication for the user when set
+	// to true.
+	DisableMFA *bool `json:"disableMFA,omitempty"`
 }
 
 // UserShowOutput mirrors the SHOW USERS output stored in status.
@@ -103,6 +133,9 @@ type UserShowOutput struct {
 
 	// LastName is the last name.
 	LastName string `json:"lastName,omitempty"`
+
+	// MiddleName is the middle name.
+	MiddleName string `json:"middleName,omitempty"`
 
 	// Comment is the user description.
 	Comment string `json:"comment,omitempty"`
@@ -133,6 +166,18 @@ type UserShowOutput struct {
 
 	// Type is the user type.
 	Type string `json:"type,omitempty"`
+
+	// DaysToExpiry is the number of days until the user's credentials expire.
+	DaysToExpiry string `json:"daysToExpiry,omitempty"`
+
+	// MinsToUnlock is the number of minutes until a locked account auto-unlocks.
+	MinsToUnlock string `json:"minsToUnlock,omitempty"`
+
+	// MinsToBypassMFA is the number of minutes to bypass MFA.
+	MinsToBypassMFA string `json:"minsToBypassMFA,omitempty"`
+
+	// DisableMFA indicates whether MFA is disabled for the user.
+	DisableMFA bool `json:"disableMFA,omitempty"`
 }
 
 // UserDescribeOutput holds additional fields from DESCRIBE USER that
@@ -143,6 +188,9 @@ type UserDescribeOutput struct {
 
 	// RSAPublicKey2FP is the fingerprint of the secondary RSA public key.
 	RSAPublicKey2FP string `json:"rsaPublicKey2Fp,omitempty"`
+
+	// NetworkPolicy is the user-level network policy name, if set.
+	NetworkPolicy string `json:"networkPolicy,omitempty"`
 }
 
 // UserStatus defines the observed state of a User.

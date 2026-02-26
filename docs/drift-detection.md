@@ -105,7 +105,7 @@ Immutable violations require manual intervention — delete/recreate the CR.
 ### User
 {: .text-delta }
 
-`loginName`, `displayName`, `firstName`, `lastName`, `email`, `comment`, `disabled`, `mustChangePassword`, `defaultRole`, `defaultSecondaryRoles`, `defaultWarehouse`, `defaultNamespace`
+`loginName`, `displayName`, `firstName`, `lastName`, `middleName`, `email`, `comment`, `disabled`, `mustChangePassword`, `defaultRole`, `defaultSecondaryRoles`, `defaultWarehouse`, `defaultNamespace`, `daysToExpiry`, `minsToUnlock`, `minsToBypassMFA`, `disableMFA`, `networkPolicy`
 
 {: .note }
 > Password and RSA key fields are not drift-detected because Snowflake does not expose their current values. Password changes are tracked via `status.lastAppliedPasswordHash`.

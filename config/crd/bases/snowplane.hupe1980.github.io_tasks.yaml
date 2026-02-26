@@ -412,11 +412,19 @@ spec:
                       failures before suspension.
                     format: int32
                     type: integer
+                  targetCompletionInterval:
+                    description: TargetCompletionInterval is the target completion
+                      interval for the task.
+                    type: string
                   taskAutoRetryAttempts:
                     description: TaskAutoRetryAttempts is the number of automatic
                       retry attempts.
                     format: int32
                     type: integer
+                  userTaskManagedInitialWarehouseSize:
+                    description: UserTaskManagedInitialWarehouseSize is the initial
+                      warehouse size for serverless tasks.
+                    type: string
                   userTaskMinimumTriggerIntervalInSeconds:
                     description: UserTaskMinimumTriggerIntervalInSeconds defines how
                       frequently a triggered task can execute.

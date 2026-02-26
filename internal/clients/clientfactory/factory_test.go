@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -527,4 +528,169 @@ func TestHasStaleHash(t *testing.T) {
 	assert.False(t, factory.HasStaleHash("p", "hash-v1"))
 	assert.True(t, factory.HasStaleHash("p", "hash-v2"))
 	assert.False(t, factory.HasStaleHash("nonexistent", "hash-v1"))
+}
+
+// ---------------------------------------------------------------------------
+// Tests: Singleflight deduplication (L-8)
+// ---------------------------------------------------------------------------
+
+func TestGetOrCreate_Singleflight_DeduplicatesConcurrent(t *testing.T) {
+	t.Parallel()
+
+	// Track how many times newFn is actually called.
+	var createCount atomic.Int32
+
+	// Use a channel to block newFn until all goroutines have started.
+	gate := make(chan struct{})
+
+	factory := NewTestClientFactoryWithFn(func(_ snowflake.Config) (SnowflakeClient, error) {
+		<-gate // wait for signal
+		createCount.Add(1)
+
+		return &fakeClient{}, nil
+	})
+	defer factory.Close()
+
+	const concurrency = 10
+
+	var wg sync.WaitGroup
+
+	results := make([]SnowflakeClient, concurrency)
+	errs := make([]error, concurrency)
+
+	for i := range concurrency {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			results[idx], errs[idx] = factory.GetOrCreate("provider-x", "h1", snowflake.Config{})
+		}(i)
+	}
+
+	// Give goroutines time to enter singleflight.
+	time.Sleep(50 * time.Millisecond)
+
+	// Release the gate — one goroutine creates, others wait.
+	close(gate)
+	wg.Wait()
+
+	for i := range concurrency {
+		assert.NoError(t, errs[i], "goroutine %d", i)
+		assert.NotNil(t, results[i], "goroutine %d", i)
+	}
+
+	// Singleflight should deduplicate: exactly 1 creation call.
+	assert.Equal(t, int32(1), createCount.Load(), "singleflight should deduplicate to 1 creation")
+}
+
+func TestGetOrCreate_Singleflight_DifferentProvidersConcurrent(t *testing.T) {
+	t.Parallel()
+
+	var createCount atomic.Int32
+
+	gate := make(chan struct{})
+
+	factory := NewTestClientFactoryWithFn(func(_ snowflake.Config) (SnowflakeClient, error) {
+		<-gate
+		createCount.Add(1)
+
+		return &fakeClient{}, nil
+	})
+	defer factory.Close()
+
+	var wg sync.WaitGroup
+
+	// 3 different providers, 5 goroutines each.
+	for _, prov := range []string{"a", "b", "c"} {
+		for range 5 {
+			wg.Add(1)
+			go func(p string) {
+				defer wg.Done()
+				_, _ = factory.GetOrCreate(p, "h1", snowflake.Config{})
+			}(prov)
+		}
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	close(gate)
+	wg.Wait()
+
+	// Each provider should have exactly 1 creation — 3 total.
+	assert.Equal(t, int32(3), createCount.Load(),
+		"each provider should have exactly 1 connection created")
+}
+
+func TestGetOrCreate_Singleflight_ErrorNotCached(t *testing.T) {
+	t.Parallel()
+
+	var callCount atomic.Int32
+
+	factory := NewTestClientFactoryWithFn(func(_ snowflake.Config) (SnowflakeClient, error) {
+		n := callCount.Add(1)
+		if n == 1 {
+			return nil, errors.New("transient failure")
+		}
+
+		return &fakeClient{}, nil
+	})
+	defer factory.Close()
+
+	// First call fails.
+	_, err := factory.GetOrCreate("p", "h1", snowflake.Config{})
+	assert.Error(t, err)
+
+	// Second call should retry (singleflight doesn't cache errors).
+	c, err := factory.GetOrCreate("p", "h1", snowflake.Config{})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+	assert.Equal(t, int32(2), callCount.Load())
+}
+
+func TestGetOrCreate_Singleflight_DoesNotBlockOtherProviders(t *testing.T) {
+	t.Parallel()
+
+	// Provider "slow" takes a long time; provider "fast" should not be blocked.
+	slowGate := make(chan struct{})
+
+	factory := NewTestClientFactoryWithFn(func(cfg snowflake.Config) (SnowflakeClient, error) {
+		if cfg.Account == "slow" {
+			<-slowGate
+		}
+
+		return &fakeClient{}, nil
+	})
+	defer factory.Close()
+
+	// Start slow provider in background.
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+
+		_, _ = factory.GetOrCreate("slow-provider", "h1", snowflake.Config{Account: "slow"})
+	}()
+
+	// Give slow provider time to start.
+	time.Sleep(50 * time.Millisecond)
+
+	// Fast provider should complete immediately, not blocked by slow one.
+	done := make(chan struct{})
+	go func() {
+		c, err := factory.GetOrCreate("fast-provider", "h1", snowflake.Config{Account: "fast"})
+		assert.NoError(t, err)
+		assert.NotNil(t, c)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// success — fast provider was not blocked
+	case <-time.After(2 * time.Second):
+		t.Fatal("fast provider was blocked by slow provider — lock not released during newFn")
+	}
+
+	// Clean up slow provider.
+	close(slowGate)
+	wg.Wait()
 }

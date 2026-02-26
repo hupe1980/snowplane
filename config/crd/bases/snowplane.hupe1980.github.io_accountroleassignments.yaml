@@ -1,0 +1,297 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: accountroleassignments.snowplane.hupe1980.github.io
+spec:
+  group: snowplane.hupe1980.github.io
+  names:
+    categories:
+    - snowplane
+    kind: AccountRoleAssignment
+    listKind: AccountRoleAssignmentList
+    plural: accountroleassignments
+    shortNames:
+    - ara
+    singular: accountroleassignment
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: SYNCED
+      type: string
+    - jsonPath: .spec.roleName
+      name: ROLE
+      type: string
+    - jsonPath: .spec.toRole
+      name: TO-ROLE
+      type: string
+    - jsonPath: .spec.toUser
+      name: TO-USER
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          AccountRoleAssignment is the Schema for the accountroleassignments API.
+          It assigns an account role to another role or user in Snowflake.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: "AccountRoleAssignmentSpec defines the desired state of an
+              AccountRoleAssignment.\nAssigns an account role to another role or user:\n\n\tGRANT
+              ROLE <role> TO ROLE <parent_role>\n\tGRANT ROLE <role> TO USER <user>\n\nAll
+              fields are immutable after creation — changing any field requires\ndeleting
+              and recreating the resource."
+            properties:
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy specifies what happens to the Snowflake resource when the CR is deleted.
+                  Defaults to "Delete".
+                enum:
+                - Delete
+                - Orphan
+                type: string
+              providerRef:
+                description: ProviderRef references the ProviderConfig to use for
+                  Snowflake connectivity.
+                properties:
+                  name:
+                    default: default
+                    description: Name of the ProviderConfig to use.
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the ProviderConfig. Defaults to the namespace of the
+                      referring resource. Set this to reference a ProviderConfig in a
+                      different namespace (e.g. a shared system namespace).
+                    type: string
+                type: object
+              roleName:
+                description: |-
+                  RoleName is the name of the account role to assign.
+                  Mutually exclusive with RoleRef.
+                type: string
+              roleRef:
+                description: |-
+                  RoleRef references an AccountRole CR in the same namespace.
+                  When set, the role name is resolved from the CR's spec.name.
+                  Mutually exclusive with RoleName.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              toRole:
+                description: |-
+                  ToRole is the name of the parent account role to assign the role to.
+                  Mutually exclusive with ToRoleRef, ToUser, ToUserRef.
+                type: string
+              toRoleRef:
+                description: |-
+                  ToRoleRef references an AccountRole CR in the same namespace.
+                  When set, the target role name is resolved from the CR's spec.name.
+                  Mutually exclusive with ToRole, ToUser, ToUserRef.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              toUser:
+                description: |-
+                  ToUser is the name of the user to assign the role to.
+                  Mutually exclusive with ToUserRef, ToRole, ToRoleRef.
+                type: string
+              toUserRef:
+                description: |-
+                  ToUserRef references a User CR in the same namespace.
+                  When set, the user name is resolved from the CR's spec.name.
+                  Mutually exclusive with ToUser, ToRole, ToRoleRef.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              useRole:
+                description: |-
+                  UseRole specifies the Snowflake role to activate via USE ROLE before
+                  CREATE/ALTER/DROP operations. In Snowflake's DAC model the role active
+                  at CREATE time becomes the object owner, so this field indirectly
+                  controls initial ownership.
+                  This field is immutable after the resource has been created in Snowflake.
+                minLength: 1
+                type: string
+            required:
+            - providerRef
+            type: object
+            x-kubernetes-validations:
+            - message: spec.roleName is immutable (delete and recreate the resource
+                to change)
+              rule: self.roleName == oldSelf.roleName
+            - message: spec.roleRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.roleRef) == has(self.roleRef) && (!has(self.roleRef)
+                || self.roleRef == oldSelf.roleRef)
+            - message: spec.toRole is immutable (delete and recreate the resource
+                to change)
+              rule: self.toRole == oldSelf.toRole
+            - message: spec.toRoleRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.toRoleRef) == has(self.toRoleRef) && (!has(self.toRoleRef)
+                || self.toRoleRef == oldSelf.toRoleRef)
+            - message: spec.toUser is immutable (delete and recreate the resource
+                to change)
+              rule: self.toUser == oldSelf.toUser
+            - message: spec.toUserRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.toUserRef) == has(self.toUserRef) && (!has(self.toUserRef)
+                || self.toUserRef == oldSelf.toUserRef)
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
+          status:
+            description: AccountRoleAssignmentStatus defines the observed state of
+              an AccountRoleAssignment.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the resource's state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              fullyQualifiedName:
+                description: FullyQualifiedName is the Snowflake fully qualified identifier
+                  for this resource.
+                type: string
+              lastAppliedSpecHash:
+                description: |-
+                  LastAppliedSpecHash is the SHA-256 hash of the spec as of the last
+                  successful reconciliation. The reconciler uses this to distinguish
+                  spec changes (user edited the CR) from external drift (Snowflake
+                  state diverged without a spec change). This is more reliable than
+                  comparing ObservedGeneration vs Generation because metadata-only
+                  changes (labels, annotations) increment Generation without changing
+                  the spec.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              showOutput:
+                description: ShowOutput contains the raw SHOW GRANTS OF ROLE output
+                  entry for this assignment.
+                properties:
+                  createdOn:
+                    description: CreatedOn is the timestamp when the role assignment
+                      was created.
+                    type: string
+                  grantedBy:
+                    description: GrantedBy is the role that performed the assignment.
+                    type: string
+                  grantedTo:
+                    description: 'GrantedTo is the grantee category: "ROLE", "USER",
+                      or "DATABASE_ROLE".'
+                    type: string
+                  granteeName:
+                    description: GranteeName is the name of the role, user, or database
+                      role receiving the assignment.
+                    type: string
+                  role:
+                    description: Role is the role name that was assigned.
+                    type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

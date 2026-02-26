@@ -414,12 +414,24 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 | `spec.loginName` | `*string` | Login name (defaults to user name) |
 | `spec.displayName` | `*string` | Display name |
 | `spec.email` | `*string` | Email address |
+| `spec.firstName` | `*string` | First name |
+| `spec.lastName` | `*string` | Last name |
+| `spec.middleName` | `*string` | Middle name |
+| `spec.comment` | `*string` | User description |
 | `spec.password` | `*SecretKeyReference` | Secret reference for password |
 | `spec.rsaPublicKey` | `*SecretKeyReference` | Secret reference for RSA public key |
 | `spec.rsaPublicKey2` | `*SecretKeyReference` | Second RSA key (for rotation) |
 | `spec.defaultRole` | `*string` | Default role on login |
+| `spec.defaultSecondaryRoles` | `*string` | Secondary roles on login (`ALL`) |
 | `spec.defaultWarehouse` | `*string` | Default warehouse |
+| `spec.defaultNamespace` | `*string` | Default database.schema namespace |
+| `spec.mustChangePassword` | `*bool` | Force password change on next login |
 | `spec.disabled` | `*bool` | Whether the user is disabled |
+| `spec.daysToExpiry` | `*int32` | Days until credentials expire (≥ 0) |
+| `spec.minsToUnlock` | `*int32` | Minutes until locked account auto-unlocks (≥ 0) |
+| `spec.minsToBypassMFA` | `*int32` | Minutes to temporarily bypass MFA (≥ 0) |
+| `spec.networkPolicy` | `*string` | User-level network policy override |
+| `spec.disableMFA` | `*bool` | Disable multi-factor authentication |
 
 > 🔐 **Secret-Referenced Credentials:** `password`, `rsaPublicKey`, and `rsaPublicKey2` use `SecretKeyReference` to point to Kubernetes Secrets. Sensitive data is never stored in the CR.
 

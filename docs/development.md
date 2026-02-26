@@ -45,7 +45,7 @@ Project layout, architecture principles, conventions, and workflow for contribut
 │   └── samples/               # Example CR YAML files
 ├── internal/
 │   ├── clients/
-│   │   ├── clientfactory/     # Snowflake client cache with LRU eviction
+│   │   ├── clientfactory/     # Snowflake client cache with LRU eviction & singleflight dedup
 │   │   └── snowflake/         # Snowflake SDK wrapper
 │   ├── controller/
 │   │   ├── reconciler/        # Generic reconciler framework

@@ -30,6 +30,7 @@ type UserShowOutput struct {
 	Email                 string
 	FirstName             string
 	LastName              string
+	MiddleName            string
 	Comment               string
 	DefaultRole           string
 	DefaultSecondaryRoles string
@@ -40,12 +41,17 @@ type UserShowOutput struct {
 	MustChangePassword    bool
 	HasRSAPublicKey       bool
 	Type                  string
+	DaysToExpiry          string
+	MinsToUnlock          string
+	MinsToBypassMFA       string
+	DisableMFA            bool
 }
 
 // UserDescribeOutput holds additional fields from DESCRIBE USER.
 type UserDescribeOutput struct {
 	RSAPublicKeyFP  string
 	RSAPublicKey2FP string
+	NetworkPolicy   string
 }
 
 // CreateUserOptions holds the parameters for creating a user.
@@ -61,6 +67,7 @@ type CreateUserOptions struct {
 	Email                 *string
 	FirstName             *string
 	LastName              *string
+	MiddleName            *string
 	Comment               *string
 	Password              *string //nolint:gosec // G117: user creation requires password field
 	RSAPublicKey          *string
@@ -72,6 +79,11 @@ type CreateUserOptions struct {
 	DefaultNamespace      *string
 	MustChangePassword    *bool
 	Disabled              *bool
+	DaysToExpiry          *int32
+	MinsToUnlock          *int32
+	MinsToBypassMFA       *int32
+	NetworkPolicy         *string
+	DisableMFA            *bool
 }
 
 // Validate checks the CreateUserOptions for validity.
@@ -97,6 +109,7 @@ type AlterUserOptions struct {
 	Email                 *string
 	FirstName             *string
 	LastName              *string
+	MiddleName            *string
 	Comment               *string
 	Password              *string //nolint:gosec // G117: user alteration requires password field
 	RSAPublicKey          *string
@@ -107,6 +120,11 @@ type AlterUserOptions struct {
 	DefaultNamespace      *string
 	MustChangePassword    *bool
 	Disabled              *bool
+	DaysToExpiry          *int32
+	MinsToUnlock          *int32
+	MinsToBypassMFA       *int32
+	NetworkPolicy         *string
+	DisableMFA            *bool
 
 	// UnsetFields lists parameter names to revert via ALTER USER ... UNSET.
 	UnsetFields []string
@@ -128,6 +146,7 @@ func (o *AlterUserOptions) HasChanges() bool {
 		o.Email != nil ||
 		o.FirstName != nil ||
 		o.LastName != nil ||
+		o.MiddleName != nil ||
 		o.Comment != nil ||
 		o.Password != nil ||
 		o.RSAPublicKey != nil ||
@@ -138,6 +157,11 @@ func (o *AlterUserOptions) HasChanges() bool {
 		o.DefaultNamespace != nil ||
 		o.MustChangePassword != nil ||
 		o.Disabled != nil ||
+		o.DaysToExpiry != nil ||
+		o.MinsToUnlock != nil ||
+		o.MinsToBypassMFA != nil ||
+		o.NetworkPolicy != nil ||
+		o.DisableMFA != nil ||
 		len(o.UnsetFields) > 0
 }
 
@@ -178,6 +202,7 @@ func buildCreateUserSQL(opts CreateUserOptions) (string, error) {
 	b.SetString("EMAIL", opts.Email)
 	b.SetString("FIRST_NAME", opts.FirstName)
 	b.SetString("LAST_NAME", opts.LastName)
+	b.SetString("MIDDLE_NAME", opts.MiddleName)
 	b.SetString("COMMENT", opts.Comment)
 	b.SetString("RSA_PUBLIC_KEY", opts.RSAPublicKey)
 	b.SetString("RSA_PUBLIC_KEY_2", opts.RSAPublicKey2)
@@ -197,6 +222,11 @@ func buildCreateUserSQL(opts CreateUserOptions) (string, error) {
 	b.SetString("DEFAULT_NAMESPACE", opts.DefaultNamespace)
 	b.SetBool("MUST_CHANGE_PASSWORD", opts.MustChangePassword)
 	b.SetBool("DISABLED", opts.Disabled)
+	b.SetInt32("DAYS_TO_EXPIRY", opts.DaysToExpiry)
+	b.SetInt32("MINS_TO_UNLOCK", opts.MinsToUnlock)
+	b.SetInt32("MINS_TO_BYPASS_MFA", opts.MinsToBypassMFA)
+	b.SetString("NETWORK_POLICY", opts.NetworkPolicy)
+	b.SetBool("DISABLE_MFA", opts.DisableMFA)
 
 	if err := b.Err(); err != nil {
 		return "", err
@@ -233,6 +263,7 @@ func buildAlterUserStatements(opts AlterUserOptions) ([]string, error) {
 	sc.String("EMAIL", opts.Email)
 	sc.String("FIRST_NAME", opts.FirstName)
 	sc.String("LAST_NAME", opts.LastName)
+	sc.String("MIDDLE_NAME", opts.MiddleName)
 	sc.String("COMMENT", opts.Comment)
 	sc.String("RSA_PUBLIC_KEY", opts.RSAPublicKey)
 	sc.String("RSA_PUBLIC_KEY_2", opts.RSAPublicKey2)
@@ -251,6 +282,11 @@ func buildAlterUserStatements(opts AlterUserOptions) ([]string, error) {
 	sc.String("DEFAULT_NAMESPACE", opts.DefaultNamespace)
 	sc.Bool("MUST_CHANGE_PASSWORD", opts.MustChangePassword)
 	sc.Bool("DISABLED", opts.Disabled)
+	sc.Int32("DAYS_TO_EXPIRY", opts.DaysToExpiry)
+	sc.Int32("MINS_TO_UNLOCK", opts.MinsToUnlock)
+	sc.Int32("MINS_TO_BYPASS_MFA", opts.MinsToBypassMFA)
+	sc.String("NETWORK_POLICY", opts.NetworkPolicy)
+	sc.Bool("DISABLE_MFA", opts.DisableMFA)
 
 	return sqlbuilder.BuildAlterStatements("USER", opts.Name.FullyQualifiedName(), &sc, opts.UnsetFields)
 }
@@ -394,6 +430,7 @@ func scanUserShowOutput(rows *sql.Rows, name string) (*UserShowOutput, error) {
 			Email:                 colMap["email"],
 			FirstName:             colMap["first_name"],
 			LastName:              colMap["last_name"],
+			MiddleName:            colMap["middle_name"],
 			Comment:               colMap["comment"],
 			DefaultRole:           colMap["default_role"],
 			DefaultSecondaryRoles: colMap["default_secondary_roles"],
@@ -404,6 +441,10 @@ func scanUserShowOutput(rows *sql.Rows, name string) (*UserShowOutput, error) {
 			MustChangePassword:    strings.EqualFold(colMap["must_change_password"], "true"),
 			HasRSAPublicKey:       strings.EqualFold(colMap["has_rsa_public_key"], "true"),
 			Type:                  colMap["type"],
+			DaysToExpiry:          colMap["days_to_expiry"],
+			MinsToUnlock:          colMap["mins_to_unlock"],
+			MinsToBypassMFA:       colMap["mins_to_bypass_mfa"],
+			DisableMFA:            strings.EqualFold(colMap["disable_mfa"], "true"),
 		}, nil
 	}
 
@@ -450,6 +491,8 @@ func scanUserDescribeOutput(rows *sql.Rows) (*UserDescribeOutput, error) {
 			result.RSAPublicKeyFP = colMap["value"]
 		case "RSA_PUBLIC_KEY_2_FP":
 			result.RSAPublicKey2FP = colMap["value"]
+		case "NETWORK_POLICY":
+			result.NetworkPolicy = colMap["value"]
 		}
 	}
 

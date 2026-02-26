@@ -110,6 +110,7 @@ func buildCreateOptions(ctx context.Context, c client.Client, user *snowplanev1a
 		Email:                 user.Spec.Email,
 		FirstName:             user.Spec.FirstName,
 		LastName:              user.Spec.LastName,
+		MiddleName:            user.Spec.MiddleName,
 		Comment:               user.Spec.Comment,
 		DefaultRole:           user.Spec.DefaultRole,
 		DefaultSecondaryRoles: user.Spec.DefaultSecondaryRoles,
@@ -117,6 +118,11 @@ func buildCreateOptions(ctx context.Context, c client.Client, user *snowplanev1a
 		DefaultNamespace:      user.Spec.DefaultNamespace,
 		MustChangePassword:    user.Spec.MustChangePassword,
 		Disabled:              user.Spec.Disabled,
+		DaysToExpiry:          user.Spec.DaysToExpiry,
+		MinsToUnlock:          user.Spec.MinsToUnlock,
+		MinsToBypassMFA:       user.Spec.MinsToBypassMFA,
+		NetworkPolicy:         user.Spec.NetworkPolicy,
+		DisableMFA:            user.Spec.DisableMFA,
 	}
 
 	if user.Spec.Type != nil {
@@ -181,6 +187,10 @@ func buildAlterOptions(ctx context.Context, c client.Client, user *snowplanev1al
 		opts.LastName = user.Spec.LastName
 	}
 
+	if user.Spec.MiddleName != nil && (show == nil || *user.Spec.MiddleName != show.MiddleName) {
+		opts.MiddleName = user.Spec.MiddleName
+	}
+
 	if user.Spec.Comment != nil && (show == nil || *user.Spec.Comment != show.Comment) {
 		opts.Comment = user.Spec.Comment
 	}
@@ -207,6 +217,29 @@ func buildAlterOptions(ctx context.Context, c client.Client, user *snowplanev1al
 
 	if user.Spec.Disabled != nil && (show == nil || *user.Spec.Disabled != show.Disabled) {
 		opts.Disabled = user.Spec.Disabled
+	}
+
+	// Integer fields — compare against SHOW output (string representation).
+	if user.Spec.DaysToExpiry != nil && (show == nil || fmt.Sprintf("%d", *user.Spec.DaysToExpiry) != show.DaysToExpiry) {
+		opts.DaysToExpiry = user.Spec.DaysToExpiry
+	}
+
+	if user.Spec.MinsToUnlock != nil && (show == nil || fmt.Sprintf("%d", *user.Spec.MinsToUnlock) != show.MinsToUnlock) {
+		opts.MinsToUnlock = user.Spec.MinsToUnlock
+	}
+
+	if user.Spec.MinsToBypassMFA != nil && (show == nil || fmt.Sprintf("%d", *user.Spec.MinsToBypassMFA) != show.MinsToBypassMFA) {
+		opts.MinsToBypassMFA = user.Spec.MinsToBypassMFA
+	}
+
+	if user.Spec.DisableMFA != nil && (show == nil || *user.Spec.DisableMFA != show.DisableMFA) {
+		opts.DisableMFA = user.Spec.DisableMFA
+	}
+
+	// NetworkPolicy is from DESCRIBE USER, not SHOW.
+	desc := obs.DescribeOutput
+	if user.Spec.NetworkPolicy != nil && (desc == nil || *user.Spec.NetworkPolicy != desc.NetworkPolicy) {
+		opts.NetworkPolicy = user.Spec.NetworkPolicy
 	}
 
 	// Resolve secrets — password is only re-applied if its hash differs from
@@ -262,6 +295,7 @@ func applyObservation(user *snowplanev1alpha1.User, obs *snowflake.UserObservati
 			Email:                 obs.ShowOutput.Email,
 			FirstName:             obs.ShowOutput.FirstName,
 			LastName:              obs.ShowOutput.LastName,
+			MiddleName:            obs.ShowOutput.MiddleName,
 			Comment:               obs.ShowOutput.Comment,
 			DefaultRole:           obs.ShowOutput.DefaultRole,
 			DefaultSecondaryRoles: obs.ShowOutput.DefaultSecondaryRoles,
@@ -272,6 +306,10 @@ func applyObservation(user *snowplanev1alpha1.User, obs *snowflake.UserObservati
 			MustChangePassword:    obs.ShowOutput.MustChangePassword,
 			HasRSAPublicKey:       obs.ShowOutput.HasRSAPublicKey,
 			Type:                  obs.ShowOutput.Type,
+			DaysToExpiry:          obs.ShowOutput.DaysToExpiry,
+			MinsToUnlock:          obs.ShowOutput.MinsToUnlock,
+			MinsToBypassMFA:       obs.ShowOutput.MinsToBypassMFA,
+			DisableMFA:            obs.ShowOutput.DisableMFA,
 		}
 	}
 
@@ -279,6 +317,7 @@ func applyObservation(user *snowplanev1alpha1.User, obs *snowflake.UserObservati
 		user.Status.DescribeOutput = &snowplanev1alpha1.UserDescribeOutput{
 			RSAPublicKeyFP:  obs.DescribeOutput.RSAPublicKeyFP,
 			RSAPublicKey2FP: obs.DescribeOutput.RSAPublicKey2FP,
+			NetworkPolicy:   obs.DescribeOutput.NetworkPolicy,
 		}
 	}
 }
@@ -342,6 +381,24 @@ func computeUnsetFields(user *snowplanev1alpha1.User) []string {
 	if user.Spec.RSAPublicKey2 == nil && managed["RSA_PUBLIC_KEY_2"] {
 		unset = append(unset, "RSA_PUBLIC_KEY_2")
 	}
+	if user.Spec.MiddleName == nil && managed["MIDDLE_NAME"] {
+		unset = append(unset, "MIDDLE_NAME")
+	}
+	if user.Spec.DaysToExpiry == nil && managed["DAYS_TO_EXPIRY"] {
+		unset = append(unset, "DAYS_TO_EXPIRY")
+	}
+	if user.Spec.MinsToUnlock == nil && managed["MINS_TO_UNLOCK"] {
+		unset = append(unset, "MINS_TO_UNLOCK")
+	}
+	if user.Spec.MinsToBypassMFA == nil && managed["MINS_TO_BYPASS_MFA"] {
+		unset = append(unset, "MINS_TO_BYPASS_MFA")
+	}
+	if user.Spec.NetworkPolicy == nil && managed["NETWORK_POLICY"] {
+		unset = append(unset, "NETWORK_POLICY")
+	}
+	if user.Spec.DisableMFA == nil && managed["DISABLE_MFA"] {
+		unset = append(unset, "DISABLE_MFA")
+	}
 
 	return unset
 }
@@ -396,6 +453,24 @@ func computeTrackedParameters(spec *snowplanev1alpha1.UserSpec) []string {
 	if spec.RSAPublicKey2 != nil {
 		fields = append(fields, "RSA_PUBLIC_KEY_2")
 	}
+	if spec.MiddleName != nil {
+		fields = append(fields, "MIDDLE_NAME")
+	}
+	if spec.DaysToExpiry != nil {
+		fields = append(fields, "DAYS_TO_EXPIRY")
+	}
+	if spec.MinsToUnlock != nil {
+		fields = append(fields, "MINS_TO_UNLOCK")
+	}
+	if spec.MinsToBypassMFA != nil {
+		fields = append(fields, "MINS_TO_BYPASS_MFA")
+	}
+	if spec.NetworkPolicy != nil {
+		fields = append(fields, "NETWORK_POLICY")
+	}
+	if spec.DisableMFA != nil {
+		fields = append(fields, "DISABLE_MFA")
+	}
 
 	return fields
 }
@@ -417,6 +492,7 @@ func detectDrift(user *snowplanev1alpha1.User, obs *snowflake.UserObservation) *
 		d.CompareString("EMAIL", user.Spec.Email, obs.ShowOutput.Email, false)
 		d.CompareString("FIRST_NAME", user.Spec.FirstName, obs.ShowOutput.FirstName, false)
 		d.CompareString("LAST_NAME", user.Spec.LastName, obs.ShowOutput.LastName, false)
+		d.CompareString("MIDDLE_NAME", user.Spec.MiddleName, obs.ShowOutput.MiddleName, false)
 		d.CompareString("COMMENT", user.Spec.Comment, obs.ShowOutput.Comment, false)
 		d.CompareStringFold("DEFAULT_ROLE", user.Spec.DefaultRole, obs.ShowOutput.DefaultRole, false)
 		d.CompareString("DEFAULT_SECONDARY_ROLES", user.Spec.DefaultSecondaryRoles, obs.ShowOutput.DefaultSecondaryRoles, false)
@@ -429,6 +505,28 @@ func detectDrift(user *snowplanev1alpha1.User, obs *snowflake.UserObservation) *
 		if user.Spec.MustChangePassword != nil {
 			d.CompareBoolValue("MUST_CHANGE_PASSWORD", *user.Spec.MustChangePassword, obs.ShowOutput.MustChangePassword, false)
 		}
+
+		// Integer fields — SHOW output stores them as strings.
+		if user.Spec.DaysToExpiry != nil {
+			d.CompareStringValue("DAYS_TO_EXPIRY", fmt.Sprintf("%d", *user.Spec.DaysToExpiry), obs.ShowOutput.DaysToExpiry, false)
+		}
+
+		if user.Spec.MinsToUnlock != nil {
+			d.CompareStringValue("MINS_TO_UNLOCK", fmt.Sprintf("%d", *user.Spec.MinsToUnlock), obs.ShowOutput.MinsToUnlock, false)
+		}
+
+		if user.Spec.MinsToBypassMFA != nil {
+			d.CompareStringValue("MINS_TO_BYPASS_MFA", fmt.Sprintf("%d", *user.Spec.MinsToBypassMFA), obs.ShowOutput.MinsToBypassMFA, false)
+		}
+
+		if user.Spec.DisableMFA != nil {
+			d.CompareBoolValue("DISABLE_MFA", *user.Spec.DisableMFA, obs.ShowOutput.DisableMFA, false)
+		}
+	}
+
+	// NetworkPolicy is from DESCRIBE USER output.
+	if obs.DescribeOutput != nil {
+		d.CompareString("NETWORK_POLICY", user.Spec.NetworkPolicy, obs.DescribeOutput.NetworkPolicy, false)
 	}
 
 	return d.Result()

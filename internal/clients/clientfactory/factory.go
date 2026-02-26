@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/metrics"
 )
@@ -51,13 +53,19 @@ const healthCheckTimeout = 5 * time.Second
 //
 // LRU tracking uses container/list (doubly-linked list) with a map of
 // provider→*list.Element for O(1) touch, remove, and eviction operations.
+//
+// Connection creation is deduplicated using singleflight: when multiple
+// goroutines request the same provider concurrently, only one connection
+// attempt is made and the result is shared. This prevents thundering-herd
+// connection storms during controller restarts or bulk reconciliation.
 type ClientFactory struct {
 	mu       sync.RWMutex
 	clients  map[string]*list.Element // provider → *list.Element (value is lruEntry)
 	lruOrder *list.List               // front = LRU (oldest), back = MRU (newest)
 	newFn    func(cfg snowflake.Config) (SnowflakeClient, error)
-	maxSize  int           // 0 = unlimited
-	idleTTL  time.Duration // 0 = disabled (default)
+	maxSize  int                // 0 = unlimited
+	idleTTL  time.Duration      // 0 = disabled (default)
+	sfGroup  singleflight.Group // deduplicates concurrent connection attempts per provider
 
 	// startupGrace is the duration after factory creation during which the
 	// readiness probe passes even when no clients are cached. This prevents
@@ -142,27 +150,87 @@ func NewTestClientFactoryWithFn(fn func(cfg snowflake.Config) (SnowflakeClient, 
 // GetOrCreate returns a cached client for the provider. If the config hash has
 // changed or the client has exceeded the idle TTL, the old client is closed and
 // a new one is created.
+//
+// Concurrent requests for the same provider are deduplicated via singleflight:
+// only one connection attempt proceeds while others wait and receive the same
+// result. This prevents thundering-herd connection storms during controller
+// restarts or mass reconciliation.
 func (f *ClientFactory) GetOrCreate(provider string, hash string, cfg snowflake.Config) (SnowflakeClient, error) {
+	// Fast path: check cache under read lock. This avoids the write lock and
+	// singleflight overhead for the common case (cache hit, same hash, TTL ok).
+	if c, ok := f.tryGetCached(provider, hash); ok {
+		return c, nil
+	}
+
+	// Slow path: use singleflight to deduplicate concurrent connection
+	// attempts for the same provider. The singleflight key includes the hash
+	// so that a config change doesn't share results with stale requests.
+	sfKey := provider + "\x00" + hash
+
+	v, err, _ := f.sfGroup.Do(sfKey, func() (any, error) {
+		return f.getOrCreateLocked(provider, hash, cfg)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return v.(SnowflakeClient), nil //nolint:forcetypeassert // singleflight returns our type
+}
+
+// tryGetCached returns a cached client if the hash matches and TTL is valid.
+// Returns (client, true) on cache hit, (nil, false) on miss or stale entry.
+// On hit, promotes the entry to MRU position and updates lastAccess.
+func (f *ClientFactory) tryGetCached(provider, hash string) (SnowflakeClient, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
+	elem, ok := f.clients[provider]
+	if !ok {
+		return nil, false
+	}
+
+	entry := elem.Value.(*lruEntry)
+	if entry.cached.hash != hash {
+		return nil, false // hash changed — need creation path
+	}
+
+	now := time.Now()
+	if f.idleTTL > 0 && now.Sub(entry.cached.lastAccess) > f.idleTTL {
+		return nil, false // expired — need creation path
+	}
+
+	entry.cached.lastAccess = now
+	f.lruOrder.MoveToBack(elem) // O(1) LRU touch
+
+	return entry.cached.client, true
+}
+
+// getOrCreateLocked performs the cache-miss path under a write lock.
+// Called from within singleflight.Do, so at most one goroutine per provider
+// executes this at a time; however, the write lock is still needed to protect
+// the shared map/list from concurrent access by other providers.
+func (f *ClientFactory) getOrCreateLocked(provider, hash string, cfg snowflake.Config) (SnowflakeClient, error) {
+	f.mu.Lock()
+
 	now := time.Now()
 
-	// Return cached client if hash matches and TTL is not exceeded.
+	// Double-check: another goroutine may have populated the cache between
+	// the read-lock miss and acquiring the write lock.
 	if elem, ok := f.clients[provider]; ok {
 		entry := elem.Value.(*lruEntry)
 		if entry.cached.hash == hash {
-			if f.idleTTL > 0 && now.Sub(entry.cached.lastAccess) > f.idleTTL {
-				// Idle too long — evict and recreate below.
-				f.closeClient(entry.cached.client, provider, "idle TTL expired")
-				f.lruOrder.Remove(elem)
-				delete(f.clients, provider)
-			} else {
+			if f.idleTTL == 0 || now.Sub(entry.cached.lastAccess) <= f.idleTTL {
 				entry.cached.lastAccess = now
 				f.lruOrder.MoveToBack(elem) // O(1) touch
+				f.mu.Unlock()
 
 				return entry.cached.client, nil
 			}
+
+			// Idle too long — evict and recreate below.
+			f.closeClient(entry.cached.client, provider, "idle TTL expired")
+			f.lruOrder.Remove(elem)
+			delete(f.clients, provider)
 		} else {
 			// Hash changed — close stale client.
 			f.closeClient(entry.cached.client, provider, "config hash changed")
@@ -176,14 +244,37 @@ func (f *ClientFactory) GetOrCreate(provider string, hash string, cfg snowflake.
 		f.evictLRU()
 	}
 
+	// Release the lock during the potentially slow newFn call (network I/O).
+	// This is the key optimization: other providers can be served from the
+	// cache while this connection is being established.
+	f.mu.Unlock()
+
 	client, err := f.newFn(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("creating snowflake client for provider %q: %w", provider, err)
 	}
 
+	// Re-acquire the lock to insert the new client.
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	// Check again: a concurrent eviction or close could have happened while
+	// we were creating the client without the lock.
+	if elem, ok := f.clients[provider]; ok {
+		// Another goroutine snuck in — close the duplicate we just created
+		// and use the existing one.
+		f.closeClient(client, provider, "duplicate creation race")
+
+		entry := elem.Value.(*lruEntry)
+		entry.cached.lastAccess = time.Now()
+		f.lruOrder.MoveToBack(elem)
+
+		return entry.cached.client, nil
+	}
+
 	entry := &lruEntry{
 		provider: provider,
-		cached:   cachedClient{client: client, hash: hash, lastAccess: now},
+		cached:   cachedClient{client: client, hash: hash, lastAccess: time.Now()},
 	}
 	elem := f.lruOrder.PushBack(entry) // O(1) insert at MRU end
 	f.clients[provider] = elem

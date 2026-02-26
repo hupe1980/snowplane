@@ -883,6 +883,22 @@ func (s *UserSpec) Validate() error {
 		}
 	}
 
+	if s.DaysToExpiry != nil && *s.DaysToExpiry < 0 {
+		errs = append(errs, errors.New("spec.daysToExpiry must be >= 0"))
+	}
+
+	if s.MinsToUnlock != nil && *s.MinsToUnlock < 0 {
+		errs = append(errs, errors.New("spec.minsToUnlock must be >= 0"))
+	}
+
+	if s.MinsToBypassMFA != nil && *s.MinsToBypassMFA < 0 {
+		errs = append(errs, errors.New("spec.minsToBypassMFA must be >= 0"))
+	}
+
+	if s.NetworkPolicy != nil && *s.NetworkPolicy == "" {
+		errs = append(errs, errors.New("spec.networkPolicy must not be empty when set"))
+	}
+
 	if err := s.CommonSpec.Validate(); err != nil {
 		errs = append(errs, err)
 	}

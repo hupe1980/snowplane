@@ -57,6 +57,14 @@ spec:
               comment:
                 description: Comment is an optional description for the user.
                 type: string
+              daysToExpiry:
+                description: |-
+                  DaysToExpiry sets the number of days after which the user's login
+                  credentials (password) expire. After expiry the user must reset their
+                  password before logging in. 0 means no expiry.
+                format: int32
+                minimum: 0
+                type: integer
               defaultNamespace:
                 description: DefaultNamespace is the default database.schema namespace
                   for the user.
@@ -83,6 +91,11 @@ spec:
                 - Delete
                 - Orphan
                 type: string
+              disableMFA:
+                description: |-
+                  DisableMFA disables multi-factor authentication for the user when set
+                  to true.
+                type: boolean
               disabled:
                 description: Disabled controls whether the user is disabled.
                 type: boolean
@@ -104,12 +117,37 @@ spec:
                   LoginName is the name that the user enters to log into the system.
                   Defaults to the user Name if not set.
                 type: string
+              middleName:
+                description: MiddleName is the user's middle name.
+                type: string
+              minsToBypassMFA:
+                description: |-
+                  MinsToBypassMFA sets the number of minutes to temporarily bypass
+                  multi-factor authentication. Use this when a user has lost their MFA
+                  device and needs temporary access.
+                format: int32
+                minimum: 0
+                type: integer
+              minsToUnlock:
+                description: |-
+                  MinsToUnlock sets the number of minutes until a locked user account
+                  is automatically unlocked. 0 means the account remains locked until
+                  an administrator unlocks it.
+                format: int32
+                minimum: 0
+                type: integer
               mustChangePassword:
                 description: MustChangePassword forces a password change on next login.
                 type: boolean
               name:
                 description: Name is the Snowflake user name. Immutable after creation.
                 minLength: 1
+                type: string
+              networkPolicy:
+                description: |-
+                  NetworkPolicy assigns a user-level network policy that overrides the
+                  account-level network policy. Set to the name of an existing Snowflake
+                  network policy.
                 type: string
               password:
                 description: Password references a Kubernetes Secret containing the
@@ -288,6 +326,10 @@ spec:
               describeOutput:
                 description: DescribeOutput contains the DESCRIBE USER output.
                 properties:
+                  networkPolicy:
+                    description: NetworkPolicy is the user-level network policy name,
+                      if set.
+                    type: string
                   rsaPublicKey2Fp:
                     description: RSAPublicKey2FP is the fingerprint of the secondary
                       RSA public key.
@@ -346,6 +388,10 @@ spec:
                   createdOn:
                     description: CreatedOn is the timestamp when the user was created.
                     type: string
+                  daysToExpiry:
+                    description: DaysToExpiry is the number of days until the user's
+                      credentials expire.
+                    type: string
                   defaultNamespace:
                     description: DefaultNamespace is the default namespace.
                     type: string
@@ -359,6 +405,10 @@ spec:
                   defaultWarehouse:
                     description: DefaultWarehouse is the default warehouse.
                     type: string
+                  disableMFA:
+                    description: DisableMFA indicates whether MFA is disabled for
+                      the user.
+                    type: boolean
                   disabled:
                     description: Disabled indicates whether the user is disabled.
                     type: boolean
@@ -380,6 +430,17 @@ spec:
                     type: string
                   loginName:
                     description: LoginName is the login name.
+                    type: string
+                  middleName:
+                    description: MiddleName is the middle name.
+                    type: string
+                  minsToBypassMFA:
+                    description: MinsToBypassMFA is the number of minutes to bypass
+                      MFA.
+                    type: string
+                  minsToUnlock:
+                    description: MinsToUnlock is the number of minutes until a locked
+                      account auto-unlocks.
                     type: string
                   mustChangePassword:
                     description: MustChangePassword indicates whether the user must

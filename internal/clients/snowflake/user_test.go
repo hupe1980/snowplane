@@ -44,6 +44,7 @@ func TestBuildCreateUserSQL(t *testing.T) {
 		email := "alice@example.com"
 		first := "Alice"
 		last := "Smith"
+		middle := "Marie"
 		comment := "Test user"
 		rsaKey := "MIIBIjAN..."
 		rsaKey2 := "MIIBIjBB..."
@@ -54,6 +55,11 @@ func TestBuildCreateUserSQL(t *testing.T) {
 		defNS := "MYDB.PUBLIC"
 		mustChange := true
 		disabled := false
+		daysToExpiry := int32(90)
+		minsToUnlock := int32(30)
+		minsToBypassMFA := int32(60)
+		networkPolicy := "MY_POLICY"
+		disableMFA := true
 
 		opts := CreateUserOptions{
 			Name:                  NewAccountObjectIdentifier("ALICE"),
@@ -63,6 +69,7 @@ func TestBuildCreateUserSQL(t *testing.T) {
 			Email:                 &email,
 			FirstName:             &first,
 			LastName:              &last,
+			MiddleName:            &middle,
 			Comment:               &comment,
 			RSAPublicKey:          &rsaKey,
 			RSAPublicKey2:         &rsaKey2,
@@ -73,6 +80,11 @@ func TestBuildCreateUserSQL(t *testing.T) {
 			DefaultNamespace:      &defNS,
 			MustChangePassword:    &mustChange,
 			Disabled:              &disabled,
+			DaysToExpiry:          &daysToExpiry,
+			MinsToUnlock:          &minsToUnlock,
+			MinsToBypassMFA:       &minsToBypassMFA,
+			NetworkPolicy:         &networkPolicy,
+			DisableMFA:            &disableMFA,
 		}
 		got, err := buildCreateUserSQL(opts)
 		require.NoError(t, err)
@@ -84,6 +96,7 @@ func TestBuildCreateUserSQL(t *testing.T) {
 			` EMAIL = 'alice@example.com'` +
 			` FIRST_NAME = 'Alice'` +
 			` LAST_NAME = 'Smith'` +
+			` MIDDLE_NAME = 'Marie'` +
 			` COMMENT = 'Test user'` +
 			` RSA_PUBLIC_KEY = 'MIIBIjAN...'` +
 			` RSA_PUBLIC_KEY_2 = 'MIIBIjBB...'` +
@@ -93,7 +106,12 @@ func TestBuildCreateUserSQL(t *testing.T) {
 			` DEFAULT_WAREHOUSE = 'COMPUTE_WH'` +
 			` DEFAULT_NAMESPACE = 'MYDB.PUBLIC'` +
 			` MUST_CHANGE_PASSWORD = TRUE` +
-			` DISABLED = FALSE`
+			` DISABLED = FALSE` +
+			` DAYS_TO_EXPIRY = 90` +
+			` MINS_TO_UNLOCK = 30` +
+			` MINS_TO_BYPASS_MFA = 60` +
+			` NETWORK_POLICY = 'MY_POLICY'` +
+			` DISABLE_MFA = TRUE`
 		assert.Equal(t, expected, got)
 	})
 
@@ -244,6 +262,34 @@ func TestBuildAlterUserStatements(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, stmts, 1)
 		assert.Equal(t, `ALTER USER "ALICE" SET DEFAULT_SECONDARY_ROLES = ('ALL')`, stmts[0])
+	})
+
+	t.Run("SetNewFields", func(t *testing.T) {
+		t.Parallel()
+		middle := "Marie"
+		days := int32(90)
+		minsUnlock := int32(30)
+		minsBypass := int32(60)
+		netPolicy := "MY_POLICY"
+		disableMFA := true
+		opts := AlterUserOptions{
+			Name:            NewAccountObjectIdentifier("ALICE"),
+			MiddleName:      &middle,
+			DaysToExpiry:    &days,
+			MinsToUnlock:    &minsUnlock,
+			MinsToBypassMFA: &minsBypass,
+			NetworkPolicy:   &netPolicy,
+			DisableMFA:      &disableMFA,
+		}
+		stmts, err := buildAlterUserStatements(opts)
+		require.NoError(t, err)
+		require.Len(t, stmts, 1)
+		assert.Contains(t, stmts[0], "MIDDLE_NAME = 'Marie'")
+		assert.Contains(t, stmts[0], "DAYS_TO_EXPIRY = 90")
+		assert.Contains(t, stmts[0], "MINS_TO_UNLOCK = 30")
+		assert.Contains(t, stmts[0], "MINS_TO_BYPASS_MFA = 60")
+		assert.Contains(t, stmts[0], "NETWORK_POLICY = 'MY_POLICY'")
+		assert.Contains(t, stmts[0], "DISABLE_MFA = TRUE")
 	})
 }
 
@@ -420,6 +466,48 @@ func TestAlterUserOptions_HasChanges(t *testing.T) {
 		t.Parallel()
 		v := true
 		opts := AlterUserOptions{Name: NewAccountObjectIdentifier("U"), MustChangePassword: &v}
+		assert.True(t, opts.HasChanges())
+	})
+
+	t.Run("MiddleNameSet", func(t *testing.T) {
+		t.Parallel()
+		v := "Marie"
+		opts := AlterUserOptions{Name: NewAccountObjectIdentifier("U"), MiddleName: &v}
+		assert.True(t, opts.HasChanges())
+	})
+
+	t.Run("DaysToExpirySet", func(t *testing.T) {
+		t.Parallel()
+		v := int32(90)
+		opts := AlterUserOptions{Name: NewAccountObjectIdentifier("U"), DaysToExpiry: &v}
+		assert.True(t, opts.HasChanges())
+	})
+
+	t.Run("MinsToUnlockSet", func(t *testing.T) {
+		t.Parallel()
+		v := int32(30)
+		opts := AlterUserOptions{Name: NewAccountObjectIdentifier("U"), MinsToUnlock: &v}
+		assert.True(t, opts.HasChanges())
+	})
+
+	t.Run("MinsToBypassMFASet", func(t *testing.T) {
+		t.Parallel()
+		v := int32(60)
+		opts := AlterUserOptions{Name: NewAccountObjectIdentifier("U"), MinsToBypassMFA: &v}
+		assert.True(t, opts.HasChanges())
+	})
+
+	t.Run("NetworkPolicySet", func(t *testing.T) {
+		t.Parallel()
+		v := "MY_POLICY"
+		opts := AlterUserOptions{Name: NewAccountObjectIdentifier("U"), NetworkPolicy: &v}
+		assert.True(t, opts.HasChanges())
+	})
+
+	t.Run("DisableMFASet", func(t *testing.T) {
+		t.Parallel()
+		v := true
+		opts := AlterUserOptions{Name: NewAccountObjectIdentifier("U"), DisableMFA: &v}
 		assert.True(t, opts.HasChanges())
 	})
 }

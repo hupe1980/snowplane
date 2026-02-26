@@ -952,6 +952,32 @@ func TestComputeTrackedParameters(t *testing.T) {
 	assert.Contains(t, fields, "COMMENT")
 }
 
+func TestComputeTrackedParameters_NewFields(t *testing.T) {
+	t.Parallel()
+
+	days := int32(90)
+	minsUnlock := int32(30)
+	minsBypass := int32(60)
+	disableMFA := true
+
+	spec := &snowplanev1alpha1.UserSpec{
+		MiddleName:      testutil.PtrString("Marie"),
+		DaysToExpiry:    &days,
+		MinsToUnlock:    &minsUnlock,
+		MinsToBypassMFA: &minsBypass,
+		NetworkPolicy:   testutil.PtrString("MY_POLICY"),
+		DisableMFA:      &disableMFA,
+	}
+
+	fields := computeTrackedParameters(spec)
+	assert.Contains(t, fields, "MIDDLE_NAME")
+	assert.Contains(t, fields, "DAYS_TO_EXPIRY")
+	assert.Contains(t, fields, "MINS_TO_UNLOCK")
+	assert.Contains(t, fields, "MINS_TO_BYPASS_MFA")
+	assert.Contains(t, fields, "NETWORK_POLICY")
+	assert.Contains(t, fields, "DISABLE_MFA")
+}
+
 func TestComputeTrackedParameters_Empty(t *testing.T) {
 	t.Parallel()
 
@@ -1016,6 +1042,30 @@ func TestComputeUnsetFields_NoTrackedParameters(t *testing.T) {
 	user.Status.TrackedParameters = nil
 	unset := computeUnsetFields(user)
 	assert.Nil(t, unset)
+}
+
+func TestComputeUnsetFields_NewFields(t *testing.T) {
+	t.Parallel()
+
+	user := newTestUser("test-user", "default")
+	user.Spec.MiddleName = nil
+	user.Spec.DaysToExpiry = nil
+	user.Spec.MinsToUnlock = nil
+	user.Spec.MinsToBypassMFA = nil
+	user.Spec.NetworkPolicy = nil
+	user.Spec.DisableMFA = nil
+	user.Status.TrackedParameters = []string{
+		"MIDDLE_NAME", "DAYS_TO_EXPIRY", "MINS_TO_UNLOCK",
+		"MINS_TO_BYPASS_MFA", "NETWORK_POLICY", "DISABLE_MFA",
+	}
+
+	unset := computeUnsetFields(user)
+	assert.Contains(t, unset, "MIDDLE_NAME")
+	assert.Contains(t, unset, "DAYS_TO_EXPIRY")
+	assert.Contains(t, unset, "MINS_TO_UNLOCK")
+	assert.Contains(t, unset, "MINS_TO_BYPASS_MFA")
+	assert.Contains(t, unset, "NETWORK_POLICY")
+	assert.Contains(t, unset, "DISABLE_MFA")
 }
 
 // --------------------------------------------------------------------------
