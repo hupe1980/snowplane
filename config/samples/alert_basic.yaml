@@ -1,0 +1,20 @@
+# Alert with minimal configuration.
+# Periodically evaluates a condition query and executes an action
+# when the condition returns rows.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Alert
+metadata:
+  name: my-alert
+  namespace: snowplane-system
+spec:
+  name: DATA_QUALITY_CHECK
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  warehouse: COMPUTE_WH
+  schedule: "5 MINUTE"
+  condition: "SELECT COUNT(*) FROM my_table WHERE status = 'ERROR' AND created_at > DATEADD('hour', -1, CURRENT_TIMESTAMP())"
+  action: "CALL alert_handler()"
+  providerRef:
+    name: default

@@ -62,12 +62,15 @@ rules:
   - databaseroles
   - accountrolegrants
   - databaserolegrants
+  - accountroleassignments
+  - databaseroleassignments
   - sharegrants
   - users
   - tables
   - views
   - stages
   - tasks
+  - alerts
   - streams
   - tags
   - networkpolicies
@@ -102,12 +105,15 @@ rules:
   - databaseroles/status
   - accountrolegrants/status
   - databaserolegrants/status
+  - accountroleassignments/status
+  - databaseroleassignments/status
   - sharegrants/status
   - users/status
   - tables/status
   - views/status
   - stages/status
   - tasks/status
+  - alerts/status
   - streams/status
   - tags/status
   - networkpolicies/status
@@ -138,12 +144,15 @@ rules:
   - databaseroles/finalizers
   - accountrolegrants/finalizers
   - databaserolegrants/finalizers
+  - accountroleassignments/finalizers
+  - databaseroleassignments/finalizers
   - sharegrants/finalizers
   - users/finalizers
   - tables/finalizers
   - views/finalizers
   - stages/finalizers
   - tasks/finalizers
+  - alerts/finalizers
   - streams/finalizers
   - tags/finalizers
   - networkpolicies/finalizers
@@ -231,12 +240,15 @@ rules:
   - databaseroles
   - accountrolegrants
   - databaserolegrants
+  - accountroleassignments
+  - databaseroleassignments
   - sharegrants
   - users
   - tables
   - views
   - stages
   - tasks
+  - alerts
   - streams
   - tags
   - networkpolicies
@@ -267,12 +279,15 @@ rules:
   - databaseroles/status
   - accountrolegrants/status
   - databaserolegrants/status
+  - accountroleassignments/status
+  - databaseroleassignments/status
   - sharegrants/status
   - users/status
   - tables/status
   - views/status
   - stages/status
   - tasks/status
+  - alerts/status
   - streams/status
   - tags/status
   - networkpolicies/status
@@ -311,12 +326,15 @@ rules:
   - databaseroles
   - accountrolegrants
   - databaserolegrants
+  - accountroleassignments
+  - databaseroleassignments
   - sharegrants
   - users
   - tables
   - views
   - stages
   - tasks
+  - alerts
   - streams
   - tags
   - networkpolicies
@@ -351,12 +369,15 @@ rules:
   - databaseroles/status
   - accountrolegrants/status
   - databaserolegrants/status
+  - accountroleassignments/status
+  - databaseroleassignments/status
   - sharegrants/status
   - users/status
   - tables/status
   - views/status
   - stages/status
   - tasks/status
+  - alerts/status
   - streams/status
   - tags/status
   - networkpolicies/status

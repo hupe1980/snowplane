@@ -46,6 +46,7 @@ All resource types support drift detection:
 | View | `name`, `database`, `schema` |
 | Stage | `name`, `database`, `schema`, `stageType` |
 | Task | `name`, `database`, `schema` |
+| Alert | `name`, `database`, `schema` |
 | Stream | `name`, `database`, `schema`, `sourceType`, `sourceName` |
 | Tag | `name`, `database`, `schema` |
 | NetworkPolicy | `name` |
@@ -129,6 +130,11 @@ Immutable violations require manual intervention — delete/recreate the CR.
 {: .text-delta }
 
 `comment`, `schedule`, `warehouse`, `sqlStatement`, `when`, `errorIntegration`, `allowOverlappingExecution`, `config` (from SHOW), plus `userTaskTimeoutMs`, `suspendTaskAfterNumFailures`, `taskAutoRetryAttempts`, `logLevel`, `userTaskMinimumTriggerIntervalInSeconds` (from SHOW PARAMETERS)
+
+### Alert
+{: .text-delta }
+
+`comment`, `schedule`, `warehouse`, `condition`, `action`
 
 ---
 

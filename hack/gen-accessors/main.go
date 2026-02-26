@@ -93,6 +93,7 @@ var types = []TypeDef{
 	{TypeName: "Stage", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "Stream", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "Task", Receiver: "t", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "Alert", Receiver: "a", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "View", Receiver: "v", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "Table", Receiver: "t", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
 

@@ -1,0 +1,27 @@
+# Alert with all optional fields configured.
+# Demonstrates scheduled alert with warehouse, comment, and initially resumed state.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Alert
+metadata:
+  name: my-alert-full
+  namespace: snowplane-system
+spec:
+  name: SLA_BREACH_MONITOR
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  warehouse: ALERT_WH
+  schedule: "USING CRON 0 */6 * * * America/New_York"
+  condition: >-
+    SELECT COUNT(*)
+    FROM orders
+    WHERE status = 'PENDING'
+      AND created_at < DATEADD('hour', -24, CURRENT_TIMESTAMP())
+  action: >-
+    CALL notify_sla_breach('orders', 24)
+  comment: "Monitors for SLA breaches on orders older than 24 hours"
+  suspend: false
+  providerRef:
+    name: default
+  deletionPolicy: Delete

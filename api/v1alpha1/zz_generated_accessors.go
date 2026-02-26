@@ -917,6 +917,82 @@ func (t *Task) SetTrackedParametersList(val []string) {
 }
 
 // ---------------------------------------------------------------------------
+// Alert
+// ---------------------------------------------------------------------------
+
+func (a *Alert) GetConditions() []metav1.Condition {
+	return a.Status.Conditions
+}
+
+func (a *Alert) SetConditions(conditions []metav1.Condition) {
+	a.Status.Conditions = conditions
+}
+
+func (a *Alert) GetDeletionPolicy() DeletionPolicy {
+	if a.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return a.Spec.DeletionPolicy
+}
+
+func (a *Alert) GetFullyQualifiedName() string {
+	return a.Status.FullyQualifiedName
+}
+
+func (a *Alert) GetProviderRef() ProviderReference {
+	return a.Spec.ProviderRef
+}
+
+func (a *Alert) GetSpecName() string {
+	return a.Spec.Name
+}
+
+func (a *Alert) GetUseRole() *string {
+	return a.Spec.UseRole
+}
+
+func (a *Alert) GetObservedGeneration() int64 {
+	return a.Status.ObservedGeneration
+}
+
+func (a *Alert) SetObservedGeneration(val int64) {
+	a.Status.ObservedGeneration = val
+}
+
+func (a *Alert) GetLastAppliedSpecHash() string {
+	return a.Status.LastAppliedSpecHash
+}
+
+func (a *Alert) SetLastAppliedSpecHash(val string) {
+	a.Status.LastAppliedSpecHash = val
+}
+
+func (a *Alert) ValidateSpec() error {
+	return a.Spec.Validate()
+}
+
+func (a *Alert) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(a.Spec)
+}
+
+func (a *Alert) GetOwner() string {
+	if a.Status.ShowOutput != nil {
+		return a.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (a *Alert) GetTrackedParametersList() []string {
+	return a.Status.TrackedParameters
+}
+
+func (a *Alert) SetTrackedParametersList(val []string) {
+	a.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
 // View
 // ---------------------------------------------------------------------------
 

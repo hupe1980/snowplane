@@ -1022,6 +1022,39 @@ func (s *TableSpec) Validate() error {
 	return errors.Join(errs...)
 }
 
+// Validate checks the AlertSpec for configuration errors.
+func (s *AlertSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	// Exactly one of databaseRef or databaseName must be set.
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Exactly one of schemaRef or schemaName must be set.
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.Condition == "" {
+		errs = append(errs, errors.New("spec.condition is required"))
+	}
+
+	if s.Action == "" {
+		errs = append(errs, errors.New("spec.action is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
 // Validate checks the TaskSpec for configuration errors.
 func (s *TaskSpec) Validate() error {
 	var errs []error
@@ -1519,6 +1552,7 @@ func (s *NetworkRuleSpec) Validate() error {
 //
 //nolint:gochecknoglobals // package-level constant set
 var ValidFieldExportSourceKinds = map[string]struct{}{
+	"Alert":                  {},
 	"Database":               {},
 	"Schema":                 {},
 	"Warehouse":              {},

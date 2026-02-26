@@ -22,6 +22,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/circuitbreaker"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	accountrolectl "github.com/hupe1980/snowplane/internal/controller/accountrole"
+	alertctl "github.com/hupe1980/snowplane/internal/controller/alert"
 	database "github.com/hupe1980/snowplane/internal/controller/database"
 	databaserolectl "github.com/hupe1980/snowplane/internal/controller/databaserole"
 	dynamictablectl "github.com/hupe1980/snowplane/internal/controller/dynamictable"
@@ -69,6 +70,7 @@ func init() {
 
 // validControllerNames is the set of controller names accepted by --disable-controllers.
 var validControllerNames = map[string]bool{
+	"alert":                  true,
 	"database":               true,
 	"schema":                 true,
 	"warehouse":              true,
@@ -162,7 +164,7 @@ func main() {
 		"Enable controllers for alpha-maturity CRDs. Set to false to skip alpha resources.")
 	flag.StringVar(&disableControllers, "disable-controllers", "",
 		"Comma-separated list of controller names to disable (e.g. \"accountrolegrant,stage,view\"). "+
-			"Valid names: database, schema, warehouse, accountrole, databaserole, accountrolegrant, databaserolegrant, sharegrant, user, table, view, stage, task, stream, tag, networkpolicy, resourcemonitor, maskingpolicy, rowaccesspolicy, grantownership, fieldexport, storageintegration, fileformat, pipe, dynamictable, securityintegration, passwordpolicy, networkrule, accountroleassignment, databaseroleassignment.")
+			"Valid names: alert, database, schema, warehouse, accountrole, databaserole, accountrolegrant, databaserolegrant, sharegrant, user, table, view, stage, task, stream, tag, networkpolicy, resourcemonitor, maskingpolicy, rowaccesspolicy, grantownership, fieldexport, storageintegration, fileformat, pipe, dynamictable, securityintegration, passwordpolicy, networkrule, accountroleassignment, databaseroleassignment.")
 	flag.StringVar(&watchNamespaces, "watch-namespaces", "",
 		"Comma-separated list of namespaces to watch. If empty, all namespaces are watched.")
 	flag.StringVar(&leaderElectionID, "leader-election-id", "snowplane-leader-election",
@@ -274,6 +276,7 @@ func main() {
 		name string
 		ctrl reconciler.Registerable
 	}{
+		{"alert", alertctl.NewReconciler(kc, factory, controllerRec("alert"), rl)},
 		{"database", database.NewReconciler(kc, factory, controllerRec("database"), rl)},
 		{"schema", schemactl.NewReconciler(kc, factory, controllerRec("schema"), rl)},
 		{"warehouse", warehousectl.NewReconciler(kc, factory, controllerRec("warehouse"), rl)},

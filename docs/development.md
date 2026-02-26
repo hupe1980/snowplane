@@ -190,7 +190,7 @@ Per-provider failure isolation. Opens after 5 consecutive failures, probes after
 
 ### CEL Validation Rules
 
-All 31 CRD types include `x-kubernetes-validations` rules — evaluated server-side on UPDATE, no webhook required. Covers immutable fields, schema defaults, policy body blocklists, mutual exclusion, and auth validation.
+All 32 CRD types include `x-kubernetes-validations` rules — evaluated server-side on UPDATE, no webhook required. Covers immutable fields, schema defaults, policy body blocklists, mutual exclusion, and auth validation.
 
 ### Resource Adoption
 

@@ -16,14 +16,14 @@
 
 ## ✨ Features
 
-### 🏗️ Resource Management (30 CRDs)
+### 🏗️ Resource Management (31 CRDs)
 
 | Category | Resources |
 |----------|-----------|
 | 🗄️ **Core Infrastructure** | Database, Schema, Warehouse |
 | 📊 **Data Objects** | Table, View, Stage, Stream, DynamicTable, FileFormat, Pipe |
 | 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
-| ⏰ **Orchestration** | Task (DAG scheduling, serverless or warehouse-backed) |
+| ⏰ **Orchestration** | Task (DAG scheduling, serverless or warehouse-backed), Alert (condition-based monitoring & notification) |
 | 🔗 **Integrations** | StorageIntegration, SecurityIntegration |
 | 🛡️ **Security & Governance** | NetworkPolicy, NetworkRule, PasswordPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
 | 📤 **Utilities** | FieldExport (copy status fields into ConfigMaps/Secrets) |
@@ -617,7 +617,28 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 </details>
 
 <details>
-<summary>🔄 <strong>Stream</strong></summary>
+<summary>� <strong>Alert</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Alert name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.condition` | `string` | SQL condition query (evaluated inside `IF(EXISTS(...))`) |
+| `spec.action` | `string` | SQL statement executed when condition is true |
+| `spec.schedule` | `*string` | Cron or interval schedule (e.g. `10 MINUTE`) — omit for streaming alerts |
+| `spec.warehouse` | `*string` | Warehouse for alert execution — omit for serverless |
+| `spec.suspend` | `*bool` | Whether the alert is suspended (default: `true`) |
+| `spec.comment` | `*string` | Optional description |
+
+> 🔔 **Monitoring:** Alerts periodically evaluate a condition query and execute an action when the condition returns rows. Use for monitoring data quality, anomaly detection, or triggering notification procedures.
+
+> ⚠️ **Security:** The `condition` and `action` fields are embedded into SQL statements. Ensure RBAC restricts Alert CR access to trusted principals.
+
+</details>
+
+<details>
+<summary>�🔄 <strong>Stream</strong></summary>
 
 | Field | Type | Description |
 |-------|------|-------------|
