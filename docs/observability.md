@@ -169,7 +169,7 @@ All log output is sanitized:
 |:-------|:------------|
 | `DriftDetected` | Out-of-band change detected |
 | `ReconcileError` | Transient error (will be retried) |
-| `TerminalError` | Non-retryable error |
+| `TerminalError` | Non-retryable error (reconciliation stopped, no further requeues) |
 | `DependencyNotReady` | ProviderConfig or parent not ready |
 | `ImmutableField` | Attempt to modify an immutable field |
 | `ConflictDetected` | Another CR manages the same Snowflake object |

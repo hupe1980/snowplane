@@ -125,8 +125,6 @@ func buildCreateStreamSQL(opts CreateStreamOptions) string {
 	b.WriteString("CREATE STREAM IF NOT EXISTS ")
 	b.WriteString(opts.Name.FullyQualifiedName())
 
-	b.SetString("COMMENT", opts.Comment)
-
 	b.WriteString(" ON ")
 	b.WriteString(sourceTypeKeyword(opts.SourceType))
 	b.WriteString(" ")
@@ -143,6 +141,9 @@ func buildCreateStreamSQL(opts CreateStreamOptions) string {
 	if opts.ShowInitialRows != nil && *opts.ShowInitialRows {
 		b.WriteString(" SHOW_INITIAL_ROWS = TRUE")
 	}
+
+	// COMMENT must appear after ON <source> and mode options per Snowflake syntax.
+	b.SetString("COMMENT", opts.Comment)
 
 	return b.String()
 }

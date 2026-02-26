@@ -85,19 +85,31 @@ func applyObservation(task *snowplanev1alpha1.Task, obs *snowflake.TaskObservati
 		task.Status.SchemaName = obs.ShowOutput.SchemaName
 
 		task.Status.ShowOutput = &snowplanev1alpha1.TaskShowOutput{
-			CreatedOn:        obs.ShowOutput.CreatedOn,
-			Name:             obs.ShowOutput.Name,
-			DatabaseName:     obs.ShowOutput.DatabaseName,
-			SchemaName:       obs.ShowOutput.SchemaName,
-			Owner:            obs.ShowOutput.Owner,
-			Comment:          obs.ShowOutput.Comment,
-			Warehouse:        obs.ShowOutput.Warehouse,
-			Schedule:         obs.ShowOutput.Schedule,
-			State:            obs.ShowOutput.State,
-			Definition:       obs.ShowOutput.Definition,
-			Condition:        obs.ShowOutput.Condition,
-			Predecessors:     obs.ShowOutput.Predecessors,
-			ErrorIntegration: obs.ShowOutput.ErrorIntegration,
+			CreatedOn:                 obs.ShowOutput.CreatedOn,
+			Name:                      obs.ShowOutput.Name,
+			DatabaseName:              obs.ShowOutput.DatabaseName,
+			SchemaName:                obs.ShowOutput.SchemaName,
+			Owner:                     obs.ShowOutput.Owner,
+			Comment:                   obs.ShowOutput.Comment,
+			Warehouse:                 obs.ShowOutput.Warehouse,
+			Schedule:                  obs.ShowOutput.Schedule,
+			State:                     obs.ShowOutput.State,
+			Definition:                obs.ShowOutput.Definition,
+			Condition:                 obs.ShowOutput.Condition,
+			Predecessors:              obs.ShowOutput.Predecessors,
+			ErrorIntegration:          obs.ShowOutput.ErrorIntegration,
+			AllowOverlappingExecution: obs.ShowOutput.AllowOverlappingExecution,
+			Config:                    obs.ShowOutput.Config,
+		}
+	}
+
+	if obs.Parameters != nil {
+		task.Status.Parameters = &snowplanev1alpha1.TaskParameters{
+			UserTaskTimeoutMs:                       obs.Parameters.UserTaskTimeoutMs,
+			SuspendTaskAfterNumFailures:             obs.Parameters.SuspendTaskAfterNumFailures,
+			TaskAutoRetryAttempts:                   obs.Parameters.TaskAutoRetryAttempts,
+			LogLevel:                                obs.Parameters.LogLevel,
+			UserTaskMinimumTriggerIntervalInSeconds: obs.Parameters.UserTaskMinimumTriggerIntervalInSeconds,
 		}
 	}
 }
@@ -170,11 +182,15 @@ func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectId
 	}
 
 	if task.Spec.UserTaskTimeoutMs != nil {
-		opts.UserTaskTimeoutMs = task.Spec.UserTaskTimeoutMs
+		if obs.Parameters == nil || obs.Parameters.UserTaskTimeoutMs == nil || *task.Spec.UserTaskTimeoutMs != *obs.Parameters.UserTaskTimeoutMs {
+			opts.UserTaskTimeoutMs = task.Spec.UserTaskTimeoutMs
+		}
 	}
 
 	if task.Spec.SuspendTaskAfterNumFailures != nil {
-		opts.SuspendTaskAfterNumFailures = task.Spec.SuspendTaskAfterNumFailures
+		if obs.Parameters == nil || obs.Parameters.SuspendTaskAfterNumFailures == nil || *task.Spec.SuspendTaskAfterNumFailures != *obs.Parameters.SuspendTaskAfterNumFailures {
+			opts.SuspendTaskAfterNumFailures = task.Spec.SuspendTaskAfterNumFailures
+		}
 	}
 
 	if task.Spec.ErrorIntegration != nil {
@@ -184,19 +200,26 @@ func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectId
 	}
 
 	if task.Spec.SuccessIntegration != nil {
+		// SuccessIntegration is not exposed in SHOW TASKS output, so always include when set.
 		opts.SuccessIntegration = task.Spec.SuccessIntegration
 	}
 
 	if task.Spec.AllowOverlappingExecution != nil {
-		opts.AllowOverlappingExecution = task.Spec.AllowOverlappingExecution
+		if obs.ShowOutput == nil || *task.Spec.AllowOverlappingExecution != obs.ShowOutput.AllowOverlappingExecution {
+			opts.AllowOverlappingExecution = task.Spec.AllowOverlappingExecution
+		}
 	}
 
 	if task.Spec.TaskAutoRetryAttempts != nil {
-		opts.TaskAutoRetryAttempts = task.Spec.TaskAutoRetryAttempts
+		if obs.Parameters == nil || obs.Parameters.TaskAutoRetryAttempts == nil || *task.Spec.TaskAutoRetryAttempts != *obs.Parameters.TaskAutoRetryAttempts {
+			opts.TaskAutoRetryAttempts = task.Spec.TaskAutoRetryAttempts
+		}
 	}
 
 	if task.Spec.Config != nil {
-		opts.Config = task.Spec.Config
+		if obs.ShowOutput == nil || *task.Spec.Config != obs.ShowOutput.Config {
+			opts.Config = task.Spec.Config
+		}
 	}
 
 	// Finalize — uses dedicated SET/UNSET FINALIZE.
@@ -212,11 +235,15 @@ func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectId
 	}
 
 	if task.Spec.LogLevel != nil {
-		opts.LogLevel = task.Spec.LogLevel
+		if obs.Parameters == nil || *task.Spec.LogLevel != obs.Parameters.LogLevel {
+			opts.LogLevel = task.Spec.LogLevel
+		}
 	}
 
 	if task.Spec.UserTaskMinimumTriggerIntervalInSeconds != nil {
-		opts.UserTaskMinimumTriggerIntervalInSeconds = task.Spec.UserTaskMinimumTriggerIntervalInSeconds
+		if obs.Parameters == nil || obs.Parameters.UserTaskMinimumTriggerIntervalInSeconds == nil || *task.Spec.UserTaskMinimumTriggerIntervalInSeconds != *obs.Parameters.UserTaskMinimumTriggerIntervalInSeconds {
+			opts.UserTaskMinimumTriggerIntervalInSeconds = task.Spec.UserTaskMinimumTriggerIntervalInSeconds
+		}
 	}
 
 	if task.Spec.TargetCompletionInterval != nil {
@@ -394,7 +421,7 @@ func detectDrift(task *snowplanev1alpha1.Task, obs *snowflake.TaskObservation) *
 		d.CompareStringValueFold("DATABASE", snowflake.ParseDatabaseNameFromFQN(task.Status.DatabaseName), obs.ShowOutput.DatabaseName, true)
 		d.CompareStringValueFold("SCHEMA", snowflake.ParseSchemaNameFromFQN(task.Status.SchemaName), obs.ShowOutput.SchemaName, true)
 
-		// Mutable fields.
+		// Mutable fields from SHOW output.
 		d.CompareString("COMMENT", task.Spec.Comment, obs.ShowOutput.Comment, false)
 		d.CompareString("SCHEDULE", task.Spec.Schedule, obs.ShowOutput.Schedule, false)
 		d.CompareString("WAREHOUSE", task.Spec.Warehouse, obs.ShowOutput.Warehouse, false)
@@ -402,6 +429,22 @@ func detectDrift(task *snowplanev1alpha1.Task, obs *snowflake.TaskObservation) *
 		d.CompareStringValue("SQL_STATEMENT", task.Spec.SQLStatement, obs.ShowOutput.Definition, false)
 		d.CompareString("WHEN", task.Spec.When, obs.ShowOutput.Condition, false)
 		d.CompareString("ERROR_INTEGRATION", task.Spec.ErrorIntegration, obs.ShowOutput.ErrorIntegration, false)
+
+		// AllowOverlappingExecution: spec is *bool, observed is plain bool.
+		if task.Spec.AllowOverlappingExecution != nil {
+			d.CompareBoolValue("ALLOW_OVERLAPPING_EXECUTION", *task.Spec.AllowOverlappingExecution, obs.ShowOutput.AllowOverlappingExecution, false)
+		}
+
+		d.CompareString("CONFIG", task.Spec.Config, obs.ShowOutput.Config, false)
+	}
+
+	if obs.Parameters != nil {
+		// Mutable fields from SHOW PARAMETERS.
+		d.CompareInt32("USER_TASK_TIMEOUT_MS", task.Spec.UserTaskTimeoutMs, obs.Parameters.UserTaskTimeoutMs, false)
+		d.CompareInt32("SUSPEND_TASK_AFTER_NUM_FAILURES", task.Spec.SuspendTaskAfterNumFailures, obs.Parameters.SuspendTaskAfterNumFailures, false)
+		d.CompareInt32("TASK_AUTO_RETRY_ATTEMPTS", task.Spec.TaskAutoRetryAttempts, obs.Parameters.TaskAutoRetryAttempts, false)
+		d.CompareString("LOG_LEVEL", task.Spec.LogLevel, obs.Parameters.LogLevel, false)
+		d.CompareInt32("USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS", task.Spec.UserTaskMinimumTriggerIntervalInSeconds, obs.Parameters.UserTaskMinimumTriggerIntervalInSeconds, false)
 	}
 
 	return d.Result()

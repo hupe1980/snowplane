@@ -359,7 +359,7 @@ func buildCreateTableSQL(opts CreateTableOptions) string {
 	if len(opts.ClusterBy) > 0 {
 		quoted := make([]string, len(opts.ClusterBy))
 		for i, c := range opts.ClusterBy {
-			quoted[i] = sqlbuilder.QuoteIdentifier(c)
+			quoted[i] = sqlbuilder.QuoteIdentifierOrExpression(c)
 		}
 
 		fmt.Fprintf(&b.Builder, " CLUSTER BY (%s)", strings.Join(quoted, ", "))
@@ -399,7 +399,7 @@ func buildAlterTableStatements(opts AlterTableOptions) ([]string, error) {
 	} else if len(opts.ClusterBy) > 0 {
 		quoted := make([]string, len(opts.ClusterBy))
 		for i, c := range opts.ClusterBy {
-			quoted[i] = sqlbuilder.QuoteIdentifier(c)
+			quoted[i] = sqlbuilder.QuoteIdentifierOrExpression(c)
 		}
 
 		statements = append(statements, fmt.Sprintf("ALTER TABLE %s CLUSTER BY (%s)",

@@ -53,6 +53,34 @@ func QuoteIdentifier(name string) string {
 	return fmt.Sprintf(`"%s"`, strings.ReplaceAll(name, `"`, `""`))
 }
 
+// IsExpressionLike returns true when s appears to be a SQL expression rather
+// than a plain column name.  It checks for characters that indicate function
+// calls, arithmetic, or multi-value lists:  parentheses, arithmetic operators
+// (+, *, /), and the comma separator.
+//
+// Note: hyphens (-) are NOT included because they are valid in Snowflake
+// identifiers (e.g. "my-column").  The subtraction operator typically appears
+// alongside parentheses or spaces (e.g. "col1 - col2"), which are caught
+// by other characters.  A bare "a-b" is ambiguous but treating it as an
+// identifier is the safer default — incorrect quoting is easily visible,
+// whereas silently emitting an unquoted identifier as an expression
+// causes hard-to-debug errors.
+func IsExpressionLike(s string) bool {
+	return strings.ContainsAny(s, "()+*/,")
+}
+
+// QuoteIdentifierOrExpression quotes simple column names but passes
+// expression-like values through unmodified.  Use for CLUSTER BY clauses
+// where the value may be either a column name (DATE_COL) or an expression
+// (TO_DATE(col)).
+func QuoteIdentifierOrExpression(s string) string {
+	if IsExpressionLike(s) {
+		return s
+	}
+
+	return QuoteIdentifier(s)
+}
+
 // QuoteIdentifierParts quotes a multi-part identifier by splitting on "."
 // and quoting each component individually.
 // Examples:

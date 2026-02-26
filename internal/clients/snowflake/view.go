@@ -208,12 +208,12 @@ func (v *ViewClient) Alter(ctx context.Context, opts AlterViewOptions) error {
 		rs := opts.ReplaceStatement
 
 		createOpts := CreateViewOptions{
-			Name:           opts.Name,
-			Statement:      rs.Statement,
-			Secure:         rs.Secure,
-			Comment:        rs.Comment,
-			ChangeTracking: rs.ChangeTracking,
-			OrReplace:      true,
+			Name:             opts.Name,
+			Statement:        rs.Statement,
+			Secure:           rs.Secure,
+			Comment:          rs.Comment,
+			ChangeTracking:   rs.ChangeTracking,
+			UseCreateOrAlter: true,
 		}
 
 		if _, err := v.client.Exec(ctx, buildCreateViewSQL(createOpts)); err != nil {

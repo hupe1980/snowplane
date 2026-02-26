@@ -33,7 +33,7 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			SourceName: `"DB"."SCH"."EXT_TBL"`,
 		}
 		got := buildCreateStreamSQL(opts)
-		assert.Contains(t, got, "ON EXTERNAL TABLE")
+		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON EXTERNAL TABLE "DB"."SCH"."EXT_TBL"`, got)
 	})
 
 	t.Run("DynamicTableStream", func(t *testing.T) {
@@ -44,7 +44,7 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			SourceName: `"DB"."SCH"."DYN_TBL"`,
 		}
 		got := buildCreateStreamSQL(opts)
-		assert.Contains(t, got, "ON DYNAMIC TABLE")
+		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON DYNAMIC TABLE "DB"."SCH"."DYN_TBL"`, got)
 	})
 
 	t.Run("ViewStream", func(t *testing.T) {
@@ -55,7 +55,7 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			SourceName: `"DB"."SCH"."MY_VIEW"`,
 		}
 		got := buildCreateStreamSQL(opts)
-		assert.Contains(t, got, "ON VIEW")
+		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON VIEW "DB"."SCH"."MY_VIEW"`, got)
 	})
 
 	t.Run("StageStream", func(t *testing.T) {
@@ -66,7 +66,7 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			SourceName: `"DB"."SCH"."MY_STAGE"`,
 		}
 		got := buildCreateStreamSQL(opts)
-		assert.Contains(t, got, "ON STAGE")
+		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON STAGE "DB"."SCH"."MY_STAGE"`, got)
 	})
 
 	t.Run("WithAllOptions", func(t *testing.T) {
@@ -81,9 +81,8 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			Comment:         &comment,
 		}
 		got := buildCreateStreamSQL(opts)
-		assert.Contains(t, got, "COMMENT = 'my stream'")
-		assert.Contains(t, got, "APPEND_ONLY = TRUE")
-		assert.Contains(t, got, "SHOW_INITIAL_ROWS = TRUE")
+		// COMMENT must come AFTER ON <source> and mode options per Snowflake syntax.
+		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON TABLE "DB"."SCH"."T" APPEND_ONLY = TRUE SHOW_INITIAL_ROWS = TRUE COMMENT = 'my stream'`, got)
 	})
 
 	t.Run("InsertOnly", func(t *testing.T) {
@@ -95,7 +94,7 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			InsertOnly: boolPtr(true),
 		}
 		got := buildCreateStreamSQL(opts)
-		assert.Contains(t, got, "INSERT_ONLY = TRUE")
+		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON EXTERNAL TABLE "DB"."SCH"."E" INSERT_ONLY = TRUE`, got)
 	})
 
 	t.Run("FalseFlags", func(t *testing.T) {
@@ -107,7 +106,21 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			AppendOnly: boolPtr(false),
 		}
 		got := buildCreateStreamSQL(opts)
-		assert.NotContains(t, got, "APPEND_ONLY")
+		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON TABLE "DB"."SCH"."T"`, got)
+	})
+
+	t.Run("CommentOrderingAfterModeOptions", func(t *testing.T) {
+		t.Parallel()
+		comment := "test"
+		opts := CreateStreamOptions{
+			Name:       NewSchemaObjectIdentifier("DB", "SCH", "S"),
+			SourceType: StreamSourceTable,
+			SourceName: `"DB"."SCH"."T"`,
+			Comment:    &comment,
+		}
+		got := buildCreateStreamSQL(opts)
+		// Verify COMMENT appears after ON TABLE, not before.
+		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON TABLE "DB"."SCH"."T" COMMENT = 'test'`, got)
 	})
 }
 

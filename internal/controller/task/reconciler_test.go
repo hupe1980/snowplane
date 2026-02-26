@@ -103,6 +103,7 @@ func successfulObservation() *snowflake.TaskObservation {
 			Definition:   "SELECT 1",
 			Condition:    "",
 		},
+		Parameters: &snowflake.TaskParameters{},
 	}
 }
 

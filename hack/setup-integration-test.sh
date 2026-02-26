@@ -92,12 +92,16 @@ CREATE ROLE IF NOT EXISTS ${TEST_ROLE}
   COMMENT = 'Role for Snowplane integration tests';
 
 -- 2. Grant necessary privileges to the test role
---    The operator needs to manage databases, schemas, warehouses, users, roles, grants
-GRANT CREATE DATABASE   ON ACCOUNT TO ROLE ${TEST_ROLE};
-GRANT CREATE WAREHOUSE  ON ACCOUNT TO ROLE ${TEST_ROLE};
-GRANT CREATE ROLE       ON ACCOUNT TO ROLE ${TEST_ROLE};
-GRANT CREATE USER       ON ACCOUNT TO ROLE ${TEST_ROLE};
-GRANT MANAGE GRANTS     ON ACCOUNT TO ROLE ${TEST_ROLE};
+--    The operator needs to manage databases, schemas, warehouses, users, roles,
+--    grants, network policies, and tasks
+GRANT CREATE DATABASE       ON ACCOUNT TO ROLE ${TEST_ROLE};
+GRANT CREATE WAREHOUSE      ON ACCOUNT TO ROLE ${TEST_ROLE};
+GRANT CREATE ROLE           ON ACCOUNT TO ROLE ${TEST_ROLE};
+GRANT CREATE USER           ON ACCOUNT TO ROLE ${TEST_ROLE};
+GRANT MANAGE GRANTS         ON ACCOUNT TO ROLE ${TEST_ROLE};
+GRANT CREATE NETWORK POLICY ON ACCOUNT TO ROLE ${TEST_ROLE};
+GRANT EXECUTE TASK          ON ACCOUNT TO ROLE ${TEST_ROLE};
+GRANT EXECUTE MANAGED TASK  ON ACCOUNT TO ROLE ${TEST_ROLE};
 
 -- 4. Create the test user with key pair authentication
 CREATE USER IF NOT EXISTS ${TEST_USER}

@@ -269,8 +269,7 @@ func TestReconcile_CreateTerminalError(t *testing.T) {
 	r := newTestReconciler(mock, nr, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mynr", "default"))
-	require.Error(t, err)
-	assert.True(t, snowflake.IsTerminalError(err))
+	require.NoError(t, err)
 }
 
 // --------------------------------------------------------------------------

@@ -239,6 +239,10 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 			return ctrl.Result{}, nil
 		}
 
+		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonReconcileError,
+			fmt.Sprintf("provider resolution failed: %v", err))
+		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonReconcileError,
+			fmt.Sprintf("provider resolution failed: %v", err))
 		r.bestEffortPatchStatus(ctx, obj)
 
 		return ctrl.Result{}, err
@@ -265,6 +269,8 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 			resName := r.Adapter.ResourceName()
 			r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonTerminalError,
 				fmt.Sprintf("Terminal error setting up service client for %s %q: %v", resName, obj.GetSpecName(), err))
+
+			return ctrl.Result{}, nil // Terminal — do not requeue; conditions already set.
 		}
 
 		return ctrl.Result{}, err
@@ -409,10 +415,45 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 
 	logger.V(1).Info("executing Snowflake CREATE", "resource", resName, "name", obj.GetSpecName())
 
+	useCoA := r.Adapter.SupportsCreateOrAlter() && snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
+
 	if err := r.executeSnowflakeOp(ctx, opCtx, obj, "create", "create", func() error {
 		return r.Adapter.Create(opCtx, svc, obj, id)
 	}); err != nil {
-		return ctrl.Result{}, err
+		// Graceful fallback: if CREATE OR ALTER is not supported for this
+		// resource type on the current Snowflake account, disable the
+		// annotation and retry with plain CREATE ... IF NOT EXISTS.
+		if useCoA && isCreateOrAlterUnsupported(err) {
+			logger.Info("CREATE OR ALTER not supported for new resource, falling back to CREATE IF NOT EXISTS", "resource", resName, "name", obj.GetSpecName())
+
+			r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonCreateOrAlterFallback,
+				fmt.Sprintf("CREATE OR ALTER not supported for %s %q, falling back to CREATE IF NOT EXISTS", resName, obj.GetSpecName()))
+
+			// Temporarily disable the annotation for the retry.
+			ann := obj.GetAnnotations()
+			if ann == nil {
+				ann = make(map[string]string)
+			}
+
+			ann[snowplanev1alpha1.AnnotationUseCreateOrAlter] = "false"
+			obj.SetAnnotations(ann)
+
+			if err := r.executeSnowflakeOp(ctx, opCtx, obj, "create", "create", func() error {
+				return r.Adapter.Create(opCtx, svc, obj, id)
+			}); err != nil {
+				if snowflake.IsTerminalError(err) {
+					return ctrl.Result{}, nil // Terminal — do not requeue; conditions already set.
+				}
+
+				return ctrl.Result{}, err
+			}
+		} else {
+			if snowflake.IsTerminalError(err) {
+				return ctrl.Result{}, nil // Terminal — do not requeue; conditions already set.
+			}
+
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Post-create observation.
@@ -478,10 +519,10 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 	alterOpts, err := r.Adapter.BuildAlterOptions(ctx, obj, id, obs)
 	if err != nil {
 		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonTerminalError, err.Error())
-		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonReconcileError, err.Error())
+		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonTerminalError, err.Error())
 		r.bestEffortPatchStatus(ctx, obj)
 
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil // Terminal — do not requeue; conditions already set.
 	}
 
 	altered := false
@@ -577,9 +618,17 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 					if err := r.executeSnowflakeOp(ctx, opCtx, obj, "alter", "alter", func() error {
 						return r.Adapter.Alter(opCtx, svc, alterOpts)
 					}); err != nil {
+						if snowflake.IsTerminalError(err) {
+							return ctrl.Result{}, nil // Terminal — do not requeue; conditions already set.
+						}
+
 						return ctrl.Result{}, err
 					}
 				} else {
+					if snowflake.IsTerminalError(err) {
+						return ctrl.Result{}, nil // Terminal — do not requeue; conditions already set.
+					}
+
 					return ctrl.Result{}, err
 				}
 			}
@@ -601,6 +650,10 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 			if err := r.executeSnowflakeOp(ctx, opCtx, obj, "alter", "alter", func() error {
 				return r.Adapter.Alter(opCtx, svc, alterOpts)
 			}); err != nil {
+				if snowflake.IsTerminalError(err) {
+					return ctrl.Result{}, nil // Terminal — do not requeue; conditions already set.
+				}
+
 				return ctrl.Result{}, err
 			}
 		}
@@ -942,7 +995,13 @@ func (r *GenericReconciler[T, S, D]) executeSnowflakeOp(
 				fmt.Sprintf("Failed to %s %s %q: %v", opVerb, resName, obj.GetSpecName(), err))
 		}
 
-		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonReconcileError, err.Error())
+		// L-11: Use matching reason for Synced condition.
+		if snowflake.IsTerminalError(err) {
+			conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonTerminalError, err.Error())
+		} else {
+			conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonReconcileError, err.Error())
+		}
+
 		r.bestEffortPatchStatus(ctx, obj)
 
 		return err

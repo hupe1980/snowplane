@@ -242,6 +242,13 @@ func TestBuildShowTaskByIDSQL(t *testing.T) {
 	assert.Contains(t, got, `IN SCHEMA "MY_DB"."MY_SCHEMA"`)
 }
 
+func TestBuildShowTaskParametersSQL(t *testing.T) {
+	t.Parallel()
+
+	got := buildShowTaskParametersSQL(NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_TASK"))
+	assert.Equal(t, `SHOW PARAMETERS IN TASK "MY_DB"."MY_SCHEMA"."MY_TASK"`, got)
+}
+
 // --------------------------------------------------------------------------
 // Validation tests
 // --------------------------------------------------------------------------

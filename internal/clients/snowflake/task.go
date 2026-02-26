@@ -17,23 +17,37 @@ type TaskObservation struct {
 
 	// ShowOutput contains the SHOW TASKS row.
 	ShowOutput *TaskShowOutput
+
+	// Parameters contains the task-level parameters from SHOW PARAMETERS IN TASK.
+	Parameters *TaskParameters
 }
 
 // TaskShowOutput contains the fields from SHOW TASKS.
 type TaskShowOutput struct {
-	CreatedOn        string
-	Name             string
-	DatabaseName     string
-	SchemaName       string
-	Owner            string
-	Comment          string
-	Warehouse        string
-	Schedule         string
-	State            string // started, suspended
-	Definition       string
-	Condition        string
-	Predecessors     string
-	ErrorIntegration string
+	CreatedOn                 string
+	Name                      string
+	DatabaseName              string
+	SchemaName                string
+	Owner                     string
+	Comment                   string
+	Warehouse                 string
+	Schedule                  string
+	State                     string // started, suspended
+	Definition                string
+	Condition                 string
+	Predecessors              string
+	ErrorIntegration          string
+	AllowOverlappingExecution bool
+	Config                    string
+}
+
+// TaskParameters contains relevant task parameters from SHOW PARAMETERS IN TASK.
+type TaskParameters struct {
+	UserTaskTimeoutMs                       *int32
+	SuspendTaskAfterNumFailures             *int32
+	TaskAutoRetryAttempts                   *int32
+	LogLevel                                string
+	UserTaskMinimumTriggerIntervalInSeconds *int32
 }
 
 // CreateTaskOptions holds the parameters for creating a task.
@@ -450,7 +464,7 @@ func (t *TaskClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) 
 	return scanTaskShowOutput(rows, name.Name())
 }
 
-// Observe combines ShowByID into a TaskObservation.
+// Observe combines ShowByID and ShowParameters into a TaskObservation.
 func (t *TaskClient) Observe(ctx context.Context, name SchemaObjectIdentifier) (*TaskObservation, error) {
 	show, err := t.ShowByID(ctx, name)
 	if err != nil {
@@ -461,9 +475,15 @@ func (t *TaskClient) Observe(ctx context.Context, name SchemaObjectIdentifier) (
 		return nil, err
 	}
 
+	params, err := t.ShowParameters(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
 	return &TaskObservation{
 		Exists:     true,
 		ShowOutput: show,
+		Parameters: params,
 	}, nil
 }
 
@@ -498,19 +518,21 @@ func scanTaskShowOutput(rows *sql.Rows, name string) (*TaskShowOutput, error) {
 		}
 
 		return &TaskShowOutput{
-			CreatedOn:        colMap["created_on"],
-			Name:             colMap["name"],
-			DatabaseName:     colMap["database_name"],
-			SchemaName:       colMap["schema_name"],
-			Owner:            colMap["owner"],
-			Comment:          colMap["comment"],
-			Warehouse:        colMap["warehouse"],
-			Schedule:         colMap["schedule"],
-			State:            colMap["state"],
-			Definition:       colMap["definition"],
-			Condition:        colMap["condition"],
-			Predecessors:     colMap["predecessors"],
-			ErrorIntegration: colMap["error_integration"],
+			CreatedOn:                 colMap["created_on"],
+			Name:                      colMap["name"],
+			DatabaseName:              colMap["database_name"],
+			SchemaName:                colMap["schema_name"],
+			Owner:                     colMap["owner"],
+			Comment:                   colMap["comment"],
+			Warehouse:                 colMap["warehouse"],
+			Schedule:                  colMap["schedule"],
+			State:                     colMap["state"],
+			Definition:                colMap["definition"],
+			Condition:                 colMap["condition"],
+			Predecessors:              colMap["predecessors"],
+			ErrorIntegration:          colMap["error_integration"],
+			AllowOverlappingExecution: strings.EqualFold(colMap["allow_overlapping_execution"], "true"),
+			Config:                    colMap["config"],
 		}, nil
 	}
 
@@ -519,4 +541,84 @@ func scanTaskShowOutput(rows *sql.Rows, name string) (*TaskShowOutput, error) {
 	}
 
 	return nil, ErrObjectNotFound
+}
+
+// buildShowTaskParametersSQL builds the SHOW PARAMETERS IN TASK SQL statement.
+func buildShowTaskParametersSQL(name SchemaObjectIdentifier) string {
+	return sqlbuilder.ShowParameters("TASK", name.FullyQualifiedName())
+}
+
+// ShowParameters queries SHOW PARAMETERS IN TASK for a specific task.
+func (t *TaskClient) ShowParameters(ctx context.Context, name SchemaObjectIdentifier) (*TaskParameters, error) {
+	if !ValidObjectIdentifier(name) {
+		return nil, NewTerminalError(fmt.Errorf("task name is required"))
+	}
+
+	rows, err := t.client.Query(ctx, buildShowTaskParametersSQL(name))
+	if err != nil {
+		return nil, fmt.Errorf("showing parameters for task %s: %w", name, err)
+	}
+	defer closeRows(rows)
+
+	return scanTaskParameters(rows)
+}
+
+// scanTaskParameters parses SHOW PARAMETERS results into TaskParameters.
+func scanTaskParameters(rows *sql.Rows) (*TaskParameters, error) {
+	params := &TaskParameters{}
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("reading columns: %w", err)
+	}
+
+	for rows.Next() {
+		values := make([]sql.NullString, len(cols))
+		ptrs := make([]any, len(cols))
+
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, fmt.Errorf("scanning parameter row: %w", err)
+		}
+
+		colMap := make(map[string]string, len(cols))
+		for i, col := range cols {
+			if values[i].Valid {
+				colMap[col] = values[i].String
+			}
+		}
+
+		key := strings.ToUpper(colMap["key"])
+		val := colMap["value"]
+
+		switch key {
+		case "USER_TASK_TIMEOUT_MS":
+			if v, ok := parseInt32(val); ok {
+				params.UserTaskTimeoutMs = &v
+			}
+		case "SUSPEND_TASK_AFTER_NUM_FAILURES":
+			if v, ok := parseInt32(val); ok {
+				params.SuspendTaskAfterNumFailures = &v
+			}
+		case "TASK_AUTO_RETRY_ATTEMPTS":
+			if v, ok := parseInt32(val); ok {
+				params.TaskAutoRetryAttempts = &v
+			}
+		case "LOG_LEVEL":
+			params.LogLevel = val
+		case "USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS":
+			if v, ok := parseInt32(val); ok {
+				params.UserTaskMinimumTriggerIntervalInSeconds = &v
+			}
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating parameter rows: %w", err)
+	}
+
+	return params, nil
 }

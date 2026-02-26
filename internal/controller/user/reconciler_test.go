@@ -303,7 +303,7 @@ func TestReconcile_CreateTerminalError(t *testing.T) {
 
 	r := newTestReconciler(mock, user, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("test-user", "default"))
-	require.Error(t, err)
+	require.NoError(t, err)
 
 	updated := &snowplanev1alpha1.User{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "test-user", Namespace: "default"}, updated))
@@ -434,7 +434,7 @@ func TestReconcile_AlterTerminalError(t *testing.T) {
 
 	r := newTestReconciler(mock, user, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("test-user", "default"))
-	require.Error(t, err)
+	require.NoError(t, err)
 
 	updated := &snowplanev1alpha1.User{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "test-user", Namespace: "default"}, updated))

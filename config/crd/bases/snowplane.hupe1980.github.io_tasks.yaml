@@ -399,6 +399,34 @@ spec:
                   observed by the controller.
                 format: int64
                 type: integer
+              parameters:
+                description: Parameters contains the session-level task parameters
+                  from SHOW PARAMETERS IN TASK.
+                properties:
+                  logLevel:
+                    description: LogLevel is the severity level of events for the
+                      task.
+                    type: string
+                  suspendTaskAfterNumFailures:
+                    description: SuspendTaskAfterNumFailures is the number of consecutive
+                      failures before suspension.
+                    format: int32
+                    type: integer
+                  taskAutoRetryAttempts:
+                    description: TaskAutoRetryAttempts is the number of automatic
+                      retry attempts.
+                    format: int32
+                    type: integer
+                  userTaskMinimumTriggerIntervalInSeconds:
+                    description: UserTaskMinimumTriggerIntervalInSeconds defines how
+                      frequently a triggered task can execute.
+                    format: int32
+                    type: integer
+                  userTaskTimeoutMs:
+                    description: UserTaskTimeoutMs is the task timeout in milliseconds.
+                    format: int32
+                    type: integer
+                type: object
               schemaName:
                 description: SchemaName is the parent Snowflake schema name.
                 type: string
@@ -406,11 +434,18 @@ spec:
                 description: ShowOutput contains the raw SHOW TASKS output for this
                   task.
                 properties:
+                  allowOverlappingExecution:
+                    description: AllowOverlappingExecution indicates whether concurrent
+                      graph runs are allowed.
+                    type: boolean
                   comment:
                     description: Comment is the task description.
                     type: string
                   condition:
                     description: Condition is the WHEN clause.
+                    type: string
+                  config:
+                    description: Config is the task configuration JSON string.
                     type: string
                   createdOn:
                     description: CreatedOn is the timestamp when the task was created.

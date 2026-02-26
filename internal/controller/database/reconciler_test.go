@@ -466,8 +466,7 @@ func TestReconcile_CreateTerminalError(t *testing.T) {
 	r := newTestReconciler(mock, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "default"))
-	require.Error(t, err)
-	assert.True(t, snowflake.IsTerminalError(err))
+	require.NoError(t, err)
 
 	got := &snowplanev1alpha1.Database{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mydb", Namespace: "default"}, got))
@@ -663,8 +662,7 @@ func TestReconcile_AlterTerminalError(t *testing.T) {
 	r := newTestReconciler(mock, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "default"))
-	require.Error(t, err)
-	assert.True(t, snowflake.IsTerminalError(err))
+	require.NoError(t, err)
 
 	got := &snowplanev1alpha1.Database{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mydb", Namespace: "default"}, got))

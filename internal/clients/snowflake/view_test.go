@@ -249,11 +249,13 @@ func TestAlterView_ReplaceStatement(t *testing.T) {
 
 	// Should issue a single CREATE OR REPLACE VIEW, NOT ALTER.
 	require.Len(t, captured, 1)
-	assert.Contains(t, captured[0], "CREATE OR REPLACE")
+	// M-11: ReplaceStatement now uses CREATE OR ALTER (preserves grants) instead of CREATE OR REPLACE.
+	assert.Contains(t, captured[0], "CREATE OR ALTER")
+	assert.NotContains(t, captured[0], "OR REPLACE")
 	assert.Contains(t, captured[0], "SECURE")
 	assert.Contains(t, captured[0], "SELECT id, name FROM users")
 	assert.Contains(t, captured[0], "COMMENT = 'replaced'")
-	assert.NotContains(t, captured[0], "ALTER")
+	assert.NotContains(t, captured[0], "ALTER VIEW")
 }
 
 // testSQLExec is a minimal SQLExecutor mock for unit tests.

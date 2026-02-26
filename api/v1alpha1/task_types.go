@@ -196,6 +196,30 @@ type TaskShowOutput struct {
 
 	// ErrorIntegration is the error notification integration.
 	ErrorIntegration string `json:"errorIntegration,omitempty"`
+
+	// AllowOverlappingExecution indicates whether concurrent graph runs are allowed.
+	AllowOverlappingExecution bool `json:"allowOverlappingExecution,omitempty"`
+
+	// Config is the task configuration JSON string.
+	Config string `json:"config,omitempty"`
+}
+
+// TaskParameters contains relevant session-level task parameters from SHOW PARAMETERS IN TASK.
+type TaskParameters struct {
+	// UserTaskTimeoutMs is the task timeout in milliseconds.
+	UserTaskTimeoutMs *int32 `json:"userTaskTimeoutMs,omitempty"`
+
+	// SuspendTaskAfterNumFailures is the number of consecutive failures before suspension.
+	SuspendTaskAfterNumFailures *int32 `json:"suspendTaskAfterNumFailures,omitempty"`
+
+	// TaskAutoRetryAttempts is the number of automatic retry attempts.
+	TaskAutoRetryAttempts *int32 `json:"taskAutoRetryAttempts,omitempty"`
+
+	// LogLevel is the severity level of events for the task.
+	LogLevel string `json:"logLevel,omitempty"`
+
+	// UserTaskMinimumTriggerIntervalInSeconds defines how frequently a triggered task can execute.
+	UserTaskMinimumTriggerIntervalInSeconds *int32 `json:"userTaskMinimumTriggerIntervalInSeconds,omitempty"`
 }
 
 // TaskStatus defines the observed state of a Task.
@@ -210,6 +234,9 @@ type TaskStatus struct {
 
 	// ShowOutput contains the raw SHOW TASKS output for this task.
 	ShowOutput *TaskShowOutput `json:"showOutput,omitempty"`
+
+	// Parameters contains the session-level task parameters from SHOW PARAMETERS IN TASK.
+	Parameters *TaskParameters `json:"parameters,omitempty"`
 
 	// TrackedParameters tracks which optional spec fields have been actively SET
 	// in Snowflake.

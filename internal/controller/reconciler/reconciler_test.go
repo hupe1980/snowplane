@@ -778,8 +778,7 @@ func TestReconcile_ServiceFromClientError_TerminalRoleSwitch(t *testing.T) {
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 	_, err := r.Reconcile(context.Background(), reconcileReq())
-	require.Error(t, err)
-	assert.True(t, snowflake.IsTerminalError(err))
+	require.NoError(t, err)
 
 	// Verify condition is terminal.
 	var fetched snowplanev1alpha1.Database
@@ -875,8 +874,7 @@ func TestReconcile_BuildAlterOptionsError_Terminal(t *testing.T) {
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 	_, err := r.Reconcile(context.Background(), reconcileReq())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot compute diff")
+	require.NoError(t, err)
 }
 
 // ---------------------------------------------------------------------------
@@ -901,8 +899,7 @@ func TestReconcile_AlterError_Terminal(t *testing.T) {
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 	_, err := r.Reconcile(context.Background(), reconcileReq())
-	require.Error(t, err)
-	assert.True(t, snowflake.IsTerminalError(err))
+	require.NoError(t, err)
 }
 
 func TestReconcile_AlterError_Recoverable(t *testing.T) {
@@ -975,8 +972,7 @@ func TestReconcile_CreateError_Terminal(t *testing.T) {
 	require.NoError(t, err)
 	// Second: create fails with terminal error.
 	_, err = r.Reconcile(context.Background(), reconcileReq())
-	require.Error(t, err)
-	assert.True(t, snowflake.IsTerminalError(err))
+	require.NoError(t, err)
 }
 
 // ---------------------------------------------------------------------------

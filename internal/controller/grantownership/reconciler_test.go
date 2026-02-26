@@ -292,8 +292,7 @@ func TestReconcile_CreateTerminalError(t *testing.T) {
 	r := newTestReconciler(mock, g, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mygo", "default"))
-	require.Error(t, err)
-	assert.True(t, snowflake.IsTerminalError(err))
+	require.NoError(t, err)
 
 	got := &snowplanev1alpha1.GrantOwnership{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mygo", Namespace: "default"}, got))

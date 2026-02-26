@@ -108,6 +108,24 @@ var (
 	gvrShareGrant = schema.GroupVersionResource{
 		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "sharegrants",
 	}
+	gvrNetworkPolicy = schema.GroupVersionResource{
+		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "networkpolicies",
+	}
+	gvrMaskingPolicy = schema.GroupVersionResource{
+		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "maskingpolicies",
+	}
+	gvrPasswordPolicy = schema.GroupVersionResource{
+		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "passwordpolicies",
+	}
+	gvrTag = schema.GroupVersionResource{
+		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "tags",
+	}
+	gvrTask = schema.GroupVersionResource{
+		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "tasks",
+	}
+	gvrStream = schema.GroupVersionResource{
+		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "streams",
+	}
 )
 
 func TestMain(m *testing.M) {
@@ -622,6 +640,12 @@ func cleanupK8sCRs() {
 		gvrAccountRoleGrant,
 		gvrDatabaseRoleGrant,
 		gvrShareGrant,
+		gvrStream,
+		gvrTask,
+		gvrMaskingPolicy,
+		gvrPasswordPolicy,
+		gvrTag,
+		gvrNetworkPolicy,
 		gvrStage,
 		gvrView,
 		gvrTable,
@@ -658,7 +682,7 @@ func cleanupK8sCRs() {
 func cleanupSnowflake() {
 	cleanCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	resourceTypes := []string{"VIEWS", "TABLES", "STAGES", "SCHEMAS", "DATABASES", "WAREHOUSES", "USERS", "ROLES"}
+	resourceTypes := []string{"STREAMS", "TASKS", "MASKING POLICIES", "PASSWORD POLICIES", "TAGS", "VIEWS", "TABLES", "STAGES", "SCHEMAS", "NETWORK POLICIES", "DATABASES", "WAREHOUSES", "USERS", "ROLES"}
 	for _, rt := range resourceTypes {
 		rows, err := sfDB.QueryContext(cleanCtx, fmt.Sprintf("SHOW %s LIKE '%s%%'", rt, sqlbuilder.EscapeLikePattern(sfPrefix)))
 		if err != nil {
@@ -750,7 +774,28 @@ func waitForReady(t *testing.T, gvr schema.GroupVersionResource, name string) {
 	t.Helper()
 	require.Eventually(t, func() bool {
 		return isReady(gvr, name)
-	}, defaultTimeout, defaultInterval, "%s/%s did not become Ready", gvr.Resource, name)
+	}, defaultTimeout, defaultInterval, "%s/%s did not become Ready\n%s", gvr.Resource, name, dumpConditions(gvr, name))
+}
+
+// dumpConditions returns a formatted string of all status conditions for diagnostics.
+func dumpConditions(gvr schema.GroupVersionResource, name string) string {
+	obj, err := dynamicClient.Resource(gvr).Namespace(testNamespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Sprintf("  (could not fetch CR: %v)", err)
+	}
+	conditions, found, _ := unstructured.NestedSlice(obj.Object, "status", "conditions")
+	if !found || len(conditions) == 0 {
+		return "  (no status conditions found)"
+	}
+	var lines []string
+	for _, c := range conditions {
+		cm, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("  type=%v status=%v reason=%v message=%v", cm["type"], cm["status"], cm["reason"], cm["message"]))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func isReady(gvr schema.GroupVersionResource, name string) bool {
@@ -1096,6 +1141,251 @@ func newFieldExportCR(name, sourceKind, sourceName, path, targetKind, targetName
 			},
 		},
 	}
+}
+
+func newAccountRoleGrantCR(name, privilege, accountRole string, on map[string]interface{}) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
+			"kind":       "AccountRoleGrant",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": testNamespace,
+			},
+			"spec": map[string]interface{}{
+				"privilege":   privilege,
+				"accountRole": accountRole,
+				"on":          on,
+				"providerRef": map[string]interface{}{
+					"name": providerName,
+				},
+			},
+		},
+	}
+}
+
+func newDatabaseRoleGrantCR(name, privilege, databaseRole string, on map[string]interface{}) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
+			"kind":       "DatabaseRoleGrant",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": testNamespace,
+			},
+			"spec": map[string]interface{}{
+				"privilege":    privilege,
+				"databaseRole": databaseRole,
+				"on":           on,
+				"providerRef": map[string]interface{}{
+					"name": providerName,
+				},
+			},
+		},
+	}
+}
+
+func newNetworkPolicyCR(name, sfName string, allowedIPs []interface{}, comment string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
+			"kind":       "NetworkPolicy",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": testNamespace,
+			},
+			"spec": map[string]interface{}{
+				"name":          sfName,
+				"allowedIPList": allowedIPs,
+				"comment":       comment,
+				"providerRef": map[string]interface{}{
+					"name": providerName,
+				},
+			},
+		},
+	}
+}
+
+func newPasswordPolicyCR(name, sfName, dbRefName, schemaRefName string, minLen int64, comment string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
+			"kind":       "PasswordPolicy",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": testNamespace,
+			},
+			"spec": map[string]interface{}{
+				"name":              sfName,
+				"passwordMinLength": minLen,
+				"comment":           comment,
+				"databaseRef": map[string]interface{}{
+					"name": dbRefName,
+				},
+				"schemaRef": map[string]interface{}{
+					"name": schemaRefName,
+				},
+				"providerRef": map[string]interface{}{
+					"name": providerName,
+				},
+			},
+		},
+	}
+}
+
+func newMaskingPolicyCR(name, sfName, dbRefName, schemaRefName, body string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
+			"kind":       "MaskingPolicy",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": testNamespace,
+			},
+			"spec": map[string]interface{}{
+				"name": sfName,
+				"signature": []interface{}{
+					map[string]interface{}{"name": "val", "type": "VARCHAR"},
+				},
+				"body": body,
+				"databaseRef": map[string]interface{}{
+					"name": dbRefName,
+				},
+				"schemaRef": map[string]interface{}{
+					"name": schemaRefName,
+				},
+				"providerRef": map[string]interface{}{
+					"name": providerName,
+				},
+			},
+		},
+	}
+}
+
+func newTagCR(name, sfName, dbRefName, schemaRefName, comment string, allowedValues []interface{}) *unstructured.Unstructured {
+	spec := map[string]interface{}{
+		"name":    sfName,
+		"comment": comment,
+		"databaseRef": map[string]interface{}{
+			"name": dbRefName,
+		},
+		"schemaRef": map[string]interface{}{
+			"name": schemaRefName,
+		},
+		"providerRef": map[string]interface{}{
+			"name": providerName,
+		},
+	}
+	if len(allowedValues) > 0 {
+		spec["allowedValues"] = allowedValues
+	}
+
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
+			"kind":       "Tag",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": testNamespace,
+			},
+			"spec": spec,
+		},
+	}
+}
+
+func newTaskCR(name, sfName, dbRefName, schemaRefName, warehouseName, sqlStatement string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
+			"kind":       "Task",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": testNamespace,
+			},
+			"spec": map[string]interface{}{
+				"name":         sfName,
+				"sqlStatement": sqlStatement,
+				"comment":      "e2e test task",
+				"schedule":     "60 MINUTE",
+				"warehouse":    warehouseName,
+				"suspend":      true,
+				"databaseRef": map[string]interface{}{
+					"name": dbRefName,
+				},
+				"schemaRef": map[string]interface{}{
+					"name": schemaRefName,
+				},
+				"providerRef": map[string]interface{}{
+					"name": providerName,
+				},
+			},
+		},
+	}
+}
+
+func newStreamCR(name, sfName, dbRefName, schemaRefName, sourceType, sourceName string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
+			"kind":       "Stream",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": testNamespace,
+			},
+			"spec": map[string]interface{}{
+				"name":       sfName,
+				"sourceType": sourceType,
+				"sourceName": sourceName,
+				"comment":    "e2e test stream",
+				"databaseRef": map[string]interface{}{
+					"name": dbRefName,
+				},
+				"schemaRef": map[string]interface{}{
+					"name": schemaRefName,
+				},
+				"providerRef": map[string]interface{}{
+					"name": providerName,
+				},
+			},
+		},
+	}
+}
+
+// sfGrantExists checks whether a specific privilege grant exists on a role.
+func sfGrantExists(t *testing.T, roleName, privilege, grantedOn, objectName string) bool {
+	t.Helper()
+	qCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	query := fmt.Sprintf("SHOW GRANTS TO ROLE %s", sqlbuilder.QuoteIdentifier(roleName))
+	rows, err := sfDB.QueryContext(qCtx, query)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+
+	cols, _ := rows.Columns()
+	for rows.Next() {
+		vals := make([]interface{}, len(cols))
+		ptrs := make([]interface{}, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+		colMap := make(map[string]string, len(cols))
+		for i, c := range cols {
+			if vals[i] != nil {
+				colMap[strings.ToLower(c)] = fmt.Sprintf("%v", vals[i])
+			}
+		}
+		if strings.EqualFold(colMap["privilege"], privilege) &&
+			strings.EqualFold(colMap["granted_on"], grantedOn) &&
+			strings.Contains(strings.ToUpper(colMap["name"]), strings.ToUpper(objectName)) {
+			return true
+		}
+	}
+	return false
 }
 
 func withAnnotation(obj *unstructured.Unstructured, key, value string) *unstructured.Unstructured {

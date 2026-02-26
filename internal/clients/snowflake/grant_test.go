@@ -554,3 +554,30 @@ func TestGrantIdentifier(t *testing.T) {
 		assert.Equal(t, `GRANT USAGE ON DATABASE "MY_DB" TO SHARE "my_share"`, id.FullyQualifiedName())
 	})
 }
+
+func TestMatchesGranteeName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		actual   string
+		expected string
+		want     bool
+	}{
+		{"exact match", "ANALYST", "ANALYST", true},
+		{"case insensitive", "analyst", "ANALYST", true},
+		{"FQN vs unqualified", "MY_ROLE", "MY_DB.MY_ROLE", true},
+		{"FQN case insensitive", "my_role", "MY_DB.MY_ROLE", true},
+		{"no match", "OTHER", "ANALYST", false},
+		{"partial no match", "ROLE", "MY_DB.MY_OTHER_ROLE", false},
+		{"empty actual", "", "ANALYST", false},
+		{"empty expected", "ANALYST", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, matchesGranteeName(tt.actual, tt.expected))
+		})
+	}
+}

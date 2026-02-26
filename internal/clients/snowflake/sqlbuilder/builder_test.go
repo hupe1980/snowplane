@@ -99,6 +99,65 @@ func TestQuoteIdentifier(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// IsExpressionLike
+// ---------------------------------------------------------------------------
+
+func TestIsExpressionLike(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"DATE_COL", false},
+		{"MY_COLUMN", false},
+		{"col", false},
+		{"my-column", false},      // hyphen in identifier, not expression
+		{"some-long-name", false}, // multi-hyphen identifier
+		{"TO_DATE(col)", true},
+		{"SUBSTR(col, 1, 5)", true},
+		{"YEAR(created_at)", true},
+		{"col1 + col2", true},
+		{"col1 * 2", true},
+		{"a / b", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, IsExpressionLike(tt.input))
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// QuoteIdentifierOrExpression
+// ---------------------------------------------------------------------------
+
+func TestQuoteIdentifierOrExpression(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"simple column", "DATE_COL", `"DATE_COL"`},
+		{"hyphenated column", "my-column", `"my-column"`},
+		{"function expression", "TO_DATE(col)", "TO_DATE(col)"},
+		{"arithmetic", "col1 + col2", "col1 + col2"},
+		{"nested function", "SUBSTR(col, 1, 5)", "SUBSTR(col, 1, 5)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, QuoteIdentifierOrExpression(tt.input))
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
 // BoolToSQL
 // ---------------------------------------------------------------------------
 

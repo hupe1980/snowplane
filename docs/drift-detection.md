@@ -123,6 +123,11 @@ Immutable violations require manual intervention — delete/recreate the CR.
 
 `comment` (from SHOW), `valueList` (from DESCRIBE)
 
+### Task
+{: .text-delta }
+
+`comment`, `schedule`, `warehouse`, `sqlStatement`, `when`, `errorIntegration`, `allowOverlappingExecution`, `config` (from SHOW), plus `userTaskTimeoutMs`, `suspendTaskAfterNumFailures`, `taskAutoRetryAttempts`, `logLevel`, `userTaskMinimumTriggerIntervalInSeconds` (from SHOW PARAMETERS)
+
 ---
 
 ## Detect-Only Policy

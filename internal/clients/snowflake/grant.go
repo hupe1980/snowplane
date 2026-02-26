@@ -300,7 +300,7 @@ func (g *GrantClient) Observe(ctx context.Context, id GrantIdentifier) (*GrantOb
 
 	for _, grant := range grants {
 		if strings.EqualFold(grant.Privilege, id.Privilege) &&
-			strings.EqualFold(grant.GranteeName, id.GranteeName) {
+			matchesGranteeName(grant.GranteeName, id.GranteeName) {
 			return &GrantObservation{
 				Exists:     true,
 				ShowOutput: grant,
@@ -309,6 +309,25 @@ func (g *GrantClient) Observe(ctx context.Context, id GrantIdentifier) (*GrantOb
 	}
 
 	return &GrantObservation{Exists: false}, nil
+}
+
+// matchesGranteeName compares a grantee name from SHOW GRANTS output against
+// an expected grantee name. For database roles, Snowflake returns only the
+// unqualified role name (e.g. "MY_ROLE") in grantee_name, but the identifier
+// stores the fully qualified name (e.g. "MY_DB.MY_ROLE"). This helper matches
+// both the exact name and, when the expected name contains a dot, the
+// unqualified suffix.
+func matchesGranteeName(actual, expected string) bool {
+	if strings.EqualFold(actual, expected) {
+		return true
+	}
+
+	// For database roles: expected may be "DB.ROLE" while actual is just "ROLE".
+	if idx := strings.LastIndex(expected, "."); idx >= 0 {
+		return strings.EqualFold(actual, expected[idx+1:])
+	}
+
+	return false
 }
 
 // scanGrantShowOutput scans SHOW GRANTS results into GrantShowOutput structs.

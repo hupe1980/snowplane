@@ -76,6 +76,18 @@ func TestBuildCreateTableSQL(t *testing.T) {
 			expected: `CREATE TABLE IF NOT EXISTS "DB"."S"."T" ("V" VARIANT) ENABLE_SCHEMA_EVOLUTION = TRUE`,
 		},
 		{
+			name: "table with expression cluster by",
+			opts: CreateTableOptions{
+				Name: NewSchemaObjectIdentifier("DB", "S", "T"),
+				Columns: []CreateTableColumn{
+					{Name: "CREATED_AT", Type: "TIMESTAMP_NTZ"},
+					{Name: "ID", Type: "NUMBER"},
+				},
+				ClusterBy: []string{"TO_DATE(CREATED_AT)", "ID"},
+			},
+			expected: `CREATE TABLE IF NOT EXISTS "DB"."S"."T" ("CREATED_AT" TIMESTAMP_NTZ, "ID" NUMBER) CLUSTER BY (TO_DATE(CREATED_AT), "ID")`,
+		},
+		{
 			name: "table with primary key constraint",
 			opts: CreateTableOptions{
 				Name: NewSchemaObjectIdentifier("DB", "S", "ORDERS"),
@@ -180,6 +192,16 @@ func TestBuildAlterTableStatements(t *testing.T) {
 			},
 			expected: []string{
 				`ALTER TABLE "DB"."S"."T" CLUSTER BY ("COL_A", "COL_B")`,
+			},
+		},
+		{
+			name: "change clustering key with expression",
+			opts: AlterTableOptions{
+				Name:      id,
+				ClusterBy: []string{"TO_DATE(CREATED_AT)", "ID"},
+			},
+			expected: []string{
+				`ALTER TABLE "DB"."S"."T" CLUSTER BY (TO_DATE(CREATED_AT), "ID")`,
 			},
 		},
 		{
