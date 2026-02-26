@@ -297,6 +297,34 @@ func ValidateDollarQuotedValue(s string) error {
 	return nil
 }
 
+// policyBodyDenyRe rejects dangerous patterns in masking/row-access policy body
+// expressions. Policy bodies are raw SQL (e.g. "CASE WHEN ... THEN ...") and
+// cannot be parameterised, but we block statement-breaking patterns to prevent
+// SQL injection: semicolons that would start a new statement, comment markers
+// that could hide injected SQL, and dollar-quoting that could break context.
+var policyBodyDenyRe = regexp.MustCompile(`[;]|--|/\*|\*/|\$\$`)
+
+// ValidatePolicyBody validates a masking policy or row access policy body
+// expression. Bodies are raw SQL expressions embedded directly into ALTER ...
+// SET BODY -> <expr> and CREATE ... AS (...) -> <expr> statements. Since the
+// body cannot be parameterised or quoted, we reject values containing
+// statement-breaking patterns as defense-in-depth.
+func ValidatePolicyBody(body string) error {
+	if body == "" {
+		return fmt.Errorf("policy body must not be empty")
+	}
+
+	if len(body) > 65536 {
+		return fmt.Errorf("policy body too long (%d chars, max 65536)", len(body))
+	}
+
+	if policyBodyDenyRe.MatchString(body) {
+		return fmt.Errorf("invalid policy body: contains forbidden pattern (semicolons, comment markers, or dollar-quoting)")
+	}
+
+	return nil
+}
+
 // ValidateUnsetField validates a field name used in UNSET clauses.
 // Only allows uppercase letters, digits, and underscores — the format used
 // by Snowflake session and object parameter names.

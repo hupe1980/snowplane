@@ -119,17 +119,27 @@ func buildCreateOptions(rm *snowplanev1alpha1.ResourceMonitor, id snowflake.Acco
 	return opts
 }
 
-func buildAlterOptions(rm *snowplanev1alpha1.ResourceMonitor, id snowflake.AccountObjectIdentifier, _ *snowflake.ResourceMonitorObservation) snowflake.AlterResourceMonitorOptions {
+func buildAlterOptions(rm *snowplanev1alpha1.ResourceMonitor, id snowflake.AccountObjectIdentifier, obs *snowflake.ResourceMonitorObservation) snowflake.AlterResourceMonitorOptions {
 	opts := snowflake.AlterResourceMonitorOptions{Name: id}
 	opts.UnsetFields = computeUnsetFields(rm)
 
-	opts.CreditQuota = rm.Spec.CreditQuota
+	// Compare against observed values to avoid unnecessary ALTERs.
+	if rm.Spec.CreditQuota != nil {
+		if obs == nil || obs.ShowOutput == nil || fmt.Sprintf("%d", *rm.Spec.CreditQuota) != obs.ShowOutput.CreditQuota {
+			opts.CreditQuota = rm.Spec.CreditQuota
+		}
+	}
 
 	if rm.Spec.Frequency != nil {
 		f := string(*rm.Spec.Frequency)
-		opts.Frequency = &f
+		if obs == nil || obs.ShowOutput == nil || !strings.EqualFold(f, obs.ShowOutput.Frequency) {
+			opts.Frequency = &f
+		}
 	}
 
+	// StartTimestamp and EndTimestamp — always send if specified.
+	// Snowflake returns these in a different format than specified, making
+	// reliable comparison impractical.
 	opts.StartTimestamp = rm.Spec.StartTimestamp
 	opts.EndTimestamp = rm.Spec.EndTimestamp
 
@@ -139,9 +149,18 @@ func buildAlterOptions(rm *snowplanev1alpha1.ResourceMonitor, id snowflake.Accou
 		opts.NotifyUsers = &users
 	}
 
+	// Compare triggers against observed state.
 	if len(rm.Spec.Triggers) > 0 {
-		triggers := specTriggersToClient(rm.Spec.Triggers)
-		opts.Triggers = &triggers
+		specTriggers := normalizeTriggers(rm.Spec.Triggers)
+		obsTriggers := ""
+		if obs != nil && obs.ShowOutput != nil {
+			obsTriggers = buildObservedTriggers(obs.ShowOutput)
+		}
+
+		if specTriggers != obsTriggers {
+			triggers := specTriggersToClient(rm.Spec.Triggers)
+			opts.Triggers = &triggers
+		}
 	}
 
 	return opts

@@ -112,16 +112,18 @@ func buildCreateOptions(mp *snowplanev1alpha1.MaskingPolicy, id snowflake.Schema
 	}
 }
 
-func buildAlterOptions(mp *snowplanev1alpha1.MaskingPolicy, id snowflake.SchemaObjectIdentifier, _ *snowflake.MaskingPolicyObservation) snowflake.AlterMaskingPolicyOptions {
+func buildAlterOptions(mp *snowplanev1alpha1.MaskingPolicy, id snowflake.SchemaObjectIdentifier, obs *snowflake.MaskingPolicyObservation) snowflake.AlterMaskingPolicyOptions {
 	opts := snowflake.AlterMaskingPolicyOptions{Name: id}
 	opts.UnsetFields = computeUnsetFields(mp)
 
-	// Body is always sent to ensure convergence.
+	// Body is always sent to ensure convergence (not in SHOW output).
 	body := mp.Spec.Body
 	opts.Body = &body
 
 	if mp.Spec.Comment != nil {
-		opts.Comment = mp.Spec.Comment
+		if obs == nil || obs.ShowOutput == nil || *mp.Spec.Comment != obs.ShowOutput.Comment {
+			opts.Comment = mp.Spec.Comment
+		}
 	}
 
 	return opts

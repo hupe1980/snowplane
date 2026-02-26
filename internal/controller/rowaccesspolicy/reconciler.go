@@ -111,16 +111,18 @@ func buildCreateOptions(rap *snowplanev1alpha1.RowAccessPolicy, id snowflake.Sch
 	}
 }
 
-func buildAlterOptions(rap *snowplanev1alpha1.RowAccessPolicy, id snowflake.SchemaObjectIdentifier, _ *snowflake.RowAccessPolicyObservation) snowflake.AlterRowAccessPolicyOptions {
+func buildAlterOptions(rap *snowplanev1alpha1.RowAccessPolicy, id snowflake.SchemaObjectIdentifier, obs *snowflake.RowAccessPolicyObservation) snowflake.AlterRowAccessPolicyOptions {
 	opts := snowflake.AlterRowAccessPolicyOptions{Name: id}
 	opts.UnsetFields = computeUnsetFields(rap)
 
-	// Body is always sent to ensure convergence.
+	// Body is always sent to ensure convergence (not in SHOW output).
 	body := rap.Spec.Body
 	opts.Body = &body
 
 	if rap.Spec.Comment != nil {
-		opts.Comment = rap.Spec.Comment
+		if obs == nil || obs.ShowOutput == nil || *rap.Spec.Comment != obs.ShowOutput.Comment {
+			opts.Comment = rap.Spec.Comment
+		}
 	}
 
 	return opts

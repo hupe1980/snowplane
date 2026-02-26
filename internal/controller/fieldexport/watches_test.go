@@ -66,9 +66,9 @@ func TestExtractTargetRef_Secret(t *testing.T) {
 	assert.Equal(t, []string{"Secret/my-secret"}, got)
 }
 
-func TestSourceResourceTypes_Returns12Types(t *testing.T) {
+func TestSourceResourceTypes_Returns14Types(t *testing.T) {
 	srcs := sourceResourceTypes()
-	assert.Len(t, srcs, 12, "should return one typed object per managed Snowplane resource")
+	assert.Len(t, srcs, 14, "should return one typed object per managed Snowplane resource")
 }
 
 func TestMapSourceToFieldExports_MatchingSource(t *testing.T) {

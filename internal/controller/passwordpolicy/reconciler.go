@@ -116,24 +116,65 @@ func buildCreateOptions(pp *snowplanev1alpha1.PasswordPolicy, id snowflake.Schem
 	}
 }
 
-func buildAlterOptions(pp *snowplanev1alpha1.PasswordPolicy, id snowflake.SchemaObjectIdentifier, _ *snowflake.PasswordPolicyObservation) snowflake.AlterPasswordPolicyOptions {
+func buildAlterOptions(pp *snowplanev1alpha1.PasswordPolicy, id snowflake.SchemaObjectIdentifier, obs *snowflake.PasswordPolicyObservation) snowflake.AlterPasswordPolicyOptions {
 	opts := snowflake.AlterPasswordPolicyOptions{Name: id}
 	opts.UnsetFields = computeUnsetFields(pp)
 
-	opts.PasswordMinLength = pp.Spec.PasswordMinLength
-	opts.PasswordMaxLength = pp.Spec.PasswordMaxLength
-	opts.PasswordMinUpperCase = pp.Spec.PasswordMinUpperCaseChars
-	opts.PasswordMinLowerCase = pp.Spec.PasswordMinLowerCaseChars
-	opts.PasswordMinNumeric = pp.Spec.PasswordMinNumericChars
-	opts.PasswordMinSpecial = pp.Spec.PasswordMinSpecialChars
-	opts.PasswordMinAgeDays = pp.Spec.PasswordMinAgeDays
-	opts.PasswordMaxAgeDays = pp.Spec.PasswordMaxAgeDays
-	opts.PasswordMaxRetries = pp.Spec.PasswordMaxRetries
-	opts.PasswordLockoutTimeMins = pp.Spec.PasswordLockoutTimeMins
-	opts.PasswordHistory = pp.Spec.PasswordHistory
-	opts.Comment = pp.Spec.Comment
+	// Compare each field against DESCRIBE output before including in ALTER.
+	// This avoids unnecessary ALTER statements every reconciliation cycle.
+	desc := describeMap(obs)
+
+	opts.PasswordMinLength = compareDescInt32(pp.Spec.PasswordMinLength, "PASSWORD_MIN_LENGTH", desc)
+	opts.PasswordMaxLength = compareDescInt32(pp.Spec.PasswordMaxLength, "PASSWORD_MAX_LENGTH", desc)
+	opts.PasswordMinUpperCase = compareDescInt32(pp.Spec.PasswordMinUpperCaseChars, "PASSWORD_MIN_UPPER_CASE_CHARS", desc)
+	opts.PasswordMinLowerCase = compareDescInt32(pp.Spec.PasswordMinLowerCaseChars, "PASSWORD_MIN_LOWER_CASE_CHARS", desc)
+	opts.PasswordMinNumeric = compareDescInt32(pp.Spec.PasswordMinNumericChars, "PASSWORD_MIN_NUMERIC_CHARS", desc)
+	opts.PasswordMinSpecial = compareDescInt32(pp.Spec.PasswordMinSpecialChars, "PASSWORD_MIN_SPECIAL_CHARS", desc)
+	opts.PasswordMinAgeDays = compareDescInt32(pp.Spec.PasswordMinAgeDays, "PASSWORD_MIN_AGE_DAYS", desc)
+	opts.PasswordMaxAgeDays = compareDescInt32(pp.Spec.PasswordMaxAgeDays, "PASSWORD_MAX_AGE_DAYS", desc)
+	opts.PasswordMaxRetries = compareDescInt32(pp.Spec.PasswordMaxRetries, "PASSWORD_MAX_RETRIES", desc)
+	opts.PasswordLockoutTimeMins = compareDescInt32(pp.Spec.PasswordLockoutTimeMins, "PASSWORD_LOCKOUT_TIME_MINS", desc)
+	opts.PasswordHistory = compareDescInt32(pp.Spec.PasswordHistory, "PASSWORD_HISTORY", desc)
+
+	if pp.Spec.Comment != nil {
+		if obs == nil || obs.ShowOutput == nil || *pp.Spec.Comment != obs.ShowOutput.Comment {
+			opts.Comment = pp.Spec.Comment
+		}
+	}
 
 	return opts
+}
+
+// describeMap safely extracts the DESCRIBE output map from an observation.
+func describeMap(obs *snowflake.PasswordPolicyObservation) map[string]string {
+	if obs == nil || obs.DescribeOutput == nil {
+		return nil
+	}
+
+	return obs.DescribeOutput
+}
+
+// compareDescInt32 returns specVal only if it differs from the DESCRIBE output value.
+// If the DESCRIBE output is missing or the values match, returns nil (no change needed).
+func compareDescInt32(specVal *int32, key string, desc map[string]string) *int32 {
+	if specVal == nil {
+		return nil
+	}
+
+	if desc == nil {
+		return specVal // No observation data — always send
+	}
+
+	descRaw, ok := desc[key]
+	if !ok {
+		return specVal // Key not in DESCRIBE — always send
+	}
+
+	if fmt.Sprintf("%d", *specVal) == descRaw {
+		return nil // Value matches — no change needed
+	}
+
+	return specVal
 }
 
 func computeUnsetFields(pp *snowplanev1alpha1.PasswordPolicy) []string {

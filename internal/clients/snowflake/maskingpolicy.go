@@ -3,6 +3,7 @@ package snowflake
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -50,19 +51,23 @@ type CreateMaskingPolicyOptions struct {
 
 // Validate checks the CreateMaskingPolicyOptions for validity.
 func (o *CreateMaskingPolicyOptions) Validate() error {
+	var errs []error
+
 	if !ValidObjectIdentifier(o.Name) {
-		return fmt.Errorf("masking policy name is required")
+		errs = append(errs, fmt.Errorf("masking policy name is required"))
 	}
 
 	if len(o.Signature) == 0 {
-		return fmt.Errorf("masking policy signature requires at least one argument")
+		errs = append(errs, fmt.Errorf("masking policy signature requires at least one argument"))
 	}
 
 	if o.Body == "" {
-		return fmt.Errorf("masking policy body is required")
+		errs = append(errs, fmt.Errorf("masking policy body is required"))
+	} else if err := sqlbuilder.ValidatePolicyBody(o.Body); err != nil {
+		errs = append(errs, fmt.Errorf("invalid masking policy body: %w", err))
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
 // AlterMaskingPolicyOptions holds the parameters for altering a masking policy.
@@ -77,11 +82,19 @@ type AlterMaskingPolicyOptions struct {
 
 // Validate checks the AlterMaskingPolicyOptions for validity.
 func (o *AlterMaskingPolicyOptions) Validate() error {
+	var errs []error
+
 	if !ValidObjectIdentifier(o.Name) {
-		return fmt.Errorf("masking policy name is required")
+		errs = append(errs, fmt.Errorf("masking policy name is required"))
 	}
 
-	return nil
+	if o.Body != nil {
+		if err := sqlbuilder.ValidatePolicyBody(*o.Body); err != nil {
+			errs = append(errs, fmt.Errorf("invalid masking policy body: %w", err))
+		}
+	}
+
+	return errors.Join(errs...)
 }
 
 // HasChanges reports whether any fields are set for alteration.

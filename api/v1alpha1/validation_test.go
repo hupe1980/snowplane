@@ -2392,6 +2392,116 @@ func TestGrantOn_Description(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// AccountRoleAssignmentSpec.Validate — tests
+// ---------------------------------------------------------------------------
+
+func TestAccountRoleAssignmentSpec_Validate_Valid_RoleName_ToRole(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, (&AccountRoleAssignmentSpec{
+		CommonSpec: validCommonSpec(), RoleName: "ANALYST", ToRole: "SYSADMIN",
+	}).Validate())
+}
+
+func TestAccountRoleAssignmentSpec_Validate_Valid_RoleRef_ToUserRef(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, (&AccountRoleAssignmentSpec{
+		CommonSpec: validCommonSpec(),
+		RoleRef:    &LocalObjectReference{Name: "my-role"},
+		ToUserRef:  &LocalObjectReference{Name: "my-user"},
+	}).Validate())
+}
+
+func TestAccountRoleAssignmentSpec_Validate_NoRole(t *testing.T) {
+	t.Parallel()
+	err := (&AccountRoleAssignmentSpec{CommonSpec: validCommonSpec(), ToRole: "SYSADMIN"}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of roleName or roleRef")
+}
+
+func TestAccountRoleAssignmentSpec_Validate_BothRoleAndRef(t *testing.T) {
+	t.Parallel()
+	err := (&AccountRoleAssignmentSpec{
+		CommonSpec: validCommonSpec(),
+		RoleName:   "X",
+		RoleRef:    &LocalObjectReference{Name: "y"},
+		ToRole:     "SYSADMIN",
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mutually exclusive")
+}
+
+func TestAccountRoleAssignmentSpec_Validate_NoTarget(t *testing.T) {
+	t.Parallel()
+	err := (&AccountRoleAssignmentSpec{CommonSpec: validCommonSpec(), RoleName: "R"}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of toRole")
+}
+
+func TestAccountRoleAssignmentSpec_Validate_TwoTargets(t *testing.T) {
+	t.Parallel()
+	err := (&AccountRoleAssignmentSpec{
+		CommonSpec: validCommonSpec(), RoleName: "R", ToRole: "A", ToUser: "B",
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of toRole")
+}
+
+// ---------------------------------------------------------------------------
+// DatabaseRoleAssignmentSpec.Validate — tests
+// ---------------------------------------------------------------------------
+
+func TestDatabaseRoleAssignmentSpec_Validate_Valid_ToRole(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, (&DatabaseRoleAssignmentSpec{
+		CommonSpec: validCommonSpec(), DatabaseRoleName: "MY_DB.READER", ToRole: "SYSADMIN",
+	}).Validate())
+}
+
+func TestDatabaseRoleAssignmentSpec_Validate_Valid_ToDatabaseRole(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, (&DatabaseRoleAssignmentSpec{
+		CommonSpec:      validCommonSpec(),
+		DatabaseRoleRef: &LocalObjectReference{Name: "my-dr"},
+		ToDatabaseRole:  "MY_DB.WRITER",
+	}).Validate())
+}
+
+func TestDatabaseRoleAssignmentSpec_Validate_NoRole(t *testing.T) {
+	t.Parallel()
+	err := (&DatabaseRoleAssignmentSpec{CommonSpec: validCommonSpec(), ToRole: "SYSADMIN"}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of databaseRoleName or databaseRoleRef")
+}
+
+func TestDatabaseRoleAssignmentSpec_Validate_BothRoleAndRef(t *testing.T) {
+	t.Parallel()
+	err := (&DatabaseRoleAssignmentSpec{
+		CommonSpec:       validCommonSpec(),
+		DatabaseRoleName: "X",
+		DatabaseRoleRef:  &LocalObjectReference{Name: "y"},
+		ToRole:           "SYSADMIN",
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mutually exclusive")
+}
+
+func TestDatabaseRoleAssignmentSpec_Validate_NoTarget(t *testing.T) {
+	t.Parallel()
+	err := (&DatabaseRoleAssignmentSpec{CommonSpec: validCommonSpec(), DatabaseRoleName: "D.R"}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of toRole")
+}
+
+func TestDatabaseRoleAssignmentSpec_Validate_TwoTargets(t *testing.T) {
+	t.Parallel()
+	err := (&DatabaseRoleAssignmentSpec{
+		CommonSpec: validCommonSpec(), DatabaseRoleName: "D.R", ToRole: "A", ToDatabaseRole: "D.B",
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of toRole")
+}
+
+// ---------------------------------------------------------------------------
 // FieldExportSpec.Validate — tests
 // ---------------------------------------------------------------------------
 

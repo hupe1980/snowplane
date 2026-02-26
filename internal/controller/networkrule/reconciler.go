@@ -3,6 +3,7 @@ package networkrule
 
 import (
 	"context"
+	"sort"
 	"strings"
 
 	"k8s.io/client-go/tools/record"
@@ -106,17 +107,20 @@ func buildCreateOptions(nr *snowplanev1alpha1.NetworkRule, id snowflake.SchemaOb
 	}
 }
 
-func buildAlterOptions(nr *snowplanev1alpha1.NetworkRule, id snowflake.SchemaObjectIdentifier, _ *snowflake.NetworkRuleObservation) snowflake.AlterNetworkRuleOptions {
+func buildAlterOptions(nr *snowplanev1alpha1.NetworkRule, id snowflake.SchemaObjectIdentifier, obs *snowflake.NetworkRuleObservation) snowflake.AlterNetworkRuleOptions {
 	opts := snowflake.AlterNetworkRuleOptions{Name: id}
 	opts.UnsetFields = computeUnsetFields(nr)
 
-	// ValueList is always sent on update to ensure convergence.
+	// ValueList is always sent on update to ensure convergence
+	// (not fully available in SHOW output).
 	valueList := make([]string, len(nr.Spec.ValueList))
 	copy(valueList, nr.Spec.ValueList)
 	opts.ValueList = &valueList
 
 	if nr.Spec.Comment != nil {
-		opts.Comment = nr.Spec.Comment
+		if obs == nil || obs.ShowOutput == nil || *nr.Spec.Comment != obs.ShowOutput.Comment {
+			opts.Comment = nr.Spec.Comment
+		}
 	}
 
 	return opts
@@ -170,13 +174,33 @@ func detectDrift(nr *snowplanev1alpha1.NetworkRule, obs *snowflake.NetworkRuleOb
 		// value list relies on DESCRIBE output or spec-hash comparison.
 	}
 
-	// If DESCRIBE output contains value_list, compare it.
+	// If DESCRIBE output contains value_list, compare it (sorted for order-independence).
 	if obs.DescribeOutput != nil {
 		if descValues, ok := obs.DescribeOutput["value_list"]; ok {
-			specValues := strings.Join(nr.Spec.ValueList, ",")
-			d.CompareStringValueFold("VALUE_LIST", specValues, descValues, false)
+			specSorted := sortedValues(nr.Spec.ValueList)
+			obsSorted := sortedValues(strings.Split(descValues, ","))
+			d.CompareStringValueFold("VALUE_LIST", specSorted, obsSorted, false)
 		}
 	}
 
 	return d.Result()
+}
+
+// sortedValues returns a sorted, comma-joined canonical string for order-independent comparison.
+func sortedValues(vals []string) string {
+	if len(vals) == 0 {
+		return ""
+	}
+
+	sorted := make([]string, len(vals))
+	copy(sorted, vals)
+
+	// Trim whitespace from each value before sorting.
+	for i := range sorted {
+		sorted[i] = strings.TrimSpace(sorted[i])
+	}
+
+	sort.Strings(sorted)
+
+	return strings.Join(sorted, ",")
 }

@@ -3,8 +3,6 @@ package networkpolicy
 
 import (
 	"context"
-	"sort"
-	"strings"
 
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -101,7 +99,7 @@ func buildCreateOptions(np *snowplanev1alpha1.NetworkPolicy, id snowflake.Accoun
 	}
 }
 
-func buildAlterOptions(np *snowplanev1alpha1.NetworkPolicy, id snowflake.AccountObjectIdentifier, _ *snowflake.NetworkPolicyObservation) snowflake.AlterNetworkPolicyOptions {
+func buildAlterOptions(np *snowplanev1alpha1.NetworkPolicy, id snowflake.AccountObjectIdentifier, obs *snowflake.NetworkPolicyObservation) snowflake.AlterNetworkPolicyOptions {
 	opts := snowflake.AlterNetworkPolicyOptions{Name: id}
 	opts.UnsetFields = computeUnsetFields(np)
 
@@ -133,7 +131,9 @@ func buildAlterOptions(np *snowplanev1alpha1.NetworkPolicy, id snowflake.Account
 	}
 
 	if np.Spec.Comment != nil {
-		opts.Comment = np.Spec.Comment
+		if obs == nil || obs.ShowOutput == nil || *np.Spec.Comment != obs.ShowOutput.Comment {
+			opts.Comment = np.Spec.Comment
+		}
 	}
 
 	return opts
@@ -194,27 +194,11 @@ func detectDrift(np *snowplanev1alpha1.NetworkPolicy, obs *snowflake.NetworkPoli
 		// Mutable fields.
 		d.CompareString("COMMENT", np.Spec.Comment, obs.ShowOutput.Comment, false)
 
-		// For IP lists we compare sorted CSV for drift detection. The SHOW
-		// output only has counts, so meaningful drift detection is limited.
-		// We report drift based on spec-hash changes instead.
-		allowedCSV := sortedString(np.Spec.AllowedIPList)
-		d.CompareStringValue("ALLOWED_IP_LIST", allowedCSV, obs.ShowOutput.EntriesInAllowedIPList, false)
-
-		blockedCSV := sortedString(np.Spec.BlockedIPList)
-		d.CompareStringValue("BLOCKED_IP_LIST", blockedCSV, obs.ShowOutput.EntriesInBlockedIPList, false)
+		// Note: SHOW NETWORK POLICIES only returns entry counts for IP lists
+		// (e.g. "2"), not actual IP addresses. Meaningful IP drift detection is
+		// not possible from SHOW output alone. We rely on spec-hash comparison
+		// to detect user-side changes, which triggers a full-list ALTER SET.
 	}
 
 	return d.Result()
-}
-
-func sortedString(list []string) string {
-	if len(list) == 0 {
-		return ""
-	}
-
-	sorted := make([]string, len(list))
-	copy(sorted, list)
-	sort.Strings(sorted)
-
-	return strings.Join(sorted, ",")
 }

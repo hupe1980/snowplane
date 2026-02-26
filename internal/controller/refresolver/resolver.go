@@ -151,6 +151,26 @@ func ResolveDatabaseRoleRef(
 	})
 }
 
+// ResolveUserRef resolves a LocalObjectReference to a User CR,
+// returning the Snowflake user name from the CR's fullyQualifiedName.
+func ResolveUserRef(
+	ctx context.Context,
+	c client.Client,
+	namespace string,
+	ref snowplanev1alpha1.LocalObjectReference,
+) (string, error) {
+	return ResolveLocalRef(ctx, c, namespace, ref.Name, func() ReferableObject {
+		u := &snowplanev1alpha1.User{}
+		u.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   snowplanev1alpha1.GroupVersion.Group,
+			Version: snowplanev1alpha1.GroupVersion.Version,
+			Kind:    "User",
+		})
+
+		return u
+	})
+}
+
 // ResolveSecretKeyRef reads the value at the specified key from a Kubernetes Secret.
 func ResolveSecretKeyRef(
 	ctx context.Context,

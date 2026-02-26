@@ -153,15 +153,25 @@ func buildCreateOptions(si *snowplanev1alpha1.SecurityIntegration, id snowflake.
 	return opts
 }
 
-func buildAlterOptions(si *snowplanev1alpha1.SecurityIntegration, id snowflake.AccountObjectIdentifier, _ *snowflake.SecurityIntegrationObservation) snowflake.AlterSecurityIntegrationOptions {
+func buildAlterOptions(si *snowplanev1alpha1.SecurityIntegration, id snowflake.AccountObjectIdentifier, obs *snowflake.SecurityIntegrationObservation) snowflake.AlterSecurityIntegrationOptions {
 	opts := snowflake.AlterSecurityIntegrationOptions{
 		Name: id,
 		Type: string(si.Spec.Type),
 	}
 	opts.UnsetFields = computeUnsetFields(si)
 
-	opts.Enabled = si.Spec.Enabled
-	opts.Comment = si.Spec.Comment
+	// Compare Enabled and Comment against observed values.
+	if si.Spec.Enabled != nil {
+		if obs == nil || obs.ShowOutput == nil || *si.Spec.Enabled != obs.ShowOutput.Enabled {
+			opts.Enabled = si.Spec.Enabled
+		}
+	}
+
+	if si.Spec.Comment != nil {
+		if obs == nil || obs.ShowOutput == nil || *si.Spec.Comment != obs.ShowOutput.Comment {
+			opts.Comment = si.Spec.Comment
+		}
+	}
 
 	switch si.Spec.Type {
 	case snowplanev1alpha1.SecurityIntegrationTypeExternalOAuth:

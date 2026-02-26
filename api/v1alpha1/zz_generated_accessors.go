@@ -2007,3 +2007,139 @@ func (g *GrantOwnership) GetOwner() string {
 func (g *GrantOwnership) GetTrackedParametersList() []string { return nil }
 
 func (g *GrantOwnership) SetTrackedParametersList(_ []string) {}
+
+// ---------------------------------------------------------------------------
+// AccountRoleAssignment
+// ---------------------------------------------------------------------------
+
+func (a *AccountRoleAssignment) GetConditions() []metav1.Condition {
+	return a.Status.Conditions
+}
+
+func (a *AccountRoleAssignment) SetConditions(conditions []metav1.Condition) {
+	a.Status.Conditions = conditions
+}
+
+func (a *AccountRoleAssignment) GetDeletionPolicy() DeletionPolicy {
+	if a.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return a.Spec.DeletionPolicy
+}
+
+func (a *AccountRoleAssignment) GetFullyQualifiedName() string {
+	return a.Status.FullyQualifiedName
+}
+
+func (a *AccountRoleAssignment) GetProviderRef() ProviderReference {
+	return a.Spec.ProviderRef
+}
+
+func (a *AccountRoleAssignment) GetUseRole() *string {
+	return a.Spec.UseRole
+}
+
+func (a *AccountRoleAssignment) GetObservedGeneration() int64 {
+	return a.Status.ObservedGeneration
+}
+
+func (a *AccountRoleAssignment) SetObservedGeneration(val int64) {
+	a.Status.ObservedGeneration = val
+}
+
+func (a *AccountRoleAssignment) GetLastAppliedSpecHash() string {
+	return a.Status.LastAppliedSpecHash
+}
+
+func (a *AccountRoleAssignment) SetLastAppliedSpecHash(val string) {
+	a.Status.LastAppliedSpecHash = val
+}
+
+func (a *AccountRoleAssignment) ValidateSpec() error {
+	return a.Spec.Validate()
+}
+
+func (a *AccountRoleAssignment) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(a.Spec)
+}
+
+func (a *AccountRoleAssignment) GetOwner() string {
+	if a.Status.ShowOutput != nil {
+		return a.Status.ShowOutput.GrantedBy
+	}
+
+	return ""
+}
+
+func (a *AccountRoleAssignment) GetTrackedParametersList() []string { return nil }
+
+func (a *AccountRoleAssignment) SetTrackedParametersList(_ []string) {}
+
+// ---------------------------------------------------------------------------
+// DatabaseRoleAssignment
+// ---------------------------------------------------------------------------
+
+func (d *DatabaseRoleAssignment) GetConditions() []metav1.Condition {
+	return d.Status.Conditions
+}
+
+func (d *DatabaseRoleAssignment) SetConditions(conditions []metav1.Condition) {
+	d.Status.Conditions = conditions
+}
+
+func (d *DatabaseRoleAssignment) GetDeletionPolicy() DeletionPolicy {
+	if d.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return d.Spec.DeletionPolicy
+}
+
+func (d *DatabaseRoleAssignment) GetFullyQualifiedName() string {
+	return d.Status.FullyQualifiedName
+}
+
+func (d *DatabaseRoleAssignment) GetProviderRef() ProviderReference {
+	return d.Spec.ProviderRef
+}
+
+func (d *DatabaseRoleAssignment) GetUseRole() *string {
+	return d.Spec.UseRole
+}
+
+func (d *DatabaseRoleAssignment) GetObservedGeneration() int64 {
+	return d.Status.ObservedGeneration
+}
+
+func (d *DatabaseRoleAssignment) SetObservedGeneration(val int64) {
+	d.Status.ObservedGeneration = val
+}
+
+func (d *DatabaseRoleAssignment) GetLastAppliedSpecHash() string {
+	return d.Status.LastAppliedSpecHash
+}
+
+func (d *DatabaseRoleAssignment) SetLastAppliedSpecHash(val string) {
+	d.Status.LastAppliedSpecHash = val
+}
+
+func (d *DatabaseRoleAssignment) ValidateSpec() error {
+	return d.Spec.Validate()
+}
+
+func (d *DatabaseRoleAssignment) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(d.Spec)
+}
+
+func (d *DatabaseRoleAssignment) GetOwner() string {
+	if d.Status.ShowOutput != nil {
+		return d.Status.ShowOutput.GrantedBy
+	}
+
+	return ""
+}
+
+func (d *DatabaseRoleAssignment) GetTrackedParametersList() []string { return nil }
+
+func (d *DatabaseRoleAssignment) SetTrackedParametersList(_ []string) {}

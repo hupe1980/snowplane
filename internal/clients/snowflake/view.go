@@ -203,7 +203,8 @@ func (v *ViewClient) Alter(ctx context.Context, opts AlterViewOptions) error {
 		return NewTerminalError(fmt.Errorf("invalid alter view options: %w", err))
 	}
 
-	// Statement change → CREATE OR REPLACE VIEW (atomic replacement).
+	// Statement change → CREATE OR ALTER VIEW (preserves grants).
+	// Falls back to CREATE OR REPLACE VIEW on accounts that lack CREATE OR ALTER support.
 	if opts.ReplaceStatement != nil {
 		rs := opts.ReplaceStatement
 
@@ -217,6 +218,24 @@ func (v *ViewClient) Alter(ctx context.Context, opts AlterViewOptions) error {
 		}
 
 		if _, err := v.client.Exec(ctx, buildCreateViewSQL(createOpts)); err != nil {
+			// Fallback: if CREATE OR ALTER is unsupported, retry with CREATE OR REPLACE.
+			if isCreateOrAlterUnsupportedErr(err) {
+				fallbackOpts := CreateViewOptions{
+					Name:           opts.Name,
+					Statement:      rs.Statement,
+					Secure:         rs.Secure,
+					Comment:        rs.Comment,
+					ChangeTracking: rs.ChangeTracking,
+					OrReplace:      true,
+				}
+
+				if _, err2 := v.client.Exec(ctx, buildCreateViewSQL(fallbackOpts)); err2 != nil {
+					return fmt.Errorf("replacing view %s (fallback): %w", opts.Name, err2)
+				}
+
+				return nil
+			}
+
 			return fmt.Errorf("replacing view %s: %w", opts.Name, err)
 		}
 
@@ -343,4 +362,19 @@ func scanViewShowOutput(rows *sql.Rows, name string) (*ViewShowOutput, error) {
 	}
 
 	return nil, ErrObjectNotFound
+}
+
+// isCreateOrAlterUnsupportedErr checks whether an error indicates that the
+// CREATE OR ALTER syntax is not supported by the Snowflake account.
+func isCreateOrAlterUnsupportedErr(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	msg := strings.ToUpper(err.Error())
+
+	return strings.Contains(msg, "UNSUPPORTED") ||
+		strings.Contains(msg, "UNEXPECTED 'OR'") ||
+		strings.Contains(msg, "SYNTAX ERROR") ||
+		strings.Contains(msg, "002032")
 }

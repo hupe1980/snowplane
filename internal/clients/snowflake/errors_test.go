@@ -167,6 +167,7 @@ func TestMapSnowflakeError_KnownCodes(t *testing.T) {
 		{"ObjectAlreadyExists", ErrCodeObjectAlreadyExists, ErrObjectAlreadyExists},
 		{"InsufficientPrivileges", ErrCodeInsufficientPrivileges, ErrInsufficientPrivileges},
 		{"ObjectNotExist", ErrCodeObjectNotExist, ErrObjectNotExistOrNotAuthorized},
+		{"SQLCompilation", ErrCodeSQLCompilation, ErrSQLCompilation},
 		{"StatementTimeout", ErrCodeStatementTimeout, ErrStatementTimeout},
 		{"AccountLocked", ErrCodeAccountLocked, ErrAccountLocked},
 		{"QuotaExceeded", ErrCodeQuotaExceeded, ErrQuotaExceeded},

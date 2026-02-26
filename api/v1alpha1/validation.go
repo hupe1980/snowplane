@@ -1503,33 +1503,35 @@ func (s *NetworkRuleSpec) Validate() error {
 //
 //nolint:gochecknoglobals // package-level constant set
 var ValidFieldExportSourceKinds = map[string]struct{}{
-	"Database":            {},
-	"Schema":              {},
-	"Warehouse":           {},
-	"User":                {},
-	"AccountRole":         {},
-	"DatabaseRole":        {},
-	"AccountRoleGrant":    {},
-	"DatabaseRoleGrant":   {},
-	"ShareGrant":          {},
-	"Table":               {},
-	"View":                {},
-	"Stage":               {},
-	"Task":                {},
-	"Stream":              {},
-	"Tag":                 {},
-	"NetworkPolicy":       {},
-	"ResourceMonitor":     {},
-	"MaskingPolicy":       {},
-	"RowAccessPolicy":     {},
-	"GrantOwnership":      {},
-	"StorageIntegration":  {},
-	"SecurityIntegration": {},
-	"FileFormat":          {},
-	"Pipe":                {},
-	"DynamicTable":        {},
-	"PasswordPolicy":      {},
-	"NetworkRule":         {},
+	"Database":               {},
+	"Schema":                 {},
+	"Warehouse":              {},
+	"User":                   {},
+	"AccountRole":            {},
+	"DatabaseRole":           {},
+	"AccountRoleGrant":       {},
+	"DatabaseRoleGrant":      {},
+	"ShareGrant":             {},
+	"Table":                  {},
+	"View":                   {},
+	"Stage":                  {},
+	"Task":                   {},
+	"Stream":                 {},
+	"Tag":                    {},
+	"NetworkPolicy":          {},
+	"ResourceMonitor":        {},
+	"MaskingPolicy":          {},
+	"RowAccessPolicy":        {},
+	"GrantOwnership":         {},
+	"StorageIntegration":     {},
+	"SecurityIntegration":    {},
+	"FileFormat":             {},
+	"Pipe":                   {},
+	"DynamicTable":           {},
+	"PasswordPolicy":         {},
+	"NetworkRule":            {},
+	"AccountRoleAssignment":  {},
+	"DatabaseRoleAssignment": {},
 }
 
 // Validate checks that the FieldExport spec fields are semantically valid.
@@ -1689,4 +1691,106 @@ func validateSchemaSource(ref *LocalObjectReference, name *string) error {
 	}
 
 	return nil
+}
+
+// Validate checks the AccountRoleAssignmentSpec for configuration errors.
+func (s *AccountRoleAssignmentSpec) Validate() error {
+	var errs []error
+
+	// Exactly one of roleName or roleRef must be set.
+	roleCount := 0
+	if s.RoleName != "" {
+		roleCount++
+	}
+
+	if s.RoleRef != nil {
+		roleCount++
+	}
+
+	if roleCount != 1 {
+		errs = append(errs, errors.New("spec: exactly one of roleName or roleRef must be set"))
+	}
+
+	if s.RoleName != "" && s.RoleRef != nil {
+		errs = append(errs, errors.New("spec: roleName and roleRef are mutually exclusive"))
+	}
+
+	// Exactly one of toRole/toRoleRef or toUser/toUserRef must be set.
+	targetCount := 0
+	if s.ToRole != "" {
+		targetCount++
+	}
+
+	if s.ToRoleRef != nil {
+		targetCount++
+	}
+
+	if s.ToUser != "" {
+		targetCount++
+	}
+
+	if s.ToUserRef != nil {
+		targetCount++
+	}
+
+	if targetCount != 1 {
+		errs = append(errs, errors.New("spec: exactly one of toRole, toRoleRef, toUser, or toUserRef must be set"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the DatabaseRoleAssignmentSpec for configuration errors.
+func (s *DatabaseRoleAssignmentSpec) Validate() error {
+	var errs []error
+
+	// Exactly one of databaseRoleName or databaseRoleRef must be set.
+	roleCount := 0
+	if s.DatabaseRoleName != "" {
+		roleCount++
+	}
+
+	if s.DatabaseRoleRef != nil {
+		roleCount++
+	}
+
+	if roleCount != 1 {
+		errs = append(errs, errors.New("spec: exactly one of databaseRoleName or databaseRoleRef must be set"))
+	}
+
+	if s.DatabaseRoleName != "" && s.DatabaseRoleRef != nil {
+		errs = append(errs, errors.New("spec: databaseRoleName and databaseRoleRef are mutually exclusive"))
+	}
+
+	// Exactly one of toRole/toRoleRef or toDatabaseRole/toDatabaseRoleRef must be set.
+	targetCount := 0
+	if s.ToRole != "" {
+		targetCount++
+	}
+
+	if s.ToRoleRef != nil {
+		targetCount++
+	}
+
+	if s.ToDatabaseRole != "" {
+		targetCount++
+	}
+
+	if s.ToDatabaseRoleRef != nil {
+		targetCount++
+	}
+
+	if targetCount != 1 {
+		errs = append(errs, errors.New("spec: exactly one of toRole, toRoleRef, toDatabaseRole, or toDatabaseRoleRef must be set"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
 }

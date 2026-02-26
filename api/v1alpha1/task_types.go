@@ -220,6 +220,12 @@ type TaskParameters struct {
 
 	// UserTaskMinimumTriggerIntervalInSeconds defines how frequently a triggered task can execute.
 	UserTaskMinimumTriggerIntervalInSeconds *int32 `json:"userTaskMinimumTriggerIntervalInSeconds,omitempty"`
+
+	// TargetCompletionInterval is the target completion interval for the task.
+	TargetCompletionInterval *string `json:"targetCompletionInterval,omitempty"`
+
+	// UserTaskManagedInitialWarehouseSize is the initial warehouse size for serverless tasks.
+	UserTaskManagedInitialWarehouseSize *string `json:"userTaskManagedInitialWarehouseSize,omitempty"`
 }
 
 // TaskStatus defines the observed state of a Task.

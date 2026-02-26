@@ -48,6 +48,8 @@ type TaskParameters struct {
 	TaskAutoRetryAttempts                   *int32
 	LogLevel                                string
 	UserTaskMinimumTriggerIntervalInSeconds *int32
+	TargetCompletionInterval                *string
+	UserTaskManagedInitialWarehouseSize     *string
 }
 
 // CreateTaskOptions holds the parameters for creating a task.
@@ -613,6 +615,10 @@ func scanTaskParameters(rows *sql.Rows) (*TaskParameters, error) {
 			if v, ok := parseInt32(val); ok {
 				params.UserTaskMinimumTriggerIntervalInSeconds = &v
 			}
+		case "TARGET_COMPLETION_INTERVAL":
+			params.TargetCompletionInterval = &val
+		case "USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE":
+			params.UserTaskManagedInitialWarehouseSize = &val
 		}
 	}
 

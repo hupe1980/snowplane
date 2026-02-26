@@ -282,7 +282,13 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 
 	id, err := r.Adapter.BuildIdentifier(obj)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("building identifier: %w", err)
+		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonTerminalError, err.Error())
+		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonTerminalError, err.Error())
+		r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonTerminalError,
+			fmt.Sprintf("Failed to build identifier for %s %q: %s", resName, obj.GetSpecName(), err.Error()))
+		r.bestEffortPatchStatus(ctx, obj)
+
+		return ctrl.Result{}, nil // Terminal — BuildIdentifier failure is deterministic.
 	}
 
 	// Handle deletion.
@@ -355,6 +361,16 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 		r.bestEffortPatchStatus(ctx, obj)
 
 		return ctrl.Result{}, err
+	}
+
+	// Guard against nil observation — adapters must return a non-nil Observation
+	// even when the resource doesn't exist (Exists=false).
+	if obs == nil {
+		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonReconcileError, fmt.Sprintf("observe returned nil for %s", resName))
+		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonReconcileError, "observe returned nil observation")
+		r.bestEffortPatchStatus(ctx, obj)
+
+		return ctrl.Result{}, fmt.Errorf("adapter %s.Observe returned nil observation", resName)
 	}
 
 	if !obs.Exists {
@@ -534,7 +550,7 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 			conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonTerminalError, hashErr.Error())
 			r.bestEffortPatchStatus(ctx, obj)
 
-			return ctrl.Result{}, hashErr
+			return ctrl.Result{}, nil // Terminal — do not requeue; hash computation is deterministic.
 		}
 
 		isDrift := obj.GetLastAppliedSpecHash() != "" && obj.GetLastAppliedSpecHash() == currentHash
@@ -868,8 +884,18 @@ func (r *GenericReconciler[T, S, D]) reconcileDelete(ctx context.Context, obj T,
 			})
 		}); err != nil {
 			if !snowflake.IsObjectNotFound(err) && !snowflake.IsObjectNotExistOrNotAuthorized(err) {
-				conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDeleting, fmt.Sprintf("failed to drop %s: %v", resName, err))
-				r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonReconcileError, fmt.Sprintf("Failed to drop %s %q: %v", resName, obj.GetSpecName(), err))
+				if snowflake.IsTerminalError(err) {
+					conditions.SetNotReady(obj, snowplanev1alpha1.ReasonTerminalError, fmt.Sprintf("terminal error dropping %s: %v", resName, err))
+					conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonTerminalError, err.Error())
+					r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonTerminalError,
+						fmt.Sprintf("Terminal error dropping %s %q: %v — manual intervention required", resName, obj.GetSpecName(), err))
+				} else {
+					conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDeleting, fmt.Sprintf("failed to drop %s: %v", resName, err))
+					conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonReconcileError, err.Error())
+					r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonReconcileError,
+						fmt.Sprintf("Failed to drop %s %q: %v", resName, obj.GetSpecName(), err))
+				}
+
 				r.bestEffortPatchStatus(ctx, obj)
 
 				return ctrl.Result{}, err

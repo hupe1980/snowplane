@@ -37,6 +37,7 @@ import (
 	providerconfig "github.com/hupe1980/snowplane/internal/controller/providerconfig"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	resourcemonitorctl "github.com/hupe1980/snowplane/internal/controller/resourcemonitor"
+	roleassignmentctl "github.com/hupe1980/snowplane/internal/controller/roleassignment"
 	rowaccesspolicyctl "github.com/hupe1980/snowplane/internal/controller/rowaccesspolicy"
 	schemactl "github.com/hupe1980/snowplane/internal/controller/schema"
 	securityintegrationctl "github.com/hupe1980/snowplane/internal/controller/securityintegration"
@@ -68,34 +69,36 @@ func init() {
 
 // validControllerNames is the set of controller names accepted by --disable-controllers.
 var validControllerNames = map[string]bool{
-	"database":            true,
-	"schema":              true,
-	"warehouse":           true,
-	"accountrole":         true,
-	"databaserole":        true,
-	"accountrolegrant":    true,
-	"databaserolegrant":   true,
-	"sharegrant":          true,
-	"user":                true,
-	"table":               true,
-	"view":                true,
-	"stage":               true,
-	"task":                true,
-	"stream":              true,
-	"tag":                 true,
-	"networkpolicy":       true,
-	"resourcemonitor":     true,
-	"maskingpolicy":       true,
-	"rowaccesspolicy":     true,
-	"grantownership":      true,
-	"fieldexport":         true,
-	"storageintegration":  true,
-	"fileformat":          true,
-	"pipe":                true,
-	"dynamictable":        true,
-	"securityintegration": true,
-	"passwordpolicy":      true,
-	"networkrule":         true,
+	"database":               true,
+	"schema":                 true,
+	"warehouse":              true,
+	"accountrole":            true,
+	"databaserole":           true,
+	"accountrolegrant":       true,
+	"databaserolegrant":      true,
+	"sharegrant":             true,
+	"user":                   true,
+	"table":                  true,
+	"view":                   true,
+	"stage":                  true,
+	"task":                   true,
+	"stream":                 true,
+	"tag":                    true,
+	"networkpolicy":          true,
+	"resourcemonitor":        true,
+	"maskingpolicy":          true,
+	"rowaccesspolicy":        true,
+	"grantownership":         true,
+	"fieldexport":            true,
+	"storageintegration":     true,
+	"fileformat":             true,
+	"pipe":                   true,
+	"dynamictable":           true,
+	"securityintegration":    true,
+	"passwordpolicy":         true,
+	"networkrule":            true,
+	"accountroleassignment":  true,
+	"databaseroleassignment": true,
 }
 
 // parseDisabledControllers parses a comma-separated list of controller names
@@ -159,7 +162,7 @@ func main() {
 		"Enable controllers for alpha-maturity CRDs. Set to false to skip alpha resources.")
 	flag.StringVar(&disableControllers, "disable-controllers", "",
 		"Comma-separated list of controller names to disable (e.g. \"accountrolegrant,stage,view\"). "+
-			"Valid names: database, schema, warehouse, accountrole, databaserole, accountrolegrant, databaserolegrant, sharegrant, user, table, view, stage, task, stream, tag, networkpolicy, resourcemonitor, maskingpolicy, rowaccesspolicy, grantownership, fieldexport, storageintegration, fileformat, pipe, dynamictable, securityintegration, passwordpolicy, networkrule.")
+			"Valid names: database, schema, warehouse, accountrole, databaserole, accountrolegrant, databaserolegrant, sharegrant, user, table, view, stage, task, stream, tag, networkpolicy, resourcemonitor, maskingpolicy, rowaccesspolicy, grantownership, fieldexport, storageintegration, fileformat, pipe, dynamictable, securityintegration, passwordpolicy, networkrule, accountroleassignment, databaseroleassignment.")
 	flag.StringVar(&watchNamespaces, "watch-namespaces", "",
 		"Comma-separated list of namespaces to watch. If empty, all namespaces are watched.")
 	flag.StringVar(&leaderElectionID, "leader-election-id", "snowplane-leader-election",
@@ -298,6 +301,8 @@ func main() {
 		{"securityintegration", securityintegrationctl.NewReconciler(kc, factory, controllerRec("securityintegration"), rl)},
 		{"passwordpolicy", passwordpolicyctl.NewReconciler(kc, factory, controllerRec("passwordpolicy"), rl)},
 		{"networkrule", networkrulectl.NewReconciler(kc, factory, controllerRec("networkrule"), rl)},
+		{"accountroleassignment", roleassignmentctl.NewAccountRoleAssignmentReconciler(kc, factory, controllerRec("accountroleassignment"), rl)},
+		{"databaseroleassignment", roleassignmentctl.NewDatabaseRoleAssignmentReconciler(kc, factory, controllerRec("databaseroleassignment"), rl)},
 	}
 
 	for _, entry := range controllers {

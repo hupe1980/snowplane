@@ -578,14 +578,6 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	assert.Contains(t, result.Summary(), "COMMENT")
 }
 
-func TestSortedString(t *testing.T) {
-	t.Parallel()
-	assert.Equal(t, "", sortedString(nil))
-	assert.Equal(t, "", sortedString([]string{}))
-	assert.Equal(t, "a,b,c", sortedString([]string{"c", "a", "b"}))
-	assert.Equal(t, "1.2.3.4", sortedString([]string{"1.2.3.4"}))
-}
-
 func TestReconcile_TrackedParametersPersistedOnCreate(t *testing.T) {
 	t.Parallel()
 	np := newTestNetworkPolicy("mynp", "default")

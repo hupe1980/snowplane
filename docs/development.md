@@ -220,7 +220,7 @@ Adopt pre-existing Snowflake resources via annotation:
 | Fuzz | Denylist validators, escaping functions | Go built-in `testing.F` |
 | CEL validation | Immutable fields, defaults, blocklists | envtest |
 | Integration | Full CRD → reconciler pipeline | envtest (59 tests, 11 resources) |
-| E2E | Real Snowflake + k3s testcontainer | 17 tests |
+| E2E | Real Snowflake + k3s testcontainer | 27 tests |
 
 ### Integration Tests
 

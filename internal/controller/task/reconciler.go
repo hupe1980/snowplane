@@ -110,6 +110,8 @@ func applyObservation(task *snowplanev1alpha1.Task, obs *snowflake.TaskObservati
 			TaskAutoRetryAttempts:                   obs.Parameters.TaskAutoRetryAttempts,
 			LogLevel:                                obs.Parameters.LogLevel,
 			UserTaskMinimumTriggerIntervalInSeconds: obs.Parameters.UserTaskMinimumTriggerIntervalInSeconds,
+			TargetCompletionInterval:                obs.Parameters.TargetCompletionInterval,
+			UserTaskManagedInitialWarehouseSize:     obs.Parameters.UserTaskManagedInitialWarehouseSize,
 		}
 	}
 }
@@ -247,7 +249,9 @@ func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectId
 	}
 
 	if task.Spec.TargetCompletionInterval != nil {
-		opts.TargetCompletionInterval = task.Spec.TargetCompletionInterval
+		if obs.Parameters == nil || obs.Parameters.TargetCompletionInterval == nil || *task.Spec.TargetCompletionInterval != *obs.Parameters.TargetCompletionInterval {
+			opts.TargetCompletionInterval = task.Spec.TargetCompletionInterval
+		}
 	}
 
 	if task.Spec.ServerlessTaskMinStatementSize != nil {
@@ -259,7 +263,9 @@ func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectId
 	}
 
 	if task.Spec.UserTaskManagedInitialWarehouseSize != nil {
-		opts.UserTaskManagedInitialWarehouseSize = task.Spec.UserTaskManagedInitialWarehouseSize
+		if obs.Parameters == nil || obs.Parameters.UserTaskManagedInitialWarehouseSize == nil || *task.Spec.UserTaskManagedInitialWarehouseSize != *obs.Parameters.UserTaskManagedInitialWarehouseSize {
+			opts.UserTaskManagedInitialWarehouseSize = task.Spec.UserTaskManagedInitialWarehouseSize
+		}
 	}
 
 	return opts

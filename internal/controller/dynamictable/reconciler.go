@@ -152,9 +152,12 @@ func buildAlterOptions(dt *snowplanev1alpha1.DynamicTable, id snowflake.SchemaOb
 		}
 	}
 
-	// ClusterBy — set if specified, or drop if previously managed but now removed.
+	// ClusterBy — set if specified and changed, or drop if previously managed but now removed.
 	if len(dt.Spec.ClusterBy) > 0 {
-		opts.ClusterBy = dt.Spec.ClusterBy
+		specCluster := strings.Join(dt.Spec.ClusterBy, ", ")
+		if obs.ShowOutput == nil || specCluster != obs.ShowOutput.ClusterBy {
+			opts.ClusterBy = dt.Spec.ClusterBy
+		}
 	} else {
 		for _, p := range dt.Status.TrackedParameters {
 			if p == "CLUSTER_BY" {

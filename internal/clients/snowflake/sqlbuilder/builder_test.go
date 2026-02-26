@@ -721,3 +721,65 @@ func TestValidateDollarQuotedValue(t *testing.T) {
 		assert.Contains(t, err.Error(), "comment")
 	})
 }
+
+func TestValidatePolicyBody(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ValidSimpleCase", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidatePolicyBody("CASE WHEN current_role() IN ('ANALYST') THEN val ELSE '***' END"))
+	})
+
+	t.Run("ValidComplexExpression", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidatePolicyBody("CASE WHEN IS_ROLE_IN_SESSION('ADMIN') THEN val WHEN val IS NULL THEN NULL ELSE SHA2(val) END"))
+	})
+
+	t.Run("ValidBoolExpression", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidatePolicyBody("current_role() IN ('ANALYST', 'ADMIN')"))
+	})
+
+	t.Run("RejectEmpty", func(t *testing.T) {
+		t.Parallel()
+		err := ValidatePolicyBody("")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "empty")
+	})
+
+	t.Run("RejectSemicolon", func(t *testing.T) {
+		t.Parallel()
+		err := ValidatePolicyBody("val; DROP TABLE x")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "forbidden")
+	})
+
+	t.Run("RejectLineComment", func(t *testing.T) {
+		t.Parallel()
+		err := ValidatePolicyBody("val -- hidden SQL")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "forbidden")
+	})
+
+	t.Run("RejectBlockComment", func(t *testing.T) {
+		t.Parallel()
+		err := ValidatePolicyBody("val /* hidden */ END")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "forbidden")
+	})
+
+	t.Run("RejectDollarQuoting", func(t *testing.T) {
+		t.Parallel()
+		err := ValidatePolicyBody("$$injection$$")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "forbidden")
+	})
+
+	t.Run("RejectTooLong", func(t *testing.T) {
+		t.Parallel()
+		body := strings.Repeat("x", 65537)
+		err := ValidatePolicyBody(body)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "too long")
+	})
+}

@@ -594,6 +594,8 @@ func sourceResourceTypes() []client.Object {
 		&snowplanev1alpha1.AccountRoleGrant{},
 		&snowplanev1alpha1.DatabaseRoleGrant{},
 		&snowplanev1alpha1.ShareGrant{},
+		&snowplanev1alpha1.AccountRoleAssignment{},
+		&snowplanev1alpha1.DatabaseRoleAssignment{},
 		&snowplanev1alpha1.Table{},
 		&snowplanev1alpha1.View{},
 		&snowplanev1alpha1.Stage{},

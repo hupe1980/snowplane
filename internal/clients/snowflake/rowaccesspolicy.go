@@ -3,6 +3,7 @@ package snowflake
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -49,19 +50,23 @@ type CreateRowAccessPolicyOptions struct {
 
 // Validate checks the CreateRowAccessPolicyOptions for validity.
 func (o *CreateRowAccessPolicyOptions) Validate() error {
+	var errs []error
+
 	if !ValidObjectIdentifier(o.Name) {
-		return fmt.Errorf("row access policy name is required")
+		errs = append(errs, fmt.Errorf("row access policy name is required"))
 	}
 
 	if len(o.Signature) == 0 {
-		return fmt.Errorf("row access policy signature requires at least one argument")
+		errs = append(errs, fmt.Errorf("row access policy signature requires at least one argument"))
 	}
 
 	if o.Body == "" {
-		return fmt.Errorf("row access policy body is required")
+		errs = append(errs, fmt.Errorf("row access policy body is required"))
+	} else if err := sqlbuilder.ValidatePolicyBody(o.Body); err != nil {
+		errs = append(errs, fmt.Errorf("invalid row access policy body: %w", err))
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
 // AlterRowAccessPolicyOptions holds the parameters for altering a row access policy.
@@ -76,11 +81,19 @@ type AlterRowAccessPolicyOptions struct {
 
 // Validate checks the AlterRowAccessPolicyOptions for validity.
 func (o *AlterRowAccessPolicyOptions) Validate() error {
+	var errs []error
+
 	if !ValidObjectIdentifier(o.Name) {
-		return fmt.Errorf("row access policy name is required")
+		errs = append(errs, fmt.Errorf("row access policy name is required"))
 	}
 
-	return nil
+	if o.Body != nil {
+		if err := sqlbuilder.ValidatePolicyBody(*o.Body); err != nil {
+			errs = append(errs, fmt.Errorf("invalid row access policy body: %w", err))
+		}
+	}
+
+	return errors.Join(errs...)
 }
 
 // HasChanges reports whether any fields are set for alteration.

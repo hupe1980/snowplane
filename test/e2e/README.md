@@ -78,3 +78,7 @@ just e2e-teardown-kind # hack/teardown-e2e-kind.sh
 | `cross_resource_test.go` | Database -> Schema -> DatabaseRole chain      |
 | `fieldexport_test.go`    | FieldExport -> ConfigMap / Secret             |
 | `adoption_test.go`       | Pre-create in SF -> adopt via annotation      |
+| `grant_test.go`          | AccountRole / DatabaseRole / future grants    |
+| `policy_test.go`         | NetworkPolicy, PasswordPolicy, MaskingPolicy  |
+| `task_test.go`           | Task lifecycle (database + schema deps)       |
+| `stream_test.go`         | Stream lifecycle (database + schema + table)  |
