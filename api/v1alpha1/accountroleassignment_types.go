@@ -71,9 +71,12 @@ type AccountRoleAssignmentStatus struct {
 // It assigns an account role to another role or user in Snowflake.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:shortName=ara,categories=snowplane
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
+// +kubebuilder:printcolumn:name="ROLE",type=string,JSONPath=`.spec.roleName`,priority=0
+// +kubebuilder:printcolumn:name="TO-ROLE",type=string,JSONPath=`.spec.toRole`,priority=0
+// +kubebuilder:printcolumn:name="TO-USER",type=string,JSONPath=`.spec.toUser`,priority=0
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type AccountRoleAssignment struct {
 	metav1.TypeMeta   `json:",inline"`

@@ -111,6 +111,9 @@ func (a *databaseRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *s
 // BuildIdentifier constructs a RoleAssignmentIdentifier from the spec.
 func (a *databaseRoleAssignmentAdapter) BuildIdentifier(obj *snowplanev1alpha1.DatabaseRoleAssignment) (reconciler.Identifier, error) {
 	grantedTo, granteeName := resolveDatabaseTarget(obj)
+	if grantedTo == "" || granteeName == "" {
+		return nil, fmt.Errorf("exactly one of toRole, toRoleRef, toDatabaseRole, or toDatabaseRoleRef must be set")
+	}
 
 	return snowflake.RoleAssignmentIdentifier{
 		RoleName:       obj.Spec.DatabaseRoleName,
@@ -141,10 +144,27 @@ func (a *databaseRoleAssignmentAdapter) SetupWatches() reconciler.SetupWatchesFu
 			return fmt.Errorf("creating field indexer for %s: %w", draIndexDatabaseRoleRef, err)
 		}
 
+		// ToDatabaseRoleRef indexer (must be registered before the combined DatabaseRole watch).
+		if err := mgr.GetFieldIndexer().IndexField(ctx, obj, draIndexToDatabaseRoleRef,
+			func(o sigs.Object) []string {
+				g, ok := o.(*snowplanev1alpha1.DatabaseRoleAssignment)
+				if !ok {
+					return nil
+				}
+				if ref := g.Spec.ToDatabaseRoleRef; ref != nil {
+					return []string{ref.Name}
+				}
+				return nil
+			},
+		); err != nil {
+			return fmt.Errorf("creating field indexer for %s: %w", draIndexToDatabaseRoleRef, err)
+		}
+
+		// Single DatabaseRole watch that queries BOTH DatabaseRoleRef and ToDatabaseRoleRef indexes.
 		bldr.Watches(
 			&snowplanev1alpha1.DatabaseRole{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj sigs.Object) []reconcile.Request {
-				return a.listByIndex(ctx, obj, draIndexDatabaseRoleRef)
+				return a.listByIndexes(ctx, obj, draIndexDatabaseRoleRef, draIndexToDatabaseRoleRef)
 			}),
 		)
 
@@ -170,22 +190,6 @@ func (a *databaseRoleAssignmentAdapter) SetupWatches() reconciler.SetupWatchesFu
 				return a.listByIndex(ctx, obj, draIndexToRoleRef)
 			}),
 		)
-
-		// ToDatabaseRoleRef indexer + watch.
-		if err := mgr.GetFieldIndexer().IndexField(ctx, obj, draIndexToDatabaseRoleRef,
-			func(o sigs.Object) []string {
-				g, ok := o.(*snowplanev1alpha1.DatabaseRoleAssignment)
-				if !ok {
-					return nil
-				}
-				if ref := g.Spec.ToDatabaseRoleRef; ref != nil {
-					return []string{ref.Name}
-				}
-				return nil
-			},
-		); err != nil {
-			return fmt.Errorf("creating field indexer for %s: %w", draIndexToDatabaseRoleRef, err)
-		}
 
 		return nil
 	}
@@ -214,6 +218,24 @@ func (a *databaseRoleAssignmentAdapter) listByIndex(ctx context.Context, obj sig
 	}
 
 	return requests
+}
+
+// listByIndexes queries multiple field indexes for the same object and merges
+// the results, deduplicating by NamespacedName.
+func (a *databaseRoleAssignmentAdapter) listByIndexes(ctx context.Context, obj sigs.Object, indexKeys ...string) []reconcile.Request {
+	seen := make(map[types.NamespacedName]struct{})
+	var merged []reconcile.Request
+
+	for _, key := range indexKeys {
+		for _, req := range a.listByIndex(ctx, obj, key) {
+			if _, ok := seen[req.NamespacedName]; !ok {
+				seen[req.NamespacedName] = struct{}{}
+				merged = append(merged, req)
+			}
+		}
+	}
+
+	return merged
 }
 
 // Observe queries Snowflake for the current state.
@@ -263,8 +285,13 @@ func (a *databaseRoleAssignmentAdapter) ApplyObservation(obj *snowplanev1alpha1.
 	raObs := obs.Detail
 	if raObs.ShowOutput != nil {
 		grantedTo, granteeName := resolveDatabaseTarget(obj)
-		obj.Status.FullyQualifiedName = fmt.Sprintf("GRANT DATABASE ROLE %s TO %s %s",
-			obj.Spec.DatabaseRoleName, grantedTo, granteeName)
+		id := snowflake.RoleAssignmentIdentifier{
+			RoleName:       obj.Spec.DatabaseRoleName,
+			IsDatabaseRole: true,
+			GrantedTo:      grantedTo,
+			GranteeName:    granteeName,
+		}
+		obj.Status.FullyQualifiedName = id.FullyQualifiedName()
 		obj.Status.ShowOutput = applyRoleAssignmentShowOutput(raObs)
 	}
 }

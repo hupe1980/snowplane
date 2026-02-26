@@ -223,6 +223,28 @@ func TestRevokeRoleOptionsValidation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "exactly one")
 	})
+
+	t.Run("Error_FromDatabaseRole_NotDatabaseRole", func(t *testing.T) {
+		t.Parallel()
+		opts := &RevokeRoleOptions{RoleName: "ANALYST", IsDatabaseRole: false, FromDatabaseRole: "MY_DB.WRITER"}
+		err := opts.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "fromDatabaseRole is only valid for database role")
+	})
+
+	t.Run("Error_FromUser_DatabaseRole", func(t *testing.T) {
+		t.Parallel()
+		opts := &RevokeRoleOptions{RoleName: "MY_DB.READER", IsDatabaseRole: true, FromUser: "john"}
+		err := opts.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "fromUser is not valid for database role")
+	})
+
+	t.Run("Valid_FromDatabaseRole_IsDatabaseRole", func(t *testing.T) {
+		t.Parallel()
+		opts := &RevokeRoleOptions{RoleName: "MY_DB.READER", IsDatabaseRole: true, FromDatabaseRole: "MY_DB.WRITER"}
+		require.NoError(t, opts.Validate())
+	})
 }
 
 // --------------------------------------------------------------------------
@@ -307,6 +329,8 @@ func TestMatchesRoleAssignmentGrantee(t *testing.T) {
 		{"FQN_vs_Unqualified", "MY_ROLE", "MY_DB.MY_ROLE", true},
 		{"FQN_vs_FQN", "MY_DB.MY_ROLE", "MY_DB.MY_ROLE", true},
 		{"FQN_vs_WrongUnqualified", "OTHER_ROLE", "MY_DB.MY_ROLE", false},
+		{"Unqualified_vs_FQN", "MY_DB.MY_ROLE", "MY_ROLE", true},
+		{"Unqualified_vs_FQN_Wrong", "MY_DB.MY_ROLE", "OTHER_ROLE", false},
 		{"Empty_both", "", "", true},
 	}
 

@@ -42,6 +42,7 @@ Every step needed to add a new Snowflake resource to Snowplane — from CRD type
 | **Database** | `databaseRef` / `databaseName` | Schema, DatabaseRole |
 | **Schema** | `databaseRef` + `schemaRef` | Table, View, Stage, Task, Stream |
 | **Grant** | Role ref or inline | AccountRoleGrant, DatabaseRoleGrant |
+| **Assignment** | Role ref, target ref | AccountRoleAssignment, DatabaseRoleAssignment |
 
 ---
 

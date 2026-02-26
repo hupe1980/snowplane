@@ -38,6 +38,8 @@ Every Snowplane CRD carries a maturity label (`snowplane.hupe1980.github.io/matu
 | DatabaseRole | alpha | Two-part identifier, parent dependency |
 | AccountRoleGrant | alpha | Grant/Revoke (no ALTER) |
 | DatabaseRoleGrant | alpha | Grant/Revoke (no ALTER) |
+| AccountRoleAssignment | alpha | GRANT ROLE TO ROLE/USER (immutable, no ALTER) |
+| DatabaseRoleAssignment | alpha | GRANT DATABASE ROLE TO ROLE/DATABASE ROLE (immutable, no ALTER) |
 | ShareGrant | alpha | Grant/Revoke (no ALTER) |
 | GrantOwnership | alpha | Ownership transfer, no-op on delete |
 | Table | alpha | Column management, schema-level |

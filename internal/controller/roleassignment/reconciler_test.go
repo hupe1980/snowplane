@@ -506,8 +506,76 @@ func TestDrop(t *testing.T) {
 		id := snowflake.RoleAssignmentIdentifier{RoleName: "X", GrantedTo: "UNKNOWN", GranteeName: "Y"}
 		err := roleAssignmentDrop(context.Background(), &mockService{}, id)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown grantedTo type")
+		assert.Contains(t, err.Error(), "unsupported grantedTo type")
 	})
+	t.Run("EmptyGrantedTo", func(t *testing.T) {
+		t.Parallel()
+		id := snowflake.RoleAssignmentIdentifier{RoleName: "X", GrantedTo: "", GranteeName: "Y"}
+		err := roleAssignmentDrop(context.Background(), &mockService{}, id)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "grantedTo is empty")
+	})
+	t.Run("FromDatabaseRole", func(t *testing.T) {
+		t.Parallel()
+		var c snowflake.RevokeRoleOptions
+		mock := &mockService{
+			revokeFn: func(_ context.Context, opts snowflake.RevokeRoleOptions) error {
+				c = opts
+				return nil
+			},
+		}
+		id := snowflake.RoleAssignmentIdentifier{RoleName: "MY_DB.READER", IsDatabaseRole: true, GrantedTo: "DATABASE_ROLE", GranteeName: "MY_DB.WRITER"}
+		require.NoError(t, roleAssignmentDrop(context.Background(), mock, id))
+		assert.Equal(t, "MY_DB.WRITER", c.FromDatabaseRole)
+	})
+}
+
+func TestARA_BuildIdentifier_EmptyTarget(t *testing.T) {
+	t.Parallel()
+	a := &accountRoleAssignmentAdapter{}
+	obj := newTestARA("t", "default")
+	obj.Spec.ToRole = ""
+	obj.Spec.ToUser = ""
+	_, err := a.BuildIdentifier(obj)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of toRole")
+}
+
+func TestDRA_BuildIdentifier_EmptyTarget(t *testing.T) {
+	t.Parallel()
+	a := &databaseRoleAssignmentAdapter{}
+	obj := newTestDRA("t", "default")
+	obj.Spec.ToRole = ""
+	_, err := a.BuildIdentifier(obj)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of toRole")
+}
+
+func TestARA_ApplyObservation_QuotedFQN(t *testing.T) {
+	t.Parallel()
+	a := &accountRoleAssignmentAdapter{}
+	obj := newTestARA("t", "default")
+	obs := &reconciler.Observation[*snowflake.RoleAssignmentObservation]{
+		Exists: true,
+		Detail: okAccountObs(),
+	}
+	a.ApplyObservation(obj, obs)
+	// FQN must use quoted identifiers from RoleAssignmentIdentifier.FullyQualifiedName().
+	assert.Equal(t, `GRANT ROLE "ANALYST" TO ROLE "SYSADMIN"`, obj.Status.FullyQualifiedName)
+	require.NotNil(t, obj.Status.ShowOutput)
+	assert.Equal(t, "ANALYST", obj.Status.ShowOutput.Role)
+}
+
+func TestDRA_ApplyObservation_QuotedFQN(t *testing.T) {
+	t.Parallel()
+	a := &databaseRoleAssignmentAdapter{}
+	obj := newTestDRA("t", "default")
+	obs := &reconciler.Observation[*snowflake.RoleAssignmentObservation]{
+		Exists: true,
+		Detail: okDatabaseObs(),
+	}
+	a.ApplyObservation(obj, obs)
+	assert.Equal(t, `GRANT DATABASE ROLE "MY_DB"."READER" TO ROLE "SYSADMIN"`, obj.Status.FullyQualifiedName)
 }
 
 func readyAccountRole(name, ns, roleName string) *snowplanev1alpha1.AccountRole {

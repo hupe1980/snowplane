@@ -40,6 +40,8 @@ All resource types support drift detection:
 | User | `name`, `type` |
 | AccountRole | `name` |
 | DatabaseRole | `name`, `database` |
+| AccountRoleAssignment | `grantedTo`, `granteeName` (all fields immutable) |
+| DatabaseRoleAssignment | `grantedTo`, `granteeName` (all fields immutable) |
 | Table | `name`, `database`, `schema`, `transient` |
 | View | `name`, `database`, `schema` |
 | Stage | `name`, `database`, `schema`, `stageType` |

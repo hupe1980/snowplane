@@ -67,7 +67,7 @@ GRANT CREATE INTEGRATION ON ACCOUNT TO ROLE SNOWPLANE_ROLE;
 ```
 
 {: .warning }
-> `MANAGE GRANTS` is a powerful privilege. Only grant it if using the Grant or GrantOwnership CRDs:
+> `MANAGE GRANTS` is a powerful privilege. Only grant it if using the Grant, GrantOwnership, or RoleAssignment CRDs:
 > ```sql
 > GRANT MANAGE GRANTS ON ACCOUNT TO ROLE SNOWPLANE_ROLE;
 > ```
@@ -107,7 +107,7 @@ GRANT CREATE DYNAMIC TABLE ON SCHEMA <db>.<schema> TO ROLE SNOWPLANE_ROLE;
 | `CREATE WAREHOUSE ON ACCOUNT` | Warehouse CRD | Account |
 | `CREATE USER ON ACCOUNT` | User CRD | Account |
 | `CREATE ROLE ON ACCOUNT` | AccountRole CRD | Account |
-| `MANAGE GRANTS ON ACCOUNT` | Grant / GrantOwnership CRDs | Account (optional) |
+| `MANAGE GRANTS ON ACCOUNT` | Grant, GrantOwnership, AccountRoleAssignment, DatabaseRoleAssignment CRDs | Account (optional) |
 | `CREATE SCHEMA ON DATABASE` | Schema CRD | Per-database |
 | `CREATE TABLE ON SCHEMA` | Table CRD | Per-schema |
 | `CREATE VIEW ON SCHEMA` | View CRD | Per-schema |

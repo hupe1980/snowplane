@@ -2427,7 +2427,7 @@ func TestAccountRoleAssignmentSpec_Validate_BothRoleAndRef(t *testing.T) {
 		ToRole:     "SYSADMIN",
 	}).Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "mutually exclusive")
+	assert.Contains(t, err.Error(), "exactly one of roleName or roleRef")
 }
 
 func TestAccountRoleAssignmentSpec_Validate_NoTarget(t *testing.T) {
@@ -2482,7 +2482,7 @@ func TestDatabaseRoleAssignmentSpec_Validate_BothRoleAndRef(t *testing.T) {
 		ToRole:           "SYSADMIN",
 	}).Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "mutually exclusive")
+	assert.Contains(t, err.Error(), "exactly one of databaseRoleName or databaseRoleRef")
 }
 
 func TestDatabaseRoleAssignmentSpec_Validate_NoTarget(t *testing.T) {

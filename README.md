@@ -16,13 +16,13 @@
 
 ## ✨ Features
 
-### 🏗️ Resource Management (28 CRDs)
+### 🏗️ Resource Management (30 CRDs)
 
 | Category | Resources |
 |----------|-----------|
 | 🗄️ **Core Infrastructure** | Database, Schema, Warehouse |
 | 📊 **Data Objects** | Table, View, Stage, Stream, DynamicTable, FileFormat, Pipe |
-| 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, GrantOwnership |
+| 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
 | ⏰ **Orchestration** | Task (DAG scheduling, serverless or warehouse-backed) |
 | 🔗 **Integrations** | StorageIntegration, SecurityIntegration |
 | 🛡️ **Security & Governance** | NetworkPolicy, NetworkRule, PasswordPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
@@ -84,7 +84,7 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 │  │  └──────────────────────────────────────────┘  ││
 │  │                                                ││
 │  │  ┌──────────────────────────────────────────┐  ││
-│  │  │  28 Resource Controllers (see above)     │  ││
+│  │  │  30 Resource Controllers (see above)     │  ││
 │  │  │  Observe → Diff → Apply reconciliation   │  ││
 │  │  └──────────────────────────────────────────┘  ││
 │  │                                                ││
@@ -452,6 +452,42 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 | `spec.withGrantOption` | `bool` | Allow grantee to re-grant *(immutable)* |
 
 > ⚠️ **Grant Immutability:** All spec fields are immutable after creation. Changing any field requires deleting and recreating the CR (or using the `force-new` annotation).
+
+</details>
+
+<details>
+<summary>🔑 <strong>AccountRoleAssignment</strong> (shortName: <code>ara</code>)</summary>
+
+Assigns an account role to another role or user: `GRANT ROLE <role> TO ROLE|USER <target>`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.roleName` | `string` | Account role to assign *(immutable, mutually exclusive with roleRef)* |
+| `spec.roleRef` | `LocalObjectReference` | AccountRole CR reference *(immutable, mutually exclusive with roleName)* |
+| `spec.toRole` | `string` | Target account role *(immutable, mutually exclusive with toRoleRef, toUser, toUserRef)* |
+| `spec.toRoleRef` | `LocalObjectReference` | AccountRole CR reference for the target *(immutable)* |
+| `spec.toUser` | `string` | Target user *(immutable, mutually exclusive with toUserRef, toRole, toRoleRef)* |
+| `spec.toUserRef` | `LocalObjectReference` | User CR reference for the target *(immutable)* |
+
+> ⚠️ **Assignment Immutability:** All spec fields are immutable after creation. Changing any field requires deleting and recreating the CR (or using the `force-new` annotation).
+
+</details>
+
+<details>
+<summary>🔑 <strong>DatabaseRoleAssignment</strong> (shortName: <code>dra</code>)</summary>
+
+Assigns a database role to an account role or another database role: `GRANT DATABASE ROLE <db>.<role> TO ROLE|DATABASE ROLE <target>`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.databaseRoleName` | `string` | Fully qualified database role *(immutable, mutually exclusive with databaseRoleRef)* |
+| `spec.databaseRoleRef` | `LocalObjectReference` | DatabaseRole CR reference *(immutable, mutually exclusive with databaseRoleName)* |
+| `spec.toRole` | `string` | Target account role *(immutable, mutually exclusive with toRoleRef, toDatabaseRole, toDatabaseRoleRef)* |
+| `spec.toRoleRef` | `LocalObjectReference` | AccountRole CR reference for the target *(immutable)* |
+| `spec.toDatabaseRole` | `string` | Fully qualified target database role *(immutable, mutually exclusive with toDatabaseRoleRef, toRole, toRoleRef)* |
+| `spec.toDatabaseRoleRef` | `LocalObjectReference` | DatabaseRole CR reference for the target *(immutable)* |
+
+> ⚠️ **Assignment Immutability:** All spec fields are immutable after creation. Changing any field requires deleting and recreating the CR (or using the `force-new` annotation).
 
 </details>
 
@@ -935,7 +971,7 @@ Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped a
 │   ├── clients/
 │   │   ├── clientfactory/  # Client cache with hash-based rotation
 │   │   └── snowflake/      # Snowflake SDK wrapper & SQL builder
-│   ├── controller/         # All reconcilers (27 managed resources + FieldExport + ProviderConfig)
+│   ├── controller/         # All reconcilers (29 managed resources + FieldExport + ProviderConfig)
 │   ├── drift/              # Field-level drift detection engine
 │   ├── metrics/            # Custom Prometheus metrics
 │   ├── provider/           # Provider config builder & client resolution

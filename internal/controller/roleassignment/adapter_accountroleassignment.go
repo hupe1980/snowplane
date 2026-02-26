@@ -111,6 +111,9 @@ func (a *accountRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *sn
 // BuildIdentifier constructs a RoleAssignmentIdentifier from the spec.
 func (a *accountRoleAssignmentAdapter) BuildIdentifier(obj *snowplanev1alpha1.AccountRoleAssignment) (reconciler.Identifier, error) {
 	grantedTo, granteeName := resolveAccountTarget(obj)
+	if grantedTo == "" || granteeName == "" {
+		return nil, fmt.Errorf("exactly one of toRole, toRoleRef, toUser, or toUserRef must be set")
+	}
 
 	return snowflake.RoleAssignmentIdentifier{
 		RoleName:       obj.Spec.RoleName,
@@ -141,14 +144,7 @@ func (a *accountRoleAssignmentAdapter) SetupWatches() reconciler.SetupWatchesFun
 			return fmt.Errorf("creating field indexer for %s: %w", araIndexRoleRef, err)
 		}
 
-		bldr.Watches(
-			&snowplanev1alpha1.AccountRole{},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj sigs.Object) []reconcile.Request {
-				return a.listByIndex(ctx, obj, araIndexRoleRef)
-			}),
-		)
-
-		// ToRoleRef indexer + watch.
+		// ToRoleRef indexer (must be registered before the combined AccountRole watch).
 		if err := mgr.GetFieldIndexer().IndexField(ctx, obj, araIndexToRoleRef,
 			func(o sigs.Object) []string {
 				g, ok := o.(*snowplanev1alpha1.AccountRoleAssignment)
@@ -164,8 +160,13 @@ func (a *accountRoleAssignmentAdapter) SetupWatches() reconciler.SetupWatchesFun
 			return fmt.Errorf("creating field indexer for %s: %w", araIndexToRoleRef, err)
 		}
 
-		// Reuse the AccountRole watch for ToRoleRef — same watch handler,
-		// queries the additional index. Combined via the same AccountRole watch above.
+		// Single AccountRole watch that queries BOTH RoleRef and ToRoleRef indexes.
+		bldr.Watches(
+			&snowplanev1alpha1.AccountRole{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj sigs.Object) []reconcile.Request {
+				return a.listByIndexes(ctx, obj, araIndexRoleRef, araIndexToRoleRef)
+			}),
+		)
 
 		// ToUserRef indexer + watch.
 		if err := mgr.GetFieldIndexer().IndexField(ctx, obj, araIndexToUserRef,
@@ -219,6 +220,24 @@ func (a *accountRoleAssignmentAdapter) listByIndex(ctx context.Context, obj sigs
 	return requests
 }
 
+// listByIndexes queries multiple field indexes for the same object and merges
+// the results, deduplicating by NamespacedName.
+func (a *accountRoleAssignmentAdapter) listByIndexes(ctx context.Context, obj sigs.Object, indexKeys ...string) []reconcile.Request {
+	seen := make(map[types.NamespacedName]struct{})
+	var merged []reconcile.Request
+
+	for _, key := range indexKeys {
+		for _, req := range a.listByIndex(ctx, obj, key) {
+			if _, ok := seen[req.NamespacedName]; !ok {
+				seen[req.NamespacedName] = struct{}{}
+				merged = append(merged, req)
+			}
+		}
+	}
+
+	return merged
+}
+
 // Observe queries Snowflake for the current state.
 func (a *accountRoleAssignmentAdapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation[*snowflake.RoleAssignmentObservation], error) {
 	return roleAssignmentObserve(ctx, svc, id)
@@ -267,8 +286,13 @@ func (a *accountRoleAssignmentAdapter) ApplyObservation(obj *snowplanev1alpha1.A
 	raObs := obs.Detail
 	if raObs.ShowOutput != nil {
 		grantedTo, granteeName := resolveAccountTarget(obj)
-		obj.Status.FullyQualifiedName = fmt.Sprintf("GRANT ROLE %s TO %s %s",
-			obj.Spec.RoleName, grantedTo, granteeName)
+		id := snowflake.RoleAssignmentIdentifier{
+			RoleName:       obj.Spec.RoleName,
+			IsDatabaseRole: false,
+			GrantedTo:      grantedTo,
+			GranteeName:    granteeName,
+		}
+		obj.Status.FullyQualifiedName = id.FullyQualifiedName()
 		obj.Status.ShowOutput = applyRoleAssignmentShowOutput(raObs)
 	}
 }

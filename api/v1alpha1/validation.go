@@ -1711,10 +1711,6 @@ func (s *AccountRoleAssignmentSpec) Validate() error {
 		errs = append(errs, errors.New("spec: exactly one of roleName or roleRef must be set"))
 	}
 
-	if s.RoleName != "" && s.RoleRef != nil {
-		errs = append(errs, errors.New("spec: roleName and roleRef are mutually exclusive"))
-	}
-
 	// Exactly one of toRole/toRoleRef or toUser/toUserRef must be set.
 	targetCount := 0
 	if s.ToRole != "" {
@@ -1760,10 +1756,6 @@ func (s *DatabaseRoleAssignmentSpec) Validate() error {
 
 	if roleCount != 1 {
 		errs = append(errs, errors.New("spec: exactly one of databaseRoleName or databaseRoleRef must be set"))
-	}
-
-	if s.DatabaseRoleName != "" && s.DatabaseRoleRef != nil {
-		errs = append(errs, errors.New("spec: databaseRoleName and databaseRoleRef are mutually exclusive"))
 	}
 
 	// Exactly one of toRole/toRoleRef or toDatabaseRole/toDatabaseRoleRef must be set.

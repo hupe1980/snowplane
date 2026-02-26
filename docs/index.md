@@ -19,7 +19,7 @@ Manage Snowflake resources declaratively as Kubernetes custom resources — simi
 
 ---
 
-## 28 Custom Resources
+## 30 Custom Resources
 
 Full lifecycle management for every resource — create, alter, drop, drift detection, adoption, and deletion policies.
 
@@ -27,7 +27,7 @@ Full lifecycle management for every resource — create, alter, drop, drift dete
 |:---------|:----------|
 | **Core Infrastructure** | Database, Schema, Warehouse |
 | **Data Objects** | Table, View, Stage, Stream, DynamicTable, FileFormat, Pipe |
-| **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, ShareGrant, GrantOwnership |
+| **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
 | **Orchestration** | Task |
 | **Integrations** | StorageIntegration, SecurityIntegration |
 | **Security & Governance** | NetworkPolicy, NetworkRule, PasswordPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
@@ -133,7 +133,7 @@ kubectl get databases
 │  │  └─────────────────────────────────────────┘   ││
 │  │                                                ││
 │  │  ┌─────────────────────────────────────────┐   ││
-│  │  │  28 Resource Controllers                │   ││
+│  │  │  30 Resource Controllers                │   ││
 │  │  │  Observe → Diff → Apply                 │   ││
 │  │  └─────────────────────────────────────────┘   ││
 │  │                                                ││

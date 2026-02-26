@@ -71,9 +71,12 @@ type DatabaseRoleAssignmentStatus struct {
 // It assigns a database role to an account role or another database role in Snowflake.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:shortName=dra,categories=snowplane
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
+// +kubebuilder:printcolumn:name="DB-ROLE",type=string,JSONPath=`.spec.databaseRoleName`,priority=0
+// +kubebuilder:printcolumn:name="TO-ROLE",type=string,JSONPath=`.spec.toRole`,priority=0
+// +kubebuilder:printcolumn:name="TO-DB-ROLE",type=string,JSONPath=`.spec.toDatabaseRole`,priority=0
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type DatabaseRoleAssignment struct {
 	metav1.TypeMeta   `json:",inline"`

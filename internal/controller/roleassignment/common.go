@@ -80,8 +80,10 @@ func roleAssignmentDrop(ctx context.Context, svc Service, id reconciler.Identifi
 		opts.FromUser = raID.GranteeName
 	case "DATABASE_ROLE":
 		opts.FromDatabaseRole = raID.GranteeName
+	case "":
+		return fmt.Errorf("grantedTo is empty in identifier %s — cannot determine revoke target", raID)
 	default:
-		return fmt.Errorf("unknown grantedTo type: %s", raID.GrantedTo)
+		return fmt.Errorf("unsupported grantedTo type %q in identifier %s", raID.GrantedTo, raID)
 	}
 
 	return svc.RevokeRole(ctx, opts)
@@ -112,9 +114,4 @@ func detectRoleAssignmentDrift(grantedTo, granteeName string, obs *snowflake.Rol
 	}
 
 	return d.Result()
-}
-
-// caseInsensitiveEqual compares two strings case-insensitively.
-func caseInsensitiveEqual(a, b string) bool {
-	return strings.EqualFold(a, b)
 }

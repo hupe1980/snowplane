@@ -163,6 +163,14 @@ func (o *RevokeRoleOptions) Validate() error {
 		return fmt.Errorf("exactly one of fromRole, fromUser, or fromDatabaseRole must be set")
 	}
 
+	if o.FromDatabaseRole != "" && !o.IsDatabaseRole {
+		return fmt.Errorf("fromDatabaseRole is only valid for database role revocations")
+	}
+
+	if o.FromUser != "" && o.IsDatabaseRole {
+		return fmt.Errorf("fromUser is not valid for database role revocations")
+	}
+
 	return nil
 }
 
@@ -332,15 +340,24 @@ func (c *RoleAssignmentClient) Observe(ctx context.Context, id RoleAssignmentIde
 // matchesRoleAssignmentGrantee compares a grantee name from SHOW GRANTS output
 // against an expected grantee name. For database roles, Snowflake may return
 // only the unqualified role name (e.g. "MY_ROLE") while the identifier uses
-// the fully qualified name (e.g. "MY_DB.MY_ROLE").
+// the fully qualified name (e.g. "MY_DB.MY_ROLE"), or vice versa.
 func matchesRoleAssignmentGrantee(actual, expected string) bool {
 	if strings.EqualFold(actual, expected) {
 		return true
 	}
 
-	// For database roles: expected may be "DB.ROLE" while actual is just "ROLE".
+	// Strip DB prefix from expected: expected="DB.ROLE", actual="ROLE".
 	if idx := strings.LastIndex(expected, "."); idx >= 0 {
-		return strings.EqualFold(actual, expected[idx+1:])
+		if strings.EqualFold(actual, expected[idx+1:]) {
+			return true
+		}
+	}
+
+	// Strip DB prefix from actual: actual="DB.ROLE", expected="ROLE".
+	if idx := strings.LastIndex(actual, "."); idx >= 0 {
+		if strings.EqualFold(actual[idx+1:], expected) {
+			return true
+		}
 	}
 
 	return false
