@@ -83,6 +83,11 @@ func newTestSecret() *corev1.Secret {
 
 // newTestReconciler builds a Reconciler with a fake k8s client, injected PingFunc, and fake EventRecorder.
 func newTestReconciler(pingFn PingFunc, objs ...runtime.Object) (*Reconciler, *clientfactory.ClientFactory, *record.FakeRecorder) {
+	return newTestReconcilerWithRoles(pingFn, nil, objs...)
+}
+
+// newTestReconcilerWithRoles is like newTestReconciler but also accepts an allowedRoles set.
+func newTestReconcilerWithRoles(pingFn PingFunc, allowedRoles map[string]bool, objs ...runtime.Object) (*Reconciler, *clientfactory.ClientFactory, *record.FakeRecorder) {
 	scheme := testScheme()
 
 	cb := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{})
@@ -111,6 +116,7 @@ func newTestReconciler(pingFn PingFunc, objs ...runtime.Object) (*Reconciler, *c
 		rateLimiter:    ratelimit.New(ratelimit.DefaultOptions()),
 		circuitBreaker: circuitbreaker.New(circuitbreaker.DefaultOptions()),
 		pingFn:         pingFn,
+		allowedRoles:   allowedRoles,
 	}
 
 	return r, factory, recorder
@@ -913,6 +919,214 @@ func TestListLen_AllTypes(t *testing.T) {
 	assert.Equal(t, 1, listLen(&snowplanev1alpha1.DatabaseRoleGrantList{Items: []snowplanev1alpha1.DatabaseRoleGrant{{}}}))
 	assert.Equal(t, 1, listLen(&snowplanev1alpha1.ShareGrantList{Items: []snowplanev1alpha1.ShareGrant{{}}}))
 }
+
+// --------------------------------------------------------------------------
+// Tests: IsRoleAllowed (M-4)
+// --------------------------------------------------------------------------
+
+func TestIsRoleAllowed_NilAllowlist_AllRolesPermitted(t *testing.T) {
+	t.Parallel()
+
+	r := &Reconciler{allowedRoles: nil}
+	assert.True(t, r.IsRoleAllowed("ACCOUNTADMIN"))
+	assert.True(t, r.IsRoleAllowed("SYSADMIN"))
+	assert.True(t, r.IsRoleAllowed("anything"))
+}
+
+func TestIsRoleAllowed_EmptyAllowlist_AllRolesPermitted(t *testing.T) {
+	t.Parallel()
+
+	r := &Reconciler{allowedRoles: map[string]bool{}}
+	assert.True(t, r.IsRoleAllowed("ACCOUNTADMIN"))
+	assert.True(t, r.IsRoleAllowed("SYSADMIN"))
+}
+
+func TestIsRoleAllowed_AllowlistEnforced(t *testing.T) {
+	t.Parallel()
+
+	r := &Reconciler{allowedRoles: map[string]bool{
+		"SYSADMIN":      true,
+		"DATA_ENGINEER": true,
+	}}
+
+	assert.True(t, r.IsRoleAllowed("SYSADMIN"))
+	assert.True(t, r.IsRoleAllowed("DATA_ENGINEER"))
+	assert.False(t, r.IsRoleAllowed("ACCOUNTADMIN"))
+	assert.False(t, r.IsRoleAllowed("SECURITYADMIN"))
+}
+
+func TestIsRoleAllowed_CaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	r := &Reconciler{allowedRoles: map[string]bool{
+		"SYSADMIN": true,
+	}}
+
+	assert.True(t, r.IsRoleAllowed("SYSADMIN"))
+	assert.True(t, r.IsRoleAllowed("sysadmin"))
+	assert.True(t, r.IsRoleAllowed("SysAdmin"))
+	assert.True(t, r.IsRoleAllowed("Sysadmin"))
+}
+
+// --------------------------------------------------------------------------
+// Tests: Reconcile with role allowlist (M-4)
+// --------------------------------------------------------------------------
+
+func TestReconcile_RoleNotAllowed_SetsCondition(t *testing.T) {
+	t.Parallel()
+
+	pc := newTestPC("my-pc")
+	pc.Spec.Role = "ACCOUNTADMIN"
+	secret := newTestSecret()
+
+	allowedRoles := map[string]bool{"SYSADMIN": true, "USERADMIN": true}
+	r, factory, recorder := newTestReconcilerWithRoles(nil, allowedRoles, pc, secret)
+	defer factory.Close()
+
+	result, err := r.Reconcile(context.Background(), reconcileReq("my-pc"))
+	require.NoError(t, err, "should not return error — requeues via RequeueAfter")
+	assert.True(t, result.RequeueAfter > 0, "should requeue for periodic resync")
+
+	got := &snowplanev1alpha1.ProviderConfig{}
+	require.NoError(t, r.client.Get(context.Background(), types.NamespacedName{Name: "my-pc", Namespace: "default"}, got))
+
+	assert.False(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
+	assert.False(t, conditions.IsTrue(got, snowplanev1alpha1.TypeSynced))
+
+	readyCond := conditions.Get(got, snowplanev1alpha1.TypeReady)
+	require.NotNil(t, readyCond)
+	assert.Equal(t, snowplanev1alpha1.ReasonRoleNotAllowed, readyCond.Reason)
+	assert.Contains(t, readyCond.Message, "ACCOUNTADMIN")
+	assert.Contains(t, readyCond.Message, "not in the allowed roles list")
+
+	// Verify warning event was emitted.
+	select {
+	case event := <-recorder.Events:
+		assert.Contains(t, event, snowplanev1alpha1.ReasonRoleNotAllowed)
+		assert.Contains(t, event, "ACCOUNTADMIN")
+	default:
+		t.Fatal("expected RoleNotAllowed warning event")
+	}
+}
+
+func TestReconcile_RoleNotAllowed_CaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	pc := newTestPC("my-pc")
+	pc.Spec.Role = "accountadmin" // lowercase
+
+	allowedRoles := map[string]bool{"SYSADMIN": true}
+	r, factory, _ := newTestReconcilerWithRoles(nil, allowedRoles, pc, newTestSecret())
+	defer factory.Close()
+
+	result, err := r.Reconcile(context.Background(), reconcileReq("my-pc"))
+	require.NoError(t, err)
+	assert.True(t, result.RequeueAfter > 0)
+
+	got := &snowplanev1alpha1.ProviderConfig{}
+	require.NoError(t, r.client.Get(context.Background(), types.NamespacedName{Name: "my-pc", Namespace: "default"}, got))
+
+	readyCond := conditions.Get(got, snowplanev1alpha1.TypeReady)
+	require.NotNil(t, readyCond)
+	assert.Equal(t, snowplanev1alpha1.ReasonRoleNotAllowed, readyCond.Reason)
+}
+
+func TestReconcile_RoleAllowed_Succeeds(t *testing.T) {
+	t.Parallel()
+
+	pc := newTestPC("my-pc")
+	pc.Spec.Role = "SYSADMIN"
+	secret := newTestSecret()
+
+	pingFn := func(_ context.Context, _ clientfactory.SnowflakeClient) error {
+		return nil
+	}
+
+	allowedRoles := map[string]bool{"SYSADMIN": true, "USERADMIN": true}
+	r, factory, _ := newTestReconcilerWithRoles(pingFn, allowedRoles, pc, secret)
+	defer factory.Close()
+
+	result, err := r.Reconcile(context.Background(), reconcileReq("my-pc"))
+	require.NoError(t, err)
+	assert.Equal(t, requeueInterval, result.RequeueAfter)
+
+	got := &snowplanev1alpha1.ProviderConfig{}
+	require.NoError(t, r.client.Get(context.Background(), types.NamespacedName{Name: "my-pc", Namespace: "default"}, got))
+
+	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
+	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeSynced))
+}
+
+func TestReconcile_EmptyRole_SkipsAllowlistCheck(t *testing.T) {
+	t.Parallel()
+
+	pc := newTestPC("my-pc")
+	pc.Spec.Role = "" // empty → user's default role, should skip allowlist check
+
+	pingFn := func(_ context.Context, _ clientfactory.SnowflakeClient) error {
+		return nil
+	}
+
+	// Even with an allowlist configured, empty role should not be blocked.
+	allowedRoles := map[string]bool{"SYSADMIN": true}
+	r, factory, _ := newTestReconcilerWithRoles(pingFn, allowedRoles, pc, newTestSecret())
+	defer factory.Close()
+
+	result, err := r.Reconcile(context.Background(), reconcileReq("my-pc"))
+	require.NoError(t, err)
+	assert.Equal(t, requeueInterval, result.RequeueAfter)
+
+	got := &snowplanev1alpha1.ProviderConfig{}
+	require.NoError(t, r.client.Get(context.Background(), types.NamespacedName{Name: "my-pc", Namespace: "default"}, got))
+
+	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
+}
+
+func TestReconcile_NilAllowlist_AllRolesPass(t *testing.T) {
+	t.Parallel()
+
+	pc := newTestPC("my-pc")
+	pc.Spec.Role = "ACCOUNTADMIN" // would be blocked by a real allowlist
+
+	pingFn := func(_ context.Context, _ clientfactory.SnowflakeClient) error {
+		return nil
+	}
+
+	// nil allowlist = no restriction.
+	r, factory, _ := newTestReconcilerWithRoles(pingFn, nil, pc, newTestSecret())
+	defer factory.Close()
+
+	result, err := r.Reconcile(context.Background(), reconcileReq("my-pc"))
+	require.NoError(t, err)
+	assert.Equal(t, requeueInterval, result.RequeueAfter)
+
+	got := &snowplanev1alpha1.ProviderConfig{}
+	require.NoError(t, r.client.Get(context.Background(), types.NamespacedName{Name: "my-pc", Namespace: "default"}, got))
+
+	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
+}
+
+func TestReconcile_RoleNotAllowed_HealthMetricSetFalse(t *testing.T) {
+	t.Parallel()
+
+	pc := newTestPC("my-pc")
+	pc.Spec.Role = "SECURITYADMIN"
+
+	allowedRoles := map[string]bool{"SYSADMIN": true}
+	r, factory, _ := newTestReconcilerWithRoles(nil, allowedRoles, pc, newTestSecret())
+	defer factory.Close()
+
+	_, err := r.Reconcile(context.Background(), reconcileReq("my-pc"))
+	require.NoError(t, err)
+
+	// The metric gauge is set — we can't easily Assert on prometheus
+	// gauges in unit tests, but we verify the code path completes without panic.
+	got := &snowplanev1alpha1.ProviderConfig{}
+	require.NoError(t, r.client.Get(context.Background(), types.NamespacedName{Name: "my-pc", Namespace: "default"}, got))
+
+	assert.False(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
+}
+
 func (m *mockClient) Query(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
 	return nil, nil
 }

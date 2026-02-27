@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -50,6 +51,7 @@ type Reconciler struct {
 	circuitBreaker  *circuitbreaker.Breaker
 	pingFn          PingFunc
 	requeueOverride time.Duration
+	allowedRoles    map[string]bool // uppercase role names; nil = all allowed
 }
 
 // WithRequeueInterval overrides the default periodic-resync interval.
@@ -67,17 +69,30 @@ func (r *Reconciler) getRequeueInterval() time.Duration {
 }
 
 // NewReconciler returns a new ProviderConfig reconciler.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter, cb *circuitbreaker.Breaker) *Reconciler {
+func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter, cb *circuitbreaker.Breaker, allowedRoles map[string]bool) *Reconciler {
 	return &Reconciler{
 		client:         c,
 		factory:        factory,
 		recorder:       recorder,
 		rateLimiter:    rl,
 		circuitBreaker: cb,
+		allowedRoles:   allowedRoles,
 		pingFn: func(ctx context.Context, sfClient clientfactory.SnowflakeClient) error {
 			return sfClient.Ping(ctx)
 		},
 	}
+}
+
+// IsRoleAllowed checks whether the given Snowflake role is permitted by the
+// controller's allowlist. Comparison is case-insensitive (Snowflake unquoted
+// identifiers are case-insensitive). A nil or empty allowedRoles map means
+// all roles are permitted.
+func (r *Reconciler) IsRoleAllowed(role string) bool {
+	if len(r.allowedRoles) == 0 {
+		return true
+	}
+
+	return r.allowedRoles[strings.ToUpper(role)]
 }
 
 // providerRefIndex is the virtual field path used by the field indexer for
@@ -277,6 +292,25 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 			return ctrl.Result{}, fmt.Errorf("adding finalizer: %w", err)
 		}
 
+	}
+
+	// Enforce role allowlist: reject roles that are not in the operator's
+	// configured --allowed-roles set (M-4: ProviderConfig role escalation guard).
+	if pc.Spec.Role != "" && !r.IsRoleAllowed(pc.Spec.Role) {
+		msg := fmt.Sprintf("role %q is not in the allowed roles list", pc.Spec.Role)
+		conditions.SetNotReady(pc, snowplanev1alpha1.ReasonRoleNotAllowed, msg)
+		conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonRoleNotAllowed, msg)
+		r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonRoleNotAllowed, msg)
+
+		metrics.SetProviderConfigHealthy(pc.Name, pc.Spec.Account, false)
+
+		r.bestEffortPatchStatus(ctx, pc)
+
+		// Return nil to avoid exponential backoff — the role won't change
+		// until the user updates the ProviderConfig spec or the operator
+		// restarts with a different --allowed-roles value. Periodic resync
+		// will re-evaluate.
+		return ctrl.Result{RequeueAfter: r.getRequeueInterval()}, nil
 	}
 
 	// Resolve credentials: either from a Secret or from WIF (no Secret).

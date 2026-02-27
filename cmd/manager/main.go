@@ -137,6 +137,30 @@ func parseDisabledControllers(s string) (map[string]bool, error) {
 	return disabled, nil
 }
 
+// parseAllowedRoles parses a comma-separated list of Snowflake role names into
+// an uppercase set for case-insensitive O(1) lookup. Returns nil if the input
+// is empty (all roles allowed).
+func parseAllowedRoles(s string) map[string]bool {
+	if s == "" {
+		return nil
+	}
+
+	roles := make(map[string]bool)
+
+	for _, role := range strings.Split(s, ",") {
+		role = strings.TrimSpace(role)
+		if role != "" {
+			roles[strings.ToUpper(role)] = true
+		}
+	}
+
+	if len(roles) == 0 {
+		return nil
+	}
+
+	return roles
+}
+
 func main() {
 	var metricsAddr string
 	var probeAddr string
@@ -154,6 +178,7 @@ func main() {
 	var watchNamespaces string
 	var cbFailureThreshold int
 	var cbResetTimeout time.Duration
+	var allowedRoles string
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -188,6 +213,9 @@ func main() {
 		"Number of consecutive Snowflake API failures before the circuit breaker opens (per-provider).")
 	flag.DurationVar(&cbResetTimeout, "circuit-breaker-reset-timeout", 60*time.Second,
 		"How long the circuit breaker stays open before allowing a probe request.")
+	flag.StringVar(&allowedRoles, "allowed-roles", "",
+		"Comma-separated allowlist of Snowflake roles permitted in ProviderConfig (case-insensitive). "+
+			"If empty, all roles are allowed. Example: \"SYSADMIN,USERADMIN,DATA_ENGINEER\".")
 
 	opts := zap.Options{Development: developmentMode}
 	opts.BindFlags(flag.CommandLine)
@@ -256,6 +284,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Parse role allowlist.
+	allowedRolesSet := parseAllowedRoles(allowedRoles)
+
 	kc := mgr.GetClient()
 
 	// Set up ProviderConfig reconciler.
@@ -265,6 +296,7 @@ func main() {
 		sanitize.NewSafeRecorderFromEvents(mgr.GetEventRecorder("providerconfig-controller")),
 		rl,
 		cb,
+		allowedRolesSet,
 	).WithRequeueInterval(requeueInterval).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ProviderConfig")
 		os.Exit(1)

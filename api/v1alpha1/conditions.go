@@ -55,4 +55,5 @@ const (
 	ReasonCredentialsRotated    = "CredentialsRotated"
 	ReasonInUse                 = "InUse"
 	ReasonDeleteBlocked         = "DeleteBlocked"
+	ReasonRoleNotAllowed        = "RoleNotAllowed"
 )

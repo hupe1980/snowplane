@@ -191,6 +191,16 @@ Hierarchical `rate.Limiter` from `golang.org/x/time/rate` with two levels:
 
 Per-provider failure isolation. Opens after 5 consecutive failures, probes after 60s. Resources using other ProviderConfigs are unaffected.
 
+### Role Allowlist (Multi-Tenant Security)
+
+The `--allowed-roles` flag restricts which Snowflake roles may be specified in ProviderConfig resources. This prevents namespace admins from escalating to privileged roles (e.g., ACCOUNTADMIN, SECURITYADMIN) when ProviderConfig creation is not restricted to cluster admins.
+
+- **Flag:** `--allowed-roles=SYSADMIN,USERADMIN,DATA_ENGINEER` (case-insensitive, comma-separated)
+- **Default:** empty (all roles allowed — backward-compatible)
+- **Helm:** `controller.allowedRoles: "SYSADMIN,USERADMIN,DATA_ENGINEER"`
+- **Behavior:** When set, ProviderConfigs with a role not in the list are rejected during reconciliation with `Ready=False`, reason `RoleNotAllowed`. An empty `role` field (user's default role) is always allowed.
+- **Complementary to RBAC:** For maximum security in multi-tenant clusters, combine `--allowed-roles` with Kubernetes RBAC that restricts ProviderConfig creation to cluster admins, and use `allowedNamespaces` on each ProviderConfig.
+
 ### CEL Validation Rules
 
 All 32 CRD types include `x-kubernetes-validations` rules — evaluated server-side on UPDATE, no webhook required. Covers immutable fields, schema defaults, policy body blocklists, mutual exclusion, and auth validation.

@@ -198,6 +198,7 @@ kubectl get databases
 | `--requeue-interval` | `5m` | Drift detection re-observe interval |
 | `--enable-alpha-resources` | `true` | Enable alpha-maturity controllers |
 | `--disable-controllers` | `""` | Comma-separated controllers to disable (e.g. `accountrolegrant,stage,view`) |
+| `--allowed-roles` | `""` | Comma-separated allowlist of Snowflake roles permitted in ProviderConfig (case-insensitive; empty = all allowed) |
 | `--watch-namespaces` | `""` | Comma-separated namespaces to watch (empty = all) |
 | `--development` | `false` | Human-readable debug logging |
 

@@ -62,3 +62,63 @@ func TestParseDisabledControllers_AllValid(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 13, len(result))
 }
+
+// --------------------------------------------------------------------------
+// Tests: parseAllowedRoles (M-4)
+// --------------------------------------------------------------------------
+
+func TestParseAllowedRoles_Empty(t *testing.T) {
+	t.Parallel()
+	result := parseAllowedRoles("")
+	assert.Nil(t, result, "empty string should return nil (all roles allowed)")
+}
+
+func TestParseAllowedRoles_Single(t *testing.T) {
+	t.Parallel()
+	result := parseAllowedRoles("SYSADMIN")
+	require.NotNil(t, result)
+	assert.True(t, result["SYSADMIN"])
+	assert.False(t, result["ACCOUNTADMIN"])
+}
+
+func TestParseAllowedRoles_Multiple(t *testing.T) {
+	t.Parallel()
+	result := parseAllowedRoles("SYSADMIN,USERADMIN,DATA_ENGINEER")
+	require.NotNil(t, result)
+	assert.True(t, result["SYSADMIN"])
+	assert.True(t, result["USERADMIN"])
+	assert.True(t, result["DATA_ENGINEER"])
+	assert.False(t, result["ACCOUNTADMIN"])
+}
+
+func TestParseAllowedRoles_NormalizesToUppercase(t *testing.T) {
+	t.Parallel()
+	result := parseAllowedRoles("sysadmin,Useradmin,data_ENGINEER")
+	require.NotNil(t, result)
+	assert.True(t, result["SYSADMIN"])
+	assert.True(t, result["USERADMIN"])
+	assert.True(t, result["DATA_ENGINEER"])
+}
+
+func TestParseAllowedRoles_TrimsSpaces(t *testing.T) {
+	t.Parallel()
+	result := parseAllowedRoles(" SYSADMIN , USERADMIN , DATA_ENGINEER ")
+	require.NotNil(t, result)
+	assert.True(t, result["SYSADMIN"])
+	assert.True(t, result["USERADMIN"])
+	assert.True(t, result["DATA_ENGINEER"])
+}
+
+func TestParseAllowedRoles_TrailingComma(t *testing.T) {
+	t.Parallel()
+	result := parseAllowedRoles("SYSADMIN,")
+	require.NotNil(t, result)
+	assert.True(t, result["SYSADMIN"])
+	assert.Equal(t, 1, len(result))
+}
+
+func TestParseAllowedRoles_OnlyCommasAndSpaces(t *testing.T) {
+	t.Parallel()
+	result := parseAllowedRoles(", , ,")
+	assert.Nil(t, result, "only whitespace/commas should return nil")
+}

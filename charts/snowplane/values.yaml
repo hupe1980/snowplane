@@ -86,6 +86,10 @@ controller:
   enableAlphaResources: true
   # -- Comma-separated list of controllers to disable (e.g. "grant,view")
   disableControllers: ""
+  # -- Comma-separated allowlist of Snowflake roles permitted in ProviderConfig (case-insensitive).
+  # If empty, all roles are allowed. Example: "SYSADMIN,USERADMIN,DATA_ENGINEER".
+  # Set this to prevent namespace admins from escalating to ACCOUNTADMIN or SECURITYADMIN.
+  allowedRoles: ""
 
 # -- Circuit breaker configuration for per-provider failure isolation
 circuitBreaker:

@@ -60,6 +60,9 @@ spec:
             {{- with .Values.controller.disableControllers }}
             - --disable-controllers={{ . }}
             {{- end }}
+            {{- with .Values.controller.allowedRoles }}
+            - --allowed-roles={{ . }}
+            {{- end }}
             - --circuit-breaker-threshold={{ .Values.circuitBreaker.threshold }}
             - --circuit-breaker-reset-timeout={{ .Values.circuitBreaker.resetTimeout }}
             - --zap-log-level={{ .Values.logging.level }}
