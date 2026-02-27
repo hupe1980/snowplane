@@ -46,7 +46,12 @@ Every Snowplane CRD carries a maturity label (`snowplane.hupe1980.github.io/matu
 | View | alpha | AS query management, secure views |
 | Stage | alpha | Internal/external stages, file format |
 | Task | alpha | Scheduled SQL, DAG, serverless |
-| Stream | alpha | CDC on tables, views, stages |
+| Alert | alpha | Condition-based monitoring & notification |
+| StreamOnTable | alpha | CDC on tables |
+| StreamOnView | alpha | CDC on views |
+| StreamOnExternalTable | alpha | CDC on external tables |
+| StreamOnDirectoryTable | alpha | CDC on stage directory tables |
+| StreamOnDynamicTable | alpha | CDC on dynamic tables |
 | Tag | alpha | Data governance with allowed values |
 | NetworkPolicy | alpha | IP allow/block lists |
 | ResourceMonitor | alpha | Credit quota monitoring |

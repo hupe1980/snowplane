@@ -39,7 +39,7 @@ Project layout, architecture principles, conventions, and workflow for contribut
 │   └── zz_generated_accessors.go   # Auto-generated ManagedResource accessors
 ├── cmd/manager/               # Controller manager entrypoint
 ├── config/
-│   ├── crd/bases/             # CRD YAML manifests (31 types)
+│   ├── crd/bases/             # CRD YAML manifests (35 types)
 │   ├── manager/               # Deployment, PDB, NetworkPolicy
 │   ├── rbac/                  # RBAC roles and bindings
 │   └── samples/               # Example CR YAML files
@@ -49,11 +49,11 @@ Project layout, architecture principles, conventions, and workflow for contribut
 │   │   └── snowflake/         # Snowflake SDK wrapper
 │   ├── controller/
 │   │   ├── reconciler/        # Generic reconciler framework
-│   │   └── <resource>/        # 29 resource-specific controllers
+│   │   └── <resource>/        # 31 resource-specific controllers
 │   ├── drift/                 # Generic field-level drift engine
 │   ├── metrics/               # Custom Prometheus metrics
 │   ├── provider/              # Config builder & hash
-│   ├── ratelimit/             # Per-provider token-bucket rate limiter
+│   ├── ratelimit/             # Hierarchical per-controller + per-account rate limiter
 │   ├── circuitbreaker/        # Per-provider circuit breaker
 │   ├── sfretry/               # Retry wrapper for transient errors
 │   └── utils/                 # Sanitization, conditions, finalizers
@@ -93,7 +93,7 @@ just verify-crds  # CI check: fails if out-of-sync
 | File | Generator | Purpose |
 |:-----|:----------|:--------|
 | `zz_generated.deepcopy.go` | `controller-gen` | DeepCopy methods |
-| `zz_generated_accessors.go` | `hack/gen-accessors` | 458 ManagedResource methods across 29 types |
+| `zz_generated_accessors.go` | `hack/gen-accessors` | 538 ManagedResource methods across 34 types |
 | `config/crd/bases/*.yaml` | `controller-gen` | CRD manifests with CEL rules |
 
 ---
@@ -112,7 +112,7 @@ This minimises Snowflake API calls and avoids unnecessary mutations.
 
 ### Generic Reconciler Framework
 
-All 29 resource reconcilers share the same state machine via `internal/controller/reconciler/`:
+All 31 resource reconcilers share the same state machine via `internal/controller/reconciler/`:
 
 - **`GenericReconciler[T, S, D]`** — Type-parameterised reconciler handling finalizers, ProviderConfig resolution, client caching, SSA status patching, conditions, rate limiting, retry, metrics, and drift detection
 - **`ResourceAdapter[T, S, D]`** — Interface each resource implements for resource-specific behaviour
@@ -181,7 +181,7 @@ Every reconciler calls `spec.Validate()` before resolving the client — a safet
 Hierarchical `rate.Limiter` from `golang.org/x/time/rate` with two levels:
 
 1. **Per-controller** (keyed by provider+controller): ensures fairness so a noisy reconciler cannot starve others. Configurable via `--rate-limit-qps` (default 10) and `--rate-limit-burst` (default 20).
-2. **Per-account** (keyed by provider): caps aggregate QPS across all 30+ controllers for a given Snowflake account, preventing HTTP 429 cascading failures. Configurable via `--account-rate-limit-qps` (default 50) and `--account-rate-limit-burst` (default 100).
+2. **Per-account** (keyed by provider): caps aggregate QPS across all 33 controllers for a given Snowflake account, preventing HTTP 429 cascading failures. Configurable via `--account-rate-limit-qps` (default 50) and `--account-rate-limit-burst` (default 100).
 
 ### Retry for Transient Errors
 
@@ -203,7 +203,7 @@ The `--allowed-roles` flag restricts which Snowflake roles may be specified in P
 
 ### CEL Validation Rules
 
-All 32 CRD types include `x-kubernetes-validations` rules — evaluated server-side on UPDATE, no webhook required. Covers immutable fields, schema defaults, policy body blocklists, mutual exclusion, and auth validation.
+All 36 CRD types include `x-kubernetes-validations` rules — evaluated server-side on UPDATE, no webhook required. Covers immutable fields, schema defaults, policy body blocklists, mutual exclusion, and auth validation.
 
 ### Resource Adoption
 

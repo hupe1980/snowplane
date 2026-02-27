@@ -47,7 +47,11 @@ All resource types support drift detection:
 | Stage | `name`, `database`, `schema`, `stageType` |
 | Task | `name`, `database`, `schema` |
 | Alert | `name`, `database`, `schema` |
-| Stream | `name`, `database`, `schema`, `sourceType`, `sourceName` |
+| StreamOnTable | `name`, `database`, `schema`, `table` |
+| StreamOnView | `name`, `database`, `schema`, `view` |
+| StreamOnExternalTable | `name`, `database`, `schema`, `externalTable` |
+| StreamOnDirectoryTable | `name`, `database`, `schema`, `stage` |
+| StreamOnDynamicTable | `name`, `database`, `schema`, `dynamicTable` |
 | Tag | `name`, `database`, `schema` |
 | NetworkPolicy | `name` |
 | ResourceMonitor | `name` |

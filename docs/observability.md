@@ -32,10 +32,11 @@ All metrics use the `snowplane_` namespace and are exposed on the controller's m
 | `snowplane_snowflake_operation_total` | Counter | `controller`, `operation`, `result` | Snowflake API calls by operation |
 | `snowplane_snowflake_operation_duration_seconds` | Histogram | `controller`, `operation` | Snowflake API call latencies |
 | `snowplane_client_pool_size` | Gauge | — | Active Snowflake clients in the connection pool |
-| `snowplane_rate_limit_waits_total` | Counter | `controller` | Rate limiter wait events |
+| `snowplane_rate_limit_waits_total` | Counter | `controller` | Per-controller rate limiter wait events |
+| `snowplane_account_rate_limit_waits_total` | Counter | `provider` | Per-account aggregate rate limiter wait events |
 
 {: .note }
-> **Cardinality Bounds:** The `operation` label is bounded to `observe`, `create`, `alter`, `drop`, `create_or_alter`, `ping`. The `controller` label is bounded by 26 controllers. Total cardinality for operation metrics is at most ~312 series.
+> **Cardinality Bounds:** The `operation` label is bounded to `observe`, `create`, `alter`, `drop`, `create_or_alter`, `ping`. The `controller` label is bounded by 33 controllers. Total cardinality for operation metrics is at most ~396 series.
 
 ### Resource Management
 

@@ -19,14 +19,14 @@ Manage Snowflake resources declaratively as Kubernetes custom resources — simi
 
 ---
 
-## 31 Custom Resources
+## 35 Custom Resources
 
 Full lifecycle management for every resource — create, alter, drop, drift detection, adoption, and deletion policies.
 
 | Category | Resources |
 |:---------|:----------|
 | **Core Infrastructure** | Database, Schema, Warehouse |
-| **Data Objects** | Table, View, Stage, Stream, DynamicTable, FileFormat, Pipe |
+| **Data Objects** | Table, View, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe |
 | **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
 | **Orchestration** | Task, Alert |
 | **Integrations** | StorageIntegration, SecurityIntegration |
@@ -133,7 +133,7 @@ kubectl get databases
 │  │  └─────────────────────────────────────────┘   ││
 │  │                                                ││
 │  │  ┌─────────────────────────────────────────┐   ││
-│  │  │  30 Resource Controllers                │   ││
+│  │  │  33 Resource Controllers                │   ││
 │  │  │  Observe → Diff → Apply                 │   ││
 │  │  └─────────────────────────────────────────┘   ││
 │  │                                                ││
@@ -163,9 +163,10 @@ Built-in Prometheus metrics, structured logging, Kubernetes events, and a Grafan
 | `snowplane_reconcile_total` | Counter | Total reconciliations (success/error) |
 | `snowplane_snowflake_operation_total` | Counter | Total Snowflake operations |
 | `snowplane_drift_detected_total` | Counter | Drift detection events |
+| `snowplane_account_rate_limit_waits_total` | Counter | Per-account aggregate rate limiter waits |
 | `snowplane_providerconfig_healthy` | Gauge | Provider health (1 = healthy) |
 
-[Full metrics reference →](/snowplane/observability/)
+[Full metrics reference →](/snowplane/observability/) \| [API Reference →](/snowplane/api-reference/)
 
 ---
 

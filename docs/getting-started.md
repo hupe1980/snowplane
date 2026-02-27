@@ -544,6 +544,6 @@ metadata:
 
 ## What's Next
 
-Snowplane manages **30 resource types** including Task, Stream, Tag, NetworkPolicy, NetworkRule, PasswordPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, StorageIntegration, SecurityIntegration, FileFormat, Pipe, DynamicTable, AccountRoleAssignment, and DatabaseRoleAssignment.
+Snowplane manages **33 resource types** including Task, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, Tag, NetworkPolicy, NetworkRule, PasswordPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, StorageIntegration, SecurityIntegration, FileFormat, Pipe, DynamicTable, AccountRoleAssignment, and DatabaseRoleAssignment.
 
 See `config/samples/` for example CRs of every resource type.

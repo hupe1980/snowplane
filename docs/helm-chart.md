@@ -55,13 +55,16 @@ helm upgrade snowplane charts/snowplane/ \
 | `controller.requeueInterval` | `5m` | Drift detection resync interval |
 | `controller.enableAlphaResources` | `true` | Enable alpha-maturity controllers |
 | `controller.disableControllers` | `""` | Comma-separated list of controllers to disable |
+| `controller.allowedRoles` | `""` | Comma-separated allowlist of permitted Snowflake roles (case-insensitive; empty = all allowed) |
 
 ### Rate Limiting
 
 | Parameter | Default | Description |
 |:----------|:--------|:------------|
-| `rateLimit.qps` | `10` | Sustained QPS to Snowflake per provider |
-| `rateLimit.burst` | `20` | Burst size for the rate limiter |
+| `rateLimit.qps` | `10` | Per-controller sustained QPS to Snowflake per provider |
+| `rateLimit.burst` | `20` | Per-controller burst size for the rate limiter |
+| `rateLimit.accountQps` | `50` | Per-account aggregate QPS across all controllers |
+| `rateLimit.accountBurst` | `100` | Per-account aggregate burst size |
 
 ### Circuit Breaker
 
