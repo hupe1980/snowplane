@@ -46,6 +46,8 @@ spec:
             - --requeue-interval={{ .Values.controller.requeueInterval }}
             - --rate-limit-qps={{ .Values.rateLimit.qps }}
             - --rate-limit-burst={{ .Values.rateLimit.burst }}
+            - --account-rate-limit-qps={{ .Values.rateLimit.accountQps }}
+            - --account-rate-limit-burst={{ .Values.rateLimit.accountBurst }}
             {{- if not .Values.controller.enableAlphaResources }}
             - --enable-alpha-resources=false
             {{- end }}

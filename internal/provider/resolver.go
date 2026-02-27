@@ -147,16 +147,23 @@ func ResolveClient(
 	hash := ComputeHash(cfg)
 
 	// Apply rate limiting before acquiring or creating the Snowflake client.
-	// The key is provider+controller so each controller gets its own token
-	// bucket per provider, preventing a noisy controller from starving others.
+	// Two levels:
+	// 1. Per-controller: token bucket keyed by provider+controller, prevents a
+	//    noisy controller from starving others.
+	// 2. Per-account: aggregate token bucket keyed by provider, caps total QPS
+	//    to a single Snowflake account across all 30+ controllers.
 	if rl != nil {
-		waited, err := rl.Wait(ctx, pc.Name+"/"+controllerName)
+		controllerWaited, accountWaited, err := rl.Wait(ctx, pc.Name, controllerName)
 		if err != nil {
 			return nil, fmt.Errorf("rate limit wait for provider %q controller %q: %w", pc.Name, controllerName, err)
 		}
 
-		if waited {
+		if controllerWaited {
 			metrics.SnowflakeRateLimitWaits.With(prometheus.Labels{"controller": controllerName}).Inc()
+		}
+
+		if accountWaited {
+			metrics.SnowflakeAccountRateLimitWaits.With(prometheus.Labels{"provider": pc.Name}).Inc()
 		}
 	}
 

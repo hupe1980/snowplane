@@ -178,7 +178,10 @@ Every reconciler calls `spec.Validate()` before resolving the client — a safet
 
 ### Rate Limiting
 
-Per-provider `rate.Limiter` from `golang.org/x/time/rate`. Configurable via `--rate-limit-qps` and `--rate-limit-burst`.
+Hierarchical `rate.Limiter` from `golang.org/x/time/rate` with two levels:
+
+1. **Per-controller** (keyed by provider+controller): ensures fairness so a noisy reconciler cannot starve others. Configurable via `--rate-limit-qps` (default 10) and `--rate-limit-burst` (default 20).
+2. **Per-account** (keyed by provider): caps aggregate QPS across all 30+ controllers for a given Snowflake account, preventing HTTP 429 cascading failures. Configurable via `--account-rate-limit-qps` (default 50) and `--account-rate-limit-burst` (default 100).
 
 ### Retry for Transient Errors
 

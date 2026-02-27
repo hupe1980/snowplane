@@ -146,6 +146,8 @@ func main() {
 	var maxConcurrentReconciles int
 	var rateLimitQPS float64
 	var rateLimitBurst int
+	var accountRateLimitQPS float64
+	var accountRateLimitBurst int
 	var requeueInterval time.Duration
 	var enableAlphaResources bool
 	var disableControllers string
@@ -163,9 +165,14 @@ func main() {
 	flag.IntVar(&maxConcurrentReconciles, "max-concurrent-reconciles", 3,
 		"The maximum number of concurrent reconciles per controller.")
 	flag.Float64Var(&rateLimitQPS, "rate-limit-qps", 10,
-		"Maximum sustained queries per second to Snowflake per provider (0 = disabled).")
+		"Maximum sustained queries per second to Snowflake per controller per provider (0 = disabled).")
 	flag.IntVar(&rateLimitBurst, "rate-limit-burst", 20,
-		"Maximum burst size for Snowflake API rate limiter.")
+		"Maximum burst size for the per-controller Snowflake API rate limiter.")
+	flag.Float64Var(&accountRateLimitQPS, "account-rate-limit-qps", 50,
+		"Maximum aggregate queries per second to Snowflake per account (provider). "+
+			"Caps total QPS across all controllers for a given Snowflake account (0 = disabled).")
+	flag.IntVar(&accountRateLimitBurst, "account-rate-limit-burst", 100,
+		"Maximum burst size for the per-account aggregate Snowflake API rate limiter.")
 	flag.DurationVar(&requeueInterval, "requeue-interval", 5*time.Minute,
 		"How often each reconciler re-observes Snowflake state for drift detection.")
 	flag.BoolVar(&enableAlphaResources, "enable-alpha-resources", true,
@@ -228,10 +235,12 @@ func main() {
 		WithStartupGrace(30 * time.Second) // L-2: grace period before readiness probe checks Snowflake connectivity
 	defer factory.Close()
 
-	// Create shared rate limiter.
+	// Create shared rate limiter with hierarchical per-controller + per-account budgets.
 	rl := ratelimit.New(ratelimit.Options{
-		QPS:   rateLimitQPS,
-		Burst: rateLimitBurst,
+		QPS:          rateLimitQPS,
+		Burst:        rateLimitBurst,
+		AccountQPS:   accountRateLimitQPS,
+		AccountBurst: accountRateLimitBurst,
 	})
 
 	// Create shared circuit breaker for provider failure isolation.

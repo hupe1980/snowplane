@@ -125,10 +125,14 @@ healthProbes:
   containerPort: 8081
 
 rateLimit:
-  # -- Maximum sustained queries per second to Snowflake per provider (0 = disabled)
+  # -- Maximum sustained queries per second to Snowflake per controller per provider (0 = disabled)
   qps: 10
-  # -- Maximum burst size for Snowflake API rate limiter
+  # -- Maximum burst size for per-controller Snowflake API rate limiter
   burst: 20
+  # -- Maximum aggregate queries per second to Snowflake per account (provider) across all controllers (0 = disabled)
+  accountQps: 50
+  # -- Maximum burst size for per-account aggregate Snowflake API rate limiter
+  accountBurst: 100
 
 logging:
   # -- Log level (info, debug, error)

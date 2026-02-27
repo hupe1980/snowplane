@@ -142,9 +142,22 @@ var SnowflakeRateLimitWaits = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "rate_limit_waits_total",
-		Help:      "Total number of times a reconciler waited for the Snowflake rate limiter.",
+		Help:      "Total number of times a reconciler waited for the per-controller Snowflake rate limiter.",
 	},
 	[]string{"controller"},
+)
+
+// SnowflakeAccountRateLimitWaits counts how many times a reconciler waited
+// for the per-account (aggregate) rate limiter. A non-zero value means the
+// aggregate QPS across all controllers for the given provider (Snowflake
+// account) is hitting the configured cap.
+var SnowflakeAccountRateLimitWaits = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "account_rate_limit_waits_total",
+		Help:      "Total number of times a reconciler waited for the per-account aggregate Snowflake rate limiter.",
+	},
+	[]string{"provider"},
 )
 
 // AdoptionTotal counts resource adoption outcomes by controller and result.
@@ -336,6 +349,7 @@ func init() {
 		SnowflakeOperationDuration,
 		ClientPoolSize,
 		SnowflakeRateLimitWaits,
+		SnowflakeAccountRateLimitWaits,
 		AdoptionTotal,
 		DriftDetectedTotal,
 		OrphanedResourcesTotal,

@@ -191,8 +191,10 @@ kubectl get databases
 | `--leader-elect` | `false` | Enable leader election for HA deployments |
 | `--leader-election-id` | `snowplane-leader-election` | Leader election identity |
 | `--max-concurrent-reconciles` | `3` | Max concurrent reconciles per controller |
-| `--rate-limit-qps` | `10` | Sustained queries/sec to Snowflake per provider (0 = disabled) |
-| `--rate-limit-burst` | `20` | Max burst size for Snowflake API rate limiter |
+| `--rate-limit-qps` | `10` | Sustained queries/sec to Snowflake per controller per provider (0 = disabled) |
+| `--rate-limit-burst` | `20` | Max burst size for per-controller Snowflake API rate limiter |
+| `--account-rate-limit-qps` | `50` | Aggregate queries/sec to Snowflake per account across all controllers (0 = disabled) |
+| `--account-rate-limit-burst` | `100` | Max burst size for per-account aggregate rate limiter |
 | `--requeue-interval` | `5m` | Drift detection re-observe interval |
 | `--enable-alpha-resources` | `true` | Enable alpha-maturity controllers |
 | `--disable-controllers` | `""` | Comma-separated controllers to disable (e.g. `accountrolegrant,stage,view`) |

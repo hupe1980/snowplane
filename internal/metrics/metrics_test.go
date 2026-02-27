@@ -94,6 +94,15 @@ func TestSnowflakeRateLimitWaits_Inc(t *testing.T) {
 	assert.GreaterOrEqual(t, collectCounter(c), float64(1))
 }
 
+func TestSnowflakeAccountRateLimitWaits_Inc(t *testing.T) {
+	t.Parallel()
+
+	c := SnowflakeAccountRateLimitWaits.With(prometheus.Labels{"provider": "test-arlw"})
+	c.Inc()
+
+	assert.GreaterOrEqual(t, collectCounter(c), float64(1))
+}
+
 func TestAdoptionTotal_RecordAdoption(t *testing.T) {
 	t.Parallel()
 
