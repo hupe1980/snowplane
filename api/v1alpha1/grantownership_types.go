@@ -26,11 +26,14 @@ const (
 //
 // +kubebuilder:validation:XValidation:rule="self.objectType == oldSelf.objectType",message="spec.objectType is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.objectName == oldSelf.objectName",message="spec.objectName is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="self.accountRole == oldSelf.accountRole",message="spec.accountRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.accountRole) == has(self.accountRole) && (!has(self.accountRole) || self.accountRole == oldSelf.accountRole)",message="spec.accountRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.accountRoleRef) == has(self.accountRoleRef) && (!has(self.accountRoleRef) || self.accountRoleRef == oldSelf.accountRoleRef)",message="spec.accountRoleRef is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="self.databaseRole == oldSelf.databaseRole",message="spec.databaseRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRole) == has(self.databaseRole) && (!has(self.databaseRole) || self.databaseRole == oldSelf.databaseRole)",message="spec.databaseRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRoleRef) == has(self.databaseRoleRef) && (!has(self.databaseRoleRef) || self.databaseRoleRef == oldSelf.databaseRoleRef)",message="spec.databaseRoleRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
+//
+// Mutual exclusivity rules:
+// +kubebuilder:validation:XValidation:rule="(has(self.accountRole) ? 1 : 0) + (has(self.accountRoleRef) ? 1 : 0) + (has(self.databaseRole) ? 1 : 0) + (has(self.databaseRoleRef) ? 1 : 0) == 1",message="exactly one of spec.accountRole, spec.accountRoleRef, spec.databaseRole, or spec.databaseRoleRef must be set"
 type GrantOwnershipSpec struct {
 	CommonSpec `json:",inline"`
 

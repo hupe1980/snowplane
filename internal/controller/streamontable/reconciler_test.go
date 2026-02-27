@@ -1,4 +1,4 @@
-package stream
+package streamontable
 
 import (
 	"context"
@@ -67,14 +67,14 @@ func (m *mockService) Drop(ctx context.Context, name snowflake.SchemaObjectIdent
 // Helpers
 // --------------------------------------------------------------------------
 
-func newTestStream(name, namespace string) *snowplanev1alpha1.Stream {
-	return &snowplanev1alpha1.Stream{
+func newTestStreamOnTable(name, namespace string) *snowplanev1alpha1.StreamOnTable {
+	return &snowplanev1alpha1.StreamOnTable{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       name,
 			Namespace:  namespace,
 			Generation: 1,
 		},
-		Spec: snowplanev1alpha1.StreamSpec{
+		Spec: snowplanev1alpha1.StreamOnTableSpec{
 			CommonSpec: snowplanev1alpha1.CommonSpec{
 				DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete,
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
@@ -82,8 +82,7 @@ func newTestStream(name, namespace string) *snowplanev1alpha1.Stream {
 			Name:         "MY_STREAM",
 			DatabaseName: testutil.PtrString("MY_DB"),
 			SchemaName:   testutil.PtrString("MY_SCHEMA"),
-			SourceType:   snowplanev1alpha1.StreamSourceType("TABLE"),
-			SourceName:   "MY_TABLE",
+			Table:        "MY_TABLE",
 		},
 	}
 }
@@ -105,11 +104,11 @@ func successfulObservation() *snowflake.StreamObservation {
 	}
 }
 
-func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Stream, Service, *snowflake.StreamObservation] {
+func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.StreamOnTable, Service, *snowflake.StreamObservation] {
 	scheme := testutil.TestScheme()
 
 	cb := fake.NewClientBuilder().WithScheme(scheme).
-		WithStatusSubresource(&snowplanev1alpha1.Stream{}, &snowplanev1alpha1.ProviderConfig{})
+		WithStatusSubresource(&snowplanev1alpha1.StreamOnTable{}, &snowplanev1alpha1.ProviderConfig{})
 	for _, obj := range objs {
 		cb = cb.WithRuntimeObjects(obj)
 	}
@@ -118,7 +117,7 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	factory := clientfactory.NewClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Stream, Service, *snowflake.StreamObservation]{
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.StreamOnTable, Service, *snowflake.StreamObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: rec,
@@ -129,7 +128,7 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 				return mock, nil, nil
 			},
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("Stream"),
+		GVK: snowplanev1alpha1.GroupVersion.WithKind("StreamOnTable"),
 	}
 }
 
@@ -154,7 +153,7 @@ func TestReconcile_CRNotFound(t *testing.T) {
 func TestReconcile_ProviderConfigNotFound(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	r := newTestReconciler(&mockService{}, s)
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mys", "default"))
@@ -169,14 +168,14 @@ func TestReconcile_ProviderConfigNotFound(t *testing.T) {
 func TestReconcile_AddsFinalizer(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	r := newTestReconciler(&mockService{}, s, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mys", "default"))
 	require.NoError(t, err)
 	assert.Equal(t, time.Second, result.RequeueAfter)
 
-	got := &snowplanev1alpha1.Stream{}
+	got := &snowplanev1alpha1.StreamOnTable{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mys", Namespace: "default"}, got))
 	assert.Contains(t, got.Finalizers, finalizerName)
 }
@@ -188,7 +187,7 @@ func TestReconcile_AddsFinalizer(t *testing.T) {
 func TestReconcile_Create(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	s.Finalizers = []string{finalizerName}
 	s.Status.DatabaseName = "MY_DB"
 	s.Status.SchemaName = "MY_SCHEMA"
@@ -220,10 +219,10 @@ func TestReconcile_Create(t *testing.T) {
 	assert.Equal(t, reconciler.DefaultRequeueInterval, result.RequeueAfter)
 
 	assert.Equal(t, "MY_STREAM", capturedOpts.Name.Name())
-	assert.Equal(t, snowflake.StreamSourceType("TABLE"), capturedOpts.SourceType)
+	assert.Equal(t, snowflake.StreamSourceTable, capturedOpts.SourceType)
 	assert.Equal(t, "MY_TABLE", capturedOpts.SourceName)
 
-	got := &snowplanev1alpha1.Stream{}
+	got := &snowplanev1alpha1.StreamOnTable{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mys", Namespace: "default"}, got))
 	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
 }
@@ -231,7 +230,7 @@ func TestReconcile_Create(t *testing.T) {
 func TestReconcile_CreateFails(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	s.Finalizers = []string{finalizerName}
 	s.Status.DatabaseName = "MY_DB"
 	s.Status.SchemaName = "MY_SCHEMA"
@@ -255,7 +254,7 @@ func TestReconcile_CreateFails(t *testing.T) {
 func TestReconcile_CreateTerminalError(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	s.Finalizers = []string{finalizerName}
 	s.Status.DatabaseName = "MY_DB"
 	s.Status.SchemaName = "MY_SCHEMA"
@@ -282,7 +281,7 @@ func TestReconcile_CreateTerminalError(t *testing.T) {
 func TestReconcile_UpdateNoChanges(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	s.Finalizers = []string{finalizerName}
 	s.Status.ObservedGeneration = 1
 	s.Status.DatabaseName = "MY_DB"
@@ -302,7 +301,7 @@ func TestReconcile_UpdateNoChanges(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, reconciler.DefaultRequeueInterval, result.RequeueAfter)
 
-	got := &snowplanev1alpha1.Stream{}
+	got := &snowplanev1alpha1.StreamOnTable{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mys", Namespace: "default"}, got))
 	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
 }
@@ -310,7 +309,7 @@ func TestReconcile_UpdateNoChanges(t *testing.T) {
 func TestReconcile_UpdateComment(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	s.Finalizers = []string{finalizerName}
 	s.Status.ObservedGeneration = 1
 	s.Generation = 2
@@ -349,7 +348,7 @@ func TestReconcile_UpdateComment(t *testing.T) {
 func TestReconcile_Delete(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	s.Finalizers = []string{finalizerName}
 	s.Status.DatabaseName = "MY_DB"
 	s.Status.SchemaName = "MY_SCHEMA"
@@ -373,7 +372,7 @@ func TestReconcile_Delete(t *testing.T) {
 	assert.Equal(t, ctrl.Result{}, result)
 	assert.True(t, dropCalled)
 
-	got := &snowplanev1alpha1.Stream{}
+	got := &snowplanev1alpha1.StreamOnTable{}
 	err = r.Client.Get(context.Background(), types.NamespacedName{Name: "mys", Namespace: "default"}, got)
 	assert.True(t, apierrors.IsNotFound(err))
 }
@@ -381,7 +380,7 @@ func TestReconcile_Delete(t *testing.T) {
 func TestReconcile_DeleteOrphanPolicy(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	s.Finalizers = []string{finalizerName}
 	s.Status.DatabaseName = "MY_DB"
 	s.Status.SchemaName = "MY_SCHEMA"
@@ -412,14 +411,14 @@ func TestReconcile_DeleteOrphanPolicy(t *testing.T) {
 func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	s.Spec.AppendOnly = testutil.PtrBool(true)
 	s.Spec.Comment = testutil.PtrString("test")
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_STREAM")
 
 	opts := buildCreateOptions(s, id)
 	assert.Equal(t, "MY_STREAM", opts.Name.Name())
-	assert.Equal(t, snowflake.StreamSourceType("TABLE"), opts.SourceType)
+	assert.Equal(t, snowflake.StreamSourceTable, opts.SourceType)
 	assert.Equal(t, "MY_TABLE", opts.SourceName)
 	assert.True(t, *opts.AppendOnly)
 	assert.Equal(t, "test", *opts.Comment)
@@ -428,7 +427,7 @@ func TestBuildCreateOptions(t *testing.T) {
 func TestBuildAlterOptions_CommentChanged(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	s.Spec.Comment = testutil.PtrString("new")
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_STREAM")
 	obs := successfulObservation()
@@ -442,7 +441,7 @@ func TestBuildAlterOptions_CommentChanged(t *testing.T) {
 func TestBuildAlterOptions_NoChanges(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_STREAM")
 	obs := successfulObservation()
 
@@ -453,7 +452,7 @@ func TestBuildAlterOptions_NoChanges(t *testing.T) {
 func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
 
-	spec := &snowplanev1alpha1.StreamSpec{
+	spec := &snowplanev1alpha1.StreamOnTableSpec{
 		Comment: testutil.PtrString("x"),
 	}
 
@@ -464,7 +463,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 func TestComputeTrackedParameters_Empty(t *testing.T) {
 	t.Parallel()
 
-	spec := &snowplanev1alpha1.StreamSpec{}
+	spec := &snowplanev1alpha1.StreamOnTableSpec{}
 	fields := computeTrackedParameters(spec)
 	assert.Empty(t, fields)
 }
@@ -472,7 +471,7 @@ func TestComputeTrackedParameters_Empty(t *testing.T) {
 func TestApplyObservation(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	obs := successfulObservation()
 
 	applyObservation(s, obs)
@@ -484,15 +483,6 @@ func TestApplyObservation(t *testing.T) {
 	assert.Equal(t, "SYSADMIN", s.Status.ShowOutput.Owner)
 }
 
-func TestSpecSourceTypeToMode(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, "DEFAULT", specSourceTypeToMode("TABLE", nil, nil))
-	assert.Equal(t, "APPEND_ONLY", specSourceTypeToMode("TABLE", testutil.PtrBool(true), nil))
-	assert.Equal(t, "INSERT_ONLY", specSourceTypeToMode("TABLE", nil, testutil.PtrBool(true)))
-	assert.Equal(t, "DEFAULT", specSourceTypeToMode("TABLE", testutil.PtrBool(false), nil))
-}
-
 // --------------------------------------------------------------------------
 // Tests: Drift detection
 // --------------------------------------------------------------------------
@@ -500,13 +490,13 @@ func TestSpecSourceTypeToMode(t *testing.T) {
 func TestDetectDrift_NoDrift(t *testing.T) {
 	t.Parallel()
 
-	s := &snowplanev1alpha1.Stream{
-		Spec: snowplanev1alpha1.StreamSpec{
-			Name:       "MY_STREAM",
-			SourceName: "MY_TABLE",
-			Comment:    testutil.PtrString("test"),
+	s := &snowplanev1alpha1.StreamOnTable{
+		Spec: snowplanev1alpha1.StreamOnTableSpec{
+			Name:    "MY_STREAM",
+			Table:   "MY_TABLE",
+			Comment: testutil.PtrString("test"),
 		},
-		Status: snowplanev1alpha1.StreamStatus{
+		Status: snowplanev1alpha1.StreamOnTableStatus{
 			DatabaseName: "MY_DB",
 			SchemaName:   "MY_SCHEMA",
 		},
@@ -530,12 +520,13 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 func TestDetectDrift_WithDrift(t *testing.T) {
 	t.Parallel()
 
-	s := &snowplanev1alpha1.Stream{
-		Spec: snowplanev1alpha1.StreamSpec{
+	s := &snowplanev1alpha1.StreamOnTable{
+		Spec: snowplanev1alpha1.StreamOnTableSpec{
 			Name:    "MY_STREAM",
+			Table:   "MY_TABLE",
 			Comment: testutil.PtrString("desired"),
 		},
-		Status: snowplanev1alpha1.StreamStatus{
+		Status: snowplanev1alpha1.StreamOnTableStatus{
 			DatabaseName: "MY_DB",
 			SchemaName:   "MY_SCHEMA",
 		},
@@ -546,6 +537,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 			Name:         "MY_STREAM",
 			DatabaseName: "MY_DB",
 			SchemaName:   "MY_SCHEMA",
+			TableName:    "MY_TABLE",
 			Comment:      "drifted",
 			Mode:         "DEFAULT",
 		},
@@ -556,6 +548,35 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	assert.Contains(t, result.Summary(), "COMMENT")
 }
 
+func TestDetectDrift_AppendOnlyMode(t *testing.T) {
+	t.Parallel()
+
+	s := &snowplanev1alpha1.StreamOnTable{
+		Spec: snowplanev1alpha1.StreamOnTableSpec{
+			Name:       "MY_STREAM",
+			Table:      "MY_TABLE",
+			AppendOnly: testutil.PtrBool(true),
+		},
+		Status: snowplanev1alpha1.StreamOnTableStatus{
+			DatabaseName: "MY_DB",
+			SchemaName:   "MY_SCHEMA",
+		},
+	}
+
+	obs := &snowflake.StreamObservation{
+		ShowOutput: &snowflake.StreamShowOutput{
+			Name:         "MY_STREAM",
+			DatabaseName: "MY_DB",
+			SchemaName:   "MY_SCHEMA",
+			TableName:    "MY_TABLE",
+			Mode:         "APPEND_ONLY",
+		},
+	}
+
+	result := detectDrift(s, obs)
+	assert.False(t, result.HasDrift)
+}
+
 // --------------------------------------------------------------------------
 // Tests: Event emission
 // --------------------------------------------------------------------------
@@ -563,7 +584,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 func TestReconcile_EventEmission_Create(t *testing.T) {
 	t.Parallel()
 
-	s := newTestStream("mys", "default")
+	s := newTestStreamOnTable("mys", "default")
 	s.Finalizers = []string{finalizerName}
 	s.Status.DatabaseName = "MY_DB"
 	s.Status.SchemaName = "MY_SCHEMA"

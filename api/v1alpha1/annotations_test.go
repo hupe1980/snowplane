@@ -26,3 +26,13 @@ func TestIsCreateOrAlter(t *testing.T) {
 	// Opt-out.
 	assert.False(t, IsCreateOrAlter(map[string]string{AnnotationUseCreateOrAlter: "false"}))
 }
+
+func TestIsAbandonOnDelete(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsAbandonOnDelete(map[string]string{AnnotationAbandonOnDelete: "true"}))
+	assert.False(t, IsAbandonOnDelete(map[string]string{AnnotationAbandonOnDelete: "false"}))
+	assert.False(t, IsAbandonOnDelete(map[string]string{AnnotationAbandonOnDelete: ""}))
+	assert.False(t, IsAbandonOnDelete(map[string]string{}))
+	assert.False(t, IsAbandonOnDelete(nil))
+}

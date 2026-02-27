@@ -38,13 +38,6 @@ func (a *shareGrantAdapter) ServiceFromClient(ctx context.Context, sfClient Snow
 	return a.newService(ctx, sfClient, useRole)
 }
 
-func (a *shareGrantAdapter) SupportsCreateOrAlter() bool { return false }
-
-// PreReconcile is a no-op for ShareGrant — no refs to resolve.
-func (a *shareGrantAdapter) PreReconcile(_ context.Context, _ *snowplanev1alpha1.ShareGrant) error {
-	return nil
-}
-
 // BuildIdentifier constructs a GrantIdentifier from the ShareGrant spec.
 func (a *shareGrantAdapter) BuildIdentifier(grant *snowplanev1alpha1.ShareGrant) (reconciler.Identifier, error) {
 	// Defense-in-depth: validate object type (CRD already validates).
@@ -66,11 +59,6 @@ func (a *shareGrantAdapter) BuildIdentifier(grant *snowplanev1alpha1.ShareGrant)
 		GranteeName:      grant.Spec.Share,
 		ShowGrantsTarget: showTarget,
 	}, nil
-}
-
-// SetupWatches returns nil — ShareGrant has no refs to watch.
-func (a *shareGrantAdapter) SetupWatches() reconciler.SetupWatchesFunc {
-	return nil
 }
 
 // Observe queries Snowflake for the current state.
@@ -149,11 +137,4 @@ func (a *shareGrantAdapter) DetectDrift(obj *snowplanev1alpha1.ShareGrant, obs *
 	detail := obs.Detail
 	// Shares don't have WithGrantOption.
 	return detectGrantDrift(obj.Spec.Privilege, false, detail)
-}
-
-// PostCreate is a no-op.
-func (a *shareGrantAdapter) PostCreate(_ *snowplanev1alpha1.ShareGrant) {}
-
-// PostUpdate is a no-op.
-func (a *shareGrantAdapter) PostUpdate(_ *snowplanev1alpha1.ShareGrant, _ bool, _ reconciler.AlterOptions) {
 }

@@ -150,6 +150,7 @@ var terminalReasons = map[string]bool{
 	snowplanev1alpha1.ReasonValidationFailed: true,
 	snowplanev1alpha1.ReasonImmutableField:   true,
 	snowplanev1alpha1.ReasonResourceExists:   true,
+	snowplanev1alpha1.ReasonDeleteBlocked:    true,
 }
 
 // IsTerminal returns true when the object has Ready=False with a terminal

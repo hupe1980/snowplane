@@ -54,8 +54,6 @@ func (a *accountRoleAssignmentAdapter) ServiceFromClient(ctx context.Context, sf
 	return a.newService(ctx, sfClient, useRole)
 }
 
-func (a *accountRoleAssignmentAdapter) SupportsCreateOrAlter() bool { return false }
-
 // PreReconcile resolves optional CR references.
 func (a *accountRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.AccountRoleAssignment) error {
 	logger := log.FromContext(ctx)
@@ -306,13 +304,6 @@ func (a *accountRoleAssignmentAdapter) ComputeTrackedParameters(_ *snowplanev1al
 func (a *accountRoleAssignmentAdapter) DetectDrift(obj *snowplanev1alpha1.AccountRoleAssignment, obs *reconciler.Observation[*snowflake.RoleAssignmentObservation]) *drift.Result {
 	grantedTo, granteeName := resolveAccountTarget(obj)
 	return detectRoleAssignmentDrift(grantedTo, granteeName, obs.Detail)
-}
-
-// PostCreate is a no-op.
-func (a *accountRoleAssignmentAdapter) PostCreate(_ *snowplanev1alpha1.AccountRoleAssignment) {}
-
-// PostUpdate is a no-op.
-func (a *accountRoleAssignmentAdapter) PostUpdate(_ *snowplanev1alpha1.AccountRoleAssignment, _ bool, _ reconciler.AlterOptions) {
 }
 
 // resolveAccountTarget determines the grantedTo category and grantee name from the spec.

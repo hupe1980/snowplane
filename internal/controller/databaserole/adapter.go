@@ -170,10 +170,4 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.DatabaseRole, obs *reconcil
 	return detectDrift(obj, detail)
 }
 
-func (a *adapter) PostCreate(_ *snowplanev1alpha1.DatabaseRole) {}
-func (a *adapter) PostUpdate(_ *snowplanev1alpha1.DatabaseRole, _ bool, _ reconciler.AlterOptions) {
-}
-
-func (a *adapter) SupportsCreateOrAlter() bool { return false }
-
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.DatabaseRole, Service, *snowflake.DatabaseRoleObservation] = (*adapter)(nil)

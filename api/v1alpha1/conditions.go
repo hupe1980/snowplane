@@ -54,4 +54,5 @@ const (
 	ReasonFinalizerRemoved      = "FinalizerRemoved"
 	ReasonCredentialsRotated    = "CredentialsRotated"
 	ReasonInUse                 = "InUse"
+	ReasonDeleteBlocked         = "DeleteBlocked"
 )

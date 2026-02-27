@@ -15,13 +15,17 @@ import (
 // All fields are immutable after creation — changing any field requires
 // deleting and recreating the resource.
 //
-// +kubebuilder:validation:XValidation:rule="self.roleName == oldSelf.roleName",message="spec.roleName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.roleName) == has(self.roleName) && (!has(self.roleName) || self.roleName == oldSelf.roleName)",message="spec.roleName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.roleRef) == has(self.roleRef) && (!has(self.roleRef) || self.roleRef == oldSelf.roleRef)",message="spec.roleRef is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="self.toRole == oldSelf.toRole",message="spec.toRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.toRole) == has(self.toRole) && (!has(self.toRole) || self.toRole == oldSelf.toRole)",message="spec.toRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.toRoleRef) == has(self.toRoleRef) && (!has(self.toRoleRef) || self.toRoleRef == oldSelf.toRoleRef)",message="spec.toRoleRef is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="self.toUser == oldSelf.toUser",message="spec.toUser is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.toUser) == has(self.toUser) && (!has(self.toUser) || self.toUser == oldSelf.toUser)",message="spec.toUser is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.toUserRef) == has(self.toUserRef) && (!has(self.toUserRef) || self.toUserRef == oldSelf.toUserRef)",message="spec.toUserRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
+//
+// Mutual exclusivity rules:
+// +kubebuilder:validation:XValidation:rule="(has(self.roleName) ? 1 : 0) + (has(self.roleRef) ? 1 : 0) == 1",message="exactly one of spec.roleName or spec.roleRef must be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.toRole) ? 1 : 0) + (has(self.toRoleRef) ? 1 : 0) + (has(self.toUser) ? 1 : 0) + (has(self.toUserRef) ? 1 : 0) == 1",message="exactly one of spec.toRole, spec.toRoleRef, spec.toUser, or spec.toUserRef must be set"
 type AccountRoleAssignmentSpec struct {
 	CommonSpec `json:",inline"`
 

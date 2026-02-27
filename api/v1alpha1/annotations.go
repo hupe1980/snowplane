@@ -48,6 +48,14 @@ const (
 	// populated from an existing Snowflake resource during adoption. Set to
 	// "true" for adopted resources.
 	AnnotationLateInitialized = "snowplane.hupe1980.github.io/late-initialized"
+
+	// AnnotationAbandonOnDelete controls whether the controller removes the
+	// finalizer without attempting to drop the Snowflake resource. Set to
+	// "true" on a resource that is pending deletion to unblock garbage
+	// collection when the DROP is permanently blocked (e.g., insufficient
+	// privileges). The Snowflake resource will remain and may require
+	// manual cleanup.
+	AnnotationAbandonOnDelete = "snowplane.hupe1980.github.io/abandon-on-delete"
 )
 
 // Label keys applied to CRD metadata (not CR annotations).
@@ -100,4 +108,11 @@ func IsCreateOrAlter(annotations map[string]string) bool {
 // field changes.
 func IsForceNew(annotations map[string]string) bool {
 	return annotations[AnnotationForceNew] == "true"
+}
+
+// IsAbandonOnDelete returns true when the abandon-on-delete annotation is set
+// to "true", signaling the controller to remove the finalizer without
+// attempting to drop the Snowflake resource.
+func IsAbandonOnDelete(annotations map[string]string) bool {
+	return annotations[AnnotationAbandonOnDelete] == "true"
 }

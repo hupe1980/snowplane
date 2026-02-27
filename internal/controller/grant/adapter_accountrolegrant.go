@@ -51,8 +51,6 @@ func (a *accountRoleGrantAdapter) ServiceFromClient(ctx context.Context, sfClien
 	return a.newService(ctx, sfClient, useRole)
 }
 
-func (a *accountRoleGrantAdapter) SupportsCreateOrAlter() bool { return false }
-
 // PreReconcile resolves optional CR references.
 func (a *accountRoleGrantAdapter) PreReconcile(ctx context.Context, grant *snowplanev1alpha1.AccountRoleGrant) error {
 	logger := log.FromContext(ctx)
@@ -280,13 +278,6 @@ func (a *accountRoleGrantAdapter) ComputeTrackedParameters(_ *snowplanev1alpha1.
 func (a *accountRoleGrantAdapter) DetectDrift(obj *snowplanev1alpha1.AccountRoleGrant, obs *reconciler.Observation[*snowflake.GrantObservation]) *drift.Result {
 	detail := obs.Detail
 	return detectGrantDrift(obj.Spec.Privilege, obj.Spec.WithGrantOption, detail)
-}
-
-// PostCreate is a no-op.
-func (a *accountRoleGrantAdapter) PostCreate(_ *snowplanev1alpha1.AccountRoleGrant) {}
-
-// PostUpdate is a no-op.
-func (a *accountRoleGrantAdapter) PostUpdate(_ *snowplanev1alpha1.AccountRoleGrant, _ bool, _ reconciler.AlterOptions) {
 }
 
 // hasOnRefs checks if the GrantOn hierarchy contains any unresolved refs.

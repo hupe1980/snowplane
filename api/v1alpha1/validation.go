@@ -1103,52 +1103,132 @@ func (s *TaskSpec) Validate() error {
 	return errors.Join(errs...)
 }
 
-// Validate checks the StreamSpec for configuration errors.
-func (s *StreamSpec) Validate() error {
+// Validate checks the StreamOnTableSpec for configuration errors.
+func (s *StreamOnTableSpec) Validate() error {
 	var errs []error
 
 	if s.Name == "" {
 		errs = append(errs, errors.New("spec.name is required"))
 	}
 
-	// Exactly one of databaseRef or databaseName must be set.
 	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
 		errs = append(errs, err)
 	}
 
-	// Exactly one of schemaRef or schemaName must be set.
 	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
 		errs = append(errs, err)
 	}
 
-	if s.SourceName == "" {
-		errs = append(errs, errors.New("spec.sourceName is required"))
+	if s.Table == "" {
+		errs = append(errs, errors.New("spec.table is required"))
 	}
 
-	// appendOnly is only valid for TABLE/VIEW streams.
-	if s.AppendOnly != nil && *s.AppendOnly {
-		if s.SourceType != StreamSourceTable && s.SourceType != StreamSourceView {
-			errs = append(errs, errors.New("spec.appendOnly is only valid for TABLE or VIEW streams"))
-		}
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
 	}
 
-	// insertOnly is only valid for EXTERNAL_TABLE streams.
-	if s.InsertOnly != nil && *s.InsertOnly {
-		if s.SourceType != StreamSourceExternalTable {
-			errs = append(errs, errors.New("spec.insertOnly is only valid for EXTERNAL_TABLE streams"))
-		}
+	return errors.Join(errs...)
+}
+
+// Validate checks the StreamOnViewSpec for configuration errors.
+func (s *StreamOnViewSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
 	}
 
-	// showInitialRows is only valid for TABLE/VIEW streams.
-	if s.ShowInitialRows != nil && *s.ShowInitialRows {
-		if s.SourceType != StreamSourceTable && s.SourceType != StreamSourceView {
-			errs = append(errs, errors.New("spec.showInitialRows is only valid for TABLE or VIEW streams"))
-		}
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
 	}
 
-	// appendOnly and insertOnly are mutually exclusive.
-	if s.AppendOnly != nil && *s.AppendOnly && s.InsertOnly != nil && *s.InsertOnly {
-		errs = append(errs, errors.New("spec.appendOnly and spec.insertOnly are mutually exclusive"))
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.View == "" {
+		errs = append(errs, errors.New("spec.view is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the StreamOnExternalTableSpec for configuration errors.
+func (s *StreamOnExternalTableSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.ExternalTable == "" {
+		errs = append(errs, errors.New("spec.externalTable is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the StreamOnDirectoryTableSpec for configuration errors.
+func (s *StreamOnDirectoryTableSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.Stage == "" {
+		errs = append(errs, errors.New("spec.stage is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the StreamOnDynamicTableSpec for configuration errors.
+func (s *StreamOnDynamicTableSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.DynamicTable == "" {
+		errs = append(errs, errors.New("spec.dynamicTable is required"))
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -1566,7 +1646,11 @@ var ValidFieldExportSourceKinds = map[string]struct{}{
 	"View":                   {},
 	"Stage":                  {},
 	"Task":                   {},
-	"Stream":                 {},
+	"StreamOnTable":          {},
+	"StreamOnView":           {},
+	"StreamOnExternalTable":  {},
+	"StreamOnDirectoryTable": {},
+	"StreamOnDynamicTable":   {},
 	"Tag":                    {},
 	"NetworkPolicy":          {},
 	"ResourceMonitor":        {},

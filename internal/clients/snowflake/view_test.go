@@ -273,7 +273,7 @@ func (m *testSQLExec) Exec(ctx context.Context, query string, args ...any) (sql.
 	return testResult{}, nil
 }
 
-func (m *testSQLExec) QueryRow(_ context.Context, _ string, _ ...any) *sql.Row {
+func (m *testSQLExec) QueryRow(_ context.Context, _ string, _ ...any) *Row {
 	return nil
 }
 

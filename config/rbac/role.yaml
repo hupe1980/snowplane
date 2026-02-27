@@ -65,7 +65,6 @@ rules:
   - views
   - stages
   - tasks
-  - streams
   - tags
   - networkpolicies
   - resourcemonitors
@@ -105,7 +104,6 @@ rules:
   - views/status
   - stages/status
   - tasks/status
-  - streams/status
   - tags/status
   - networkpolicies/status
   - resourcemonitors/status
@@ -141,7 +139,6 @@ rules:
   - views/finalizers
   - stages/finalizers
   - tasks/finalizers
-  - streams/finalizers
   - tags/finalizers
   - networkpolicies/finalizers
   - resourcemonitors/finalizers

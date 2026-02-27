@@ -44,7 +44,11 @@ import (
 	securityintegrationctl "github.com/hupe1980/snowplane/internal/controller/securityintegration"
 	stagectl "github.com/hupe1980/snowplane/internal/controller/stage"
 	storageintegrationctl "github.com/hupe1980/snowplane/internal/controller/storageintegration"
-	streamctl "github.com/hupe1980/snowplane/internal/controller/stream"
+	streamondirectorytablectl "github.com/hupe1980/snowplane/internal/controller/streamondirectorytable"
+	streamondynamictablectl "github.com/hupe1980/snowplane/internal/controller/streamondynamictable"
+	streamonexternaltablectl "github.com/hupe1980/snowplane/internal/controller/streamonexternaltable"
+	streamontablectl "github.com/hupe1980/snowplane/internal/controller/streamontable"
+	streamonviewctl "github.com/hupe1980/snowplane/internal/controller/streamonview"
 	tablectl "github.com/hupe1980/snowplane/internal/controller/table"
 	tagctl "github.com/hupe1980/snowplane/internal/controller/tag"
 	taskctl "github.com/hupe1980/snowplane/internal/controller/task"
@@ -84,7 +88,11 @@ var validControllerNames = map[string]bool{
 	"view":                   true,
 	"stage":                  true,
 	"task":                   true,
-	"stream":                 true,
+	"streamontable":          true,
+	"streamonview":           true,
+	"streamonexternaltable":  true,
+	"streamondirectorytable": true,
+	"streamondynamictable":   true,
 	"tag":                    true,
 	"networkpolicy":          true,
 	"resourcemonitor":        true,
@@ -164,7 +172,7 @@ func main() {
 		"Enable controllers for alpha-maturity CRDs. Set to false to skip alpha resources.")
 	flag.StringVar(&disableControllers, "disable-controllers", "",
 		"Comma-separated list of controller names to disable (e.g. \"accountrolegrant,stage,view\"). "+
-			"Valid names: alert, database, schema, warehouse, accountrole, databaserole, accountrolegrant, databaserolegrant, sharegrant, user, table, view, stage, task, stream, tag, networkpolicy, resourcemonitor, maskingpolicy, rowaccesspolicy, grantownership, fieldexport, storageintegration, fileformat, pipe, dynamictable, securityintegration, passwordpolicy, networkrule, accountroleassignment, databaseroleassignment.")
+			"Valid names: alert, database, schema, warehouse, accountrole, databaserole, accountrolegrant, databaserolegrant, sharegrant, user, table, view, stage, task, streamontable, streamonview, streamonexternaltable, streamondirectorytable, streamondynamictable, tag, networkpolicy, resourcemonitor, maskingpolicy, rowaccesspolicy, grantownership, fieldexport, storageintegration, fileformat, pipe, dynamictable, securityintegration, passwordpolicy, networkrule, accountroleassignment, databaseroleassignment.")
 	flag.StringVar(&watchNamespaces, "watch-namespaces", "",
 		"Comma-separated list of namespaces to watch. If empty, all namespaces are watched.")
 	flag.StringVar(&leaderElectionID, "leader-election-id", "snowplane-leader-election",
@@ -291,7 +299,11 @@ func main() {
 		{"view", viewctl.NewReconciler(kc, factory, controllerRec("view"), rl)},
 		{"stage", stagectl.NewReconciler(kc, factory, controllerRec("stage"), rl)},
 		{"task", taskctl.NewReconciler(kc, factory, controllerRec("task"), rl)},
-		{"stream", streamctl.NewReconciler(kc, factory, controllerRec("stream"), rl)},
+		{"streamontable", streamontablectl.NewReconciler(kc, factory, controllerRec("streamontable"), rl)},
+		{"streamonview", streamonviewctl.NewReconciler(kc, factory, controllerRec("streamonview"), rl)},
+		{"streamonexternaltable", streamonexternaltablectl.NewReconciler(kc, factory, controllerRec("streamonexternaltable"), rl)},
+		{"streamondirectorytable", streamondirectorytablectl.NewReconciler(kc, factory, controllerRec("streamondirectorytable"), rl)},
+		{"streamondynamictable", streamondynamictablectl.NewReconciler(kc, factory, controllerRec("streamondynamictable"), rl)},
 		{"tag", tagctl.NewReconciler(kc, factory, controllerRec("tag"), rl)},
 		{"networkpolicy", networkpolicyctl.NewReconciler(kc, factory, controllerRec("networkpolicy"), rl)},
 		{"resourcemonitor", resourcemonitorctl.NewReconciler(kc, factory, controllerRec("resourcemonitor"), rl)},

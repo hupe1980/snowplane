@@ -442,34 +442,6 @@ func TestCEL_Stage_ImmutableType(t *testing.T) {
 	assert.Contains(t, err.Error(), "stage type")
 }
 
-// TestCEL_Stream_ImmutableSourceType verifies that spec.sourceType is immutable.
-func TestCEL_Stream_ImmutableSourceType(t *testing.T) {
-	t.Parallel()
-
-	stream := &snowplanev1alpha1.Stream{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cel-stream-immutable-src",
-			Namespace: testNamespace,
-		},
-		Spec: snowplanev1alpha1.StreamSpec{
-			Name:         "MY_STREAM",
-			DatabaseName: strPtr("MY_DB"),
-			SchemaName:   strPtr("MY_SCHEMA"),
-			SourceType:   "TABLE",
-			SourceName:   "MY_TABLE",
-		},
-	}
-
-	require.NoError(t, k8sClient.Create(ctx, stream))
-	t.Cleanup(func() { _ = k8sClient.Delete(ctx, stream) })
-
-	err := updateWithCELCheck(t, types.NamespacedName{Name: stream.Name, Namespace: stream.Namespace}, stream, func() {
-		stream.Spec.SourceType = "VIEW"
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.sourceType is immutable")
-}
-
 // TestCEL_User_DefaultType verifies that the User type defaults to PERSON.
 func TestCEL_User_DefaultType(t *testing.T) {
 	t.Parallel()

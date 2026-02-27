@@ -33,6 +33,21 @@ func resetMocks() {
 	accountRoleMockSvc.Reset()
 	databaseRoleMockSvc.Reset()
 	grantMockSvc.Reset()
+	alertMockSvc.Reset()
+	taskMockSvc.Reset()
+	dynamicTableMockSvc.Reset()
+	networkPolicyMockSvc.Reset()
+	maskingPolicyMockSvc.Reset()
+	passwordPolicyMockSvc.Reset()
+	securityIntegrationMockSvc.Reset()
+	storageIntegrationMockSvc.Reset()
+	resourceMonitorMockSvc.Reset()
+	pipeMockSvc.Reset()
+	fileFormatMockSvc.Reset()
+	tagMockSvc.Reset()
+	rowAccessPolicyMockSvc.Reset()
+	grantOwnershipMockSvc.Reset()
+	roleAssignmentMockSvc.Reset()
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +66,7 @@ func (m *mockSnowflakeClient) Exec(_ context.Context, _ string, _ ...any) (sql.R
 	return nil, nil
 }
 
-func (m *mockSnowflakeClient) QueryRow(_ context.Context, _ string, _ ...any) *sql.Row {
+func (m *mockSnowflakeClient) QueryRow(_ context.Context, _ string, _ ...any) *snowflake.Row {
 	return nil
 }
 

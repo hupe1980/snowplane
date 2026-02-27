@@ -210,8 +210,6 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.View, obs *reconciler.Obser
 	return detectDrift(obj, detail)
 }
 
-func (a *adapter) PostCreate(_ *snowplanev1alpha1.View) {}
-
 func (a *adapter) PostUpdate(_ *snowplanev1alpha1.View, specChanged bool, opts reconciler.AlterOptions) {
 	// No-op: statement changes are handled transparently in buildAlterOptions
 	// via ReplaceStatement, which triggers CREATE OR REPLACE VIEW in the

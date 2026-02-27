@@ -38,7 +38,7 @@ func (m *mockSnowflakeClient) Close() error                 { return nil }
 func (m *mockSnowflakeClient) Exec(_ context.Context, _ string, _ ...any) (sql.Result, error) {
 	return nil, nil
 }
-func (m *mockSnowflakeClient) QueryRow(_ context.Context, _ string, _ ...any) *sql.Row {
+func (m *mockSnowflakeClient) QueryRow(_ context.Context, _ string, _ ...any) *snowflake.Row {
 	return nil
 }
 func (m *mockSnowflakeClient) Query(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
@@ -383,6 +383,151 @@ func TestReconcile_Delete_OrphanPolicy(t *testing.T) {
 	_, err := r.Reconcile(context.Background(), reconcileReq())
 	require.NoError(t, err)
 	assert.False(t, dropCalled, "Drop should NOT be called with Orphan policy")
+}
+
+func TestReconcile_Delete_TerminalDropError_DoesNotRequeue(t *testing.T) {
+	t.Parallel()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	now := metav1.Now()
+	db.DeletionTimestamp = &now
+	adapter := &mockAdapter{
+		dropFn: func(_ context.Context, _ any, _ reconciler.Identifier) error {
+			return snowflake.NewTerminalError(errors.New("insufficient privileges to drop"))
+		},
+	}
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	// Terminal delete errors must NOT requeue — return nil error.
+	require.NoError(t, err, "terminal drop error should not requeue")
+
+	// Verify DeleteBlocked condition is set.
+	var fetched snowplanev1alpha1.Database
+	require.NoError(t, r.Client.Get(context.Background(), reconcileReq().NamespacedName, &fetched))
+
+	ready := conditions.Get(&fetched, snowplanev1alpha1.TypeReady)
+	require.NotNil(t, ready)
+	assert.Equal(t, metav1.ConditionFalse, ready.Status)
+	assert.Equal(t, snowplanev1alpha1.ReasonDeleteBlocked, ready.Reason, "terminal drop should set DeleteBlocked reason")
+	assert.Contains(t, ready.Message, "insufficient privileges to drop")
+
+	synced := conditions.Get(&fetched, snowplanev1alpha1.TypeSynced)
+	require.NotNil(t, synced)
+	assert.Equal(t, snowplanev1alpha1.ReasonDeleteBlocked, synced.Reason)
+
+	// Finalizer should still be present (not removed on terminal error).
+	assert.Contains(t, fetched.Finalizers, "snowplane.test/database")
+}
+
+func TestReconcile_Delete_TransientDropError_Requeues(t *testing.T) {
+	t.Parallel()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	now := metav1.Now()
+	db.DeletionTimestamp = &now
+	adapter := &mockAdapter{
+		dropFn: func(_ context.Context, _ any, _ reconciler.Identifier) error {
+			return errors.New("connection timeout")
+		},
+	}
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	// Transient errors SHOULD requeue.
+	require.Error(t, err, "transient drop error should requeue")
+	assert.Contains(t, err.Error(), "connection timeout")
+
+	// Finalizer should still be present.
+	var fetched snowplanev1alpha1.Database
+	require.NoError(t, r.Client.Get(context.Background(), reconcileReq().NamespacedName, &fetched))
+	assert.Contains(t, fetched.Finalizers, "snowplane.test/database")
+}
+
+func TestReconcile_Delete_AbandonOnDelete_SkipsDropAndRemovesFinalizer(t *testing.T) {
+	t.Parallel()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	now := metav1.Now()
+	db.DeletionTimestamp = &now
+	db.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationAbandonOnDelete: "true",
+	}
+	dropCalled := false
+	adapter := &mockAdapter{
+		dropFn: func(_ context.Context, _ any, _ reconciler.Identifier) error {
+			dropCalled = true
+			return nil
+		},
+	}
+	recorder := record.NewFakeRecorder(100)
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r.Recorder = recorder
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.False(t, dropCalled, "Drop should NOT be called with abandon-on-delete annotation")
+
+	// Verify the warning event was emitted with abandon details.
+	found := false
+	close(recorder.Events)
+	for event := range recorder.Events {
+		if strings.Contains(event, snowplanev1alpha1.ReasonOrphanedResource) &&
+			strings.Contains(event, "abandoned") {
+			found = true
+
+			break
+		}
+	}
+
+	assert.True(t, found, "should emit OrphanedResource event with abandon details")
+}
+
+func TestReconcile_Delete_AbandonOnDelete_NotSet_DropsNormally(t *testing.T) {
+	t.Parallel()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	now := metav1.Now()
+	db.DeletionTimestamp = &now
+	// Annotation not set — should proceed with normal drop.
+	dropCalled := false
+	adapter := &mockAdapter{
+		dropFn: func(_ context.Context, _ any, _ reconciler.Identifier) error {
+			dropCalled = true
+			return nil
+		},
+	}
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.True(t, dropCalled, "Drop should be called without abandon-on-delete annotation")
+}
+
+func TestReconcile_Delete_TerminalDropError_EventContainsAbandonGuidance(t *testing.T) {
+	t.Parallel()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	now := metav1.Now()
+	db.DeletionTimestamp = &now
+	adapter := &mockAdapter{
+		dropFn: func(_ context.Context, _ any, _ reconciler.Identifier) error {
+			return snowflake.NewTerminalError(errors.New("insufficient privileges"))
+		},
+	}
+	recorder := record.NewFakeRecorder(100)
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r.Recorder = recorder
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+
+	// Verify the event contains guidance about the abandon annotation.
+	found := false
+	close(recorder.Events)
+	for event := range recorder.Events {
+		if strings.Contains(event, snowplanev1alpha1.ReasonDeleteBlocked) &&
+			strings.Contains(event, "abandon-on-delete") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "terminal drop event should contain abandon-on-delete guidance")
 }
 
 // ---------------------------------------------------------------------------
@@ -1510,14 +1655,16 @@ func TestReconcile_Delete_TerminalDropError_SetsConditions(t *testing.T) {
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 	_, err := r.Reconcile(context.Background(), reconcileReq())
 
-	// Should return the error (terminal but still needs requeue for delete path
-	// since finalizer blocks garbage collection).
-	require.Error(t, err)
+	// M-7: Terminal delete errors no longer requeue — return nil to stop
+	// infinite backoff. The periodic resync retries, and the user can set
+	// abandon-on-delete to force finalizer removal.
+	require.NoError(t, err, "terminal drop error should not requeue")
 
 	// Verify conditions are set.
 	var fetched snowplanev1alpha1.Database
 	require.NoError(t, r.Client.Get(context.Background(), reconcileReq().NamespacedName, &fetched))
 	assert.False(t, conditions.IsTrue(&fetched, snowplanev1alpha1.TypeReady), "should be not ready")
+	assert.Equal(t, snowplanev1alpha1.ReasonDeleteBlocked, conditions.Get(&fetched, snowplanev1alpha1.TypeReady).Reason)
 }
 
 func TestReconcile_Delete_DropError_SetsSyncedCondition(t *testing.T) {

@@ -71,7 +71,11 @@ rules:
   - stages
   - tasks
   - alerts
-  - streams
+  - streamontables
+  - streamonviews
+  - streamonexternaltables
+  - streamondirectorytables
+  - streamondynamictables
   - tags
   - networkpolicies
   - resourcemonitors
@@ -114,7 +118,11 @@ rules:
   - stages/status
   - tasks/status
   - alerts/status
-  - streams/status
+  - streamontables/status
+  - streamonviews/status
+  - streamonexternaltables/status
+  - streamondirectorytables/status
+  - streamondynamictables/status
   - tags/status
   - networkpolicies/status
   - resourcemonitors/status
@@ -153,7 +161,11 @@ rules:
   - stages/finalizers
   - tasks/finalizers
   - alerts/finalizers
-  - streams/finalizers
+  - streamontables/finalizers
+  - streamonviews/finalizers
+  - streamonexternaltables/finalizers
+  - streamondirectorytables/finalizers
+  - streamondynamictables/finalizers
   - tags/finalizers
   - networkpolicies/finalizers
   - resourcemonitors/finalizers
@@ -249,7 +261,11 @@ rules:
   - stages
   - tasks
   - alerts
-  - streams
+  - streamontables
+  - streamonviews
+  - streamonexternaltables
+  - streamondirectorytables
+  - streamondynamictables
   - tags
   - networkpolicies
   - resourcemonitors
@@ -288,7 +304,11 @@ rules:
   - stages/status
   - tasks/status
   - alerts/status
-  - streams/status
+  - streamontables/status
+  - streamonviews/status
+  - streamonexternaltables/status
+  - streamondirectorytables/status
+  - streamondynamictables/status
   - tags/status
   - networkpolicies/status
   - resourcemonitors/status
@@ -335,7 +355,11 @@ rules:
   - stages
   - tasks
   - alerts
-  - streams
+  - streamontables
+  - streamonviews
+  - streamonexternaltables
+  - streamondirectorytables
+  - streamondynamictables
   - tags
   - networkpolicies
   - resourcemonitors
@@ -378,7 +402,11 @@ rules:
   - stages/status
   - tasks/status
   - alerts/status
-  - streams/status
+  - streamontables/status
+  - streamonviews/status
+  - streamonexternaltables/status
+  - streamondirectorytables/status
+  - streamondynamictables/status
   - tags/status
   - networkpolicies/status
   - resourcemonitors/status

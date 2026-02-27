@@ -209,9 +209,6 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.PasswordPolicy, obs *reconc
 	return detectDrift(obj, detail)
 }
 
-func (a *adapter) PostCreate(_ *snowplanev1alpha1.PasswordPolicy) {}
-func (a *adapter) PostUpdate(_ *snowplanev1alpha1.PasswordPolicy, _ bool, _ reconciler.AlterOptions) {
-}
 func (a *adapter) SupportsCreateOrAlter() bool { return true }
 
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.PasswordPolicy, Service, *snowflake.PasswordPolicyObservation] = (*adapter)(nil)

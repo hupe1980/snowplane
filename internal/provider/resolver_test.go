@@ -377,7 +377,7 @@ func (f *fakeSnowflakeClient) Close() error                 { return nil }
 func (f *fakeSnowflakeClient) Exec(_ context.Context, _ string, _ ...any) (sql.Result, error) {
 	return nil, nil
 }
-func (f *fakeSnowflakeClient) QueryRow(_ context.Context, _ string, _ ...any) *sql.Row {
+func (f *fakeSnowflakeClient) QueryRow(_ context.Context, _ string, _ ...any) *snowflake.Row {
 	return nil
 }
 func (f *fakeSnowflakeClient) Query(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {

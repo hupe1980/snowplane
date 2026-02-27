@@ -5,6 +5,7 @@ package provider
 import (
 	"crypto/sha256"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -75,7 +76,10 @@ func BuildSnowflakeConfig(pc *snowplanev1alpha1.ProviderConfig, secret *corev1.S
 
 		switch pc.Spec.AuthenticationType {
 		case snowplanev1alpha1.AuthenticationTypeKeyPair:
-			cfg.PrivateKey = string(data)
+			// Copy Secret data into owned slices so BuildSnowflakeConfig does
+			// not alias the informer-cached Secret.Data backing array. The
+			// caller (or NewClient) will zeroize these after use.
+			cfg.PrivateKey = append([]byte(nil), data...)
 
 			// Optionally read the passphrase for encrypted PKCS#8 keys.
 			// The passphrase must be in the same Secret, referenced by key name.
@@ -87,10 +91,10 @@ func BuildSnowflakeConfig(pc *snowplanev1alpha1.ProviderConfig, secret *corev1.S
 						secret.Namespace, secret.Name, ppKey)
 				}
 
-				cfg.Passphrase = string(ppData)
+				cfg.Passphrase = append([]byte(nil), ppData...)
 			}
 		case snowplanev1alpha1.AuthenticationTypeUsernamePassword:
-			cfg.Password = string(data)
+			cfg.Password = append([]byte(nil), data...)
 		}
 
 		return cfg, nil
@@ -110,12 +114,27 @@ func BuildSnowflakeConfig(pc *snowplanev1alpha1.ProviderConfig, secret *corev1.S
 }
 
 // ValidateTokenFilePath returns an error if path is outside the allowed prefixes.
-// The path is cleaned (resolving . and ..) before checking.
+// The path is cleaned (resolving . and ..) and symlinks are resolved before
+// checking the prefix, preventing symlink-based bypass (e.g. a symlink at
+// /var/run/secrets/evil -> /etc/shadow).
 func ValidateTokenFilePath(path string) error {
 	cleaned := filepath.Clean(path)
 
+	// Resolve symlinks so a link inside the allowed tree that points
+	// outside it is caught. EvalSymlinks also cleans the result.
+	resolved, err := filepath.EvalSymlinks(cleaned)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// File may not be mounted yet (projected volume race).
+			// Fall back to the cleaned path for the prefix check.
+			resolved = cleaned
+		} else {
+			return fmt.Errorf("tokenFilePath %q: failed to resolve symlinks: %w", path, err)
+		}
+	}
+
 	for _, prefix := range AllowedTokenPathPrefixes {
-		if strings.HasPrefix(cleaned, prefix) {
+		if strings.HasPrefix(resolved, prefix) {
 			return nil
 		}
 	}
@@ -130,19 +149,27 @@ func ValidateTokenFilePath(path string) error {
 func ComputeHash(cfg snowflake.Config) string {
 	h := sha256.New()
 
+	// String fields.
 	for _, v := range []string{
 		cfg.Account,
 		cfg.User,
 		cfg.Region,
 		cfg.Role,
 		cfg.Warehouse,
-		cfg.Password,
-		cfg.PrivateKey,
-		cfg.Passphrase,
 		cfg.TokenFilePath,
 		cfg.WorkloadIdentityProvider,
 	} {
 		h.Write([]byte(v))
+		h.Write([]byte{'\x00'})
+	}
+
+	// Credential fields are []byte — write directly without conversion.
+	for _, b := range [][]byte{
+		cfg.Password,
+		cfg.PrivateKey,
+		cfg.Passphrase,
+	} {
+		h.Write(b)
 		h.Write([]byte{'\x00'})
 	}
 

@@ -54,8 +54,6 @@ func (a *databaseRoleAssignmentAdapter) ServiceFromClient(ctx context.Context, s
 	return a.newService(ctx, sfClient, useRole)
 }
 
-func (a *databaseRoleAssignmentAdapter) SupportsCreateOrAlter() bool { return false }
-
 // PreReconcile resolves optional CR references.
 func (a *databaseRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.DatabaseRoleAssignment) error {
 	logger := log.FromContext(ctx)
@@ -305,13 +303,6 @@ func (a *databaseRoleAssignmentAdapter) ComputeTrackedParameters(_ *snowplanev1a
 func (a *databaseRoleAssignmentAdapter) DetectDrift(obj *snowplanev1alpha1.DatabaseRoleAssignment, obs *reconciler.Observation[*snowflake.RoleAssignmentObservation]) *drift.Result {
 	grantedTo, granteeName := resolveDatabaseTarget(obj)
 	return detectRoleAssignmentDrift(grantedTo, granteeName, obs.Detail)
-}
-
-// PostCreate is a no-op.
-func (a *databaseRoleAssignmentAdapter) PostCreate(_ *snowplanev1alpha1.DatabaseRoleAssignment) {}
-
-// PostUpdate is a no-op.
-func (a *databaseRoleAssignmentAdapter) PostUpdate(_ *snowplanev1alpha1.DatabaseRoleAssignment, _ bool, _ reconciler.AlterOptions) {
 }
 
 // resolveDatabaseTarget determines the grantedTo category and grantee name from the spec.

@@ -80,6 +80,14 @@ type Observation[D any] struct {
 // reconciler. Each managed resource type (Database, Schema, Warehouse, User,
 // AccountRole) implements this interface.
 //
+// The interface follows the Interface Segregation Principle: only the 14 core
+// methods that every adapter must implement are required. Optional behaviours
+// (PreReconcile, SetupWatches, PostCreate, PostUpdate, SupportsCreateOrAlter)
+// are expressed as separate interfaces that adapters opt into. The reconciler
+// detects these via type assertions, applying sensible defaults when absent.
+// This eliminates the trivial no-op implementations that most adapters
+// previously required.
+//
 // Type parameters:
 //   - T: the CRD type (e.g. *snowplanev1alpha1.Database)
 //   - S: the Snowflake CRUD service interface (e.g. database.Service)
@@ -103,17 +111,8 @@ type ResourceAdapter[T ManagedResource, S any, D any] interface {
 	// that role, and returns a cleanup function.
 	ServiceFromClient(ctx context.Context, sfClient clientfactory.SnowflakeClient, useRole string) (S, func(context.Context), error)
 
-	// PreReconcile runs resource-specific setup before the main state machine.
-	// Schema uses this to resolve databaseRef. Other resources return nil.
-	PreReconcile(ctx context.Context, obj T) error
-
 	// BuildIdentifier constructs the Snowflake identifier from the object.
 	BuildIdentifier(obj T) (Identifier, error)
-
-	// SetupWatches allows resource-specific watch configuration beyond the
-	// primary For() watch. Schema adds Database watches here.
-	// Return nil to skip.
-	SetupWatches() SetupWatchesFunc
 
 	// Observe queries Snowflake for the current state.
 	Observe(ctx context.Context, svc S, id Identifier) (*Observation[D], error)
@@ -141,24 +140,55 @@ type ResourceAdapter[T ManagedResource, S any, D any] interface {
 
 	// DetectDrift compares spec vs observation for reporting.
 	DetectDrift(obj T, obs *Observation[D]) *drift.Result
+}
 
-	// SupportsCreateOrAlter reports whether this resource type supports
-	// the CREATE OR ALTER SQL syntax. When true and the CR carries the
-	// use-create-or-alter annotation, the reconciler uses a single
-	// CREATE OR ALTER statement for both create and update paths.
-	SupportsCreateOrAlter() bool
+// ---------------------------------------------------------------------------
+// Optional adapter interfaces — checked via type assertions in the reconciler.
+// Adapters that do not implement these get sensible defaults (no-op / false).
+// ---------------------------------------------------------------------------
 
-	// PostCreate runs resource-specific logic after a successful create.
-	// Called before status is patched. User tracks password hash;
-	// Warehouse tracks resource constraint.
+// PreReconciler is an optional interface for adapters that need to run
+// resource-specific setup before the main reconciliation state machine.
+// Schema uses this to resolve databaseRef; Grant and RoleAssignment adapters
+// use it to resolve role and target references.
+// Default when absent: skip (no pre-reconcile step).
+type PreReconciler[T ManagedResource] interface {
+	PreReconcile(ctx context.Context, obj T) error
+}
+
+// WatchConfigurer is an optional interface for adapters that add
+// resource-specific watches beyond the primary For() watch. Schema-scoped
+// resources watch their parent Database; grant adapters watch referenced roles.
+// Default when absent: no additional watches.
+type WatchConfigurer interface {
+	SetupWatches() SetupWatchesFunc
+}
+
+// PostCreateHook is an optional interface for adapters that need to run
+// resource-specific logic after a successful create, before the status patch.
+// Default when absent: no-op.
+type PostCreateHook[T ManagedResource] interface {
 	PostCreate(obj T)
+}
 
-	// PostUpdate runs resource-specific post-update logic. Called before
-	// the final status patch. "altered" indicates whether an ALTER was
-	// issued. alterOpts are the options returned by BuildAlterOptions;
-	// adapters read per-reconciliation values from them (e.g. password
-	// hash) instead of storing mutable state on the adapter struct.
+// PostUpdateHook is an optional interface for adapters that need to run
+// resource-specific logic after a successful update, before the final status
+// patch. "altered" indicates whether an ALTER was issued. alterOpts are the
+// options returned by BuildAlterOptions; adapters read per-reconciliation
+// values from them (e.g. password hash, resource constraint) instead of
+// storing mutable state on the adapter struct.
+// Default when absent: no-op.
+type PostUpdateHook[T ManagedResource] interface {
 	PostUpdate(obj T, altered bool, alterOpts AlterOptions)
+}
+
+// CreateOrAlterSupporter is an optional interface for adapters whose resource
+// type supports the CREATE OR ALTER SQL syntax. When implemented (returning
+// true) and the CR carries the use-create-or-alter annotation, the reconciler
+// uses a single CREATE OR ALTER statement for both create and update paths.
+// Default when absent: CREATE OR ALTER is not supported.
+type CreateOrAlterSupporter interface {
+	SupportsCreateOrAlter() bool
 }
 
 // SetupWatchesFunc is a callback used during SetupWithManager to add

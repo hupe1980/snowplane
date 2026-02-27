@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -47,7 +49,7 @@ func TestBuildSnowflakeConfig_UsernamePassword(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "acct", cfg.Account)
 	assert.Equal(t, "user", cfg.User)
-	assert.Equal(t, "s3cret", cfg.Password)
+	assert.Equal(t, []byte("s3cret"), cfg.Password)
 	assert.Empty(t, cfg.PrivateKey)
 }
 
@@ -80,7 +82,7 @@ func TestBuildSnowflakeConfig_KeyPair_WithPassphrase(t *testing.T) {
 	}))
 	require.NoError(t, err)
 	assert.NotEmpty(t, cfg.PrivateKey)
-	assert.Equal(t, "my-secret-passphrase", cfg.Passphrase)
+	assert.Equal(t, []byte("my-secret-passphrase"), cfg.Passphrase)
 }
 
 func TestBuildSnowflakeConfig_KeyPair_PassphraseMissing(t *testing.T) {
@@ -102,8 +104,8 @@ func TestBuildSnowflakeConfig_KeyPair_PassphraseMissing(t *testing.T) {
 func TestComputeHash_PassphraseAffectsHash(t *testing.T) {
 	t.Parallel()
 
-	cfg1 := snowflake.Config{Account: "a", PrivateKey: "k"}
-	cfg2 := snowflake.Config{Account: "a", PrivateKey: "k", Passphrase: "pp"}
+	cfg1 := snowflake.Config{Account: "a", PrivateKey: []byte("k")}
+	cfg2 := snowflake.Config{Account: "a", PrivateKey: []byte("k"), Passphrase: []byte("pp")}
 	assert.NotEqual(t, ComputeHash(cfg1), ComputeHash(cfg2))
 }
 
@@ -223,7 +225,7 @@ func TestBuildSnowflakeConfig_WorkloadIdentity_InvalidTokenPath(t *testing.T) {
 func TestComputeHash_Deterministic(t *testing.T) {
 	t.Parallel()
 
-	cfg := snowflake.Config{Account: "a", User: "u", Password: "p"}
+	cfg := snowflake.Config{Account: "a", User: "u", Password: []byte("p")}
 	assert.Equal(t, ComputeHash(cfg), ComputeHash(cfg))
 	assert.Len(t, ComputeHash(cfg), 64) // SHA-256 hex
 }
@@ -288,6 +290,46 @@ func TestValidateTokenFilePath_Blocked(t *testing.T) {
 		assert.Error(t, err, "path %q should be blocked", path)
 		assert.Contains(t, err.Error(), "not under an allowed prefix")
 	}
+}
+
+func TestValidateTokenFilePath_SymlinkBypass(t *testing.T) {
+	// Not parallel — this test temporarily overrides AllowedTokenPathPrefixes.
+
+	// Create a temp directory that simulates /var/run/secrets/ structure.
+	// We can't create files in /var/run/secrets/ in tests, so we override
+	// AllowedTokenPathPrefixes temporarily.
+	tmpDir := t.TempDir()
+
+	// Resolve the tmpDir itself — on macOS /var is a symlink to /private/var.
+	tmpDir, err := filepath.EvalSymlinks(tmpDir)
+	require.NoError(t, err)
+
+	allowedDir := filepath.Join(tmpDir, "var", "run", "secrets")
+	require.NoError(t, os.MkdirAll(allowedDir, 0o755))
+
+	// Create a file outside the allowed tree.
+	outsideFile := filepath.Join(tmpDir, "etc", "shadow")
+	require.NoError(t, os.MkdirAll(filepath.Dir(outsideFile), 0o755))
+	require.NoError(t, os.WriteFile(outsideFile, []byte("secret"), 0o600))
+
+	// Create a symlink inside the allowed tree that points outside.
+	symlink := filepath.Join(allowedDir, "evil")
+	require.NoError(t, os.Symlink(outsideFile, symlink))
+
+	// Save and restore the original prefixes.
+	origPrefixes := AllowedTokenPathPrefixes
+	AllowedTokenPathPrefixes = []string{allowedDir + "/"}
+	t.Cleanup(func() { AllowedTokenPathPrefixes = origPrefixes })
+
+	// The symlink is under the allowed prefix lexically, but resolves outside.
+	err = ValidateTokenFilePath(symlink)
+	assert.Error(t, err, "symlink pointing outside allowed tree should be blocked")
+	assert.Contains(t, err.Error(), "not under an allowed prefix")
+
+	// A real file inside the allowed tree should still work.
+	realFile := filepath.Join(allowedDir, "token")
+	require.NoError(t, os.WriteFile(realFile, []byte("tok"), 0o600))
+	assert.NoError(t, ValidateTokenFilePath(realFile), "real file inside allowed tree should pass")
 }
 
 func TestBuildSnowflakeConfig_WorkloadIdentity_TraversalBlocked(t *testing.T) {

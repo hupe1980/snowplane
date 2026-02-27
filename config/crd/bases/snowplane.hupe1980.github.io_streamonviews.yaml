@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
-  name: streams.snowplane.hupe1980.github.io
+  name: streamonviews.snowplane.hupe1980.github.io
 spec:
   group: snowplane.hupe1980.github.io
   names:
     categories:
     - snowplane
-    kind: Stream
-    listKind: StreamList
-    plural: streams
-    singular: stream
+    kind: StreamOnView
+    listKind: StreamOnViewList
+    plural: streamonviews
+    singular: streamonview
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -38,7 +38,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Stream is the Schema for the streams API.
+        description: StreamOnView is the Schema for the streamonviews API.
         properties:
           apiVersion:
             description: |-
@@ -58,11 +58,12 @@ spec:
           metadata:
             type: object
           spec:
-            description: StreamSpec defines the desired state of a Snowflake Stream.
+            description: StreamOnViewSpec defines the desired state of a Snowflake
+              Stream on a View.
             properties:
               appendOnly:
-                description: AppendOnly tracks row inserts only (TABLE/VIEW streams
-                  only).
+                description: AppendOnly when true creates an append-only stream that
+                  tracks row inserts only.
                 type: boolean
               comment:
                 description: Comment is an optional description for the stream.
@@ -94,10 +95,6 @@ spec:
                 - Delete
                 - Orphan
                 type: string
-              insertOnly:
-                description: InsertOnly tracks row inserts only (EXTERNAL_TABLE streams
-                  only).
-                type: boolean
               name:
                 description: Name is the Snowflake stream name. Immutable after creation.
                 minLength: 1
@@ -137,26 +134,9 @@ spec:
                 - name
                 type: object
               showInitialRows:
-                description: ShowInitialRows returns existing rows on first consume
-                  (TABLE/VIEW streams only).
+                description: ShowInitialRows when true returns existing rows as inserts
+                  on first consume.
                 type: boolean
-              sourceName:
-                description: |-
-                  SourceName is the fully qualified name of the source object
-                  (e.g. "MY_DB"."MY_SCHEMA"."MY_TABLE"). Immutable after creation.
-                minLength: 1
-                type: string
-              sourceType:
-                description: |-
-                  SourceType specifies the type of object the stream is created on.
-                  Immutable after creation.
-                enum:
-                - TABLE
-                - VIEW
-                - EXTERNAL_TABLE
-                - STAGE
-                - DYNAMIC_TABLE
-                type: string
               useRole:
                 description: |-
                   UseRole specifies the Snowflake role to activate via USE ROLE before
@@ -166,11 +146,16 @@ spec:
                   This field is immutable after the resource has been created in Snowflake.
                 minLength: 1
                 type: string
+              view:
+                description: |-
+                  View is the fully qualified name of the source view
+                  (e.g. "MY_DB"."MY_SCHEMA"."MY_VIEW"). Immutable after creation.
+                minLength: 1
+                type: string
             required:
             - name
             - providerRef
-            - sourceName
-            - sourceType
+            - view
             type: object
             x-kubernetes-validations:
             - message: spec.name is immutable (delete and recreate the resource to
@@ -192,12 +177,9 @@ spec:
                 to change)
               rule: has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName)
                 || self.schemaName == oldSelf.schemaName)
-            - message: spec.sourceType is immutable (delete and recreate the resource
-                to change)
-              rule: self.sourceType == oldSelf.sourceType
-            - message: spec.sourceName is immutable (delete and recreate the resource
-                to change)
-              rule: self.sourceName == oldSelf.sourceName
+            - message: spec.view is immutable (delete and recreate the resource to
+                change)
+              rule: self.view == oldSelf.view
             - message: spec.useRole is immutable (delete and recreate the resource
                 to change)
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
@@ -210,7 +192,7 @@ spec:
               rule: (has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef)
                 && has(self.schemaName))
           status:
-            description: StreamStatus defines the observed state of a Stream.
+            description: StreamOnViewStatus defines the observed state of a StreamOnView.
             properties:
               conditions:
                 description: Conditions represent the latest available observations

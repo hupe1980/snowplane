@@ -358,7 +358,7 @@ func TestBuildConfig_UsernamePassword(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "testaccount", cfg.Account)
 	assert.Equal(t, "testuser", cfg.User)
-	assert.Equal(t, "s3cret", cfg.Password)
+	assert.Equal(t, []byte("s3cret"), cfg.Password)
 	assert.Empty(t, cfg.PrivateKey)
 }
 
@@ -410,7 +410,7 @@ func TestComputeHash_Deterministic(t *testing.T) {
 	cfg := snowflake.Config{
 		Account:  "acct",
 		User:     "user",
-		Password: "pass",
+		Password: []byte("pass"),
 	}
 	h1 := provider.ComputeHash(cfg)
 	h2 := provider.ComputeHash(cfg)
@@ -841,7 +841,7 @@ func collectEvents(recorder *record.FakeRecorder) []string {
 // mockClient implements clientfactory.SnowflakeClient for tests that need to
 // track which credentials were used to create the client.
 type mockClient struct {
-	password string
+	password []byte
 }
 
 func (m *mockClient) Ping(_ context.Context) error { return nil }
@@ -849,7 +849,7 @@ func (m *mockClient) Close() error                 { return nil }
 func (m *mockClient) Exec(_ context.Context, _ string, _ ...any) (sql.Result, error) {
 	return nil, nil
 }
-func (m *mockClient) QueryRow(_ context.Context, _ string, _ ...any) *sql.Row {
+func (m *mockClient) QueryRow(_ context.Context, _ string, _ ...any) *snowflake.Row {
 	return nil
 }
 

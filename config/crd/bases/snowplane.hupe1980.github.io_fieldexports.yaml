@@ -132,7 +132,7 @@ spec:
               rule: '!self.from.path.contains(''['')'
             - message: spec.from.resource.kind must be a supported Snowplane resource
                 kind
-              rule: self.from.resource.kind in ['Alert','Database','Schema','Warehouse','User','AccountRole','DatabaseRole','AccountRoleGrant','DatabaseRoleGrant','ShareGrant','AccountRoleAssignment','DatabaseRoleAssignment','Table','View','Stage','Task','Stream','Tag','NetworkPolicy','ResourceMonitor','MaskingPolicy','RowAccessPolicy','GrantOwnership','StorageIntegration','SecurityIntegration','FileFormat','Pipe','DynamicTable','PasswordPolicy','NetworkRule']
+              rule: self.from.resource.kind in ['Alert','Database','Schema','Warehouse','User','AccountRole','DatabaseRole','AccountRoleGrant','DatabaseRoleGrant','ShareGrant','AccountRoleAssignment','DatabaseRoleAssignment','Table','View','Stage','Task','Stream','StreamOnTable','StreamOnView','StreamOnExternalTable','StreamOnDirectoryTable','StreamOnDynamicTable','Tag','NetworkPolicy','ResourceMonitor','MaskingPolicy','RowAccessPolicy','GrantOwnership','StorageIntegration','SecurityIntegration','FileFormat','Pipe','DynamicTable','PasswordPolicy','NetworkRule']
             - message: spec.from.resource.kind is immutable
               rule: self.from.resource.kind == oldSelf.from.resource.kind
             - message: spec.from.resource.name is immutable

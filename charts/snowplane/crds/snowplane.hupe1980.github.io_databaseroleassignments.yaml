@@ -67,7 +67,7 @@ spec:
               or another database role:\n\n\tGRANT DATABASE ROLE <db>.<role> TO ROLE
               <parent_role>\n\tGRANT DATABASE ROLE <db>.<role> TO DATABASE ROLE <db>.<other_role>\n\nAll
               fields are immutable after creation — changing any field requires\ndeleting
-              and recreating the resource."
+              and recreating the resource.\n\nMutual exclusivity rules:"
             properties:
               databaseRoleName:
                 description: |-
@@ -163,21 +163,24 @@ spec:
             x-kubernetes-validations:
             - message: spec.databaseRoleName is immutable (delete and recreate the
                 resource to change)
-              rule: self.databaseRoleName == oldSelf.databaseRoleName
+              rule: has(oldSelf.databaseRoleName) == has(self.databaseRoleName) &&
+                (!has(self.databaseRoleName) || self.databaseRoleName == oldSelf.databaseRoleName)
             - message: spec.databaseRoleRef is immutable (delete and recreate the
                 resource to change)
               rule: has(oldSelf.databaseRoleRef) == has(self.databaseRoleRef) && (!has(self.databaseRoleRef)
                 || self.databaseRoleRef == oldSelf.databaseRoleRef)
             - message: spec.toRole is immutable (delete and recreate the resource
                 to change)
-              rule: self.toRole == oldSelf.toRole
+              rule: has(oldSelf.toRole) == has(self.toRole) && (!has(self.toRole)
+                || self.toRole == oldSelf.toRole)
             - message: spec.toRoleRef is immutable (delete and recreate the resource
                 to change)
               rule: has(oldSelf.toRoleRef) == has(self.toRoleRef) && (!has(self.toRoleRef)
                 || self.toRoleRef == oldSelf.toRoleRef)
             - message: spec.toDatabaseRole is immutable (delete and recreate the resource
                 to change)
-              rule: self.toDatabaseRole == oldSelf.toDatabaseRole
+              rule: has(oldSelf.toDatabaseRole) == has(self.toDatabaseRole) && (!has(self.toDatabaseRole)
+                || self.toDatabaseRole == oldSelf.toDatabaseRole)
             - message: spec.toDatabaseRoleRef is immutable (delete and recreate the
                 resource to change)
               rule: has(oldSelf.toDatabaseRoleRef) == has(self.toDatabaseRoleRef)
@@ -186,6 +189,15 @@ spec:
                 to change)
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
                 || self.useRole == oldSelf.useRole)
+            - message: exactly one of spec.databaseRoleName or spec.databaseRoleRef
+                must be set
+              rule: '(has(self.databaseRoleName) ? 1 : 0) + (has(self.databaseRoleRef)
+                ? 1 : 0) == 1'
+            - message: exactly one of spec.toRole, spec.toRoleRef, spec.toDatabaseRole,
+                or spec.toDatabaseRoleRef must be set
+              rule: '(has(self.toRole) ? 1 : 0) + (has(self.toRoleRef) ? 1 : 0) +
+                (has(self.toDatabaseRole) ? 1 : 0) + (has(self.toDatabaseRoleRef)
+                ? 1 : 0) == 1'
           status:
             description: DatabaseRoleAssignmentStatus defines the observed state of
               a DatabaseRoleAssignment.

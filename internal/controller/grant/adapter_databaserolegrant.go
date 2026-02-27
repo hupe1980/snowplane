@@ -51,8 +51,6 @@ func (a *databaseRoleGrantAdapter) ServiceFromClient(ctx context.Context, sfClie
 	return a.newService(ctx, sfClient, useRole)
 }
 
-func (a *databaseRoleGrantAdapter) SupportsCreateOrAlter() bool { return false }
-
 // PreReconcile resolves optional CR references.
 func (a *databaseRoleGrantAdapter) PreReconcile(ctx context.Context, grant *snowplanev1alpha1.DatabaseRoleGrant) error {
 	logger := log.FromContext(ctx)
@@ -280,11 +278,4 @@ func (a *databaseRoleGrantAdapter) ComputeTrackedParameters(_ *snowplanev1alpha1
 func (a *databaseRoleGrantAdapter) DetectDrift(obj *snowplanev1alpha1.DatabaseRoleGrant, obs *reconciler.Observation[*snowflake.GrantObservation]) *drift.Result {
 	detail := obs.Detail
 	return detectGrantDrift(obj.Spec.Privilege, obj.Spec.WithGrantOption, detail)
-}
-
-// PostCreate is a no-op.
-func (a *databaseRoleGrantAdapter) PostCreate(_ *snowplanev1alpha1.DatabaseRoleGrant) {}
-
-// PostUpdate is a no-op.
-func (a *databaseRoleGrantAdapter) PostUpdate(_ *snowplanev1alpha1.DatabaseRoleGrant, _ bool, _ reconciler.AlterOptions) {
 }

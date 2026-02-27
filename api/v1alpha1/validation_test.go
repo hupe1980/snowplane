@@ -2625,7 +2625,7 @@ func TestFieldExportSpec_Validate_PathArrayIndexing(t *testing.T) {
 
 func TestFieldExportSpec_Validate_AllSourceKinds(t *testing.T) {
 	t.Parallel()
-	for _, kind := range []string{"Database", "Schema", "Warehouse", "User", "AccountRole", "DatabaseRole", "AccountRoleGrant", "DatabaseRoleGrant", "ShareGrant", "Table", "View", "Stage", "Task", "Stream", "Tag", "NetworkPolicy", "ResourceMonitor", "MaskingPolicy", "RowAccessPolicy", "GrantOwnership"} {
+	for _, kind := range []string{"Database", "Schema", "Warehouse", "User", "AccountRole", "DatabaseRole", "AccountRoleGrant", "DatabaseRoleGrant", "ShareGrant", "Table", "View", "Stage", "Task", "StreamOnTable", "StreamOnView", "StreamOnExternalTable", "StreamOnDirectoryTable", "StreamOnDynamicTable", "Tag", "NetworkPolicy", "ResourceMonitor", "MaskingPolicy", "RowAccessPolicy", "GrantOwnership"} {
 		spec := FieldExportSpec{
 			From: FieldExportSource{
 				Resource: FieldExportResourceRef{Kind: kind, Name: "test"},
@@ -3249,123 +3249,6 @@ func TestValidateSchemaSource_EmptyRefName(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// StreamSpec
-// ---------------------------------------------------------------------------
-
-func ptrBool(b bool) *bool { return &b }
-
-func validStreamSpec() *StreamSpec {
-	return &StreamSpec{
-		CommonSpec:   validCommonSpec(),
-		Name:         "MY_STREAM",
-		DatabaseName: ptrStr("DB"),
-		SchemaName:   ptrStr("SCH"),
-		SourceType:   StreamSourceTable,
-		SourceName:   `"DB"."SCH"."MY_TABLE"`,
-	}
-}
-
-func TestStreamSpec_Validate_Valid(t *testing.T) {
-	t.Parallel()
-	assert.NoError(t, validStreamSpec().Validate())
-}
-
-func TestStreamSpec_Validate_EmptyName(t *testing.T) {
-	t.Parallel()
-	s := validStreamSpec()
-	s.Name = ""
-	err := s.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.name is required")
-}
-
-func TestStreamSpec_Validate_EmptySourceName(t *testing.T) {
-	t.Parallel()
-	s := validStreamSpec()
-	s.SourceName = ""
-	err := s.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.sourceName is required")
-}
-
-func TestStreamSpec_Validate_NoDatabaseSource(t *testing.T) {
-	t.Parallel()
-	s := validStreamSpec()
-	s.DatabaseName = nil
-	s.DatabaseRef = nil
-	err := s.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "databaseRef")
-}
-
-func TestStreamSpec_Validate_NoSchemaSource(t *testing.T) {
-	t.Parallel()
-	s := validStreamSpec()
-	s.SchemaName = nil
-	s.SchemaRef = nil
-	err := s.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "schemaRef")
-}
-
-func TestStreamSpec_Validate_AppendOnlyInvalidSourceType(t *testing.T) {
-	t.Parallel()
-	s := validStreamSpec()
-	s.SourceType = StreamSourceExternalTable
-	s.AppendOnly = ptrBool(true)
-	err := s.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.appendOnly is only valid for TABLE or VIEW streams")
-}
-
-func TestStreamSpec_Validate_AppendOnlyValidForView(t *testing.T) {
-	t.Parallel()
-	s := validStreamSpec()
-	s.SourceType = StreamSourceView
-	s.AppendOnly = ptrBool(true)
-	assert.NoError(t, s.Validate())
-}
-
-func TestStreamSpec_Validate_InsertOnlyInvalidSourceType(t *testing.T) {
-	t.Parallel()
-	s := validStreamSpec()
-	s.SourceType = StreamSourceTable
-	s.InsertOnly = ptrBool(true)
-	err := s.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.insertOnly is only valid for EXTERNAL_TABLE streams")
-}
-
-func TestStreamSpec_Validate_InsertOnlyValidForExternalTable(t *testing.T) {
-	t.Parallel()
-	s := validStreamSpec()
-	s.SourceType = StreamSourceExternalTable
-	s.InsertOnly = ptrBool(true)
-	assert.NoError(t, s.Validate())
-}
-
-func TestStreamSpec_Validate_AppendOnlyAndInsertOnlyMutuallyExclusive(t *testing.T) {
-	t.Parallel()
-	s := validStreamSpec()
-	s.SourceType = StreamSourceTable
-	s.AppendOnly = ptrBool(true)
-	s.InsertOnly = ptrBool(true)
-	err := s.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.appendOnly and spec.insertOnly are mutually exclusive")
-}
-
-func TestStreamSpec_Validate_ShowInitialRowsInvalidSourceType(t *testing.T) {
-	t.Parallel()
-	s := validStreamSpec()
-	s.SourceType = StreamSourceStage
-	s.ShowInitialRows = ptrBool(true)
-	err := s.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.showInitialRows is only valid for TABLE or VIEW streams")
-}
-
-// ---------------------------------------------------------------------------
 // TaskSpec
 // ---------------------------------------------------------------------------
 
@@ -3654,4 +3537,160 @@ func TestFieldExportCELListMatchesGoMap(t *testing.T) {
 	// Ensure exact count match as a safety net.
 	assert.Equal(t, len(ValidFieldExportSourceKinds), len(celKinds),
 		"CEL whitelist has %d kinds but Go map has %d", len(celKinds), len(ValidFieldExportSourceKinds))
+}
+
+// ---------------------------------------------------------------------------
+// L-15 Sync Tests: Verify CEL and Go validation stay in sync
+// ---------------------------------------------------------------------------
+
+// TestCELAndGoMutualExclusivityInSync verifies that every mutual exclusivity
+// check in Go Validate() has a corresponding CEL XValidation rule in the types
+// file. The CEL rule provides fast admission-time rejection; the Go check
+// provides defense-in-depth for programmatic callers and CRD version skew.
+//
+// If you add a new exactly-one-of check in Go, this test will fail until you
+// also add the matching CEL XValidation rule (and vice versa).
+//
+// Validation policy:
+//   - CEL = admission gate (runs on CREATE/UPDATE, instant user feedback)
+//   - Go Validate() = defense-in-depth (runs in reconciler, catches API skew)
+//   - Go checks that CEL cannot express (email parsing, lookup tables, regex)
+//     are Go-only by design and are NOT covered by this sync test.
+func TestCELAndGoMutualExclusivityInSync(t *testing.T) {
+	t.Parallel()
+
+	// All resources that have databaseRef/databaseName exactly-one-of in Go
+	// must have a matching CEL rule in their types file.
+	dbRefResources := []string{
+		"schema_types.go",
+		"databaserole_types.go",
+		"table_types.go",
+		"view_types.go",
+		"alert_types.go",
+		"task_types.go",
+		"stream_on_table_types.go",
+		"stream_on_view_types.go",
+		"stream_on_external_table_types.go",
+		"stream_on_directory_table_types.go",
+		"stream_on_dynamic_table_types.go",
+		"tag_types.go",
+		"stage_types.go",
+		"fileformat_types.go",
+		"pipe_types.go",
+		"dynamictable_types.go",
+		"passwordpolicy_types.go",
+		"networkrule_types.go",
+		"maskingpolicy_types.go",
+		"rowaccesspolicy_types.go",
+	}
+
+	for _, typesFile := range dbRefResources {
+		t.Run("databaseRef_"+typesFile, func(t *testing.T) {
+			assertCELMutualExclusivity(t, typesFile, "databaseRef", "databaseName")
+		})
+	}
+
+	// All schema-scoped resources with schemaRef/schemaName.
+	schemaRefResources := []string{
+		"table_types.go",
+		"view_types.go",
+		"alert_types.go",
+		"task_types.go",
+		"stream_on_table_types.go",
+		"stream_on_view_types.go",
+		"stream_on_external_table_types.go",
+		"stream_on_directory_table_types.go",
+		"stream_on_dynamic_table_types.go",
+		"tag_types.go",
+		"stage_types.go",
+		"fileformat_types.go",
+		"pipe_types.go",
+		"dynamictable_types.go",
+		"passwordpolicy_types.go",
+		"networkrule_types.go",
+		"maskingpolicy_types.go",
+		"rowaccesspolicy_types.go",
+	}
+
+	for _, typesFile := range schemaRefResources {
+		t.Run("schemaRef_"+typesFile, func(t *testing.T) {
+			assertCELMutualExclusivity(t, typesFile, "schemaRef", "schemaName")
+		})
+	}
+
+	// Grant role/ref mutual exclusivity.
+	t.Run("accountRoleGrant_roleRef", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "accountrolegrant_types.go", "accountRole", "accountRoleRef")
+	})
+	t.Run("databaseRoleGrant_roleRef", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "databaserolegrant_types.go", "databaseRole", "databaseRoleRef")
+	})
+
+	// RoleAssignment mutual exclusivity.
+	t.Run("accountRoleAssignment_role", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "accountroleassignment_types.go", "roleName", "roleRef")
+	})
+	t.Run("accountRoleAssignment_target", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "accountroleassignment_types.go", "toRole", "toRoleRef", "toUser", "toUserRef")
+	})
+	t.Run("databaseRoleAssignment_role", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "databaseroleassignment_types.go", "databaseRoleName", "databaseRoleRef")
+	})
+	t.Run("databaseRoleAssignment_target", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "databaseroleassignment_types.go", "toRole", "toRoleRef", "toDatabaseRole", "toDatabaseRoleRef")
+	})
+
+	// GrantOwnership target mutual exclusivity.
+	t.Run("grantOwnership_target", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "grantownership_types.go", "accountRole", "accountRoleRef", "databaseRole", "databaseRoleRef")
+	})
+
+	// Task warehouse mutual exclusivity.
+	t.Run("task_warehouse", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "task_types.go", "warehouse", "userTaskManagedInitialWarehouseSize")
+	})
+}
+
+// assertCELMutualExclusivity verifies that the given types file contains a CEL
+// XValidation rule that references ALL specified fields. This covers both
+// "exactly one of A or B" and "exactly one of A, B, C, or D" patterns.
+func assertCELMutualExclusivity(t *testing.T, typesFile string, fields ...string) {
+	t.Helper()
+
+	src, err := os.ReadFile(typesFile)
+	require.NoError(t, err, "reading %s", typesFile)
+
+	content := string(src)
+
+	// Look for a single CEL XValidation rule line that mentions ALL fields.
+	// This catches patterns like:
+	//   (has(self.databaseRef) ? 1 : 0) + (has(self.databaseName) ? 1 : 0) == 1
+	//   has(self.databaseRef) != has(self.databaseName)
+	//   !(has(self.databaseRef) && has(self.databaseName))
+	lines := strings.Split(content, "\n")
+	found := false
+
+	for _, line := range lines {
+		if !strings.Contains(line, "XValidation") {
+			continue
+		}
+
+		allPresent := true
+		for _, field := range fields {
+			if !strings.Contains(line, "self."+field) {
+				allPresent = false
+				break
+			}
+		}
+
+		if allPresent {
+			found = true
+			break
+		}
+	}
+
+	assert.True(t, found,
+		"%s: missing CEL XValidation rule for mutual exclusivity of [%s]. "+
+			"Go Validate() has this check — add a matching CEL rule for admission-time rejection.",
+		typesFile, strings.Join(fields, ", "))
 }

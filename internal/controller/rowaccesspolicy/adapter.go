@@ -209,9 +209,6 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.RowAccessPolicy, obs *recon
 	return detectDrift(obj, detail)
 }
 
-func (a *adapter) PostCreate(_ *snowplanev1alpha1.RowAccessPolicy) {}
-func (a *adapter) PostUpdate(_ *snowplanev1alpha1.RowAccessPolicy, _ bool, _ reconciler.AlterOptions) {
-}
 func (a *adapter) SupportsCreateOrAlter() bool { return true }
 
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.RowAccessPolicy, Service, *snowflake.RowAccessPolicyObservation] = (*adapter)(nil)

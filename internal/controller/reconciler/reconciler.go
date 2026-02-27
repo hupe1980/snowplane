@@ -109,6 +109,30 @@ func (r *GenericReconciler[T, S, D]) getMaturity() string {
 	return snowplanev1alpha1.MaturityAlpha
 }
 
+// supportsCreateOrAlter returns true when the adapter implements
+// CreateOrAlterSupporter and reports support, false otherwise.
+func (r *GenericReconciler[T, S, D]) supportsCreateOrAlter() bool {
+	if s, ok := r.Adapter.(CreateOrAlterSupporter); ok {
+		return s.SupportsCreateOrAlter()
+	}
+
+	return false
+}
+
+// invokePostCreate calls the PostCreateHook if the adapter implements it.
+func (r *GenericReconciler[T, S, D]) invokePostCreate(obj T) {
+	if h, ok := r.Adapter.(PostCreateHook[T]); ok {
+		h.PostCreate(obj)
+	}
+}
+
+// invokePostUpdate calls the PostUpdateHook if the adapter implements it.
+func (r *GenericReconciler[T, S, D]) invokePostUpdate(obj T, altered bool, alterOpts AlterOptions) {
+	if h, ok := r.Adapter.(PostUpdateHook[T]); ok {
+		h.PostUpdate(obj, altered, alterOpts)
+	}
+}
+
 func (r *GenericReconciler[T, S, D]) getRequeueInterval() time.Duration {
 	if r.requeueOverride > 0 {
 		return r.requeueOverride
@@ -152,9 +176,11 @@ func (r *GenericReconciler[T, S, D]) SetupWithManager(mgr ctrl.Manager, maxConcu
 		Named(r.Adapter.ResourceName())
 
 	// Let the adapter add resource-specific watches (e.g., Schema -> Database).
-	if fn := r.Adapter.SetupWatches(); fn != nil {
-		if err := fn(context.Background(), mgr, bldr); err != nil {
-			return fmt.Errorf("setting up watches for %s: %w", r.Adapter.ResourceName(), err)
+	if wc, ok := r.Adapter.(WatchConfigurer); ok {
+		if fn := wc.SetupWatches(); fn != nil {
+			if err := fn(context.Background(), mgr, bldr); err != nil {
+				return fmt.Errorf("setting up watches for %s: %w", r.Adapter.ResourceName(), err)
+			}
 		}
 	}
 
@@ -202,14 +228,16 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 	logger.Info("reconciling "+resName, "name", obj.GetName(), resName, obj.GetSpecName())
 
 	// Resource-specific pre-reconcile hook (e.g. Schema resolves databaseRef).
-	if err := r.Adapter.PreReconcile(ctx, obj); err != nil {
-		logger.Info("pre-reconcile failed, will retry", "error", err)
-		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDependencyNotReady, fmt.Sprintf("pre-reconcile failed: %v", err))
-		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonDependencyNotReady, err.Error())
-		r.bestEffortPatchStatus(ctx, obj)
-		// Return the error to controller-runtime for exponential backoff
-		// instead of a fixed 10s requeue interval.
-		return ctrl.Result{}, err
+	if pr, ok := r.Adapter.(PreReconciler[T]); ok {
+		if err := pr.PreReconcile(ctx, obj); err != nil {
+			logger.Info("pre-reconcile failed, will retry", "error", err)
+			conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDependencyNotReady, fmt.Sprintf("pre-reconcile failed: %v", err))
+			conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonDependencyNotReady, err.Error())
+			r.bestEffortPatchStatus(ctx, obj)
+			// Return the error to controller-runtime for exponential backoff
+			// instead of a fixed 10s requeue interval.
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Resolve Snowflake client via ProviderConfig.
@@ -430,7 +458,7 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 
 	logger.V(1).Info("executing Snowflake CREATE", "resource", resName, "name", obj.GetSpecName())
 
-	useCoA := r.Adapter.SupportsCreateOrAlter() && snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
+	useCoA := r.supportsCreateOrAlter() && snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
 
 	if err := r.executeSnowflakeOp(ctx, opCtx, obj, "create", "create", func() error {
 		return r.Adapter.Create(opCtx, svc, obj, id)
@@ -500,7 +528,7 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 	}
 
 	// Resource-specific post-create hook (e.g. User password hash tracking).
-	r.Adapter.PostCreate(obj)
+	r.invokePostCreate(obj)
 
 	r.Recorder.Event(obj, corev1.EventTypeNormal, snowplanev1alpha1.ReasonCreating, fmt.Sprintf("%s %q created", resName, obj.GetSpecName()))
 
@@ -615,7 +643,7 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 
 		// Use CREATE OR ALTER when the annotation is set and the adapter
 		// supports it, otherwise fall through to the standard ALTER path.
-		useCoA := r.Adapter.SupportsCreateOrAlter() && snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
+		useCoA := r.supportsCreateOrAlter() && snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
 
 		if useCoA {
 			logger.Info("using CREATE OR ALTER (Snowflake preview feature)", "resource", resName, "name", obj.GetSpecName(), "isDrift", isDrift)
@@ -652,7 +680,7 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 			// IsCreateOrAlter defaults to true when the annotation is absent, so we must check
 			// for explicit presence to avoid noisy warnings on every ALTER for resources that
 			// don't support CREATE OR ALTER.
-			if !r.Adapter.SupportsCreateOrAlter() {
+			if !r.supportsCreateOrAlter() {
 				if _, explicit := obj.GetAnnotations()[snowplanev1alpha1.AnnotationUseCreateOrAlter]; explicit {
 					logger.Info("use-create-or-alter annotation ignored: not supported for resource type", "resource", resName)
 					r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonUnsupportedAnnotation,
@@ -707,7 +735,7 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 	// Resource-specific post-update hook — pass alterOpts so adapters can
 	// read per-reconciliation values (e.g. password hash) without storing
 	// mutable state on the shared adapter struct.
-	r.Adapter.PostUpdate(obj, altered, alterOpts)
+	r.invokePostUpdate(obj, altered, alterOpts)
 
 	if err := r.patchStatus(ctx, obj); err != nil {
 		return ctrl.Result{}, err
@@ -735,7 +763,7 @@ func (r *GenericReconciler[T, S, D]) reconcilePostCrashCreate(ctx context.Contex
 		return ctrl.Result{}, err
 	}
 
-	r.Adapter.PostCreate(obj)
+	r.invokePostCreate(obj)
 
 	r.Recorder.Event(obj, corev1.EventTypeNormal, snowplanev1alpha1.ReasonCreating,
 		fmt.Sprintf("%s %q create recovered after restart", resName, obj.GetSpecName()))
@@ -813,7 +841,7 @@ func (r *GenericReconciler[T, S, D]) reconcileAdoptOrReject(ctx context.Context,
 		return ctrl.Result{}, err
 	}
 
-	r.Adapter.PostCreate(obj)
+	r.invokePostCreate(obj)
 
 	r.Recorder.Event(obj, corev1.EventTypeNormal, snowplanev1alpha1.ReasonAdopted, fmt.Sprintf("%s %q adopted from existing Snowflake resource", resName, obj.GetSpecName()))
 	metrics.RecordAdoption(resName)
@@ -869,39 +897,62 @@ func (r *GenericReconciler[T, S, D]) reconcileDelete(ctx context.Context, obj T,
 		logger.Info("orphaning "+resName+" in Snowflake", resName, obj.GetSpecName())
 		r.Recorder.Event(obj, corev1.EventTypeNormal, snowplanev1alpha1.ReasonDeleting, fmt.Sprintf("%s %q orphaned", resName, obj.GetSpecName()))
 	default:
-		// Default to Delete for safety — unknown values must not silently orphan.
-		logger.Info("dropping "+resName+" from Snowflake", resName, obj.GetSpecName())
+		// Escape hatch: if a DROP is permanently blocked (e.g., insufficient
+		// privileges), the user can annotate the resource with
+		// abandon-on-delete=true to remove the finalizer without dropping.
+		if snowplanev1alpha1.IsAbandonOnDelete(obj.GetAnnotations()) {
+			abandonMsg := fmt.Sprintf(
+				"Snowflake %s %q abandoned per %s annotation — resource may still exist in Snowflake and require manual cleanup",
+				resName, obj.GetSpecName(), snowplanev1alpha1.AnnotationAbandonOnDelete)
+			logger.Info("abandoning "+resName+" in Snowflake per annotation", resName, obj.GetSpecName())
+			r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonOrphanedResource, abandonMsg)
+			conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonOrphanedResource, abandonMsg)
+			r.bestEffortPatchStatus(ctx, obj)
+			metrics.RecordOrphanedResource(resName)
+		} else {
+			// Default to Delete for safety — unknown values must not silently orphan.
+			logger.Info("dropping "+resName+" from Snowflake", resName, obj.GetSpecName())
 
-		logger.V(1).Info("executing Snowflake DROP", "resource", resName, "name", obj.GetSpecName())
+			logger.V(1).Info("executing Snowflake DROP", "resource", resName, "name", obj.GetSpecName())
 
-		opCtx, cancel := context.WithTimeout(ctx, snowflakeOpTimeout)
-		defer cancel()
+			opCtx, cancel := context.WithTimeout(ctx, snowflakeOpTimeout)
+			defer cancel()
 
-		if err := metrics.ObserveSnowflakeOp(resName, "drop", func() error {
-			return sfretry.Do(opCtx, sfretry.DefaultOptions(), func() error {
-				return r.Adapter.Drop(opCtx, svc, id)
-			})
-		}); err != nil {
-			if !snowflake.IsObjectNotFound(err) && !snowflake.IsObjectNotExistOrNotAuthorized(err) {
-				if snowflake.IsTerminalError(err) {
-					conditions.SetNotReady(obj, snowplanev1alpha1.ReasonTerminalError, fmt.Sprintf("terminal error dropping %s: %v", resName, err))
-					conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonTerminalError, err.Error())
-					r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonTerminalError,
-						fmt.Sprintf("Terminal error dropping %s %q: %v — manual intervention required", resName, obj.GetSpecName(), err))
-				} else {
-					conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDeleting, fmt.Sprintf("failed to drop %s: %v", resName, err))
-					conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonReconcileError, err.Error())
-					r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonReconcileError,
-						fmt.Sprintf("Failed to drop %s %q: %v", resName, obj.GetSpecName(), err))
+			if err := metrics.ObserveSnowflakeOp(resName, "drop", func() error {
+				return sfretry.Do(opCtx, sfretry.DefaultOptions(), func() error {
+					return r.Adapter.Drop(opCtx, svc, id)
+				})
+			}); err != nil {
+				if !snowflake.IsObjectNotFound(err) && !snowflake.IsObjectNotExistOrNotAuthorized(err) {
+					if snowflake.IsTerminalError(err) {
+						conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDeleteBlocked, fmt.Sprintf("terminal error dropping %s: %v", resName, err))
+						conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonDeleteBlocked, err.Error())
+						r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonDeleteBlocked,
+							fmt.Sprintf("Terminal error dropping %s %q: %v — resolve the issue or set annotation %s=true to abandon",
+								resName, obj.GetSpecName(), err, snowplanev1alpha1.AnnotationAbandonOnDelete))
+					} else {
+						conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDeleting, fmt.Sprintf("failed to drop %s: %v", resName, err))
+						conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonReconcileError, err.Error())
+						r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonReconcileError,
+							fmt.Sprintf("Failed to drop %s %q: %v", resName, obj.GetSpecName(), err))
+					}
+
+					r.bestEffortPatchStatus(ctx, obj)
+
+					if snowflake.IsTerminalError(err) {
+						// Terminal — do not requeue. The periodic resync will
+						// retry in case the underlying issue is fixed (e.g.,
+						// privileges granted). The user can also set the
+						// abandon-on-delete annotation to force finalizer removal.
+						return ctrl.Result{}, nil
+					}
+
+					return ctrl.Result{}, err
 				}
-
-				r.bestEffortPatchStatus(ctx, obj)
-
-				return ctrl.Result{}, err
 			}
-		}
 
-		r.Recorder.Event(obj, corev1.EventTypeNormal, snowplanev1alpha1.ReasonDeleting, fmt.Sprintf("%s %q dropped", resName, obj.GetSpecName()))
+			r.Recorder.Event(obj, corev1.EventTypeNormal, snowplanev1alpha1.ReasonDeleting, fmt.Sprintf("%s %q dropped", resName, obj.GetSpecName()))
+		}
 	}
 
 	// Take a snapshot before removing the finalizer so that MergeFrom

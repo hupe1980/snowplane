@@ -219,10 +219,4 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.DynamicTable, obs *reconcil
 	return detectDrift(obj, detail)
 }
 
-func (a *adapter) PostCreate(_ *snowplanev1alpha1.DynamicTable) {}
-
-func (a *adapter) PostUpdate(_ *snowplanev1alpha1.DynamicTable, _ bool, _ reconciler.AlterOptions) {}
-
-func (a *adapter) SupportsCreateOrAlter() bool { return false }
-
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.DynamicTable, Service, *snowflake.DynamicTableObservation] = (*adapter)(nil)

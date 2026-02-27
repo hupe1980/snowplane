@@ -34,6 +34,18 @@ const (
 	DefaultPingTimeout     = 10 * time.Second
 )
 
+// Zeroize overwrites a byte slice with zeros, preventing credential data from
+// lingering in memory after use. This is a best-effort defence — the Go
+// runtime may have already copied the backing array during GC compaction, and
+// the compiler is free to elide stores to "dead" memory. Nonetheless, zeroing
+// reduces the window during which credentials are recoverable from a memory
+// dump or core file.
+func Zeroize(b []byte) {
+	for i := range b {
+		b[i] = 0
+	}
+}
+
 // Config holds all parameters needed to connect to a Snowflake account.
 type Config struct {
 	// Account is the Snowflake account identifier (e.g. "xy12345").
@@ -46,14 +58,17 @@ type Config struct {
 	User string
 
 	// Password for username/password authentication. Mutually exclusive with PrivateKey and TokenFilePath.
-	Password string //nolint:gosec // G117: struct must hold credentials for Snowflake connection
+	// Stored as []byte for zeroization after use.
+	Password []byte //nolint:gosec // G117: struct must hold credentials for Snowflake connection
 
 	// PrivateKey is the PEM-encoded RSA private key for key pair authentication.
-	PrivateKey string //nolint:gosec // G117: struct must hold credentials for Snowflake connection
+	// Stored as []byte for zeroization after use.
+	PrivateKey []byte //nolint:gosec // G117: struct must hold credentials for Snowflake connection
 
 	// Passphrase is the passphrase for decrypting an encrypted PKCS#8 private key.
 	// Only used with PrivateKey when the PEM block type is "ENCRYPTED PRIVATE KEY".
-	Passphrase string //nolint:gosec // G117: struct must hold credentials for Snowflake connection
+	// Stored as []byte for zeroization after use.
+	Passphrase []byte //nolint:gosec // G117: struct must hold credentials for Snowflake connection
 
 	// TokenFilePath is the path to a file containing an OIDC/OAuth token.
 	// Used with WorkloadIdentity authentication. The gosnowflake driver reads
@@ -116,13 +131,41 @@ func (c *Config) pingTimeout() time.Duration {
 	return DefaultPingTimeout
 }
 
+// ZeroizeCredentials overwrites Password, PrivateKey, and Passphrase with
+// zeros so that plaintext credentials do not linger in process memory after
+// the Snowflake DSN has been built.
+func (c *Config) ZeroizeCredentials() {
+	Zeroize(c.Password)
+	Zeroize(c.PrivateKey)
+	Zeroize(c.Passphrase)
+}
+
+// Row wraps *sql.Row and applies MapSnowflakeError to the Scan result.
+// This ensures that Snowflake driver errors are automatically mapped to
+// sentinel errors (e.g. ErrObjectNotExistOrNotAuthorized), matching the
+// error-mapping behavior of Exec and Query.
+type Row struct {
+	row *sql.Row
+}
+
+// Scan delegates to the underlying sql.Row.Scan and maps any Snowflake
+// driver error to the corresponding sentinel error.
+func (r *Row) Scan(dest ...any) error {
+	return MapSnowflakeError(r.row.Scan(dest...))
+}
+
+// Err delegates to the underlying sql.Row.Err.
+func (r *Row) Err() error {
+	return MapSnowflakeError(r.row.Err())
+}
+
 // SQLExecutor defines the interface for executing SQL statements against Snowflake.
 // Both pooled (*Client) and scoped (pinned-connection) clients satisfy this
 // interface. Resource clients (DatabaseClient, SchemaClient, etc.) depend on
 // this interface rather than the concrete *Client type.
 type SQLExecutor interface {
 	Exec(ctx context.Context, query string, args ...any) (sql.Result, error)
-	QueryRow(ctx context.Context, query string, args ...any) *sql.Row
+	QueryRow(ctx context.Context, query string, args ...any) *Row
 	Query(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
@@ -141,8 +184,13 @@ type Client struct {
 
 // NewClient creates a new Snowflake client and opens a connection pool.
 // The caller should invoke Ping separately to verify connectivity.
+// Credential fields in cfg are zeroed after the DSN is built so that
+// plaintext secrets do not linger in process memory.
 func NewClient(cfg Config) (*Client, error) {
-	if cfg.Password == "" && cfg.PrivateKey == "" && cfg.TokenFilePath == "" {
+	// Zeroize credential bytes once the DSN has been constructed (or on error).
+	defer cfg.ZeroizeCredentials()
+
+	if len(cfg.Password) == 0 && len(cfg.PrivateKey) == 0 && cfg.TokenFilePath == "" {
 		return nil, fmt.Errorf("either Password, PrivateKey, or TokenFilePath must be provided")
 	}
 
@@ -156,7 +204,7 @@ func NewClient(cfg Config) (*Client, error) {
 
 	// Configure authentication.
 	switch {
-	case cfg.PrivateKey != "":
+	case len(cfg.PrivateKey) > 0:
 		key, err := parsePrivateKey(cfg.PrivateKey, cfg.Passphrase)
 		if err != nil {
 			return nil, fmt.Errorf("parsing private key: %w", err)
@@ -170,8 +218,11 @@ func NewClient(cfg Config) (*Client, error) {
 		sfConfig.Authenticator = gosnowflake.AuthTypeWorkloadIdentityFederation
 		sfConfig.TokenFilePath = cfg.TokenFilePath
 		sfConfig.WorkloadIdentityProvider = cfg.WorkloadIdentityProvider
-	case cfg.Password != "":
-		sfConfig.Password = cfg.Password
+	case len(cfg.Password) > 0:
+		// gosnowflake.Config.Password is string (external dependency);
+		// the conversion is unavoidable. The []byte source is zeroed by
+		// the deferred ZeroizeCredentials above.
+		sfConfig.Password = string(cfg.Password)
 	}
 
 	dsn, err := gosnowflake.DSN(sfConfig)
@@ -227,12 +278,13 @@ func (c *Client) Exec(ctx context.Context, query string, args ...any) (sql.Resul
 
 // QueryRow executes a query that returns at most one row.
 // When a pinned connection is available (via WithRole), it is used instead of the pool.
-func (c *Client) QueryRow(ctx context.Context, query string, args ...any) *sql.Row {
+// Snowflake driver errors are automatically mapped to sentinel errors when Scan() is called.
+func (c *Client) QueryRow(ctx context.Context, query string, args ...any) *Row {
 	if c.conn != nil {
-		return c.conn.QueryRowContext(ctx, query, args...)
+		return &Row{row: c.conn.QueryRowContext(ctx, query, args...)}
 	}
 
-	return c.db.QueryRowContext(ctx, query, args...)
+	return &Row{row: c.db.QueryRowContext(ctx, query, args...)}
 }
 
 // Query executes a query that returns rows.
@@ -321,7 +373,7 @@ func (c *Client) WithRole(ctx context.Context, role string) (*Client, func(conte
 
 	// Save current role so we can restore it before returning the connection to the pool.
 	var originalRole string
-	if err := conn.QueryRowContext(ctx, "SELECT CURRENT_ROLE()").Scan(&originalRole); err != nil {
+	if err := MapSnowflakeError(conn.QueryRowContext(ctx, "SELECT CURRENT_ROLE()").Scan(&originalRole)); err != nil {
 		if closeErr := conn.Close(); closeErr != nil {
 			slog.Debug("error returning connection to pool after role query failure", "error", closeErr)
 		}
@@ -494,9 +546,9 @@ func decryptPKCS8PrivateKey(der, passphrase []byte) ([]byte, error) {
 // parsePrivateKey decodes a PEM-encoded RSA private key.
 // It supports unencrypted PKCS#8, PKCS#1, and passphrase-encrypted PKCS#8 keys.
 // For encrypted keys (PEM type "ENCRYPTED PRIVATE KEY"), a non-empty passphrase
-// is required.
-func parsePrivateKey(pemData string, passphrase string) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(pemData))
+// is required. The passphrase slice is zeroed after use.
+func parsePrivateKey(pemData []byte, passphrase []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(pemData)
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM block")
 	}
@@ -505,11 +557,11 @@ func parsePrivateKey(pemData string, passphrase string) (*rsa.PrivateKey, error)
 
 	// Handle encrypted PKCS#8 keys (BEGIN ENCRYPTED PRIVATE KEY).
 	if block.Type == "ENCRYPTED PRIVATE KEY" {
-		if passphrase == "" {
+		if len(passphrase) == 0 {
 			return nil, fmt.Errorf("encrypted private key requires a passphrase")
 		}
 
-		decrypted, err := decryptPKCS8PrivateKey(derBytes, []byte(passphrase))
+		decrypted, err := decryptPKCS8PrivateKey(derBytes, passphrase)
 		if err != nil {
 			return nil, fmt.Errorf("decrypting private key: %w", err)
 		}

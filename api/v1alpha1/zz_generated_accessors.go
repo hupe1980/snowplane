@@ -765,18 +765,18 @@ func (s *Stage) SetTrackedParametersList(val []string) {
 }
 
 // ---------------------------------------------------------------------------
-// Stream
+// StreamOnTable
 // ---------------------------------------------------------------------------
 
-func (s *Stream) GetConditions() []metav1.Condition {
+func (s *StreamOnTable) GetConditions() []metav1.Condition {
 	return s.Status.Conditions
 }
 
-func (s *Stream) SetConditions(conditions []metav1.Condition) {
+func (s *StreamOnTable) SetConditions(conditions []metav1.Condition) {
 	s.Status.Conditions = conditions
 }
 
-func (s *Stream) GetDeletionPolicy() DeletionPolicy {
+func (s *StreamOnTable) GetDeletionPolicy() DeletionPolicy {
 	if s.Spec.DeletionPolicy == "" {
 		return DeletionPolicyDelete
 	}
@@ -784,47 +784,47 @@ func (s *Stream) GetDeletionPolicy() DeletionPolicy {
 	return s.Spec.DeletionPolicy
 }
 
-func (s *Stream) GetFullyQualifiedName() string {
+func (s *StreamOnTable) GetFullyQualifiedName() string {
 	return s.Status.FullyQualifiedName
 }
 
-func (s *Stream) GetProviderRef() ProviderReference {
+func (s *StreamOnTable) GetProviderRef() ProviderReference {
 	return s.Spec.ProviderRef
 }
 
-func (s *Stream) GetSpecName() string {
+func (s *StreamOnTable) GetSpecName() string {
 	return s.Spec.Name
 }
 
-func (s *Stream) GetUseRole() *string {
+func (s *StreamOnTable) GetUseRole() *string {
 	return s.Spec.UseRole
 }
 
-func (s *Stream) GetObservedGeneration() int64 {
+func (s *StreamOnTable) GetObservedGeneration() int64 {
 	return s.Status.ObservedGeneration
 }
 
-func (s *Stream) SetObservedGeneration(val int64) {
+func (s *StreamOnTable) SetObservedGeneration(val int64) {
 	s.Status.ObservedGeneration = val
 }
 
-func (s *Stream) GetLastAppliedSpecHash() string {
+func (s *StreamOnTable) GetLastAppliedSpecHash() string {
 	return s.Status.LastAppliedSpecHash
 }
 
-func (s *Stream) SetLastAppliedSpecHash(val string) {
+func (s *StreamOnTable) SetLastAppliedSpecHash(val string) {
 	s.Status.LastAppliedSpecHash = val
 }
 
-func (s *Stream) ValidateSpec() error {
+func (s *StreamOnTable) ValidateSpec() error {
 	return s.Spec.Validate()
 }
 
-func (s *Stream) ComputeSpecHash() (string, error) {
+func (s *StreamOnTable) ComputeSpecHash() (string, error) {
 	return ComputeSpecHash(s.Spec)
 }
 
-func (s *Stream) GetOwner() string {
+func (s *StreamOnTable) GetOwner() string {
 	if s.Status.ShowOutput != nil {
 		return s.Status.ShowOutput.Owner
 	}
@@ -832,11 +832,315 @@ func (s *Stream) GetOwner() string {
 	return ""
 }
 
-func (s *Stream) GetTrackedParametersList() []string {
+func (s *StreamOnTable) GetTrackedParametersList() []string {
 	return s.Status.TrackedParameters
 }
 
-func (s *Stream) SetTrackedParametersList(val []string) {
+func (s *StreamOnTable) SetTrackedParametersList(val []string) {
+	s.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// StreamOnView
+// ---------------------------------------------------------------------------
+
+func (s *StreamOnView) GetConditions() []metav1.Condition {
+	return s.Status.Conditions
+}
+
+func (s *StreamOnView) SetConditions(conditions []metav1.Condition) {
+	s.Status.Conditions = conditions
+}
+
+func (s *StreamOnView) GetDeletionPolicy() DeletionPolicy {
+	if s.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return s.Spec.DeletionPolicy
+}
+
+func (s *StreamOnView) GetFullyQualifiedName() string {
+	return s.Status.FullyQualifiedName
+}
+
+func (s *StreamOnView) GetProviderRef() ProviderReference {
+	return s.Spec.ProviderRef
+}
+
+func (s *StreamOnView) GetSpecName() string {
+	return s.Spec.Name
+}
+
+func (s *StreamOnView) GetUseRole() *string {
+	return s.Spec.UseRole
+}
+
+func (s *StreamOnView) GetObservedGeneration() int64 {
+	return s.Status.ObservedGeneration
+}
+
+func (s *StreamOnView) SetObservedGeneration(val int64) {
+	s.Status.ObservedGeneration = val
+}
+
+func (s *StreamOnView) GetLastAppliedSpecHash() string {
+	return s.Status.LastAppliedSpecHash
+}
+
+func (s *StreamOnView) SetLastAppliedSpecHash(val string) {
+	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *StreamOnView) ValidateSpec() error {
+	return s.Spec.Validate()
+}
+
+func (s *StreamOnView) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(s.Spec)
+}
+
+func (s *StreamOnView) GetOwner() string {
+	if s.Status.ShowOutput != nil {
+		return s.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (s *StreamOnView) GetTrackedParametersList() []string {
+	return s.Status.TrackedParameters
+}
+
+func (s *StreamOnView) SetTrackedParametersList(val []string) {
+	s.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// StreamOnExternalTable
+// ---------------------------------------------------------------------------
+
+func (s *StreamOnExternalTable) GetConditions() []metav1.Condition {
+	return s.Status.Conditions
+}
+
+func (s *StreamOnExternalTable) SetConditions(conditions []metav1.Condition) {
+	s.Status.Conditions = conditions
+}
+
+func (s *StreamOnExternalTable) GetDeletionPolicy() DeletionPolicy {
+	if s.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return s.Spec.DeletionPolicy
+}
+
+func (s *StreamOnExternalTable) GetFullyQualifiedName() string {
+	return s.Status.FullyQualifiedName
+}
+
+func (s *StreamOnExternalTable) GetProviderRef() ProviderReference {
+	return s.Spec.ProviderRef
+}
+
+func (s *StreamOnExternalTable) GetSpecName() string {
+	return s.Spec.Name
+}
+
+func (s *StreamOnExternalTable) GetUseRole() *string {
+	return s.Spec.UseRole
+}
+
+func (s *StreamOnExternalTable) GetObservedGeneration() int64 {
+	return s.Status.ObservedGeneration
+}
+
+func (s *StreamOnExternalTable) SetObservedGeneration(val int64) {
+	s.Status.ObservedGeneration = val
+}
+
+func (s *StreamOnExternalTable) GetLastAppliedSpecHash() string {
+	return s.Status.LastAppliedSpecHash
+}
+
+func (s *StreamOnExternalTable) SetLastAppliedSpecHash(val string) {
+	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *StreamOnExternalTable) ValidateSpec() error {
+	return s.Spec.Validate()
+}
+
+func (s *StreamOnExternalTable) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(s.Spec)
+}
+
+func (s *StreamOnExternalTable) GetOwner() string {
+	if s.Status.ShowOutput != nil {
+		return s.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (s *StreamOnExternalTable) GetTrackedParametersList() []string {
+	return s.Status.TrackedParameters
+}
+
+func (s *StreamOnExternalTable) SetTrackedParametersList(val []string) {
+	s.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// StreamOnDirectoryTable
+// ---------------------------------------------------------------------------
+
+func (s *StreamOnDirectoryTable) GetConditions() []metav1.Condition {
+	return s.Status.Conditions
+}
+
+func (s *StreamOnDirectoryTable) SetConditions(conditions []metav1.Condition) {
+	s.Status.Conditions = conditions
+}
+
+func (s *StreamOnDirectoryTable) GetDeletionPolicy() DeletionPolicy {
+	if s.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return s.Spec.DeletionPolicy
+}
+
+func (s *StreamOnDirectoryTable) GetFullyQualifiedName() string {
+	return s.Status.FullyQualifiedName
+}
+
+func (s *StreamOnDirectoryTable) GetProviderRef() ProviderReference {
+	return s.Spec.ProviderRef
+}
+
+func (s *StreamOnDirectoryTable) GetSpecName() string {
+	return s.Spec.Name
+}
+
+func (s *StreamOnDirectoryTable) GetUseRole() *string {
+	return s.Spec.UseRole
+}
+
+func (s *StreamOnDirectoryTable) GetObservedGeneration() int64 {
+	return s.Status.ObservedGeneration
+}
+
+func (s *StreamOnDirectoryTable) SetObservedGeneration(val int64) {
+	s.Status.ObservedGeneration = val
+}
+
+func (s *StreamOnDirectoryTable) GetLastAppliedSpecHash() string {
+	return s.Status.LastAppliedSpecHash
+}
+
+func (s *StreamOnDirectoryTable) SetLastAppliedSpecHash(val string) {
+	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *StreamOnDirectoryTable) ValidateSpec() error {
+	return s.Spec.Validate()
+}
+
+func (s *StreamOnDirectoryTable) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(s.Spec)
+}
+
+func (s *StreamOnDirectoryTable) GetOwner() string {
+	if s.Status.ShowOutput != nil {
+		return s.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (s *StreamOnDirectoryTable) GetTrackedParametersList() []string {
+	return s.Status.TrackedParameters
+}
+
+func (s *StreamOnDirectoryTable) SetTrackedParametersList(val []string) {
+	s.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// StreamOnDynamicTable
+// ---------------------------------------------------------------------------
+
+func (s *StreamOnDynamicTable) GetConditions() []metav1.Condition {
+	return s.Status.Conditions
+}
+
+func (s *StreamOnDynamicTable) SetConditions(conditions []metav1.Condition) {
+	s.Status.Conditions = conditions
+}
+
+func (s *StreamOnDynamicTable) GetDeletionPolicy() DeletionPolicy {
+	if s.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return s.Spec.DeletionPolicy
+}
+
+func (s *StreamOnDynamicTable) GetFullyQualifiedName() string {
+	return s.Status.FullyQualifiedName
+}
+
+func (s *StreamOnDynamicTable) GetProviderRef() ProviderReference {
+	return s.Spec.ProviderRef
+}
+
+func (s *StreamOnDynamicTable) GetSpecName() string {
+	return s.Spec.Name
+}
+
+func (s *StreamOnDynamicTable) GetUseRole() *string {
+	return s.Spec.UseRole
+}
+
+func (s *StreamOnDynamicTable) GetObservedGeneration() int64 {
+	return s.Status.ObservedGeneration
+}
+
+func (s *StreamOnDynamicTable) SetObservedGeneration(val int64) {
+	s.Status.ObservedGeneration = val
+}
+
+func (s *StreamOnDynamicTable) GetLastAppliedSpecHash() string {
+	return s.Status.LastAppliedSpecHash
+}
+
+func (s *StreamOnDynamicTable) SetLastAppliedSpecHash(val string) {
+	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *StreamOnDynamicTable) ValidateSpec() error {
+	return s.Spec.Validate()
+}
+
+func (s *StreamOnDynamicTable) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(s.Spec)
+}
+
+func (s *StreamOnDynamicTable) GetOwner() string {
+	if s.Status.ShowOutput != nil {
+		return s.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (s *StreamOnDynamicTable) GetTrackedParametersList() []string {
+	return s.Status.TrackedParameters
+}
+
+func (s *StreamOnDynamicTable) SetTrackedParametersList(val []string) {
 	s.Status.TrackedParameters = val
 }
 

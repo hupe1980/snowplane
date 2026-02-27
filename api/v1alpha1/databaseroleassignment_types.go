@@ -15,13 +15,17 @@ import (
 // All fields are immutable after creation — changing any field requires
 // deleting and recreating the resource.
 //
-// +kubebuilder:validation:XValidation:rule="self.databaseRoleName == oldSelf.databaseRoleName",message="spec.databaseRoleName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRoleName) == has(self.databaseRoleName) && (!has(self.databaseRoleName) || self.databaseRoleName == oldSelf.databaseRoleName)",message="spec.databaseRoleName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRoleRef) == has(self.databaseRoleRef) && (!has(self.databaseRoleRef) || self.databaseRoleRef == oldSelf.databaseRoleRef)",message="spec.databaseRoleRef is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="self.toRole == oldSelf.toRole",message="spec.toRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.toRole) == has(self.toRole) && (!has(self.toRole) || self.toRole == oldSelf.toRole)",message="spec.toRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.toRoleRef) == has(self.toRoleRef) && (!has(self.toRoleRef) || self.toRoleRef == oldSelf.toRoleRef)",message="spec.toRoleRef is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="self.toDatabaseRole == oldSelf.toDatabaseRole",message="spec.toDatabaseRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.toDatabaseRole) == has(self.toDatabaseRole) && (!has(self.toDatabaseRole) || self.toDatabaseRole == oldSelf.toDatabaseRole)",message="spec.toDatabaseRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.toDatabaseRoleRef) == has(self.toDatabaseRoleRef) && (!has(self.toDatabaseRoleRef) || self.toDatabaseRoleRef == oldSelf.toDatabaseRoleRef)",message="spec.toDatabaseRoleRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
+//
+// Mutual exclusivity rules:
+// +kubebuilder:validation:XValidation:rule="(has(self.databaseRoleName) ? 1 : 0) + (has(self.databaseRoleRef) ? 1 : 0) == 1",message="exactly one of spec.databaseRoleName or spec.databaseRoleRef must be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.toRole) ? 1 : 0) + (has(self.toRoleRef) ? 1 : 0) + (has(self.toDatabaseRole) ? 1 : 0) + (has(self.toDatabaseRoleRef) ? 1 : 0) == 1",message="exactly one of spec.toRole, spec.toRoleRef, spec.toDatabaseRole, or spec.toDatabaseRoleRef must be set"
 type DatabaseRoleAssignmentSpec struct {
 	CommonSpec `json:",inline"`
 

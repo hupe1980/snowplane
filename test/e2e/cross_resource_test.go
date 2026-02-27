@@ -50,7 +50,7 @@ func TestCrossResource_DatabaseSchemaRole(t *testing.T) {
 }
 
 // TestCrossResource_FullStack tests a deep dependency chain:
-// Database -> Schema -> Table -> Stream + Task + Grant
+// Database -> Schema -> Table -> StreamOnTable + Task + Grant
 func TestCrossResource_FullStack(t *testing.T) {
 	// 1. Warehouse (needed for task)
 	whSFName := uniqueName("XREF_FULL_WH")
@@ -84,9 +84,9 @@ func TestCrossResource_FullStack(t *testing.T) {
 	streamSFName := uniqueName("XREF_FULL_STR")
 	streamName := k8sName(streamSFName)
 	fqTable := dbSFName + "." + schemaSFName + "." + tableSFName
-	streamCleanup := createCR(t, gvrStream, newStreamCR(streamName, streamSFName, dbName, schemaName, "TABLE", fqTable))
+	streamCleanup := createCR(t, gvrStreamOnTable, newStreamOnTableCR(streamName, streamSFName, dbName, schemaName, fqTable))
 	defer streamCleanup()
-	waitForReady(t, gvrStream, streamName)
+	waitForReady(t, gvrStreamOnTable, streamName)
 
 	// 5. Task in the same schema (warehouse-backed)
 	taskSFName := uniqueName("XREF_FULL_TSK")
@@ -128,8 +128,8 @@ func TestCrossResource_FullStack(t *testing.T) {
 	waitForCRDeleted(t, gvrAccountRole, roleName)
 	deleteCR(t, gvrTask, taskName)
 	waitForCRDeleted(t, gvrTask, taskName)
-	deleteCR(t, gvrStream, streamName)
-	waitForCRDeleted(t, gvrStream, streamName)
+	deleteCR(t, gvrStreamOnTable, streamName)
+	waitForCRDeleted(t, gvrStreamOnTable, streamName)
 	deleteCR(t, gvrTable, tableName)
 	waitForCRDeleted(t, gvrTable, tableName)
 	deleteCR(t, gvrSchema, schemaName)

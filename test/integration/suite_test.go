@@ -23,13 +23,28 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	accountrolectl "github.com/hupe1980/snowplane/internal/controller/accountrole"
+	alertctl "github.com/hupe1980/snowplane/internal/controller/alert"
 	database "github.com/hupe1980/snowplane/internal/controller/database"
 	databaserolectl "github.com/hupe1980/snowplane/internal/controller/databaserole"
+	dynamictablectl "github.com/hupe1980/snowplane/internal/controller/dynamictable"
 	fieldexportctl "github.com/hupe1980/snowplane/internal/controller/fieldexport"
+	fileformatctl "github.com/hupe1980/snowplane/internal/controller/fileformat"
 	grantctl "github.com/hupe1980/snowplane/internal/controller/grant"
+	grantownershipctl "github.com/hupe1980/snowplane/internal/controller/grantownership"
+	maskingpolicyctl "github.com/hupe1980/snowplane/internal/controller/maskingpolicy"
+	networkpolicyctl "github.com/hupe1980/snowplane/internal/controller/networkpolicy"
+	passwordpolicyctl "github.com/hupe1980/snowplane/internal/controller/passwordpolicy"
+	pipectl "github.com/hupe1980/snowplane/internal/controller/pipe"
+	resourcemonitorctl "github.com/hupe1980/snowplane/internal/controller/resourcemonitor"
+	roleassignmentctl "github.com/hupe1980/snowplane/internal/controller/roleassignment"
+	rowaccesspolicyctl "github.com/hupe1980/snowplane/internal/controller/rowaccesspolicy"
 	schemactl "github.com/hupe1980/snowplane/internal/controller/schema"
+	securityintegrationctl "github.com/hupe1980/snowplane/internal/controller/securityintegration"
 	stagectl "github.com/hupe1980/snowplane/internal/controller/stage"
+	storageintegrationctl "github.com/hupe1980/snowplane/internal/controller/storageintegration"
 	tablectl "github.com/hupe1980/snowplane/internal/controller/table"
+	tagctl "github.com/hupe1980/snowplane/internal/controller/tag"
+	taskctl "github.com/hupe1980/snowplane/internal/controller/task"
 	userctl "github.com/hupe1980/snowplane/internal/controller/user"
 	viewctl "github.com/hupe1980/snowplane/internal/controller/view"
 	warehousectl "github.com/hupe1980/snowplane/internal/controller/warehouse"
@@ -40,20 +55,35 @@ import (
 
 // Package-level state shared across all integration tests.
 var (
-	k8sClient           client.Client
-	testEnv             *envtest.Environment
-	ctx                 context.Context
-	cancel              context.CancelFunc
-	dbMockSvc           *mockDatabaseService
-	schemaMockSvc       *mockSchemaService
-	tableMockSvc        *mockTableService
-	viewMockSvc         *mockViewService
-	stageMockSvc        *mockStageService
-	warehouseMockSvc    *mockWarehouseService
-	userMockSvc         *mockUserService
-	accountRoleMockSvc  *mockAccountRoleService
-	databaseRoleMockSvc *mockDatabaseRoleService
-	grantMockSvc        *mockGrantService
+	k8sClient                  client.Client
+	testEnv                    *envtest.Environment
+	ctx                        context.Context
+	cancel                     context.CancelFunc
+	dbMockSvc                  *mockDatabaseService
+	schemaMockSvc              *mockSchemaService
+	tableMockSvc               *mockTableService
+	viewMockSvc                *mockViewService
+	stageMockSvc               *mockStageService
+	warehouseMockSvc           *mockWarehouseService
+	userMockSvc                *mockUserService
+	accountRoleMockSvc         *mockAccountRoleService
+	databaseRoleMockSvc        *mockDatabaseRoleService
+	grantMockSvc               *mockGrantService
+	alertMockSvc               *mockAlertService
+	taskMockSvc                *mockTaskService
+	dynamicTableMockSvc        *mockDynamicTableService
+	networkPolicyMockSvc       *mockNetworkPolicyService
+	maskingPolicyMockSvc       *mockMaskingPolicyService
+	passwordPolicyMockSvc      *mockPasswordPolicyService
+	securityIntegrationMockSvc *mockSecurityIntegrationService
+	storageIntegrationMockSvc  *mockStorageIntegrationService
+	resourceMonitorMockSvc     *mockResourceMonitorService
+	pipeMockSvc                *mockPipeService
+	fileFormatMockSvc          *mockFileFormatService
+	tagMockSvc                 *mockTagService
+	rowAccessPolicyMockSvc     *mockRowAccessPolicyService
+	grantOwnershipMockSvc      *mockGrantOwnershipService
+	roleAssignmentMockSvc      *mockRoleAssignmentService
 )
 
 const (
@@ -295,6 +325,240 @@ func TestMain(m *testing.M) {
 
 	if err := fieldExportReconciler.SetupWithManager(mgr, 1); err != nil {
 		panic("failed to setup fieldexport controller: " + err.Error())
+	}
+
+	// --- Alert controller ---
+	alertMockSvc = &mockAlertService{}
+
+	alertServiceFactory := func(_ context.Context, _ alertctl.SnowflakeClient, _ string) (alertctl.Service, func(context.Context), error) {
+		return alertMockSvc, func(context.Context) {}, nil
+	}
+
+	alertReconciler := alertctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, alertServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := alertReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup alert controller: " + err.Error())
+	}
+
+	// --- Task controller ---
+	taskMockSvc = &mockTaskService{}
+
+	taskServiceFactory := func(_ context.Context, _ taskctl.SnowflakeClient, _ string) (taskctl.Service, func(context.Context), error) {
+		return taskMockSvc, func(context.Context) {}, nil
+	}
+
+	taskReconciler := taskctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, taskServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := taskReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup task controller: " + err.Error())
+	}
+
+	// --- DynamicTable controller ---
+	dynamicTableMockSvc = &mockDynamicTableService{}
+
+	dynamicTableServiceFactory := func(_ context.Context, _ dynamictablectl.SnowflakeClient, _ string) (dynamictablectl.Service, func(context.Context), error) {
+		return dynamicTableMockSvc, func(context.Context) {}, nil
+	}
+
+	dynamicTableReconciler := dynamictablectl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, dynamicTableServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := dynamicTableReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup dynamictable controller: " + err.Error())
+	}
+
+	// --- NetworkPolicy controller ---
+	networkPolicyMockSvc = &mockNetworkPolicyService{}
+
+	networkPolicyServiceFactory := func(_ context.Context, _ networkpolicyctl.SnowflakeClient, _ string) (networkpolicyctl.Service, func(context.Context), error) {
+		return networkPolicyMockSvc, func(context.Context) {}, nil
+	}
+
+	networkPolicyReconciler := networkpolicyctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, networkPolicyServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := networkPolicyReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup networkpolicy controller: " + err.Error())
+	}
+
+	// --- MaskingPolicy controller ---
+	maskingPolicyMockSvc = &mockMaskingPolicyService{}
+
+	maskingPolicyServiceFactory := func(_ context.Context, _ maskingpolicyctl.SnowflakeClient, _ string) (maskingpolicyctl.Service, func(context.Context), error) {
+		return maskingPolicyMockSvc, func(context.Context) {}, nil
+	}
+
+	maskingPolicyReconciler := maskingpolicyctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, maskingPolicyServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := maskingPolicyReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup maskingpolicy controller: " + err.Error())
+	}
+
+	// --- PasswordPolicy controller ---
+	passwordPolicyMockSvc = &mockPasswordPolicyService{}
+
+	passwordPolicyServiceFactory := func(_ context.Context, _ passwordpolicyctl.SnowflakeClient, _ string) (passwordpolicyctl.Service, func(context.Context), error) {
+		return passwordPolicyMockSvc, func(context.Context) {}, nil
+	}
+
+	passwordPolicyReconciler := passwordpolicyctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, passwordPolicyServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := passwordPolicyReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup passwordpolicy controller: " + err.Error())
+	}
+
+	// --- SecurityIntegration controller ---
+	securityIntegrationMockSvc = &mockSecurityIntegrationService{}
+
+	securityIntegrationServiceFactory := func(_ context.Context, _ securityintegrationctl.SnowflakeClient, _ string) (securityintegrationctl.Service, func(context.Context), error) {
+		return securityIntegrationMockSvc, func(context.Context) {}, nil
+	}
+
+	securityIntegrationReconciler := securityintegrationctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, securityIntegrationServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := securityIntegrationReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup securityintegration controller: " + err.Error())
+	}
+
+	// --- StorageIntegration controller ---
+	storageIntegrationMockSvc = &mockStorageIntegrationService{}
+
+	storageIntegrationServiceFactory := func(_ context.Context, _ storageintegrationctl.SnowflakeClient, _ string) (storageintegrationctl.Service, func(context.Context), error) {
+		return storageIntegrationMockSvc, func(context.Context) {}, nil
+	}
+
+	storageIntegrationReconciler := storageintegrationctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, storageIntegrationServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := storageIntegrationReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup storageintegration controller: " + err.Error())
+	}
+
+	// --- ResourceMonitor controller ---
+	resourceMonitorMockSvc = &mockResourceMonitorService{}
+
+	resourceMonitorServiceFactory := func(_ context.Context, _ resourcemonitorctl.SnowflakeClient, _ string) (resourcemonitorctl.Service, func(context.Context), error) {
+		return resourceMonitorMockSvc, func(context.Context) {}, nil
+	}
+
+	resourceMonitorReconciler := resourcemonitorctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, resourceMonitorServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := resourceMonitorReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup resourcemonitor controller: " + err.Error())
+	}
+
+	// --- Pipe controller ---
+	pipeMockSvc = &mockPipeService{}
+
+	pipeServiceFactory := func(_ context.Context, _ pipectl.SnowflakeClient, _ string) (pipectl.Service, func(context.Context), error) {
+		return pipeMockSvc, func(context.Context) {}, nil
+	}
+
+	pipeReconciler := pipectl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, pipeServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := pipeReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup pipe controller: " + err.Error())
+	}
+
+	// --- FileFormat controller ---
+	fileFormatMockSvc = &mockFileFormatService{}
+
+	fileFormatServiceFactory := func(_ context.Context, _ fileformatctl.SnowflakeClient, _ string) (fileformatctl.Service, func(context.Context), error) {
+		return fileFormatMockSvc, func(context.Context) {}, nil
+	}
+
+	fileFormatReconciler := fileformatctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, fileFormatServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := fileFormatReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup fileformat controller: " + err.Error())
+	}
+
+	// --- Tag controller ---
+	tagMockSvc = &mockTagService{}
+
+	tagServiceFactory := func(_ context.Context, _ tagctl.SnowflakeClient, _ string) (tagctl.Service, func(context.Context), error) {
+		return tagMockSvc, func(context.Context) {}, nil
+	}
+
+	tagReconciler := tagctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, tagServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := tagReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup tag controller: " + err.Error())
+	}
+
+	// --- RowAccessPolicy controller ---
+	rowAccessPolicyMockSvc = &mockRowAccessPolicyService{}
+
+	rowAccessPolicyServiceFactory := func(_ context.Context, _ rowaccesspolicyctl.SnowflakeClient, _ string) (rowaccesspolicyctl.Service, func(context.Context), error) {
+		return rowAccessPolicyMockSvc, func(context.Context) {}, nil
+	}
+
+	rowAccessPolicyReconciler := rowaccesspolicyctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, rowAccessPolicyServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := rowAccessPolicyReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup rowaccesspolicy controller: " + err.Error())
+	}
+
+	// --- GrantOwnership controller ---
+	grantOwnershipMockSvc = &mockGrantOwnershipService{}
+
+	grantOwnershipServiceFactory := func(_ context.Context, _ grantownershipctl.SnowflakeClient, _ string) (grantownershipctl.Service, func(context.Context), error) {
+		return grantOwnershipMockSvc, func(context.Context) {}, nil
+	}
+
+	grantOwnershipReconciler := grantownershipctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, grantOwnershipServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := grantOwnershipReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup grantownership controller: " + err.Error())
+	}
+
+	// --- AccountRoleAssignment controller ---
+	roleAssignmentMockSvc = &mockRoleAssignmentService{}
+
+	roleAssignmentServiceFactory := func(_ context.Context, _ roleassignmentctl.SnowflakeClient, _ string) (roleassignmentctl.Service, func(context.Context), error) {
+		return roleAssignmentMockSvc, func(context.Context) {}, nil
+	}
+
+	accountRoleAssignmentReconciler := roleassignmentctl.NewAccountRoleAssignmentReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, roleAssignmentServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := accountRoleAssignmentReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup accountroleassignment controller: " + err.Error())
+	}
+
+	// --- DatabaseRoleAssignment controller ---
+	databaseRoleAssignmentReconciler := roleassignmentctl.NewDatabaseRoleAssignmentReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, roleAssignmentServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := databaseRoleAssignmentReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup databaseroleassignment controller: " + err.Error())
 	}
 
 	// Start the manager in a goroutine.

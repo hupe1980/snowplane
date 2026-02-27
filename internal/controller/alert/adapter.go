@@ -209,9 +209,4 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.Alert, obs *reconciler.Obse
 	return detectDrift(obj, detail)
 }
 
-func (a *adapter) PostCreate(_ *snowplanev1alpha1.Alert)                                    {}
-func (a *adapter) PostUpdate(_ *snowplanev1alpha1.Alert, _ bool, _ reconciler.AlterOptions) {}
-
-func (a *adapter) SupportsCreateOrAlter() bool { return false }
-
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.Alert, Service, *snowflake.AlertObservation] = (*adapter)(nil)

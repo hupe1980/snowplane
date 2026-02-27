@@ -24,7 +24,6 @@ rules:
   - views
   - stages
   - tasks
-  - streams
   - tags
   - networkpolicies
   - resourcemonitors
@@ -60,7 +59,6 @@ rules:
   - views/status
   - stages/status
   - tasks/status
-  - streams/status
   - tags/status
   - networkpolicies/status
   - resourcemonitors/status

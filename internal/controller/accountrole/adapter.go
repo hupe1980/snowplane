@@ -26,15 +26,9 @@ func (a *adapter) ServiceFromClient(ctx context.Context, sfClient SnowflakeClien
 	return a.newService(ctx, sfClient, useRole)
 }
 
-func (a *adapter) PreReconcile(_ context.Context, _ *snowplanev1alpha1.AccountRole) error {
-	return nil
-}
-
 func (a *adapter) BuildIdentifier(obj *snowplanev1alpha1.AccountRole) (reconciler.Identifier, error) {
 	return snowflake.NewAccountObjectIdentifier(obj.Spec.Name), nil
 }
-
-func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc { return nil }
 
 func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation[*snowflake.AccountRoleObservation], error) {
 	aid, err := reconciler.AssertIdentifier[snowflake.AccountObjectIdentifier](id)
@@ -117,11 +111,6 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.AccountRole, obs *reconcile
 	detail := obs.Detail
 	return detectDrift(obj, detail)
 }
-
-func (a *adapter) PostCreate(_ *snowplanev1alpha1.AccountRole)                                    {}
-func (a *adapter) PostUpdate(_ *snowplanev1alpha1.AccountRole, _ bool, _ reconciler.AlterOptions) {}
-
-func (a *adapter) SupportsCreateOrAlter() bool { return false }
 
 // Compile-time interface check.
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.AccountRole, Service, *snowflake.AccountRoleObservation] = (*adapter)(nil)

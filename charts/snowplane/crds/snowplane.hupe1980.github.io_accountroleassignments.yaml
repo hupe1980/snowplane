@@ -66,7 +66,7 @@ spec:
               AccountRoleAssignment.\nAssigns an account role to another role or user:\n\n\tGRANT
               ROLE <role> TO ROLE <parent_role>\n\tGRANT ROLE <role> TO USER <user>\n\nAll
               fields are immutable after creation — changing any field requires\ndeleting
-              and recreating the resource."
+              and recreating the resource.\n\nMutual exclusivity rules:"
             properties:
               deletionPolicy:
                 default: Delete
@@ -162,21 +162,24 @@ spec:
             x-kubernetes-validations:
             - message: spec.roleName is immutable (delete and recreate the resource
                 to change)
-              rule: self.roleName == oldSelf.roleName
+              rule: has(oldSelf.roleName) == has(self.roleName) && (!has(self.roleName)
+                || self.roleName == oldSelf.roleName)
             - message: spec.roleRef is immutable (delete and recreate the resource
                 to change)
               rule: has(oldSelf.roleRef) == has(self.roleRef) && (!has(self.roleRef)
                 || self.roleRef == oldSelf.roleRef)
             - message: spec.toRole is immutable (delete and recreate the resource
                 to change)
-              rule: self.toRole == oldSelf.toRole
+              rule: has(oldSelf.toRole) == has(self.toRole) && (!has(self.toRole)
+                || self.toRole == oldSelf.toRole)
             - message: spec.toRoleRef is immutable (delete and recreate the resource
                 to change)
               rule: has(oldSelf.toRoleRef) == has(self.toRoleRef) && (!has(self.toRoleRef)
                 || self.toRoleRef == oldSelf.toRoleRef)
             - message: spec.toUser is immutable (delete and recreate the resource
                 to change)
-              rule: self.toUser == oldSelf.toUser
+              rule: has(oldSelf.toUser) == has(self.toUser) && (!has(self.toUser)
+                || self.toUser == oldSelf.toUser)
             - message: spec.toUserRef is immutable (delete and recreate the resource
                 to change)
               rule: has(oldSelf.toUserRef) == has(self.toUserRef) && (!has(self.toUserRef)
@@ -185,6 +188,13 @@ spec:
                 to change)
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
                 || self.useRole == oldSelf.useRole)
+            - message: exactly one of spec.roleName or spec.roleRef must be set
+              rule: '(has(self.roleName) ? 1 : 0) + (has(self.roleRef) ? 1 : 0) ==
+                1'
+            - message: exactly one of spec.toRole, spec.toRoleRef, spec.toUser, or
+                spec.toUserRef must be set
+              rule: '(has(self.toRole) ? 1 : 0) + (has(self.toRoleRef) ? 1 : 0) +
+                (has(self.toUser) ? 1 : 0) + (has(self.toUserRef) ? 1 : 0) == 1'
           status:
             description: AccountRoleAssignmentStatus defines the observed state of
               an AccountRoleAssignment.

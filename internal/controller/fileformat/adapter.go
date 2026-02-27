@@ -214,8 +214,6 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.FileFormat, obs *reconciler
 	return detectDrift(obj, detail)
 }
 
-func (a *adapter) PostCreate(_ *snowplanev1alpha1.FileFormat)                                    {}
-func (a *adapter) PostUpdate(_ *snowplanev1alpha1.FileFormat, _ bool, _ reconciler.AlterOptions) {}
-func (a *adapter) SupportsCreateOrAlter() bool                                                   { return true }
+func (a *adapter) SupportsCreateOrAlter() bool { return true }
 
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.FileFormat, Service, *snowflake.FileFormatObservation] = (*adapter)(nil)

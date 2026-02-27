@@ -217,8 +217,6 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.NetworkRule, obs *reconcile
 	return detectDrift(obj, detail)
 }
 
-func (a *adapter) PostCreate(_ *snowplanev1alpha1.NetworkRule)                                    {}
-func (a *adapter) PostUpdate(_ *snowplanev1alpha1.NetworkRule, _ bool, _ reconciler.AlterOptions) {}
-func (a *adapter) SupportsCreateOrAlter() bool                                                    { return true }
+func (a *adapter) SupportsCreateOrAlter() bool { return true }
 
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.NetworkRule, Service, *snowflake.NetworkRuleObservation] = (*adapter)(nil)

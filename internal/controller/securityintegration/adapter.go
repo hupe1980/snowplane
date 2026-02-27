@@ -26,15 +26,9 @@ func (a *adapter) ServiceFromClient(ctx context.Context, sfClient SnowflakeClien
 	return a.newService(ctx, sfClient, useRole)
 }
 
-func (a *adapter) PreReconcile(_ context.Context, _ *snowplanev1alpha1.SecurityIntegration) error {
-	return nil
-}
-
 func (a *adapter) BuildIdentifier(obj *snowplanev1alpha1.SecurityIntegration) (reconciler.Identifier, error) {
 	return snowflake.NewAccountObjectIdentifier(obj.Spec.Name), nil
 }
-
-func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc { return nil }
 
 func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation[*snowflake.SecurityIntegrationObservation], error) {
 	aid, err := reconciler.AssertIdentifier[snowflake.AccountObjectIdentifier](id)
@@ -121,10 +115,5 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.SecurityIntegration, obs *r
 	detail := obs.Detail
 	return detectDrift(obj, detail)
 }
-
-func (a *adapter) PostCreate(_ *snowplanev1alpha1.SecurityIntegration) {}
-func (a *adapter) PostUpdate(_ *snowplanev1alpha1.SecurityIntegration, _ bool, _ reconciler.AlterOptions) {
-}
-func (a *adapter) SupportsCreateOrAlter() bool { return false }
 
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.SecurityIntegration, Service, *snowflake.SecurityIntegrationObservation] = (*adapter)(nil)

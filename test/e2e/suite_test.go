@@ -123,8 +123,8 @@ var (
 	gvrTask = schema.GroupVersionResource{
 		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "tasks",
 	}
-	gvrStream = schema.GroupVersionResource{
-		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "streams",
+	gvrStreamOnTable = schema.GroupVersionResource{
+		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "streamontables",
 	}
 )
 
@@ -640,7 +640,7 @@ func cleanupK8sCRs() {
 		gvrAccountRoleGrant,
 		gvrDatabaseRoleGrant,
 		gvrShareGrant,
-		gvrStream,
+		gvrStreamOnTable,
 		gvrTask,
 		gvrMaskingPolicy,
 		gvrPasswordPolicy,
@@ -1323,20 +1323,19 @@ func newTaskCR(name, sfName, dbRefName, schemaRefName, warehouseName, sqlStateme
 	}
 }
 
-func newStreamCR(name, sfName, dbRefName, schemaRefName, sourceType, sourceName string) *unstructured.Unstructured {
+func newStreamOnTableCR(name, sfName, dbRefName, schemaRefName, table string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
-			"kind":       "Stream",
+			"kind":       "StreamOnTable",
 			"metadata": map[string]interface{}{
 				"name":      name,
 				"namespace": testNamespace,
 			},
 			"spec": map[string]interface{}{
-				"name":       sfName,
-				"sourceType": sourceType,
-				"sourceName": sourceName,
-				"comment":    "e2e test stream",
+				"name":    sfName,
+				"table":   table,
+				"comment": "e2e test stream on table",
 				"databaseRef": map[string]interface{}{
 					"name": dbRefName,
 				},

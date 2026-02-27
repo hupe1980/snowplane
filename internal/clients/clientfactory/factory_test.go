@@ -30,7 +30,7 @@ func (f *fakeClient) Close() error {
 func (f *fakeClient) Exec(_ context.Context, _ string, _ ...any) (sql.Result, error) {
 	return nil, nil
 }
-func (f *fakeClient) QueryRow(_ context.Context, _ string, _ ...any) *sql.Row { return nil }
+func (f *fakeClient) QueryRow(_ context.Context, _ string, _ ...any) *snowflake.Row { return nil }
 func (f *fakeClient) Query(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
 	return nil, nil
 }
