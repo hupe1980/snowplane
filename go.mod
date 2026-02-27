@@ -10,6 +10,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/k3s v0.40.0
 	go.uber.org/goleak v1.3.0
 	golang.org/x/crypto v0.48.0
+	golang.org/x/sync v0.19.0
 	golang.org/x/time v0.14.0
 	k8s.io/api v0.35.1
 	k8s.io/apimachinery v0.35.1
@@ -141,7 +142,6 @@ require (
 	golang.org/x/mod v0.32.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260109210033-bd525da824e2 // indirect
 	golang.org/x/term v0.40.0 // indirect

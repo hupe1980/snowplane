@@ -16,6 +16,8 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRoleRef) == has(self.databaseRoleRef) && (!has(self.databaseRoleRef) || self.databaseRoleRef == oldSelf.databaseRoleRef)",message="spec.databaseRoleRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.withGrantOption == oldSelf.withGrantOption",message="spec.withGrantOption is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(self.databaseRole) || has(self.databaseRoleRef)",message="one of spec.databaseRole or spec.databaseRoleRef must be set"
+// +kubebuilder:validation:XValidation:rule="!(has(self.databaseRole) && has(self.databaseRoleRef))",message="spec.databaseRole and spec.databaseRoleRef are mutually exclusive"
 type DatabaseRoleGrantSpec struct {
 	CommonSpec `json:",inline"`
 

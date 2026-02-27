@@ -79,6 +79,8 @@ type FieldExportSpec struct {
 // FieldExportStatus defines the observed state of FieldExport.
 type FieldExportStatus struct {
 	// Conditions represent the latest available observations.
+	// +listType=map
+	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// LastExportedValueHash is a SHA-256 hash of the last exported value.

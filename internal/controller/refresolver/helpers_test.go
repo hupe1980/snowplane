@@ -28,7 +28,10 @@ func TestHandleRefError_SetsConditionsAndEmitsEvent(t *testing.T) {
 	}
 	recorder := record.NewFakeRecorder(10)
 
-	HandleRefError(db, recorder, "Database", `"my-ref" (ref)`, fmt.Errorf("not found"))
+	ctx := context.Background()
+	err := HandleRefError(ctx, db, recorder, "Database", "my-ref", fmt.Errorf("not found"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "resolving Database ref")
 
 	// ReferencesResolved condition should be False.
 	refCond := conditions.Get(db, snowplanev1alpha1.TypeReferencesResolved)

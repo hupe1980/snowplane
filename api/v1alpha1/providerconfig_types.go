@@ -65,7 +65,7 @@ type ProviderConfigSpec struct {
 	Warehouse string `json:"warehouse,omitempty"`
 
 	// AuthenticationType selects the authentication method.
-	// +kubebuilder:validation:Enum=KeyPair;UsernamePassword;WorkloadIdentity;""
+	// +kubebuilder:validation:Enum=KeyPair;UsernamePassword;WorkloadIdentity
 	AuthenticationType AuthenticationType `json:"authenticationType,omitempty"`
 
 	// Credentials references a Kubernetes Secret containing authentication material.
@@ -160,6 +160,8 @@ type ProviderConfigStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Conditions represent the latest available observations of the ProviderConfig's state.
+	// +listType=map
+	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
@@ -201,7 +203,7 @@ func (s *ProviderConfigSpec) Validate() error {
 	}
 
 	if err := validateEnum("spec.authenticationType", &s.AuthenticationType,
-		AuthenticationTypeKeyPair, AuthenticationTypeUsernamePassword, AuthenticationTypeWorkloadIdentity, ""); err != nil {
+		AuthenticationTypeKeyPair, AuthenticationTypeUsernamePassword, AuthenticationTypeWorkloadIdentity); err != nil {
 		errs = append(errs, err)
 	}
 

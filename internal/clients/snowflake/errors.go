@@ -3,6 +3,7 @@ package snowflake
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	gosnowflake "github.com/snowflakedb/gosnowflake"
 )
@@ -24,6 +25,9 @@ const (
 
 	// Statement timed out.
 	ErrCodeStatementTimeout = 604
+
+	// CREATE OR ALTER is not supported on the account.
+	ErrCodeCreateOrAlterUnsupported = 2032
 
 	// Account is locked/suspended.
 	ErrCodeAccountLocked = 260009
@@ -157,9 +161,32 @@ func IsConnectionFailed(err error) bool {
 	return err != nil && errors.Is(err, ErrConnectionFailed)
 }
 
-// MapSnowflakeError inspects err for a *gosnowflake.SnowflakeError and, if found,
-// wraps it with the matching sentinel error from errorCodeMap. If the error code
-// is not recognized, the original error is returned unchanged.
+// IsCreateOrAlterUnsupported checks whether err indicates that the
+// CREATE OR ALTER syntax is not supported by the Snowflake account.
+// It first checks for a structured gosnowflake.SnowflakeError with code 2032,
+// then falls back to string matching for non-structured errors.
+func IsCreateOrAlterUnsupported(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Prefer structured error code matching.
+	var sfErr *gosnowflake.SnowflakeError
+	if errors.As(err, &sfErr) && sfErr.Number == ErrCodeCreateOrAlterUnsupported {
+		return true
+	}
+
+	// Fallback: string matching for non-structured errors.
+	msg := strings.ToUpper(err.Error())
+
+	return strings.Contains(msg, "UNSUPPORTED") ||
+		strings.Contains(msg, "UNEXPECTED 'OR'") ||
+		strings.Contains(msg, "SYNTAX ERROR") ||
+		strings.Contains(msg, "002032")
+}
+
+// MapSnowflakeError wraps err with the matching sentinel error from errorCodeMap.
+// If the error code is not recognized, the original error is returned unchanged.
 // This ensures that IsObjectAlreadyExists, IsInsufficientPrivileges, and other
 // sentinel checkers work correctly for errors returned by the Snowflake driver.
 func MapSnowflakeError(err error) error {

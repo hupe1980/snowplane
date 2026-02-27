@@ -221,6 +221,121 @@ func TestBuildAlterAlertStatements(t *testing.T) {
 		assert.True(t, len(stmts) >= 4, "expected at least 4 statements, got %d", len(stmts))
 		assert.Contains(t, stmts[len(stmts)-1], "RESUME")
 	})
+
+	t.Run("AutoSuspendBeforeModifyCondition", func(t *testing.T) {
+		t.Parallel()
+		cond := "SELECT 1 FROM t"
+		opts := AlterAlertOptions{
+			Name:         NewSchemaObjectIdentifier("DB", "SCH", "A"),
+			Condition:    &cond,
+			CurrentState: "started",
+		}
+		stmts, err := buildAlterAlertStatements(opts)
+		require.NoError(t, err)
+		require.Len(t, stmts, 3, "expected SUSPEND + MODIFY CONDITION + RESUME")
+		assert.Contains(t, stmts[0], "SUSPEND")
+		assert.Contains(t, stmts[1], "MODIFY CONDITION")
+		assert.Contains(t, stmts[2], "RESUME")
+	})
+
+	t.Run("AutoSuspendBeforeModifyAction", func(t *testing.T) {
+		t.Parallel()
+		action := "CALL x()"
+		opts := AlterAlertOptions{
+			Name:         NewSchemaObjectIdentifier("DB", "SCH", "A"),
+			Action:       &action,
+			CurrentState: "started",
+		}
+		stmts, err := buildAlterAlertStatements(opts)
+		require.NoError(t, err)
+		require.Len(t, stmts, 3, "expected SUSPEND + MODIFY ACTION + RESUME")
+		assert.Contains(t, stmts[0], "SUSPEND")
+		assert.Contains(t, stmts[1], "MODIFY ACTION")
+		assert.Contains(t, stmts[2], "RESUME")
+	})
+
+	t.Run("AutoSuspendBeforeSetSchedule", func(t *testing.T) {
+		t.Parallel()
+		sched := "5 MINUTE"
+		opts := AlterAlertOptions{
+			Name:         NewSchemaObjectIdentifier("DB", "SCH", "A"),
+			Schedule:     &sched,
+			CurrentState: "started",
+		}
+		stmts, err := buildAlterAlertStatements(opts)
+		require.NoError(t, err)
+		require.Len(t, stmts, 3, "expected SUSPEND + SET SCHEDULE + RESUME")
+		assert.Contains(t, stmts[0], "SUSPEND")
+		assert.Contains(t, stmts[1], "SCHEDULE")
+		assert.Contains(t, stmts[2], "RESUME")
+	})
+
+	t.Run("AutoSuspendBeforeSetWarehouse", func(t *testing.T) {
+		t.Parallel()
+		wh := "WH2"
+		opts := AlterAlertOptions{
+			Name:         NewSchemaObjectIdentifier("DB", "SCH", "A"),
+			Warehouse:    &wh,
+			CurrentState: "started",
+		}
+		stmts, err := buildAlterAlertStatements(opts)
+		require.NoError(t, err)
+		require.Len(t, stmts, 3, "expected SUSPEND + SET WAREHOUSE + RESUME")
+		assert.Contains(t, stmts[0], "SUSPEND")
+		assert.Contains(t, stmts[1], "WAREHOUSE")
+		assert.Contains(t, stmts[2], "RESUME")
+	})
+
+	t.Run("NoAutoSuspendWhenAlreadySuspended", func(t *testing.T) {
+		t.Parallel()
+		cond := "SELECT 1"
+		opts := AlterAlertOptions{
+			Name:         NewSchemaObjectIdentifier("DB", "SCH", "A"),
+			Condition:    &cond,
+			CurrentState: "suspended",
+		}
+		stmts, err := buildAlterAlertStatements(opts)
+		require.NoError(t, err)
+		require.Len(t, stmts, 1, "no auto-suspend when already suspended")
+		assert.Contains(t, stmts[0], "MODIFY CONDITION")
+	})
+
+	t.Run("ExplicitSuspendWithModify_NoDoubleOrResume", func(t *testing.T) {
+		t.Parallel()
+		cond := "SELECT 1"
+		opts := AlterAlertOptions{
+			Name:         NewSchemaObjectIdentifier("DB", "SCH", "A"),
+			Condition:    &cond,
+			Suspend:      boolPtr(true),
+			CurrentState: "started",
+		}
+		stmts, err := buildAlterAlertStatements(opts)
+		require.NoError(t, err)
+		// SUSPEND + MODIFY CONDITION — no RESUME because user wants it suspended.
+		require.Len(t, stmts, 2)
+		assert.Contains(t, stmts[0], "SUSPEND")
+		assert.Contains(t, stmts[1], "MODIFY CONDITION")
+	})
+
+	t.Run("NoAutoSuspendForCommentOnly", func(t *testing.T) {
+		t.Parallel()
+		comment := "hi"
+		opts := AlterAlertOptions{
+			Name:         NewSchemaObjectIdentifier("DB", "SCH", "A"),
+			Comment:      &comment,
+			CurrentState: "started",
+		}
+		stmts, err := buildAlterAlertStatements(opts)
+		require.NoError(t, err)
+		// Comment changes don't require suspend.
+		require.Len(t, stmts, 1)
+		assert.Contains(t, stmts[0], "COMMENT")
+		// No SUSPEND or RESUME.
+		for _, s := range stmts {
+			assert.NotContains(t, s, "SUSPEND")
+			assert.NotContains(t, s, "RESUME")
+		}
+	})
 }
 
 func TestBuildShowAlertByIDSQL(t *testing.T) {

@@ -64,6 +64,8 @@ spec:
                 description: DataRetentionTimeInDays specifies the Time Travel retention
                   period (0–90 days).
                 format: int32
+                maximum: 90
+                minimum: 0
                 type: integer
               databaseName:
                 description: |-
@@ -108,6 +110,8 @@ spec:
                   MaxDataExtensionTimeInDays specifies the maximum number of days Snowflake
                   can extend the data retention period.
                 format: int32
+                maximum: 90
+                minimum: 0
                 type: integer
               metricLevel:
                 description: MetricLevel controls the metric collection level.
@@ -245,6 +249,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               databaseName:
                 description: DatabaseName is the parent Snowflake database name.
                 type: string

@@ -247,6 +247,7 @@ func main() {
 		factory,
 		sanitize.NewSafeRecorderFromEvents(mgr.GetEventRecorder("providerconfig-controller")),
 		rl,
+		cb,
 	).WithRequeueInterval(requeueInterval).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ProviderConfig")
 		os.Exit(1)

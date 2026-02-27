@@ -67,7 +67,7 @@ func (a *accountRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *sn
 
 		name, err := refresolver.ResolveAccountRoleRef(ctx, a.client, obj.Namespace, *ref)
 		if err != nil {
-			return handleRefError(ctx, a.recorder, obj, "AccountRole", ref.Name, err)
+			return refresolver.HandleRefError(ctx, obj, a.recorder, "AccountRole", ref.Name, err)
 		}
 
 		obj.Spec.RoleName = name
@@ -80,7 +80,7 @@ func (a *accountRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *sn
 
 		name, err := refresolver.ResolveAccountRoleRef(ctx, a.client, obj.Namespace, *ref)
 		if err != nil {
-			return handleRefError(ctx, a.recorder, obj, "AccountRole", ref.Name, err)
+			return refresolver.HandleRefError(ctx, obj, a.recorder, "AccountRole", ref.Name, err)
 		}
 
 		obj.Spec.ToRole = name
@@ -93,7 +93,7 @@ func (a *accountRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *sn
 
 		name, err := refresolver.ResolveUserRef(ctx, a.client, obj.Namespace, *ref)
 		if err != nil {
-			return handleRefError(ctx, a.recorder, obj, "User", ref.Name, err)
+			return refresolver.HandleRefError(ctx, obj, a.recorder, "User", ref.Name, err)
 		}
 
 		obj.Spec.ToUser = name

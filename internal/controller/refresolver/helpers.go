@@ -25,14 +25,21 @@ type ConditionedClientObject interface {
 	conditions.ConditionedObject
 }
 
-// HandleRefError sets ReferencesNotResolved + NotReady conditions and emits a
-// warning event. It is the shared error-handling boilerplate previously
-// duplicated in every adapter's resolveDatabaseRef / resolveSchemaRef.
-func HandleRefError(obj ConditionedClientObject, recorder record.EventRecorder, kindLabel, sourceName string, err error) {
-	msg := fmt.Sprintf("%s %s: %v", kindLabel, sourceName, err)
+// HandleRefError sets ReferencesNotResolved + NotReady conditions, emits a
+// warning event, logs transient reference errors, and returns a formatted error.
+// It is the shared error-handling boilerplate for ref-resolution failures in
+// grant and role-assignment adapters.
+func HandleRefError(ctx context.Context, obj ConditionedClientObject, recorder record.EventRecorder, kindLabel, sourceName string, err error) error {
+	msg := fmt.Sprintf("%s %q: %v", kindLabel, sourceName, err)
 	conditions.SetReferencesNotResolved(obj, snowplanev1alpha1.ReasonDependencyNotReady, msg)
 	conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDependencyWait, msg)
 	recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonDependencyNotReady, msg)
+
+	if errors.Is(err, ErrReferenceNotFound) || errors.Is(err, ErrReferenceNotReady) {
+		log.FromContext(ctx).Info("reference not resolved, requeuing", "kind", kindLabel, "name", sourceName, "error", err)
+	}
+
+	return fmt.Errorf("resolving %s ref %q: %w", kindLabel, sourceName, err)
 }
 
 // ResolveDatabaseRefWithConditions resolves a database reference and, on error,
@@ -50,9 +57,7 @@ func ResolveDatabaseRefWithConditions(
 	dbFQN, err := ResolveDatabaseSource(ctx, c, namespace, ref, rawName)
 	if err != nil {
 		refName := SourceName(ref, rawName)
-		HandleRefError(obj, recorder, "Database", refName, err)
-
-		return "", err
+		return "", HandleRefError(ctx, obj, recorder, "Database", refName, err)
 	}
 
 	return dbFQN, nil
@@ -73,9 +78,7 @@ func ResolveSchemaRefWithConditions(
 	schemaFQN, err := ResolveSchemaSource(ctx, c, namespace, ref, rawName)
 	if err != nil {
 		refName := SourceName(ref, rawName)
-		HandleRefError(obj, recorder, "Schema", refName, err)
-
-		return "", err
+		return "", HandleRefError(ctx, obj, recorder, "Schema", refName, err)
 	}
 
 	return schemaFQN, nil

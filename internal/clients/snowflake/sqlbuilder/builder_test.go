@@ -147,6 +147,9 @@ func TestQuoteIdentifierOrExpression(t *testing.T) {
 		{"function expression", "TO_DATE(col)", "TO_DATE(col)"},
 		{"arithmetic", "col1 + col2", "col1 + col2"},
 		{"nested function", "SUBSTR(col, 1, 5)", "SUBSTR(col, 1, 5)"},
+		{"injection semicolon falls back to quoting", "); DROP TABLE t; --", `"); DROP TABLE t; --"`},
+		{"injection block comment falls back to quoting", "TO_DATE(col) /* hidden */", `"TO_DATE(col) /* hidden */"`},
+		{"injection dollar quoting falls back to quoting", "FUNC($$inject$$)", `"FUNC($$inject$$)"`},
 	}
 
 	for _, tt := range tests {
@@ -781,5 +784,83 @@ func TestValidatePolicyBody(t *testing.T) {
 		err := ValidatePolicyBody(body)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "too long")
+	})
+}
+
+func TestValidateIdentifierParts(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ValidSinglePart", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidateIdentifierParts("MY_TABLE"))
+	})
+
+	t.Run("ValidTwoParts", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidateIdentifierParts("DB.SCHEMA"))
+	})
+
+	t.Run("ValidThreeParts", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidateIdentifierParts("DB.SCHEMA.TABLE"))
+	})
+
+	t.Run("RejectEmpty", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateIdentifierParts("")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "empty")
+	})
+
+	t.Run("RejectTooManyParts", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateIdentifierParts("A.B.C.D")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "too many parts")
+	})
+
+	t.Run("RejectEmptyPart", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateIdentifierParts("DB..TABLE")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "empty")
+	})
+
+	t.Run("RejectSemicolon", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateIdentifierParts("DB; DROP TABLE x")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "forbidden")
+	})
+
+	t.Run("RejectLineComment", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateIdentifierParts("TABLE-- comment")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "forbidden")
+	})
+
+	t.Run("RejectBlockComment", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateIdentifierParts("TABLE /* hidden */")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "forbidden")
+	})
+
+	t.Run("RejectDollarQuoting", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateIdentifierParts("TABLE$$inject$$")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "forbidden")
+	})
+
+	t.Run("AllowHyphensInIdentifier", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidateIdentifierParts("my-db.my-schema.my-table"))
+	})
+
+	t.Run("AllowSpacesInParts", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidateIdentifierParts("MY DB.MY SCHEMA.MY TABLE"))
 	})
 }

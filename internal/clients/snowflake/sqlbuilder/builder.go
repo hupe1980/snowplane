@@ -70,11 +70,22 @@ func IsExpressionLike(s string) bool {
 }
 
 // QuoteIdentifierOrExpression quotes simple column names but passes
-// expression-like values through unmodified.  Use for CLUSTER BY clauses
-// where the value may be either a column name (DATE_COL) or an expression
-// (TO_DATE(col)).
+// expression-like values through after a SQL injection denylist check.
+// Use for CLUSTER BY clauses where the value may be either a column name
+// (DATE_COL) or an expression (TO_DATE(col)).
+//
+// Returns the quoted identifier or sanitized expression. If the expression
+// contains forbidden SQL patterns (semicolons, comments, dollar-quoting),
+// it is treated as a plain identifier and quoted to neutralize any injection.
 func QuoteIdentifierOrExpression(s string) string {
 	if IsExpressionLike(s) {
+		// Defense-in-depth: reject expressions containing SQL injection markers.
+		// Rather than returning an error (which would change the API surface),
+		// fall back to quoting, which safely neutralizes the payload.
+		if identifierDenyRe.MatchString(s) {
+			return QuoteIdentifier(s)
+		}
+
 		return s
 	}
 
@@ -97,6 +108,47 @@ func QuoteIdentifierParts(fqn string) string {
 	}
 
 	return strings.Join(quoted, ".")
+}
+
+// ValidateIdentifierParts validates that a dot-separated identifier string
+// (e.g. "DB.SCHEMA.TABLE") is safe for use as a Snowflake fully-qualified name.
+// Each part must be non-empty and must not contain SQL injection markers
+// (semicolons, comments, dollar-quoting). Returns nil if valid.
+func ValidateIdentifierParts(fqn string) error {
+	if fqn == "" {
+		return fmt.Errorf("identifier must not be empty")
+	}
+
+	parts := strings.Split(fqn, ".")
+	if len(parts) > 3 {
+		return fmt.Errorf("identifier has too many parts (%d), expected at most 3 (database.schema.object)", len(parts))
+	}
+
+	for i, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			return fmt.Errorf("identifier part %d is empty", i+1)
+		}
+
+		if err := validateIdentifierPart(p); err != nil {
+			return fmt.Errorf("identifier part %d (%q): %w", i+1, p, err)
+		}
+	}
+
+	return nil
+}
+
+// identifierDenyRe rejects characters and patterns that are never valid in
+// Snowflake object identifiers but could be used for SQL injection.
+var identifierDenyRe = regexp.MustCompile(`(?i:;|--\s|/\*|\*/|\$\$)`)
+
+// validateIdentifierPart checks a single component of a multi-part identifier.
+func validateIdentifierPart(part string) error {
+	if identifierDenyRe.MatchString(part) {
+		return fmt.Errorf("contains forbidden SQL pattern (semicolon, comment, or dollar-quoting)")
+	}
+
+	return nil
 }
 
 // validObjectTypes is the set of valid Snowflake object type keywords used in

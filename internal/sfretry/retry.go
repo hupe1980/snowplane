@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/utils/sanitize"
 )
 
 // Options controls retry behaviour.
@@ -118,7 +119,7 @@ func Do(ctx context.Context, opts Options, fn func() error) error {
 				"attempt", attempt,
 				"maxAttempts", opts.MaxAttempts,
 				"backoff", jitteredBackoff.String(),
-				"error", lastErr.Error(),
+				"error", sanitize.ForLog(lastErr.Error()),
 			)
 
 			select {

@@ -367,14 +367,5 @@ func scanViewShowOutput(rows *sql.Rows, name string) (*ViewShowOutput, error) {
 // isCreateOrAlterUnsupportedErr checks whether an error indicates that the
 // CREATE OR ALTER syntax is not supported by the Snowflake account.
 func isCreateOrAlterUnsupportedErr(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	msg := strings.ToUpper(err.Error())
-
-	return strings.Contains(msg, "UNSUPPORTED") ||
-		strings.Contains(msg, "UNEXPECTED 'OR'") ||
-		strings.Contains(msg, "SYNTAX ERROR") ||
-		strings.Contains(msg, "002032")
+	return IsCreateOrAlterUnsupported(err)
 }

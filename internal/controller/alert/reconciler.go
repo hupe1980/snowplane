@@ -122,6 +122,10 @@ func buildAlterOptions(alert *snowplanev1alpha1.Alert, id snowflake.SchemaObject
 	}
 
 	if obs.ShowOutput != nil {
+		// Pass current state so buildAlterAlertStatements can auto-suspend
+		// before modifying condition/action/schedule/warehouse.
+		opts.CurrentState = obs.ShowOutput.State
+
 		// Schedule changes.
 		if alert.Spec.Schedule != nil && *alert.Spec.Schedule != obs.ShowOutput.Schedule {
 			opts.Schedule = alert.Spec.Schedule

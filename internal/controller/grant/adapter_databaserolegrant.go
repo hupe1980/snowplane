@@ -64,7 +64,7 @@ func (a *databaseRoleGrantAdapter) PreReconcile(ctx context.Context, grant *snow
 
 		fqn, err := refresolver.ResolveDatabaseRoleRef(ctx, a.client, grant.Namespace, *ref)
 		if err != nil {
-			return handleRefError(ctx, a.recorder, grant, "DatabaseRole", ref.Name, err)
+			return refresolver.HandleRefError(ctx, grant, a.recorder, "DatabaseRole", ref.Name, err)
 		}
 
 		grant.Spec.DatabaseRole = fqn
@@ -73,7 +73,7 @@ func (a *databaseRoleGrantAdapter) PreReconcile(ctx context.Context, grant *snow
 
 	// Resolve On refs.
 	errHandler := func(kind, name string, err error) error {
-		return handleRefError(ctx, a.recorder, grant, kind, name, err)
+		return refresolver.HandleRefError(ctx, grant, a.recorder, kind, name, err)
 	}
 
 	if err := resolveOnRefs(ctx, a.client, grant.Namespace, &grant.Spec.On, errHandler); err != nil {

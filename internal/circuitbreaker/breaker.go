@@ -53,9 +53,14 @@ type Options struct {
 	// circuit opens. Default: 5.
 	FailureThreshold int
 
-	// ResetTimeout is how long the circuit stays open before transitioning
-	// to half-open. Default: 60s.
+	// ResetTimeout is the initial duration the circuit stays open before
+	// transitioning to half-open. Default: 60s.
 	ResetTimeout time.Duration
+
+	// MaxResetTimeout is the maximum duration after exponential backoff.
+	// Each consecutive half-open failure doubles the timeout, capped at
+	// this value. Default: 15m.
+	MaxResetTimeout time.Duration
 }
 
 // DefaultOptions returns sensible production defaults.
@@ -63,6 +68,7 @@ func DefaultOptions() Options {
 	return Options{
 		FailureThreshold: 5,
 		ResetTimeout:     60 * time.Second,
+		MaxResetTimeout:  15 * time.Minute,
 	}
 }
 
@@ -71,7 +77,8 @@ type providerBreaker struct {
 	state               State
 	consecutiveFailures int
 	lastFailureTime     time.Time
-	probing             bool // true when a HalfOpen probe is in-flight
+	probing             bool          // true when a HalfOpen probe is in-flight
+	currentResetTimeout time.Duration // current backoff duration (doubles on consecutive failures)
 }
 
 // Breaker provides per-provider circuit breaker state management.
@@ -93,6 +100,14 @@ func New(opts Options) *Breaker {
 		opts.ResetTimeout = 60 * time.Second
 	}
 
+	if opts.MaxResetTimeout <= 0 {
+		opts.MaxResetTimeout = 15 * time.Minute
+	}
+
+	if opts.MaxResetTimeout < opts.ResetTimeout {
+		opts.MaxResetTimeout = opts.ResetTimeout
+	}
+
 	return &Breaker{
 		breakers: make(map[string]*providerBreaker),
 		opts:     opts,
@@ -112,7 +127,7 @@ func (b *Breaker) Allow(provider string) error {
 	case StateClosed:
 		return nil
 	case StateOpen:
-		if b.now().Sub(pb.lastFailureTime) >= b.opts.ResetTimeout {
+		if b.now().Sub(pb.lastFailureTime) >= pb.currentResetTimeout {
 			pb.state = StateHalfOpen
 			pb.probing = true
 			metrics.SetCircuitBreakerState(provider, float64(StateHalfOpen))
@@ -136,7 +151,7 @@ func (b *Breaker) Allow(provider string) error {
 }
 
 // RecordSuccess records a successful call for the provider.
-// Resets the breaker to Closed state.
+// Resets the breaker to Closed state and resets the backoff timeout.
 func (b *Breaker) RecordSuccess(provider string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -145,22 +160,34 @@ func (b *Breaker) RecordSuccess(provider string) {
 	pb.consecutiveFailures = 0
 	pb.state = StateClosed
 	pb.probing = false
+	pb.currentResetTimeout = b.opts.ResetTimeout
 	metrics.SetCircuitBreakerState(provider, float64(StateClosed))
 }
 
 // RecordFailure records a failed call for the provider.
-// Opens the breaker after reaching the failure threshold.
+// Opens the breaker after reaching the failure threshold and applies
+// exponential backoff on consecutive half-open probe failures.
 func (b *Breaker) RecordFailure(provider string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	pb := b.getOrCreate(provider)
+
+	wasHalfOpen := pb.state == StateHalfOpen
+
 	pb.consecutiveFailures++
 	pb.lastFailureTime = b.now()
 	pb.probing = false
 
 	if pb.consecutiveFailures >= b.opts.FailureThreshold {
 		pb.state = StateOpen
+
+		// Exponential backoff: double the timeout on each half-open failure,
+		// capped at MaxResetTimeout.
+		if wasHalfOpen {
+			pb.currentResetTimeout = min(pb.currentResetTimeout*2, b.opts.MaxResetTimeout)
+		}
+
 		metrics.RecordCircuitBreakerTrip(provider)
 		metrics.SetCircuitBreakerState(provider, float64(StateOpen))
 	}
@@ -172,7 +199,7 @@ func (b *Breaker) State(provider string) State {
 	defer b.mu.RUnlock()
 
 	if pb, ok := b.breakers[provider]; ok {
-		if pb.state == StateOpen && b.now().Sub(pb.lastFailureTime) >= b.opts.ResetTimeout {
+		if pb.state == StateOpen && b.now().Sub(pb.lastFailureTime) >= pb.currentResetTimeout {
 			return StateHalfOpen
 		}
 
@@ -202,12 +229,18 @@ func (b *Breaker) Reset(provider string) {
 	delete(b.breakers, provider)
 }
 
+// Evict removes the breaker entry for the given provider, reclaiming memory.
+// Alias for Reset — provided for API symmetry with ratelimit.Limiter.
+func (b *Breaker) Evict(provider string) {
+	b.Reset(provider)
+}
+
 func (b *Breaker) getOrCreate(provider string) *providerBreaker {
 	if pb, ok := b.breakers[provider]; ok {
 		return pb
 	}
 
-	pb := &providerBreaker{state: StateClosed}
+	pb := &providerBreaker{state: StateClosed, currentResetTimeout: b.opts.ResetTimeout}
 	b.breakers[provider] = pb
 
 	return pb

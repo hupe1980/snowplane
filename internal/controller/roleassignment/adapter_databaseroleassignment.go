@@ -67,7 +67,7 @@ func (a *databaseRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *s
 
 		fqn, err := refresolver.ResolveDatabaseRoleRef(ctx, a.client, obj.Namespace, *ref)
 		if err != nil {
-			return handleRefError(ctx, a.recorder, obj, "DatabaseRole", ref.Name, err)
+			return refresolver.HandleRefError(ctx, obj, a.recorder, "DatabaseRole", ref.Name, err)
 		}
 
 		obj.Spec.DatabaseRoleName = fqn
@@ -80,7 +80,7 @@ func (a *databaseRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *s
 
 		name, err := refresolver.ResolveAccountRoleRef(ctx, a.client, obj.Namespace, *ref)
 		if err != nil {
-			return handleRefError(ctx, a.recorder, obj, "AccountRole", ref.Name, err)
+			return refresolver.HandleRefError(ctx, obj, a.recorder, "AccountRole", ref.Name, err)
 		}
 
 		obj.Spec.ToRole = name
@@ -93,7 +93,7 @@ func (a *databaseRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *s
 
 		fqn, err := refresolver.ResolveDatabaseRoleRef(ctx, a.client, obj.Namespace, *ref)
 		if err != nil {
-			return handleRefError(ctx, a.recorder, obj, "DatabaseRole", ref.Name, err)
+			return refresolver.HandleRefError(ctx, obj, a.recorder, "DatabaseRole", ref.Name, err)
 		}
 
 		obj.Spec.ToDatabaseRole = fqn

@@ -3,21 +3,16 @@ package grant
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
-	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
 // grantAlterOptions implements reconciler.AlterOptions for grants.
@@ -154,27 +149,6 @@ func resolveOnRefs(ctx context.Context, client sigs.Client, ns string, on *snowp
 	}
 
 	return nil
-}
-
-// grantConditionedObject combines client.Object with the conditions interface
-// so handleRefError can both set conditions and emit events.
-type grantConditionedObject interface {
-	sigs.Object
-	conditions.ConditionedObject
-}
-
-// handleRefError emits an event and sets conditions when a reference cannot be resolved.
-func handleRefError(ctx context.Context, recorder record.EventRecorder, obj grantConditionedObject, kind, name string, err error) error {
-	msg := fmt.Sprintf("%s %q: %v", kind, name, err)
-	conditions.SetReferencesNotResolved(obj, snowplanev1alpha1.ReasonDependencyNotReady, msg)
-	conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDependencyWait, msg)
-	recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonDependencyNotReady, msg)
-
-	if errors.Is(err, refresolver.ErrReferenceNotFound) || errors.Is(err, refresolver.ErrReferenceNotReady) {
-		log.FromContext(ctx).Info("grant reference not resolved, requeuing", "kind", kind, "name", name, "error", err)
-	}
-
-	return fmt.Errorf("resolving %s ref %q: %w", kind, name, err)
 }
 
 // buildGrantIdentifier builds a GrantIdentifier from components.

@@ -224,3 +224,34 @@ func TestMapSnowflakeError_IsCheckers(t *testing.T) {
 		assert.True(t, IsInsufficientPrivileges(MapSnowflakeError(sfErr)))
 	})
 }
+
+// ---------------------------------------------------------------------------
+// Tests: IsCreateOrAlterUnsupported
+// ---------------------------------------------------------------------------
+
+func TestIsCreateOrAlterUnsupported(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{"nil", nil, false},
+		{"generic error", errors.New("connection reset"), false},
+		{"snowflake error code 2032", &gosnowflake.SnowflakeError{Number: ErrCodeCreateOrAlterUnsupported, Message: "unsupported"}, true},
+		{"string match unsupported", errors.New("SQL compilation error: UNSUPPORTED feature"), true},
+		{"string match unexpected OR", errors.New("SQL compilation error: unexpected 'OR'"), true},
+		{"string match syntax error", errors.New("SQL compilation error: syntax error"), true},
+		{"string match 002032", errors.New("002032 (42601): SQL compilation error"), true},
+		{"wrapped snowflake error 2032", fmt.Errorf("exec failed: %w", &gosnowflake.SnowflakeError{Number: ErrCodeCreateOrAlterUnsupported}), true},
+		{"different snowflake error code", &gosnowflake.SnowflakeError{Number: 9999, Message: "other"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, IsCreateOrAlterUnsupported(tt.err))
+		})
+	}
+}

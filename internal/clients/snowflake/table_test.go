@@ -128,7 +128,7 @@ func TestBuildCreateTableSQL(t *testing.T) {
 						Name:              "fk_order",
 						Type:              "FOREIGN KEY",
 						Columns:           []string{"ORDER_ID"},
-						ForeignKeyTable:   `"DB"."S"."ORDERS"`,
+						ForeignKeyTable:   "DB.S.ORDERS",
 						ForeignKeyColumns: []string{"ID"},
 					},
 				},
@@ -147,7 +147,7 @@ func TestBuildCreateTableSQL(t *testing.T) {
 				Constraints: []CreateTableConstraint{
 					{Name: "pk_t", Type: "PRIMARY KEY", Columns: []string{"ID"}},
 					{Name: "uq_code", Type: "UNIQUE", Columns: []string{"CODE"}},
-					{Name: "fk_ref", Type: "FOREIGN KEY", Columns: []string{"REF_ID"}, ForeignKeyTable: `"DB"."S"."OTHER"`, ForeignKeyColumns: []string{"ID"}},
+					{Name: "fk_ref", Type: "FOREIGN KEY", Columns: []string{"REF_ID"}, ForeignKeyTable: "DB.S.OTHER", ForeignKeyColumns: []string{"ID"}},
 				},
 			},
 			expected: `CREATE TABLE IF NOT EXISTS "DB"."S"."T" ("ID" NUMBER NOT NULL, "CODE" VARCHAR(10), "REF_ID" NUMBER, CONSTRAINT "pk_t" PRIMARY KEY ("ID"), CONSTRAINT "uq_code" UNIQUE ("CODE"), CONSTRAINT "fk_ref" FOREIGN KEY ("REF_ID") REFERENCES "DB"."S"."OTHER" ("ID"))`,
@@ -157,7 +157,8 @@ func TestBuildCreateTableSQL(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := buildCreateTableSQL(tc.opts)
+			got, err := buildCreateTableSQL(tc.opts)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected, got)
 		})
 	}
@@ -360,6 +361,28 @@ func TestCreateTableOptionsValidation(t *testing.T) {
 				Columns: []CreateTableColumn{{Name: "A", Type: "NUMBER"}, {Name: "B", Type: "NUMBER"}},
 				Constraints: []CreateTableConstraint{
 					{Type: "FOREIGN KEY", Columns: []string{"A", "B"}, ForeignKeyTable: "OTHER", ForeignKeyColumns: []string{"X"}},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "foreign key table SQL injection rejected",
+			opts: CreateTableOptions{
+				Name:    NewSchemaObjectIdentifier("DB", "S", "T"),
+				Columns: []CreateTableColumn{{Name: "A", Type: "NUMBER"}},
+				Constraints: []CreateTableConstraint{
+					{Type: "FOREIGN KEY", Columns: []string{"A"}, ForeignKeyTable: "evil; DROP TABLE x; --", ForeignKeyColumns: []string{"ID"}},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "foreign key table with comment injection rejected",
+			opts: CreateTableOptions{
+				Name:    NewSchemaObjectIdentifier("DB", "S", "T"),
+				Columns: []CreateTableColumn{{Name: "A", Type: "NUMBER"}},
+				Constraints: []CreateTableConstraint{
+					{Type: "FOREIGN KEY", Columns: []string{"A"}, ForeignKeyTable: "tbl /* hidden */", ForeignKeyColumns: []string{"ID"}},
 				},
 			},
 			wantErr: true,

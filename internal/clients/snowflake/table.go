@@ -134,6 +134,8 @@ func (o *CreateTableOptions) Validate() error {
 		case "FOREIGN KEY":
 			if c.ForeignKeyTable == "" {
 				errs = append(errs, fmt.Errorf("constraint %d: foreign key table is required", i))
+			} else if err := sqlbuilder.ValidateIdentifierParts(c.ForeignKeyTable); err != nil {
+				errs = append(errs, fmt.Errorf("constraint %d: foreign key table: %w", i, err))
 			}
 
 			if len(c.ForeignKeyColumns) == 0 {
@@ -270,7 +272,7 @@ func NewTableClient(c SQLExecutor) *TableClient {
 }
 
 // buildCreateTableSQL builds the CREATE TABLE SQL statement.
-func buildCreateTableSQL(opts CreateTableOptions) string {
+func buildCreateTableSQL(opts CreateTableOptions) (string, error) {
 	var b sqlbuilder.Builder
 
 	if opts.UseCreateOrAlter {
@@ -336,7 +338,7 @@ func buildCreateTableSQL(opts CreateTableOptions) string {
 		b.WriteString(")")
 
 		if c.Type == "FOREIGN KEY" && c.ForeignKeyTable != "" {
-			fmt.Fprintf(&b.Builder, " REFERENCES %s", c.ForeignKeyTable)
+			fmt.Fprintf(&b.Builder, " REFERENCES %s", sqlbuilder.QuoteIdentifierParts(c.ForeignKeyTable))
 
 			if len(c.ForeignKeyColumns) > 0 {
 				b.WriteString(" (")
@@ -372,7 +374,11 @@ func buildCreateTableSQL(opts CreateTableOptions) string {
 	b.SetString("DEFAULT_DDL_COLLATION", opts.DefaultDDLCollation)
 	b.SetString("COMMENT", opts.Comment)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", fmt.Errorf("building CREATE TABLE SQL: %w", err)
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a table in Snowflake.
@@ -381,7 +387,12 @@ func (t *TableClient) Create(ctx context.Context, opts CreateTableOptions) error
 		return NewTerminalError(fmt.Errorf("invalid create table options: %w", err))
 	}
 
-	if _, err := t.client.Exec(ctx, buildCreateTableSQL(opts)); err != nil {
+	sql, err := buildCreateTableSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("invalid create table options: %w", err))
+	}
+
+	if _, err := t.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating table %s: %w", opts.Name, err)
 	}
 

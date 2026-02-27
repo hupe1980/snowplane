@@ -65,9 +65,11 @@ spec:
                   on query.
                 type: boolean
               autoSuspend:
-                description: AutoSuspend is the number of seconds of inactivity before
-                  auto-suspend.
+                description: |-
+                  AutoSuspend is the number of seconds of inactivity before auto-suspend.
+                  Must be 0 (disable) or >= 60.
                 format: int32
+                minimum: 0
                 type: integer
               comment:
                 description: Comment is an optional description.
@@ -176,11 +178,13 @@ spec:
                 description: StatementQueuedTimeoutInSeconds controls how long queries
                   queue before timing out.
                 format: int32
+                minimum: 0
                 type: integer
               statementTimeoutInSeconds:
                 description: StatementTimeoutInSeconds controls the max execution
                   time per statement.
                 format: int32
+                minimum: 0
                 type: integer
               useRole:
                 description: |-
@@ -227,6 +231,9 @@ spec:
                 || self.useRole == oldSelf.useRole)
             - message: spec.generation and spec.resourceConstraint are mutually exclusive
               rule: '!(has(self.generation) && has(self.resourceConstraint))'
+            - message: spec.autoSuspend must be 0 (disable) or >= 60 seconds
+              rule: '!has(self.autoSuspend) || self.autoSuspend == 0 || self.autoSuspend
+                >= 60'
           status:
             description: WarehouseStatus defines the observed state of a Warehouse.
             properties:
@@ -288,6 +295,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               fullyQualifiedName:
                 description: FullyQualifiedName is the Snowflake fully qualified identifier
                   for this resource.

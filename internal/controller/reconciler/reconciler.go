@@ -3,7 +3,6 @@ package reconciler
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -1059,16 +1058,9 @@ func (r *GenericReconciler[T, S, D]) finalizeSpec(ctx context.Context, obj T) er
 
 // isCreateOrAlterUnsupported checks whether an error indicates that the
 // CREATE OR ALTER syntax is not supported by the Snowflake account.
-// Snowflake returns SQL compilation error 2032 for unsupported syntax.
+// Delegates to the shared snowflake.IsCreateOrAlterUnsupported helper
+// which prefers structured error code matching (code 2032), then falls
+// back to string matching.
 func isCreateOrAlterUnsupported(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	msg := strings.ToUpper(err.Error())
-
-	return strings.Contains(msg, "UNSUPPORTED") ||
-		strings.Contains(msg, "UNEXPECTED 'OR'") ||
-		strings.Contains(msg, "SYNTAX ERROR") ||
-		strings.Contains(msg, "002032")
+	return snowflake.IsCreateOrAlterUnsupported(err)
 }

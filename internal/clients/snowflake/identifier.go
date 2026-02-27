@@ -88,8 +88,10 @@ func (a AccountObjectIdentifier) FullyQualifiedName() string { return quoteIdent
 func (a AccountObjectIdentifier) String() string { return a.FullyQualifiedName() }
 
 // Equal reports whether two identifiers refer to the same object.
+// Comparison is case-insensitive because Snowflake treats unquoted
+// identifiers as case-insensitive (stored as uppercase internally).
 func (a AccountObjectIdentifier) Equal(other AccountObjectIdentifier) bool {
-	return a.name == other.name
+	return strings.EqualFold(a.name, other.name)
 }
 
 // --- DatabaseObjectIdentifier ---
@@ -120,8 +122,10 @@ func (d DatabaseObjectIdentifier) FullyQualifiedName() string {
 func (d DatabaseObjectIdentifier) String() string { return d.FullyQualifiedName() }
 
 // Equal reports whether two identifiers refer to the same object.
+// Comparison is case-insensitive because Snowflake treats unquoted
+// identifiers as case-insensitive (stored as uppercase internally).
 func (d DatabaseObjectIdentifier) Equal(other DatabaseObjectIdentifier) bool {
-	return d.databaseName == other.databaseName && d.name == other.name
+	return strings.EqualFold(d.databaseName, other.databaseName) && strings.EqualFold(d.name, other.name)
 }
 
 // --- SchemaObjectIdentifier ---
@@ -156,6 +160,8 @@ func (s SchemaObjectIdentifier) FullyQualifiedName() string {
 func (s SchemaObjectIdentifier) String() string { return s.FullyQualifiedName() }
 
 // Equal reports whether two identifiers refer to the same object.
+// Comparison is case-insensitive because Snowflake treats unquoted
+// identifiers as case-insensitive (stored as uppercase internally).
 func (s SchemaObjectIdentifier) Equal(other SchemaObjectIdentifier) bool {
-	return s.databaseName == other.databaseName && s.schemaName == other.schemaName && s.name == other.name
+	return strings.EqualFold(s.databaseName, other.databaseName) && strings.EqualFold(s.schemaName, other.schemaName) && strings.EqualFold(s.name, other.name)
 }

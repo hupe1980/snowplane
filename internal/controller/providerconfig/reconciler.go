@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
+	"github.com/hupe1980/snowplane/internal/circuitbreaker"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/metrics"
@@ -47,6 +48,7 @@ type Reconciler struct {
 	factory         *clientfactory.ClientFactory
 	recorder        record.EventRecorder
 	rateLimiter     *ratelimit.Limiter
+	circuitBreaker  *circuitbreaker.Breaker
 	pingFn          PingFunc
 	requeueOverride time.Duration
 }
@@ -66,12 +68,13 @@ func (r *Reconciler) getRequeueInterval() time.Duration {
 }
 
 // NewReconciler returns a new ProviderConfig reconciler.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *Reconciler {
+func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter, cb *circuitbreaker.Breaker) *Reconciler {
 	return &Reconciler{
-		client:      c,
-		factory:     factory,
-		recorder:    recorder,
-		rateLimiter: rl,
+		client:         c,
+		factory:        factory,
+		recorder:       recorder,
+		rateLimiter:    rl,
+		circuitBreaker: cb,
 		pingFn: func(ctx context.Context, sfClient clientfactory.SnowflakeClient) error {
 			return sfClient.Ping(ctx)
 		},
@@ -247,6 +250,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 		if apierrors.IsNotFound(err) {
 			// CR deleted — evict any cached client and clean up metrics.
 			r.factory.Evict(req.Name)
+			r.rateLimiter.Evict(req.Name)
+			r.circuitBreaker.Evict(req.Name)
 			metrics.DeleteProviderConfigHealthy(req.Name)
 			return ctrl.Result{}, nil
 		}
@@ -417,6 +422,8 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, pc *snowplanev1alpha1.
 	if !finalizers.Has(pc, finalizerName) {
 		// No finalizer — nothing to do.
 		r.factory.Evict(pc.Name)
+		r.rateLimiter.Evict(pc.Name)
+		r.circuitBreaker.Evict(pc.Name)
 		return ctrl.Result{}, nil
 	}
 
@@ -444,6 +451,8 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, pc *snowplanev1alpha1.
 	}
 
 	r.factory.Evict(pc.Name)
+	r.rateLimiter.Evict(pc.Name)
+	r.circuitBreaker.Evict(pc.Name)
 	metrics.DeleteProviderConfigHealthy(pc.Name)
 	logger.Info("ProviderConfig deleted, client evicted", "name", pc.Name)
 

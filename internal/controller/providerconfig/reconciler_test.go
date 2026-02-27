@@ -21,9 +21,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
+	"github.com/hupe1980/snowplane/internal/circuitbreaker"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/provider"
+	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 	"github.com/hupe1980/snowplane/internal/utils/finalizers"
 )
@@ -103,10 +105,12 @@ func newTestReconciler(pingFn PingFunc, objs ...runtime.Object) (*Reconciler, *c
 	recorder := record.NewFakeRecorder(100)
 
 	r := &Reconciler{
-		client:   c,
-		factory:  factory,
-		recorder: recorder,
-		pingFn:   pingFn,
+		client:         c,
+		factory:        factory,
+		recorder:       recorder,
+		rateLimiter:    ratelimit.New(ratelimit.DefaultOptions()),
+		circuitBreaker: circuitbreaker.New(circuitbreaker.DefaultOptions()),
+		pingFn:         pingFn,
 	}
 
 	return r, factory, recorder

@@ -23,6 +23,15 @@ func TestAccountObjectIdentifier_Equal(t *testing.T) {
 	assert.False(t, a.Equal(c))
 }
 
+func TestAccountObjectIdentifier_EqualCaseInsensitive(t *testing.T) {
+	t.Parallel()
+	a := NewAccountObjectIdentifier("ANALYTICS")
+	b := NewAccountObjectIdentifier("analytics")
+	c := NewAccountObjectIdentifier("Analytics")
+	assert.True(t, a.Equal(b))
+	assert.True(t, a.Equal(c))
+}
+
 func TestAccountObjectIdentifier_CasePreservation(t *testing.T) {
 	t.Parallel()
 	id := NewAccountObjectIdentifier("MixedCase")
@@ -48,6 +57,13 @@ func TestDatabaseObjectIdentifier_Equal(t *testing.T) {
 	assert.False(t, a.Equal(d))
 }
 
+func TestDatabaseObjectIdentifier_EqualCaseInsensitive(t *testing.T) {
+	t.Parallel()
+	a := NewDatabaseObjectIdentifier("DB", "ROLE_A")
+	b := NewDatabaseObjectIdentifier("db", "role_a")
+	assert.True(t, a.Equal(b))
+}
+
 func TestNewSchemaObjectIdentifier(t *testing.T) {
 	t.Parallel()
 	id := NewSchemaObjectIdentifier("DB", "SCHEMA", "TABLE")
@@ -64,6 +80,13 @@ func TestSchemaObjectIdentifier_Equal(t *testing.T) {
 	c := NewSchemaObjectIdentifier("DB", "SCH", "OTHER")
 	assert.True(t, a.Equal(b))
 	assert.False(t, a.Equal(c))
+}
+
+func TestSchemaObjectIdentifier_EqualCaseInsensitive(t *testing.T) {
+	t.Parallel()
+	a := NewSchemaObjectIdentifier("DB", "SCH", "TBL")
+	b := NewSchemaObjectIdentifier("db", "sch", "tbl")
+	assert.True(t, a.Equal(b))
 }
 
 func TestValidObjectIdentifier_Valid(t *testing.T) {

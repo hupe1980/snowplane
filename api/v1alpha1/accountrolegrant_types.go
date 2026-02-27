@@ -16,6 +16,8 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.accountRoleRef) == has(self.accountRoleRef) && (!has(self.accountRoleRef) || self.accountRoleRef == oldSelf.accountRoleRef)",message="spec.accountRoleRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.withGrantOption == oldSelf.withGrantOption",message="spec.withGrantOption is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(self.accountRole) || has(self.accountRoleRef)",message="one of spec.accountRole or spec.accountRoleRef must be set"
+// +kubebuilder:validation:XValidation:rule="!(has(self.accountRole) && has(self.accountRoleRef))",message="spec.accountRole and spec.accountRoleRef are mutually exclusive"
 type AccountRoleGrantSpec struct {
 	CommonSpec `json:",inline"`
 

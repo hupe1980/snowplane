@@ -90,6 +90,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="!(has(self.generation) && has(self.resourceConstraint))",message="spec.generation and spec.resourceConstraint are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.autoSuspend) || self.autoSuspend == 0 || self.autoSuspend >= 60",message="spec.autoSuspend must be 0 (disable) or >= 60 seconds"
 type WarehouseSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -123,6 +124,9 @@ type WarehouseSpec struct {
 	ScalingPolicy *ScalingPolicy `json:"scalingPolicy,omitempty"`
 
 	// AutoSuspend is the number of seconds of inactivity before auto-suspend.
+	// Must be 0 (disable) or >= 60.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
 	AutoSuspend *int32 `json:"autoSuspend,omitempty"`
 
 	// AutoResume controls whether the warehouse auto-resumes on query.
@@ -154,9 +158,13 @@ type WarehouseSpec struct {
 	MaxConcurrencyLevel *int32 `json:"maxConcurrencyLevel,omitempty"`
 
 	// StatementQueuedTimeoutInSeconds controls how long queries queue before timing out.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
 	StatementQueuedTimeoutInSeconds *int32 `json:"statementQueuedTimeoutInSeconds,omitempty"`
 
 	// StatementTimeoutInSeconds controls the max execution time per statement.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
 	StatementTimeoutInSeconds *int32 `json:"statementTimeoutInSeconds,omitempty"`
 
 	// ResourceConstraint specifies resource constraints (e.g., MEMORY, STANDARD_GEN_1, MEMORY_16X).

@@ -64,7 +64,7 @@ func (a *accountRoleGrantAdapter) PreReconcile(ctx context.Context, grant *snowp
 
 		name, err := refresolver.ResolveAccountRoleRef(ctx, a.client, grant.Namespace, *ref)
 		if err != nil {
-			return handleRefError(ctx, a.recorder, grant, "AccountRole", ref.Name, err)
+			return refresolver.HandleRefError(ctx, grant, a.recorder, "AccountRole", ref.Name, err)
 		}
 
 		grant.Spec.AccountRole = name
@@ -73,7 +73,7 @@ func (a *accountRoleGrantAdapter) PreReconcile(ctx context.Context, grant *snowp
 
 	// Resolve On refs.
 	errHandler := func(kind, name string, err error) error {
-		return handleRefError(ctx, a.recorder, grant, kind, name, err)
+		return refresolver.HandleRefError(ctx, grant, a.recorder, kind, name, err)
 	}
 
 	if err := resolveOnRefs(ctx, a.client, grant.Namespace, &grant.Spec.On, errHandler); err != nil {

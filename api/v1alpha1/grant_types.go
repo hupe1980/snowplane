@@ -18,6 +18,8 @@ const (
 
 // GrantOn defines the target object for the grant.
 // Exactly one field must be set.
+//
+// +kubebuilder:validation:XValidation:rule="(has(self.account) && self.account ? 1 : 0) + (has(self.accountObject) ? 1 : 0) + (has(self.schema) ? 1 : 0) + (has(self.schemaObject) ? 1 : 0) == 1",message="exactly one of account, accountObject, schema, or schemaObject must be set"
 type GrantOn struct {
 	// Account grants a global account-level privilege (e.g. CREATE DATABASE, MANAGE GRANTS).
 	// Set to true for ON ACCOUNT.
@@ -52,6 +54,8 @@ type GrantOnAccountObject struct {
 
 // GrantOnSchema specifies a grant on a schema or set of schemas.
 // Exactly one field must be set.
+//
+// +kubebuilder:validation:XValidation:rule="(has(self.schemaName) ? 1 : 0) + (has(self.schemaRef) ? 1 : 0) + (has(self.allInDatabase) ? 1 : 0) + (has(self.allInDatabaseRef) ? 1 : 0) + (has(self.futureInDatabase) ? 1 : 0) + (has(self.futureInDatabaseRef) ? 1 : 0) == 1",message="exactly one of schemaName, schemaRef, allInDatabase, allInDatabaseRef, futureInDatabase, or futureInDatabaseRef must be set"
 type GrantOnSchema struct {
 	// SchemaName is the fully qualified schema name (e.g. "MY_DB"."PUBLIC").
 	// For: ON SCHEMA <schema_name>
@@ -87,6 +91,8 @@ type GrantOnSchema struct {
 
 // GrantOnSchemaObject specifies a grant on schema-level objects.
 // Exactly one of (ObjectType+ObjectName), All, or Future must be set.
+//
+// +kubebuilder:validation:XValidation:rule="(has(self.objectType) && has(self.objectName) ? 1 : 0) + (has(self.all) ? 1 : 0) + (has(self.future) ? 1 : 0) == 1",message="exactly one of (objectType+objectName), all, or future must be set"
 type GrantOnSchemaObject struct {
 	// ObjectType is the schema object type (e.g. TABLE, VIEW, STAGE, FUNCTION, PROCEDURE, STREAM, TASK, PIPE).
 	// Required when granting on a specific object.
@@ -110,6 +116,10 @@ type GrantOnSchemaObject struct {
 }
 
 // GrantOnBulk specifies a bulk or future grant target scope.
+//
+// +kubebuilder:validation:XValidation:rule="!(has(self.inDatabase) && has(self.inDatabaseRef))",message="inDatabase and inDatabaseRef are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!(has(self.inSchema) && has(self.inSchemaRef))",message="inSchema and inSchemaRef are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="(has(self.inDatabase) || has(self.inDatabaseRef) ? 1 : 0) + (has(self.inSchema) || has(self.inSchemaRef) ? 1 : 0) == 1",message="exactly one scope (database or schema) must be set"
 type GrantOnBulk struct {
 	// ObjectTypePlural is the plural form of the object type (e.g. TABLES, VIEWS, STAGES).
 	ObjectTypePlural string `json:"objectTypePlural"`

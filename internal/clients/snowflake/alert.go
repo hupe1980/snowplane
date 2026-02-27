@@ -73,6 +73,12 @@ type AlterAlertOptions struct {
 	Action    *string
 	Suspend   *bool
 
+	// CurrentState is the observed state of the alert (e.g. "started", "suspended").
+	// When the alert is running and condition/action/schedule/warehouse are being
+	// modified, the alter logic will auto-suspend before modification and
+	// auto-resume afterward (unless Suspend is explicitly set to true).
+	CurrentState string
+
 	// UnsetFields lists Snowflake parameter names to revert to defaults.
 	UnsetFields []string
 }
@@ -143,29 +149,34 @@ func (a *AlertClient) Create(ctx context.Context, opts CreateAlertOptions) error
 }
 
 // buildAlterAlertStatements builds the ALTER ALERT SQL statements.
+// Implements the suspend-before-modify pattern: if the alert is currently
+// running ("started") and any of condition/action/schedule/warehouse are
+// being modified, the alert is suspended first, then modified, then resumed
+// (unless the user explicitly requests suspension via Suspend=true).
 func buildAlterAlertStatements(opts AlterAlertOptions) (statements []string, _ error) {
-	var resumeAtEnd bool
+	fqn := opts.Name.FullyQualifiedName()
 
-	// Suspend/resume must be separate statements.
-	if opts.Suspend != nil {
-		if *opts.Suspend {
-			statements = append(statements, fmt.Sprintf("ALTER ALERT %s SUSPEND", opts.Name.FullyQualifiedName()))
-		} else {
-			// Resume is appended last to ensure other changes are applied first.
-			resumeAtEnd = true
-		}
+	// Determine if we need to auto-suspend for safe modification.
+	isRunning := strings.EqualFold(opts.CurrentState, "started")
+	needsModify := opts.Condition != nil || opts.Action != nil || opts.Schedule != nil || opts.Warehouse != nil
+	userWantsSuspend := opts.Suspend != nil && *opts.Suspend
+	userWantsResume := opts.Suspend != nil && !*opts.Suspend
+	autoSuspend := isRunning && needsModify && !userWantsSuspend
+
+	// Step 1: Suspend if explicitly requested or needed for safe modification.
+	if userWantsSuspend || autoSuspend {
+		statements = append(statements, fmt.Sprintf("ALTER ALERT %s SUSPEND", fqn))
 	}
 
-	// Modify condition.
+	// Step 2: Apply modifications (condition, action, SET/UNSET).
 	if opts.Condition != nil {
 		statements = append(statements, fmt.Sprintf("ALTER ALERT %s MODIFY CONDITION EXISTS (%s)",
-			opts.Name.FullyQualifiedName(), *opts.Condition))
+			fqn, *opts.Condition))
 	}
 
-	// Modify action.
 	if opts.Action != nil {
 		statements = append(statements, fmt.Sprintf("ALTER ALERT %s MODIFY ACTION %s",
-			opts.Name.FullyQualifiedName(), *opts.Action))
+			fqn, *opts.Action))
 	}
 
 	// Build SET clause for other parameters.
@@ -181,15 +192,16 @@ func buildAlterAlertStatements(opts AlterAlertOptions) (statements []string, _ e
 		sc.String("SCHEDULE", opts.Schedule)
 	}
 
-	alterStmts, err := sqlbuilder.BuildAlterStatements("ALERT", opts.Name.FullyQualifiedName(), &sc, opts.UnsetFields)
+	alterStmts, err := sqlbuilder.BuildAlterStatements("ALERT", fqn, &sc, opts.UnsetFields)
 	if err != nil {
 		return nil, err
 	}
 
 	statements = append(statements, alterStmts...)
 
-	if resumeAtEnd {
-		statements = append(statements, fmt.Sprintf("ALTER ALERT %s RESUME", opts.Name.FullyQualifiedName()))
+	// Step 3: Resume if explicitly requested or if we auto-suspended.
+	if userWantsResume || (autoSuspend && !userWantsSuspend) {
+		statements = append(statements, fmt.Sprintf("ALTER ALERT %s RESUME", fqn))
 	}
 
 	return statements, nil

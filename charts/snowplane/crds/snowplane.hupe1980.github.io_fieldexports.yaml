@@ -203,6 +203,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               lastExportedValueHash:
                 description: |-
                   LastExportedValueHash is a SHA-256 hash of the last exported value.

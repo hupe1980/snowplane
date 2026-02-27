@@ -35,10 +35,16 @@ type SchemaSpec struct {
 	Comment *string `json:"comment,omitempty"`
 
 	// DataRetentionTimeInDays specifies the Time Travel retention period (0–90 days).
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=90
 	DataRetentionTimeInDays *int32 `json:"dataRetentionTimeInDays,omitempty"`
 
 	// MaxDataExtensionTimeInDays specifies the maximum number of days Snowflake
 	// can extend the data retention period.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=90
 	MaxDataExtensionTimeInDays *int32 `json:"maxDataExtensionTimeInDays,omitempty"`
 
 	// Transient indicates this is a transient schema (no Fail-safe). Immutable after creation.

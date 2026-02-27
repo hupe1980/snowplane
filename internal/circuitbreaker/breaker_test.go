@@ -198,3 +198,101 @@ func TestState_String(t *testing.T) {
 	assert.Equal(t, "half-open", StateHalfOpen.String())
 	assert.Equal(t, "unknown", State(99).String())
 }
+
+func TestBreaker_ExponentialBackoff(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	cb := New(Options{
+		FailureThreshold: 1,
+		ResetTimeout:     10 * time.Second,
+		MaxResetTimeout:  80 * time.Second,
+	})
+	cb.now = func() time.Time { return now }
+
+	provider := "exp-backoff"
+
+	// Trip the breaker (threshold=1).
+	cb.RecordFailure(provider)
+	assert.Equal(t, StateOpen, cb.State(provider))
+
+	// After 10s (initial timeout), should transition to HalfOpen.
+	cb.now = func() time.Time { return now.Add(11 * time.Second) }
+	require.NoError(t, cb.Allow(provider))
+
+	// Half-open probe fails → re-opens with 2x timeout (20s).
+	cb.RecordFailure(provider)
+	assert.Equal(t, StateOpen, cb.State(provider))
+
+	// After 15s (< 20s), should still be open.
+	cb.now = func() time.Time { return now.Add(11*time.Second + 15*time.Second) }
+	assert.ErrorIs(t, cb.Allow(provider), ErrCircuitOpen)
+
+	// After 21s (> 20s), should transition to HalfOpen.
+	cb.now = func() time.Time { return now.Add(11*time.Second + 21*time.Second) }
+	require.NoError(t, cb.Allow(provider))
+
+	// Half-open probe fails again → re-opens with 4x timeout (40s).
+	cb.RecordFailure(provider)
+	assert.Equal(t, StateOpen, cb.State(provider))
+
+	// After 35s (< 40s), should still be open.
+	cb.now = func() time.Time { return now.Add(11*time.Second + 21*time.Second + 35*time.Second) }
+	assert.ErrorIs(t, cb.Allow(provider), ErrCircuitOpen)
+
+	// After 41s (> 40s), should transition to HalfOpen.
+	cb.now = func() time.Time { return now.Add(11*time.Second + 21*time.Second + 41*time.Second) }
+	require.NoError(t, cb.Allow(provider))
+
+	// Success resets to Closed and resets backoff.
+	cb.RecordSuccess(provider)
+	assert.Equal(t, StateClosed, cb.State(provider))
+
+	// Trip again — should use initial timeout (10s), not the doubled one.
+	cb.now = func() time.Time { return now.Add(100 * time.Second) }
+	cb.RecordFailure(provider)
+	assert.Equal(t, StateOpen, cb.State(provider))
+
+	// After 11s, should transition to HalfOpen (initial timeout restored).
+	cb.now = func() time.Time { return now.Add(112 * time.Second) }
+	assert.Equal(t, StateHalfOpen, cb.State(provider))
+}
+
+func TestBreaker_ExponentialBackoffCapsAtMax(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	cb := New(Options{
+		FailureThreshold: 1,
+		ResetTimeout:     10 * time.Second,
+		MaxResetTimeout:  30 * time.Second,
+	})
+	cb.now = func() time.Time { return now }
+
+	provider := "exp-cap"
+
+	// Trip → 10s, fail → 20s, fail → 30s (capped), fail → still 30s.
+	cb.RecordFailure(provider)
+
+	// First half-open → fail (timeout doubles to 20s)
+	cb.now = func() time.Time { return now.Add(11 * time.Second) }
+	require.NoError(t, cb.Allow(provider))
+	cb.RecordFailure(provider)
+
+	// Second half-open → fail (timeout doubles to 30s, hits cap)
+	cb.now = func() time.Time { return now.Add(11*time.Second + 21*time.Second) }
+	require.NoError(t, cb.Allow(provider))
+	cb.RecordFailure(provider)
+
+	// Third half-open → fail (timeout stays at 30s, already at cap)
+	cb.now = func() time.Time { return now.Add(11*time.Second + 21*time.Second + 31*time.Second) }
+	require.NoError(t, cb.Allow(provider))
+	cb.RecordFailure(provider)
+
+	// Should still need 30s (not 60s) — verify cap is enforced.
+	cb.now = func() time.Time { return now.Add(11*time.Second + 21*time.Second + 31*time.Second + 25*time.Second) }
+	assert.ErrorIs(t, cb.Allow(provider), ErrCircuitOpen)
+
+	cb.now = func() time.Time { return now.Add(11*time.Second + 21*time.Second + 31*time.Second + 31*time.Second) }
+	assert.Equal(t, StateHalfOpen, cb.State(provider))
+}
