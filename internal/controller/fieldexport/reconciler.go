@@ -208,9 +208,10 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, fe *snowplanev1alpha1.
 }
 
 // SetupWithManager registers the FieldExport controller with the manager.
-// GenerationChangedPredicate prevents status-only updates from triggering
+// DesiredStateChanged prevents status-only updates from triggering
 // reconciliation, avoiding self-triggering loops when patchStatus updates
-// .status.lastExportedValueHash.
+// .status.lastExportedValueHash. It also triggers on Snowplane annotation
+// changes (e.g., force-new, drift-policy) without waiting for periodic resync.
 //
 // Source resource watches: when a source Snowplane managed resource
 // transitions to Ready or its status changes, FieldExports referencing it
@@ -238,7 +239,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrent int) error
 
 	bldr := ctrl.NewControllerManagedBy(mgr).
 		For(&snowplanev1alpha1.FieldExport{},
-			builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+			builder.WithPredicates(reconciler.DesiredStateChanged())).
 		// Watch target ConfigMaps managed by snowplane-fieldexport.
 		Watches(&corev1.ConfigMap{},
 			handler.EnqueueRequestsFromMapFunc(r.mapTargetToFieldExports),

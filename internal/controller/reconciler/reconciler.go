@@ -16,7 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/circuitbreaker"
@@ -171,7 +170,7 @@ func (r *GenericReconciler[T, S, D]) SetupWithManager(mgr ctrl.Manager, maxConcu
 	}
 
 	bldr := ctrl.NewControllerManagedBy(mgr).
-		For(r.Adapter.NewObject(), builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		For(r.Adapter.NewObject(), builder.WithPredicates(DesiredStateChanged())).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrent}).
 		Named(r.Adapter.ResourceName())
 

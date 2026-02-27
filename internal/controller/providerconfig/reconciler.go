@@ -19,7 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -194,7 +193,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrent int) error
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&snowplanev1alpha1.ProviderConfig{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		For(&snowplanev1alpha1.ProviderConfig{}, builder.WithPredicates(reconciler.DesiredStateChanged())).
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.mapSecretToProviderConfigs),
