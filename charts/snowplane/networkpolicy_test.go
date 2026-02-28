@@ -15,10 +15,11 @@ func helmTemplate(t *testing.T, setFlags ...string) string {
 	root := repoRoot(t)
 	chartDir := root + "/charts/snowplane"
 
-	args := []string{
+	args := make([]string, 0, 5+2*len(setFlags))
+	args = append(args,
 		"template", "snowplane", chartDir,
 		"--show-only", "templates/networkpolicy.yaml",
-	}
+	)
 
 	for _, f := range setFlags {
 		args = append(args, "--set", f)
