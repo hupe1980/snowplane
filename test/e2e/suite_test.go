@@ -292,6 +292,7 @@ func TestMain(m *testing.M) {
 		"--set", "controller.enableAlphaResources=true",
 		"--set", "rbac.secrets.write=true",
 		"--set", "rbac.configMaps.write=true",
+		"--set", "networkPolicy.enabled=false",
 		"--wait", "--timeout", "120s",
 	); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to deploy Helm chart: %v\n", err)

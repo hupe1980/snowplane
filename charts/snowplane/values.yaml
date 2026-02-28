@@ -149,9 +149,33 @@ podDisruptionBudget:
   enabled: true
   maxUnavailable: 1
 
-# -- NetworkPolicy configuration
+# -- NetworkPolicy configuration.
+# Restricts ingress to metrics + health-probe ports and egress to DNS, HTTPS, and Kubernetes API.
 networkPolicy:
-  enabled: false
+  # -- Create a NetworkPolicy for the controller pod. Enabled by default for defense-in-depth.
+  enabled: true
+  # -- Restrict DNS egress to pods in the kube-system namespace (kube-dns / CoreDNS).
+  # Set to false if your cluster runs DNS outside kube-system (e.g. node-local-dns in a custom namespace).
+  restrictDNS: true
+  # -- Restrict HTTPS/Kubernetes API egress to specific CIDRs.
+  # When non-empty, only these destinations are reachable on ports 443 and 6443.
+  # Include both Snowflake IP ranges AND your Kubernetes API server endpoint.
+  # When empty (default), HTTPS egress is allowed to all destinations.
+  # Example:
+  #   egressCIDRs:
+  #     - 52.25.0.0/16       # Snowflake US West (AWS)
+  #     - 104.198.0.0/16     # Snowflake US Central (GCP)
+  #     - 10.96.0.1/32       # Kubernetes API server ClusterIP
+  egressCIDRs: []
+  # -- Restrict metrics ingress to pods in a specific namespace (e.g. monitoring).
+  # When set, only pods in this namespace can reach the metrics and health-probe ports.
+  # When empty (default), any source can reach those ports.
+  metricsNamespace: ""
+  # -- Additional egress rules appended to the generated policy.
+  # Use this for sidecar proxies, external log sinks, or OCSP responders.
+  extraEgress: []
+  # -- Additional ingress rules appended to the generated policy.
+  extraIngress: []
 
 # -- Priority class name for pod scheduling (e.g. system-cluster-critical for production)
 priorityClassName: ""

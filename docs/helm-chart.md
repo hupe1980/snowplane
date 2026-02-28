@@ -154,7 +154,12 @@ helm upgrade snowplane charts/snowplane/ \
 | `serviceAccount.create` | `true` | Create a ServiceAccount |
 | `serviceAccount.annotations` | `{}` | SA annotations (e.g., for IRSA/WI) |
 | `podSecurityContext.runAsNonRoot` | `true` | Run as non-root |
-| `networkPolicy.enabled` | `false` | Create a NetworkPolicy |
+| `networkPolicy.enabled` | `true` | Create a NetworkPolicy restricting ingress/egress |
+| `networkPolicy.restrictDNS` | `true` | Restrict DNS egress to kube-system namespace (kube-dns/CoreDNS) |
+| `networkPolicy.egressCIDRs` | `[]` | Restrict HTTPS egress to specific CIDRs (e.g., Snowflake IP ranges + K8s API server). Empty = allow all |
+| `networkPolicy.metricsNamespace` | `""` | Restrict metrics/health-probe ingress to pods in this namespace. Empty = allow all |
+| `networkPolicy.extraEgress` | `[]` | Additional egress rules appended to the policy |
+| `networkPolicy.extraIngress` | `[]` | Additional ingress rules appended to the policy |
 
 ---
 
@@ -206,7 +211,6 @@ helm install snowplane charts/snowplane/ \
   --set controller.maxConcurrentReconciles=5 \
   --set rateLimit.qps=20 \
   --set metrics.serviceMonitor.enabled=true \
-  --set networkPolicy.enabled=true \
   --set priorityClassName=system-cluster-critical \
   --set grafana.dashboard.enabled=true \
   --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="arn:aws:iam::123456789012:role/snowplane"

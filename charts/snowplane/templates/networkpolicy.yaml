@@ -15,26 +15,49 @@ spec:
     - Ingress
     - Egress
   ingress:
+    # Allow metrics scraping and health/readiness probes.
     - ports:
-        - port: 8080
+        - port: {{ .Values.metrics.containerPort | default 8080 }}
           protocol: TCP
-        - port: 8081
+        - port: {{ .Values.healthProbes.containerPort | default 8081 }}
           protocol: TCP
+      {{- if .Values.networkPolicy.metricsNamespace }}
+      from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.metricsNamespace }}
+      {{- end }}
+    {{- with .Values.networkPolicy.extraIngress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
   egress:
-    # Allow DNS resolution.
+    # Allow DNS resolution (kube-dns / CoreDNS).
     - ports:
         - port: 53
           protocol: UDP
         - port: 53
           protocol: TCP
-    # Allow HTTPS to Snowflake API.
-    - ports:
-        - port: 443
-          protocol: TCP
-    # Allow communication with the Kubernetes API server.
+      {{- if .Values.networkPolicy.restrictDNS }}
+      to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      {{- end }}
+    # Allow HTTPS (Snowflake API) and Kubernetes API server.
+    # When egressCIDRs is set, traffic is restricted to those destinations only.
     - ports:
         - port: 443
           protocol: TCP
         - port: 6443
           protocol: TCP
+      {{- with .Values.networkPolicy.egressCIDRs }}
+      to:
+        {{- range . }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      {{- end }}
+    {{- with .Values.networkPolicy.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 {{- end }}
