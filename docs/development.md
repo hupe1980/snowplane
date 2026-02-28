@@ -39,7 +39,7 @@ Project layout, architecture principles, conventions, and workflow for contribut
 │   └── zz_generated_accessors.go   # Auto-generated ManagedResource accessors
 ├── cmd/manager/               # Controller manager entrypoint
 ├── config/
-│   ├── crd/bases/             # CRD YAML manifests (35 types)
+│   ├── crd/bases/             # CRD YAML manifests
 │   ├── manager/               # Deployment, PDB, NetworkPolicy
 │   ├── rbac/                  # RBAC roles and bindings
 │   └── samples/               # Example CR YAML files
@@ -49,6 +49,7 @@ Project layout, architecture principles, conventions, and workflow for contribut
 │   │   └── snowflake/         # Snowflake SDK wrapper
 │   ├── controller/
 │   │   ├── reconciler/        # Generic reconciler framework
+│   │   ├── refresolver/       # Reference resolution helpers
 │   │   └── <resource>/        # Resource-specific controllers
 │   ├── drift/                 # Generic field-level drift engine
 │   ├── metrics/               # Custom Prometheus metrics
@@ -93,7 +94,7 @@ just verify-crds  # CI check: fails if out-of-sync
 | File | Generator | Purpose |
 |:-----|:----------|:--------|
 | `zz_generated.deepcopy.go` | `controller-gen` | DeepCopy methods |
-| `zz_generated_accessors.go` | `hack/gen-accessors` | 538 ManagedResource methods across 34 types |
+| `zz_generated_accessors.go` | `hack/gen-accessors` | ManagedResource accessor methods (auto-counted by sync tests) |
 | `config/crd/bases/*.yaml` | `controller-gen` | CRD manifests with CEL rules |
 
 ---
@@ -117,7 +118,7 @@ All resource reconcilers share the same state machine via `internal/controller/r
 - **`GenericReconciler[T, S, D]`** — Type-parameterised reconciler handling finalizers, ProviderConfig resolution, client caching, SSA status patching, conditions, rate limiting, retry, metrics, and drift detection
 - **`ResourceAdapter[T, S, D]`** — Interface each resource implements for resource-specific behaviour
 - **`Observation[D]`** — Typed observation struct (`Exists bool`, `Detail D`) with compile-time safety
-- **`ManagedResource`** — Constraint interface with 16 code-generated accessor methods
+- **`ManagedResource`** — Constraint interface with code-generated accessor methods
 
 Each resource package provides:
 1. **`adapter.go`** — Implements `ResourceAdapter` with resource-specific logic
@@ -203,7 +204,7 @@ The `--allowed-roles` flag restricts which Snowflake roles may be specified in P
 
 ### CEL Validation Rules
 
-All 36 CRD types include `x-kubernetes-validations` rules — evaluated server-side on UPDATE, no webhook required. Covers immutable fields, schema defaults, policy body blocklists, mutual exclusion, and auth validation.
+All CRD types include `x-kubernetes-validations` rules — evaluated server-side on UPDATE, no webhook required. Covers immutable fields, schema defaults, policy body blocklists, mutual exclusion, and auth validation.
 
 ### Resource Adoption
 

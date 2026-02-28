@@ -66,9 +66,10 @@ func TestExtractTargetRef_Secret(t *testing.T) {
 	assert.Equal(t, []string{"Secret/my-secret"}, got)
 }
 
-func TestSourceResourceTypes_Returns14Types(t *testing.T) {
+func TestSourceResourceTypes_ReturnsAllTypes(t *testing.T) {
 	srcs := sourceResourceTypes()
-	assert.Len(t, srcs, 14, "should return one typed object per managed Snowplane resource")
+	assert.Len(t, srcs, len(snowplanev1alpha1.ValidFieldExportSourceKinds),
+		"should return one typed object per valid FieldExport source kind")
 }
 
 func TestMapSourceToFieldExports_MatchingSource(t *testing.T) {
@@ -389,3 +390,38 @@ func TestMapSourceToFieldExports_SameNamespace_Match(t *testing.T) {
 // Ensure typed objects used in tests satisfy client.Object.
 var _ client.Object = (*snowplanev1alpha1.Database)(nil)
 var _ client.Object = (*snowplanev1alpha1.Warehouse)(nil)
+
+// TestSourceResourceTypes_MatchesValidKinds verifies that sourceResourceTypes()
+// returns a typed object for every kind in ValidFieldExportSourceKinds. This
+// prevents the reactive watch list from drifting when new resource types are added.
+func TestSourceResourceTypes_MatchesValidKinds(t *testing.T) {
+	scheme := testutil.TestScheme()
+
+	// Build set of kinds from sourceResourceTypes().
+	watchedKinds := make(map[string]bool)
+	for _, obj := range sourceResourceTypes() {
+		gvks, _, err := scheme.ObjectKinds(obj)
+		require.NoError(t, err, "ObjectKinds for %T", obj)
+		require.NotEmpty(t, gvks, "no GVKs for %T", obj)
+		watchedKinds[gvks[0].Kind] = true
+	}
+
+	// Every ValidFieldExportSourceKinds entry must have a reactive watch.
+	for kind := range snowplanev1alpha1.ValidFieldExportSourceKinds {
+		assert.True(t, watchedKinds[kind],
+			"kind %q is in ValidFieldExportSourceKinds but missing from sourceResourceTypes() — add it to the reactive watch list",
+			kind)
+	}
+
+	// Every reactive watch must be a valid source kind.
+	for kind := range watchedKinds {
+		_, ok := snowplanev1alpha1.ValidFieldExportSourceKinds[kind]
+		assert.True(t, ok,
+			"kind %q is in sourceResourceTypes() but missing from ValidFieldExportSourceKinds — remove it or add it to the valid kinds map",
+			kind)
+	}
+
+	assert.Equal(t, len(snowplanev1alpha1.ValidFieldExportSourceKinds), len(watchedKinds),
+		"sourceResourceTypes() should have exactly %d entries, got %d",
+		len(snowplanev1alpha1.ValidFieldExportSourceKinds), len(watchedKinds))
+}

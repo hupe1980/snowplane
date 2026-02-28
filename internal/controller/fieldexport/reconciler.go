@@ -89,9 +89,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 
 	// Defense-in-depth: validate spec beyond what CEL rules enforce.
 	if err := fe.Spec.Validate(); err != nil {
-		conditions.SetNotReady(&fe, snowplanev1alpha1.ReasonValidationFailed, err.Error())
-		conditions.SetNotSynced(&fe, snowplanev1alpha1.ReasonValidationFailed, err.Error())
-		r.recorder.Event(&fe, corev1.EventTypeWarning, snowplanev1alpha1.ReasonValidationFailed, err.Error())
+		msg := fmt.Sprintf("validation failed: %v", err)
+		conditions.SetNotReady(&fe, snowplanev1alpha1.ReasonValidationFailed, msg)
+		conditions.SetNotSynced(&fe, snowplanev1alpha1.ReasonValidationFailed, msg)
+		r.recorder.Event(&fe, corev1.EventTypeWarning, snowplanev1alpha1.ReasonValidationFailed, msg)
 		r.bestEffortPatchStatus(ctx, &fe)
 
 		return ctrl.Result{}, nil // Terminal — do not requeue.
@@ -583,9 +584,12 @@ func extractTargetRef(obj client.Object) []string {
 }
 
 // sourceResourceTypes returns all typed Snowplane managed resource objects
-// that FieldExport can reference as sources.
+// that FieldExport can reference as sources. This list MUST match
+// ValidFieldExportSourceKinds in api/v1alpha1/validation.go — the
+// TestSourceResourceTypes_MatchesValidKinds test enforces this.
 func sourceResourceTypes() []client.Object {
 	return []client.Object{
+		&snowplanev1alpha1.Alert{},
 		&snowplanev1alpha1.Database{},
 		&snowplanev1alpha1.Schema{},
 		&snowplanev1alpha1.Warehouse{},
@@ -597,9 +601,29 @@ func sourceResourceTypes() []client.Object {
 		&snowplanev1alpha1.ShareGrant{},
 		&snowplanev1alpha1.AccountRoleAssignment{},
 		&snowplanev1alpha1.DatabaseRoleAssignment{},
+		&snowplanev1alpha1.GrantOwnership{},
 		&snowplanev1alpha1.Table{},
 		&snowplanev1alpha1.View{},
 		&snowplanev1alpha1.Stage{},
+		&snowplanev1alpha1.Task{},
+		&snowplanev1alpha1.StreamOnTable{},
+		&snowplanev1alpha1.StreamOnView{},
+		&snowplanev1alpha1.StreamOnExternalTable{},
+		&snowplanev1alpha1.StreamOnDirectoryTable{},
+		&snowplanev1alpha1.StreamOnDynamicTable{},
+		&snowplanev1alpha1.DynamicTable{},
+		&snowplanev1alpha1.Tag{},
+		&snowplanev1alpha1.NetworkPolicy{},
+		&snowplanev1alpha1.NetworkRule{},
+		&snowplanev1alpha1.ResourceMonitor{},
+		&snowplanev1alpha1.MaskingPolicy{},
+		&snowplanev1alpha1.RowAccessPolicy{},
+		&snowplanev1alpha1.PasswordPolicy{},
+		&snowplanev1alpha1.FileFormat{},
+		&snowplanev1alpha1.Pipe{},
+		&snowplanev1alpha1.StorageIntegration{},
+		&snowplanev1alpha1.SecurityIntegration{},
+		&snowplanev1alpha1.NotificationIntegration{},
 	}
 }
 

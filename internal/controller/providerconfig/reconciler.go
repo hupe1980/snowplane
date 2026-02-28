@@ -34,9 +34,9 @@ import (
 )
 
 const (
-	requeueInterval    = 5 * time.Minute
-	snowflakeOpTimeout = 60 * time.Second
-	finalizerName      = "providerconfig.snowplane.hupe1980.github.io/in-use"
+	requeueInterval           = 5 * time.Minute
+	defaultSnowflakeOpTimeout = 60 * time.Second
+	finalizerName             = "providerconfig.snowplane.hupe1980.github.io/in-use"
 )
 
 // PingFunc abstracts the Ping call for testability.
@@ -44,14 +44,15 @@ type PingFunc func(ctx context.Context, client clientfactory.SnowflakeClient) er
 
 // Reconciler reconciles a ProviderConfig object.
 type Reconciler struct {
-	client          client.Client
-	factory         *clientfactory.ClientFactory
-	recorder        record.EventRecorder
-	rateLimiter     *ratelimit.Limiter
-	circuitBreaker  *circuitbreaker.Breaker
-	pingFn          PingFunc
-	requeueOverride time.Duration
-	allowedRoles    map[string]bool // uppercase role names; nil = all allowed
+	client             client.Client
+	factory            *clientfactory.ClientFactory
+	recorder           record.EventRecorder
+	rateLimiter        *ratelimit.Limiter
+	circuitBreaker     *circuitbreaker.Breaker
+	pingFn             PingFunc
+	requeueOverride    time.Duration
+	snowflakeOpTimeout time.Duration   // 0 → defaultSnowflakeOpTimeout
+	allowedRoles       map[string]bool // uppercase role names; nil = all allowed
 }
 
 // WithRequeueInterval overrides the default periodic-resync interval.
@@ -66,6 +67,21 @@ func (r *Reconciler) getRequeueInterval() time.Duration {
 	}
 
 	return requeueInterval
+}
+
+// WithSnowflakeOpTimeout overrides the per-operation timeout for Snowflake
+// calls (e.g. Ping). Zero keeps the default (60 s).
+func (r *Reconciler) WithSnowflakeOpTimeout(d time.Duration) *Reconciler {
+	r.snowflakeOpTimeout = d
+	return r
+}
+
+func (r *Reconciler) getSnowflakeOpTimeout() time.Duration {
+	if r.snowflakeOpTimeout > 0 {
+		return r.snowflakeOpTimeout
+	}
+
+	return defaultSnowflakeOpTimeout
 }
 
 // NewReconciler returns a new ProviderConfig reconciler.
@@ -389,7 +405,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 	}
 
 	// Verify connectivity with timeout.
-	pingCtx, pingCancel := context.WithTimeout(ctx, snowflakeOpTimeout)
+	pingCtx, pingCancel := context.WithTimeout(ctx, r.getSnowflakeOpTimeout())
 	defer pingCancel()
 
 	if err := metrics.ObserveSnowflakeOp("providerconfig", "ping", func() error {

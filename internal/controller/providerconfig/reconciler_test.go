@@ -1133,3 +1133,18 @@ func (m *mockClient) Query(_ context.Context, _ string, _ ...any) (*sql.Rows, er
 func (m *mockClient) WithRole(_ context.Context, _ string) (*snowflake.Client, func(context.Context), error) {
 	return nil, nil, nil
 }
+
+func TestWithSnowflakeOpTimeout(t *testing.T) {
+	r := &Reconciler{}
+
+	// Default should return defaultSnowflakeOpTimeout.
+	assert.Equal(t, defaultSnowflakeOpTimeout, r.getSnowflakeOpTimeout())
+
+	// Override should be honoured.
+	r.WithSnowflakeOpTimeout(30 * time.Second)
+	assert.Equal(t, 30*time.Second, r.getSnowflakeOpTimeout())
+
+	// Zero should fall back to default.
+	r.WithSnowflakeOpTimeout(0)
+	assert.Equal(t, defaultSnowflakeOpTimeout, r.getSnowflakeOpTimeout())
+}

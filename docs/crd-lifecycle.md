@@ -59,6 +59,7 @@ Every Snowplane CRD carries a maturity label (`snowplane.hupe1980.github.io/matu
 | RowAccessPolicy | alpha | Row-level security |
 | StorageIntegration | alpha | S3, GCS, Azure integrations |
 | SecurityIntegration | alpha | SAML2, OAuth, SCIM, API auth |
+| NotificationIntegration | alpha | EMAIL, QUEUE, WEBHOOK notifications |
 | PasswordPolicy | alpha | Password compliance rules |
 | NetworkRule | alpha | Network identifier groups |
 | FileFormat | alpha | CSV, JSON, Parquet, etc. |

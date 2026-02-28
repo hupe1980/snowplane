@@ -40,7 +40,7 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 - 🛡️ **Dangerous Grant Protection** — Blocks grants to ACCOUNTADMIN/SECURITYADMIN/ORGADMIN and dangerous privileges by default
 - 🛡️ **Policy Body Validation** — Blocklist-based SQL injection prevention for MaskingPolicy and RowAccessPolicy `body` fields
 - 🏷️ **Ownership Conflict Detection** — Prevents duplicate CRs from managing the same Snowflake object via label-based conflict detection
-- ⚛️ **CREATE OR ALTER** — Atomic `CREATE OR ALTER` enabled by default for Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, NetworkRule, RowAccessPolicy & User (13 resource types), with graceful fallback for unsupported Snowflake editions (opt out via annotation)
+- ⚛️ **CREATE OR ALTER** — Atomic `CREATE OR ALTER` enabled by default for Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, NetworkRule, RowAccessPolicy & User, with graceful fallback for unsupported Snowflake editions (opt out via annotation)
 - 🗑️ **Deletion Policies** — `Delete` (drop resource) or `Orphan` (leave intact)
 - 🏷️ **ForceNew Annotation** — Delete+recreate on immutable field changes
 
@@ -201,6 +201,7 @@ kubectl get databases
 | `--circuit-breaker-threshold` | `5` | Consecutive Snowflake failures before circuit opens |
 | `--circuit-breaker-reset-timeout` | `60s` | Backoff duration before half-open probe |
 | `--allowed-roles` | `""` | Comma-separated allowlist of Snowflake roles permitted in ProviderConfig (case-insensitive; empty = all allowed) |
+| `--snowflake-op-timeout` | `60s` | Timeout for individual Snowflake API operations |
 | `--watch-namespaces` | `""` | Comma-separated namespaces to watch (empty = all) |
 | `--development` | `false` | Human-readable debug logging |
 
@@ -246,6 +247,7 @@ helm install snowplane charts/snowplane/ \
 | `controller.enableAlphaResources` | `true` | Enable alpha-maturity controllers |
 | `controller.disableControllers` | `""` | Comma-separated controllers to disable |
 | `controller.allowedRoles` | `""` | Comma-separated allowlist of permitted Snowflake roles |
+| `controller.snowflakeOpTimeout` | `60s` | Timeout for individual Snowflake API operations |
 | `rateLimit.qps` | `10` | Per-controller Snowflake API rate limit per provider |
 | `rateLimit.burst` | `20` | Per-controller rate limit burst size |
 | `rateLimit.accountQps` | `50` | Per-account aggregate rate limit (all controllers) |
@@ -307,7 +309,7 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 
 ## 📖 API Reference
 
-Complete field-level documentation for all 35 Snowplane CRDs is available in the **[API Reference](docs/api-reference.md)**.
+Complete field-level documentation for all Snowplane CRDs is available in the **[API Reference](docs/api-reference.md)**.
 
 | Category | Resources |
 |----------|-----------|
@@ -420,7 +422,7 @@ Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped a
 │   ├── clients/
 │   │   ├── clientfactory/  # Client cache with hash-based rotation
 │   │   └── snowflake/      # Snowflake SDK wrapper & SQL builder
-│   ├── controller/         # All reconcilers (31 managed resources + FieldExport + ProviderConfig)
+│   ├── controller/         # All reconcilers (managed resources + FieldExport + ProviderConfig)
 │   ├── drift/              # Field-level drift detection engine
 │   ├── metrics/            # Custom Prometheus metrics
 │   ├── provider/           # Provider config builder & client resolution

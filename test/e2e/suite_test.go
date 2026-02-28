@@ -239,7 +239,10 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "failed to write kubeconfig: %v\n", err)
 		os.Exit(1)
 	}
-	kubeconfigFile.Close()
+	if err := kubeconfigFile.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to close kubeconfig file: %v\n", err)
+		os.Exit(1)
+	}
 
 	kubeconfigPath := kubeconfigFile.Name()
 

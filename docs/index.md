@@ -19,7 +19,7 @@ Manage Snowflake resources declaratively as Kubernetes custom resources — simi
 
 ---
 
-## 35 Custom Resources
+## Custom Resources
 
 Full lifecycle management for every resource — create, alter, drop, drift detection, adoption, and deletion policies.
 

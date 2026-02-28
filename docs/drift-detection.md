@@ -59,6 +59,7 @@ All resource types support drift detection:
 | RowAccessPolicy | `name`, `database`, `schema`, `signature` |
 | StorageIntegration | `name` |
 | SecurityIntegration | `name`, `type` |
+| NotificationIntegration | `name`, `type` |
 | PasswordPolicy | `name`, `database`, `schema` |
 | NetworkRule | `name`, `database`, `schema`, `type`, `mode` |
 | FileFormat | `name`, `database`, `schema`, `type` |
@@ -123,7 +124,7 @@ Immutable violations require manual intervention — delete/recreate the CR.
 ### PasswordPolicy
 {: .text-delta }
 
-`comment` (from SHOW), plus all 11 numeric parameters from DESCRIBE: `passwordMinLength`, `passwordMaxLength`, `passwordMinUpperCaseChars`, `passwordMinLowerCaseChars`, `passwordMinNumericChars`, `passwordMinSpecialChars`, `passwordMinAgeDays`, `passwordMaxAgeDays`, `passwordMaxRetries`, `passwordLockoutTimeMins`, `passwordHistory`
+`comment` (from SHOW), plus all numeric parameters from DESCRIBE: `passwordMinLength`, `passwordMaxLength`, `passwordMinUpperCaseChars`, `passwordMinLowerCaseChars`, `passwordMinNumericChars`, `passwordMinSpecialChars`, `passwordMinAgeDays`, `passwordMaxAgeDays`, `passwordMaxRetries`, `passwordLockoutTimeMins`, `passwordHistory`
 
 ### NetworkRule
 {: .text-delta }
@@ -139,6 +140,11 @@ Immutable violations require manual intervention — delete/recreate the CR.
 {: .text-delta }
 
 `comment`, `schedule`, `warehouse`, `condition`, `action`
+
+### NotificationIntegration
+{: .text-delta }
+
+`comment`, `enabled` (from SHOW), plus sub-type fields from DESCRIBE: EMAIL (`allowedRecipients`, `defaultRecipients`, `defaultSubject`), QUEUE (`notificationProvider`, cloud-specific ARNs/endpoints), WEBHOOK (`webhookURL`, `webhookSecret`, `webhookBodyTemplate`, `webhookHeaders`)
 
 ---
 
@@ -175,8 +181,11 @@ With `detect-only`:
 ```
 Type:    DriftDetected
 Status:  True
-Message: COMMENT: "desired" → "drifted", DATA_RETENTION_TIME_IN_DAYS: 30 → 1
+Message: drifted fields: COMMENT, DATA_RETENTION_TIME_IN_DAYS
 ```
+
+{: .note }
+> For security, drift condition messages show **field names only** — actual values are never included in status conditions or events. Full before/after values are available in debug-level structured logs only.
 
 After successful correction, the condition is cleared.
 

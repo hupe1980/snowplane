@@ -5,7 +5,7 @@ nav_order: 2
 
 # 📖 API Reference
 
-Complete field-level documentation for all 36 Snowplane CRDs. Each resource supports full lifecycle management (create, alter, drop), drift detection, adoption of pre-existing objects, and deletion policies.
+Complete field-level documentation for all Snowplane CRDs. Each resource supports full lifecycle management (create, alter, drop), drift detection, adoption of pre-existing objects, and deletion policies.
 
 > 💡 **Nil-means-unmanaged convention:** Pointer fields (`*string`, `*int32`, `*bool`) use `nil` to mean "not managed by Snowplane." When nil, the controller skips the parameter in CREATE/ALTER, leaving Snowflake's server-side default intact.
 
@@ -458,8 +458,39 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 
 </details>
 
-<details>
-<summary>� <strong>SecurityIntegration</strong></summary>
+<details><summary>🔔 <strong>NotificationIntegration</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Notification integration name *(immutable)* |
+| `spec.type` | `enum` | Integration type: `EMAIL` / `QUEUE` / `WEBHOOK` *(immutable)* |
+| `spec.enabled` | `*bool` | Whether the integration is active *(default: true)* |
+| `spec.email.allowedRecipients` | `[]string` | Email addresses that can receive notifications *(required for EMAIL, min 1)* |
+| `spec.email.defaultRecipients` | `[]string` | Default email recipients |
+| `spec.email.defaultSubject` | `*string` | Default email subject line |
+| `spec.queue.notificationProvider` | `enum` | Cloud provider: `AWS_SNS` / `AWS_SQS` / `GCP_PUBSUB` / `AZURE_STORAGE_QUEUE` / `AZURE_EVENT_GRID` *(required for QUEUE)* |
+| `spec.queue.direction` | `enum` | Message direction: `OUTBOUND` / `INBOUND` *(default: OUTBOUND)* |
+| `spec.queue.awsSNSTopicARN` | `*string` | ARN of the SNS topic (AWS_SNS) |
+| `spec.queue.awsSNSRoleARN` | `*string` | IAM role ARN for SNS access (AWS_SNS) |
+| `spec.queue.awsSQSArn` | `*string` | ARN of the SQS queue (AWS_SQS) |
+| `spec.queue.awsSQSRoleARN` | `*string` | IAM role ARN for SQS access (AWS_SQS) |
+| `spec.queue.gcpPubSubTopicName` | `*string` | Pub/Sub topic name (GCP_PUBSUB) |
+| `spec.queue.gcpPubSubSubscriptionName` | `*string` | Pub/Sub subscription name (GCP_PUBSUB) |
+| `spec.queue.azureStorageQueuePrimaryURI` | `*string` | Azure Storage queue endpoint (AZURE_STORAGE_QUEUE) |
+| `spec.queue.azureTenantID` | `*string` | Azure AD tenant ID (Azure providers) |
+| `spec.queue.azureEventGridTopicEndpoint` | `*string` | Event Grid topic endpoint (AZURE_EVENT_GRID) |
+| `spec.webhook.webhookURL` | `string` | Endpoint URL for the webhook *(required for WEBHOOK)* |
+| `spec.webhook.webhookSecret` | `*string` | Secret used to sign webhook payloads |
+| `spec.webhook.webhookBodyTemplate` | `*string` | Custom body template for webhook payload |
+| `spec.webhook.webhookHeaders` | `map[string]string` | Custom HTTP headers for webhook requests |
+| `spec.comment` | `*string` | Optional description |
+| `status.describeOutput` | `map[string]string` | Key-value pairs from DESCRIBE INTEGRATION |
+
+> 🔔 **Alerting & Events:** Notification integrations deliver alerts and events to email, cloud messaging (SNS, SQS, Pub/Sub, Azure), or webhook endpoints. Each type requires its own sub-config — CEL validation enforces this at admission time.
+
+</details>
+
+<details><summary>� <strong>SecurityIntegration</strong></summary>
 
 | Field | Type | Description |
 |-------|------|-------------|

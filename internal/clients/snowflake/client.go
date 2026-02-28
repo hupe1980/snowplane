@@ -566,6 +566,10 @@ func parsePrivateKey(pemData []byte, passphrase []byte) (*rsa.PrivateKey, error)
 			return nil, fmt.Errorf("decrypting private key: %w", err)
 		}
 
+		// Zero decrypted DER bytes after parsing to avoid lingering
+		// private key material on the heap.
+		defer Zeroize(decrypted)
+
 		derBytes = decrypted
 	}
 

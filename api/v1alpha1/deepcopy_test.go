@@ -127,7 +127,7 @@ func TestDeepCopy_WarehouseSpec_PointerIsolation(t *testing.T) {
 	assert.Equal(t, int32(120), *orig.StatementTimeoutInSeconds)
 }
 
-// TestDeepCopy_UserSpec_PointerIsolation tests all 15 pointer fields on UserSpec.
+// TestDeepCopy_UserSpec_PointerIsolation tests all pointer fields on UserSpec.
 func TestDeepCopy_UserSpec_PointerIsolation(t *testing.T) {
 	t.Parallel()
 

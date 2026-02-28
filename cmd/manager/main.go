@@ -302,7 +302,7 @@ func main() {
 		rl,
 		cb,
 		allowedRolesSet,
-	).WithRequeueInterval(requeueInterval).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
+	).WithRequeueInterval(requeueInterval).WithSnowflakeOpTimeout(snowflakeOpTimeout).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ProviderConfig")
 		os.Exit(1)
 	}
