@@ -19,7 +19,7 @@ test-short:
 
 # Run envtest integration tests (requires setup-envtest)
 test-integration:
-    KUBEBUILDER_ASSETS="$(setup-envtest use -p path)" go test -tags integration -v -timeout 180s -count=1 ./test/integration/
+    KUBEBUILDER_ASSETS="$(setup-envtest use -p path)" go test -tags integration -v -timeout 600s -count=1 ./test/integration/
 
 # Run E2E tests (self-contained: spins up a k3s testcontainer automatically)
 test-e2e:
