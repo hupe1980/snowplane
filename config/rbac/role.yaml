@@ -77,6 +77,15 @@ rules:
   - securityintegrations
   - passwordpolicies
   - networkrules
+  - alerts
+  - notificationintegrations
+  - accountroleassignments
+  - databaseroleassignments
+  - streamontables
+  - streamonviews
+  - streamonexternaltables
+  - streamondirectorytables
+  - streamondynamictables
   - fieldexports
   - providerconfigs
   verbs:
@@ -116,6 +125,15 @@ rules:
   - securityintegrations/status
   - passwordpolicies/status
   - networkrules/status
+  - alerts/status
+  - notificationintegrations/status
+  - accountroleassignments/status
+  - databaseroleassignments/status
+  - streamontables/status
+  - streamonviews/status
+  - streamonexternaltables/status
+  - streamondirectorytables/status
+  - streamondynamictables/status
   - fieldexports/status
   - providerconfigs/status
   verbs:
@@ -151,6 +169,15 @@ rules:
   - securityintegrations/finalizers
   - passwordpolicies/finalizers
   - networkrules/finalizers
+  - alerts/finalizers
+  - notificationintegrations/finalizers
+  - accountroleassignments/finalizers
+  - databaseroleassignments/finalizers
+  - streamontables/finalizers
+  - streamonviews/finalizers
+  - streamonexternaltables/finalizers
+  - streamondirectorytables/finalizers
+  - streamondynamictables/finalizers
   - fieldexports/finalizers
   - providerconfigs/finalizers
   verbs:

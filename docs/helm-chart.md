@@ -53,6 +53,7 @@ helm upgrade snowplane charts/snowplane/ \
 |:----------|:--------|:------------|
 | `controller.maxConcurrentReconciles` | `3` | Max concurrent reconciles per controller |
 | `controller.requeueInterval` | `5m` | Drift detection resync interval |
+| `controller.snowflakeOpTimeout` | `60s` | Timeout for individual Snowflake API operations |
 | `controller.enableAlphaResources` | `true` | Enable alpha-maturity controllers |
 | `controller.disableControllers` | `""` | Comma-separated list of controllers to disable |
 | `controller.allowedRoles` | `""` | Comma-separated allowlist of permitted Snowflake roles (case-insensitive; empty = all allowed) |

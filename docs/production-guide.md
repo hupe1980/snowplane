@@ -133,11 +133,124 @@ ProviderConfigs specifying a role not in the allowlist will be rejected with `Re
 
 ### Policy Enforcement
 
-For organizational policy enforcement beyond what the controller provides, deploy [OPA/Gatekeeper](https://open-policy-agent.github.io/gatekeeper/) or [Kyverno](https://kyverno.io/) policies. Example policies:
+For organizational policy enforcement beyond what the controller provides, deploy [OPA/Gatekeeper](https://open-policy-agent.github.io/gatekeeper/) or [Kyverno](https://kyverno.io/) policies.
 
-- Prevent ProviderConfig with `role: ACCOUNTADMIN`
-- Require `allowedNamespaces` on all ProviderConfigs
-- Block dangerous grant privileges without the `allow-dangerous-grant` annotation
+#### Kyverno Example: Block ACCOUNTADMIN in ProviderConfig
+
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: block-accountadmin
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: deny-accountadmin-role
+      match:
+        resources:
+          kinds:
+            - ProviderConfig
+      validate:
+        message: "ACCOUNTADMIN is not allowed in ProviderConfig. Use a least-privilege role."
+        pattern:
+          spec:
+            role: "!ACCOUNTADMIN"
+```
+
+#### Kyverno Example: Require allowedNamespaces on ProviderConfig
+
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-namespace-scoping
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: require-allowed-namespaces
+      match:
+        resources:
+          kinds:
+            - ProviderConfig
+      validate:
+        message: "ProviderConfig must specify allowedNamespaces for multi-tenant isolation."
+        pattern:
+          spec:
+            allowedNamespaces: "?*"
+```
+
+#### Kyverno Example: Block dangerous grants without annotation
+
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: block-dangerous-grants
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: deny-ownership-grants
+      match:
+        resources:
+          kinds:
+            - AccountRoleGrant
+            - DatabaseRoleGrant
+      validate:
+        message: "OWNERSHIP grants are prohibited. Use specific privileges instead."
+        deny:
+          conditions:
+            all:
+              - key: "{{ request.object.spec.privilege }}"
+                operator: Equals
+                value: "OWNERSHIP"
+```
+
+#### OPA/Gatekeeper: ConstraintTemplate for role restriction
+
+```yaml
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: snowplaneroledenylist
+spec:
+  crd:
+    spec:
+      names:
+        kind: SnowplaneRoleDenylist
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            deniedRoles:
+              type: array
+              items:
+                type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package snowplaneroledenylist
+        violation[{"msg": msg}] {
+          role := upper(input.review.object.spec.role)
+          denied := upper(input.parameters.deniedRoles[_])
+          role == denied
+          msg := sprintf("Role '%v' is denied by policy", [role])
+        }
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: SnowplaneRoleDenylist
+metadata:
+  name: block-admin-roles
+spec:
+  match:
+    kinds:
+      - apiGroups: ["snowplane.hupe1980.github.io"]
+        kinds: ["ProviderConfig"]
+  parameters:
+    deniedRoles:
+      - ACCOUNTADMIN
+      - SECURITYADMIN
+      - ORGADMIN
+```
 
 ---
 

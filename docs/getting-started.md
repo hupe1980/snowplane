@@ -542,6 +542,22 @@ metadata:
 
 ---
 
+## Abandon on Delete
+
+To delete a Kubernetes resource **without dropping the Snowflake object**, set the `abandon-on-delete` annotation:
+
+```yaml
+metadata:
+  annotations:
+    snowplane.hupe1980.github.io/abandon-on-delete: "true"
+```
+
+This is useful for unblocking stuck deletions (e.g., when `DROP` fails due to revoked permissions) or migrating ownership to another tool.
+
+See [Annotations Reference]({% link annotations.md %}) for the full list of annotations.
+
+---
+
 ## What's Next
 
 Snowplane manages many Snowflake resource types including Task, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, Tag, NetworkPolicy, NetworkRule, PasswordPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, StorageIntegration, SecurityIntegration, NotificationIntegration, FileFormat, Pipe, DynamicTable, AccountRoleAssignment, and DatabaseRoleAssignment.

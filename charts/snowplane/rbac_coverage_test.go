@@ -336,3 +336,107 @@ func TestRBACConsistentAcrossRoles(t *testing.T) {
 		}
 	}
 }
+
+// --------------------------------------------------------------------------
+// Kustomize RBAC sync tests (H-1)
+// --------------------------------------------------------------------------
+
+// TestKustomizeRBACCoversAllCRDs verifies that the kustomize role.yaml contains
+// every CRD type registered in the scheme. This prevents the common mistake of
+// adding a new CRD and only updating the Helm chart RBAC, leaving kustomize stale.
+func TestKustomizeRBACCoversAllCRDs(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	rolePath := filepath.Join(root, "config", "rbac", "role.yaml")
+
+	crdPlurals := registeredCRDPlurals(t)
+	rbacResources := parseRBACResources(t, rolePath)
+
+	for plural := range crdPlurals {
+		t.Run(plural, func(t *testing.T) {
+			t.Parallel()
+
+			rbac, ok := rbacResources[plural]
+			if !ok {
+				assert.Fail(t, "CRD resource missing from kustomize RBAC",
+					"CRD %q is registered in the scheme but has no entry in config/rbac/role.yaml."+
+						" Add it to all three sections (resources, /status, /finalizers).",
+					plural)
+				return
+			}
+			assert.True(t, rbac["base"],
+				"CRD %q is missing from the main resources list in config/rbac/role.yaml", plural)
+			assert.True(t, rbac["status"],
+				"CRD %q/status is missing from config/rbac/role.yaml", plural)
+			assert.True(t, rbac["finalizers"],
+				"CRD %q/finalizers is missing from config/rbac/role.yaml", plural)
+		})
+	}
+}
+
+// TestKustomizeEditorViewerCoverAllCRDs verifies that the kustomize
+// role_editor.yaml and role_viewer.yaml contain every CRD type registered
+// in the scheme.
+func TestKustomizeEditorViewerCoverAllCRDs(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	crdPlurals := registeredCRDPlurals(t)
+
+	files := []struct {
+		name string
+		path string
+	}{
+		{"editor", filepath.Join(root, "config", "rbac", "role_editor.yaml")},
+		{"viewer", filepath.Join(root, "config", "rbac", "role_viewer.yaml")},
+	}
+
+	for _, f := range files {
+		f := f
+		t.Run(f.name, func(t *testing.T) {
+			t.Parallel()
+			rbacResources := parseRBACResources(t, f.path)
+			for plural := range crdPlurals {
+				rbac, ok := rbacResources[plural]
+				if !ok {
+					assert.Fail(t, "CRD resource missing from kustomize "+f.name+" role",
+						"CRD %q is registered in the scheme but has no entry in config/rbac/%s."+
+							" Add it to resources and /status sections.",
+						plural, filepath.Base(f.path))
+					continue
+				}
+				assert.True(t, rbac["base"],
+					"CRD %q is missing from the main resources list in %s", plural, f.name)
+				assert.True(t, rbac["status"],
+					"CRD %q/status is missing from %s", plural, f.name)
+			}
+		})
+	}
+}
+
+// TestKustomizeRBACMatchesHelmRBAC verifies that the kustomize and Helm RBAC
+// files contain the same set of snowplane resources. This catches drift between
+// the two deployment paths.
+func TestKustomizeRBACMatchesHelmRBAC(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	helmPath := filepath.Join(root, "charts", "snowplane", "templates", "rbac.yaml")
+	kustomizePath := filepath.Join(root, "config", "rbac", "role.yaml")
+
+	helmResources := parseRBACResources(t, helmPath)
+	kustomizeResources := parseRBACResources(t, kustomizePath)
+
+	// Every Helm resource must be in kustomize
+	for res := range helmResources {
+		assert.Contains(t, kustomizeResources, res,
+			"Resource %q is in Helm rbac.yaml but missing from kustomize role.yaml", res)
+	}
+
+	// Every kustomize resource must be in Helm
+	for res := range kustomizeResources {
+		assert.Contains(t, helmResources, res,
+			"Resource %q is in kustomize role.yaml but missing from Helm rbac.yaml", res)
+	}
+}
