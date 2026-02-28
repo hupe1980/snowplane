@@ -40,6 +40,7 @@ func resetMocks() {
 	maskingPolicyMockSvc.Reset()
 	passwordPolicyMockSvc.Reset()
 	securityIntegrationMockSvc.Reset()
+	notificationIntegrationMockSvc.Reset()
 	storageIntegrationMockSvc.Reset()
 	resourceMonitorMockSvc.Reset()
 	pipeMockSvc.Reset()

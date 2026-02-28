@@ -29,7 +29,7 @@ Full lifecycle management for every resource — create, alter, drop, drift dete
 | **Data Objects** | Table, View, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe |
 | **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
 | **Orchestration** | Task, Alert |
-| **Integrations** | StorageIntegration, SecurityIntegration |
+| **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
 | **Security & Governance** | NetworkPolicy, NetworkRule, PasswordPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
 | **Utilities** | FieldExport |
 
@@ -133,7 +133,7 @@ kubectl get databases
 │  │  └─────────────────────────────────────────┘   ││
 │  │                                                ││
 │  │  ┌─────────────────────────────────────────┐   ││
-│  │  │  33 Resource Controllers                │   ││
+│  │  │  Resource Controllers                   │   ││
 │  │  │  Observe → Diff → Apply                 │   ││
 │  │  └─────────────────────────────────────────┘   ││
 │  │                                                ││

@@ -21,6 +21,10 @@ type SetupConfig struct {
 	// RequeueInterval is the periodic-resync interval for drift detection.
 	RequeueInterval time.Duration
 
+	// SnowflakeOpTimeout is the per-operation timeout for Snowflake CRUD calls.
+	// Zero means DefaultSnowflakeOpTimeout (60s).
+	SnowflakeOpTimeout time.Duration
+
 	// Maturity is the maturity classification (alpha, beta, stable).
 	Maturity string
 
@@ -49,6 +53,7 @@ func (r *GenericReconciler[T, S, D]) Setup(cfg SetupConfig) error {
 	return r.
 		WithCircuitBreaker(cfg.CircuitBreaker).
 		WithRequeueInterval(cfg.RequeueInterval).
+		WithSnowflakeOpTimeout(cfg.SnowflakeOpTimeout).
 		WithMaturity(cfg.Maturity).
 		WithAlphaEnabled(cfg.AlphaEnabled).
 		WithDisabled(cfg.Disabled).

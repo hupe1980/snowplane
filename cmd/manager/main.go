@@ -33,6 +33,7 @@ import (
 	maskingpolicyctl "github.com/hupe1980/snowplane/internal/controller/maskingpolicy"
 	networkpolicyctl "github.com/hupe1980/snowplane/internal/controller/networkpolicy"
 	networkrulectl "github.com/hupe1980/snowplane/internal/controller/networkrule"
+	notificationintegrationctl "github.com/hupe1980/snowplane/internal/controller/notificationintegration"
 	passwordpolicyctl "github.com/hupe1980/snowplane/internal/controller/passwordpolicy"
 	pipectl "github.com/hupe1980/snowplane/internal/controller/pipe"
 	providerconfig "github.com/hupe1980/snowplane/internal/controller/providerconfig"
@@ -74,41 +75,42 @@ func init() {
 
 // validControllerNames is the set of controller names accepted by --disable-controllers.
 var validControllerNames = map[string]bool{
-	"alert":                  true,
-	"database":               true,
-	"schema":                 true,
-	"warehouse":              true,
-	"accountrole":            true,
-	"databaserole":           true,
-	"accountrolegrant":       true,
-	"databaserolegrant":      true,
-	"sharegrant":             true,
-	"user":                   true,
-	"table":                  true,
-	"view":                   true,
-	"stage":                  true,
-	"task":                   true,
-	"streamontable":          true,
-	"streamonview":           true,
-	"streamonexternaltable":  true,
-	"streamondirectorytable": true,
-	"streamondynamictable":   true,
-	"tag":                    true,
-	"networkpolicy":          true,
-	"resourcemonitor":        true,
-	"maskingpolicy":          true,
-	"rowaccesspolicy":        true,
-	"grantownership":         true,
-	"fieldexport":            true,
-	"storageintegration":     true,
-	"fileformat":             true,
-	"pipe":                   true,
-	"dynamictable":           true,
-	"securityintegration":    true,
-	"passwordpolicy":         true,
-	"networkrule":            true,
-	"accountroleassignment":  true,
-	"databaseroleassignment": true,
+	"alert":                   true,
+	"database":                true,
+	"schema":                  true,
+	"warehouse":               true,
+	"accountrole":             true,
+	"databaserole":            true,
+	"accountrolegrant":        true,
+	"databaserolegrant":       true,
+	"sharegrant":              true,
+	"user":                    true,
+	"table":                   true,
+	"view":                    true,
+	"stage":                   true,
+	"task":                    true,
+	"streamontable":           true,
+	"streamonview":            true,
+	"streamonexternaltable":   true,
+	"streamondirectorytable":  true,
+	"streamondynamictable":    true,
+	"tag":                     true,
+	"networkpolicy":           true,
+	"resourcemonitor":         true,
+	"maskingpolicy":           true,
+	"rowaccesspolicy":         true,
+	"grantownership":          true,
+	"fieldexport":             true,
+	"storageintegration":      true,
+	"fileformat":              true,
+	"pipe":                    true,
+	"dynamictable":            true,
+	"notificationintegration": true,
+	"securityintegration":     true,
+	"passwordpolicy":          true,
+	"networkrule":             true,
+	"accountroleassignment":   true,
+	"databaseroleassignment":  true,
 }
 
 // parseDisabledControllers parses a comma-separated list of controller names
@@ -179,6 +181,7 @@ func main() {
 	var cbFailureThreshold int
 	var cbResetTimeout time.Duration
 	var allowedRoles string
+	var snowflakeOpTimeout time.Duration
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -216,6 +219,8 @@ func main() {
 	flag.StringVar(&allowedRoles, "allowed-roles", "",
 		"Comma-separated allowlist of Snowflake roles permitted in ProviderConfig (case-insensitive). "+
 			"If empty, all roles are allowed. Example: \"SYSADMIN,USERADMIN,DATA_ENGINEER\".")
+	flag.DurationVar(&snowflakeOpTimeout, "snowflake-op-timeout", 60*time.Second,
+		"Per-operation timeout for Snowflake CRUD calls (Observe, Create, Alter, Drop).")
 
 	opts := zap.Options{Development: developmentMode}
 	opts.BindFlags(flag.CommandLine)
@@ -313,6 +318,7 @@ func main() {
 		Manager:                 mgr,
 		CircuitBreaker:          cb,
 		RequeueInterval:         requeueInterval,
+		SnowflakeOpTimeout:      snowflakeOpTimeout,
 		Maturity:                "alpha",
 		AlphaEnabled:            enableAlphaResources,
 		MaxConcurrentReconciles: maxConcurrentReconciles,
@@ -355,6 +361,7 @@ func main() {
 		{"fileformat", fileformatctl.NewReconciler(kc, factory, controllerRec("fileformat"), rl)},
 		{"pipe", pipectl.NewReconciler(kc, factory, controllerRec("pipe"), rl)},
 		{"dynamictable", dynamictablectl.NewReconciler(kc, factory, controllerRec("dynamictable"), rl)},
+		{"notificationintegration", notificationintegrationctl.NewReconciler(kc, factory, controllerRec("notificationintegration"), rl)},
 		{"securityintegration", securityintegrationctl.NewReconciler(kc, factory, controllerRec("securityintegration"), rl)},
 		{"passwordpolicy", passwordpolicyctl.NewReconciler(kc, factory, controllerRec("passwordpolicy"), rl)},
 		{"networkrule", networkrulectl.NewReconciler(kc, factory, controllerRec("networkrule"), rl)},

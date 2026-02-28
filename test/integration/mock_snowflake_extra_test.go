@@ -1439,3 +1439,101 @@ func (m *mockRoleAssignmentService) Reset() {
 	m.grantRoleFn = nil
 	m.revokeRoleFn = nil
 }
+
+// ---------------------------------------------------------------------------
+// mockNotificationIntegrationService
+// ---------------------------------------------------------------------------
+
+type mockNotificationIntegrationService struct {
+	mu        sync.Mutex
+	observeFn func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.NotificationIntegrationObservation, error)
+	createFn  func(ctx context.Context, opts snowflake.CreateNotificationIntegrationOptions) error
+	alterFn   func(ctx context.Context, opts snowflake.AlterNotificationIntegrationOptions) error
+	dropFn    func(ctx context.Context, name snowflake.AccountObjectIdentifier) error
+}
+
+func (m *mockNotificationIntegrationService) Observe(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.NotificationIntegrationObservation, error) {
+	m.mu.Lock()
+	fn := m.observeFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, name)
+	}
+
+	return &snowflake.NotificationIntegrationObservation{Exists: false}, nil
+}
+
+func (m *mockNotificationIntegrationService) Create(ctx context.Context, opts snowflake.CreateNotificationIntegrationOptions) error {
+	m.mu.Lock()
+	fn := m.createFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, opts)
+	}
+
+	return nil
+}
+
+func (m *mockNotificationIntegrationService) Alter(ctx context.Context, opts snowflake.AlterNotificationIntegrationOptions) error {
+	m.mu.Lock()
+	fn := m.alterFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, opts)
+	}
+
+	return nil
+}
+
+func (m *mockNotificationIntegrationService) Drop(ctx context.Context, name snowflake.AccountObjectIdentifier) error {
+	m.mu.Lock()
+	fn := m.dropFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, name)
+	}
+
+	return nil
+}
+
+func (m *mockNotificationIntegrationService) SetObserve(fn func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.NotificationIntegrationObservation, error)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.observeFn = fn
+}
+
+func (m *mockNotificationIntegrationService) SetCreate(fn func(ctx context.Context, opts snowflake.CreateNotificationIntegrationOptions) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.createFn = fn
+}
+
+func (m *mockNotificationIntegrationService) SetAlter(fn func(ctx context.Context, opts snowflake.AlterNotificationIntegrationOptions) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.alterFn = fn
+}
+
+func (m *mockNotificationIntegrationService) SetDrop(fn func(ctx context.Context, name snowflake.AccountObjectIdentifier) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.dropFn = fn
+}
+
+func (m *mockNotificationIntegrationService) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.observeFn = nil
+	m.createFn = nil
+	m.alterFn = nil
+	m.dropFn = nil
+}

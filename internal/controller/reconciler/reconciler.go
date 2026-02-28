@@ -33,7 +33,10 @@ import (
 const (
 	// DefaultRequeueInterval is the default periodic-resync interval.
 	DefaultRequeueInterval = 5 * time.Minute
-	snowflakeOpTimeout     = 60 * time.Second
+
+	// DefaultSnowflakeOpTimeout is the default per-operation timeout for
+	// Snowflake CRUD calls (Observe, Create, Alter, Drop).
+	DefaultSnowflakeOpTimeout = 60 * time.Second
 
 	// StatusFieldOwner is the SSA field manager for status patches.
 	// Using a dedicated field owner ensures the controller has exclusive
@@ -58,9 +61,10 @@ type GenericReconciler[T ManagedResource, S any, D any] struct {
 	GVK            schema.GroupVersionKind // set during SetupWithManager or manually in tests
 
 	requeueOverride      time.Duration
-	maturity             string // alpha, beta, stable (default: alpha)
-	enableAlphaResources bool   // gate: register alpha controllers only when true
-	disabled             bool   // explicit disable via --disable-controllers
+	snowflakeOpTimeout   time.Duration // 0 → DefaultSnowflakeOpTimeout
+	maturity             string        // alpha, beta, stable (default: alpha)
+	enableAlphaResources bool          // gate: register alpha controllers only when true
+	disabled             bool          // explicit disable via --disable-controllers
 }
 
 // WithRequeueInterval overrides the default periodic-resync interval.
@@ -138,6 +142,21 @@ func (r *GenericReconciler[T, S, D]) getRequeueInterval() time.Duration {
 	}
 
 	return DefaultRequeueInterval
+}
+
+func (r *GenericReconciler[T, S, D]) getSnowflakeOpTimeout() time.Duration {
+	if r.snowflakeOpTimeout > 0 {
+		return r.snowflakeOpTimeout
+	}
+
+	return DefaultSnowflakeOpTimeout
+}
+
+// WithSnowflakeOpTimeout overrides the per-operation timeout for Snowflake
+// CRUD calls (Observe, Create, Alter, Drop).
+func (r *GenericReconciler[T, S, D]) WithSnowflakeOpTimeout(d time.Duration) *GenericReconciler[T, S, D] {
+	r.snowflakeOpTimeout = d
+	return r
 }
 
 // SetupWithManager registers the controller with the manager.
@@ -365,7 +384,7 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// Observe current Snowflake state.
-	opCtx, cancel := context.WithTimeout(ctx, snowflakeOpTimeout)
+	opCtx, cancel := context.WithTimeout(ctx, r.getSnowflakeOpTimeout())
 	defer cancel()
 
 	var obs *Observation[D]
@@ -452,7 +471,7 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 
 	// Fresh timeout ensures the CREATE gets the full budget, independent of
 	// how much time the preceding Observe consumed.
-	opCtx, cancel := context.WithTimeout(ctx, snowflakeOpTimeout)
+	opCtx, cancel := context.WithTimeout(ctx, r.getSnowflakeOpTimeout())
 	defer cancel()
 
 	logger.V(1).Info("executing Snowflake CREATE", "resource", resName, "name", obj.GetSpecName())
@@ -552,7 +571,7 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 
 	// Fresh timeout ensures ALTER gets the full budget, independent of
 	// how much time the preceding Observe consumed.
-	opCtx, cancel := context.WithTimeout(ctx, snowflakeOpTimeout)
+	opCtx, cancel := context.WithTimeout(ctx, r.getSnowflakeOpTimeout())
 	defer cancel()
 
 	r.Adapter.ApplyObservation(obj, obs)
@@ -585,9 +604,9 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 			// Only compute field-level diffs when changes are from external drift.
 			driftResult := r.Adapter.DetectDrift(obj, obs)
 			logger.Info("drift detected", resName, obj.GetSpecName(), "summary", driftResult.Summary())
-			conditions.SetDriftDetected(obj, driftResult.Summary())
+			conditions.SetDriftDetected(obj, driftResult.SafeSummary())
 			metrics.RecordDriftDetected(resName)
-			r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonDriftDetected, fmt.Sprintf("Drift detected on %s %q: %s", resName, obj.GetSpecName(), driftResult.Summary()))
+			r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonDriftDetected, fmt.Sprintf("Drift detected on %s %q: %s", resName, obj.GetSpecName(), driftResult.SafeSummary()))
 
 			// Immutable field violations cannot be fixed via ALTER.
 			// Emit a distinct event and skip correction when only immutable fields drifted.
@@ -914,7 +933,7 @@ func (r *GenericReconciler[T, S, D]) reconcileDelete(ctx context.Context, obj T,
 
 			logger.V(1).Info("executing Snowflake DROP", "resource", resName, "name", obj.GetSpecName())
 
-			opCtx, cancel := context.WithTimeout(ctx, snowflakeOpTimeout)
+			opCtx, cancel := context.WithTimeout(ctx, r.getSnowflakeOpTimeout())
 			defer cancel()
 
 			if err := metrics.ObserveSnowflakeOp(resName, "drop", func() error {

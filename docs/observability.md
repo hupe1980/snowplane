@@ -36,7 +36,7 @@ All metrics use the `snowplane_` namespace and are exposed on the controller's m
 | `snowplane_account_rate_limit_waits_total` | Counter | `provider` | Per-account aggregate rate limiter wait events |
 
 {: .note }
-> **Cardinality Bounds:** The `operation` label is bounded to `observe`, `create`, `alter`, `drop`, `create_or_alter`, `ping`. The `controller` label is bounded by 33 controllers. Total cardinality for operation metrics is at most ~396 series.
+> **Cardinality Bounds:** The `operation` label is bounded to `observe`, `create`, `alter`, `drop`, `create_or_alter`, `ping`. The `controller` label is bounded by the number of registered controllers. Total cardinality for operation metrics scales linearly with the number of controllers.
 
 ### Resource Management
 

@@ -87,6 +87,7 @@ rules:
   - pipes
   - storageintegrations
   - securityintegrations
+  - notificationintegrations
   - passwordpolicies
   - networkrules
   - fieldexports
@@ -134,6 +135,7 @@ rules:
   - pipes/status
   - storageintegrations/status
   - securityintegrations/status
+  - notificationintegrations/status
   - passwordpolicies/status
   - networkrules/status
   - fieldexports/status
@@ -177,6 +179,7 @@ rules:
   - pipes/finalizers
   - storageintegrations/finalizers
   - securityintegrations/finalizers
+  - notificationintegrations/finalizers
   - passwordpolicies/finalizers
   - networkrules/finalizers
   - fieldexports/finalizers
@@ -277,6 +280,7 @@ rules:
   - pipes
   - storageintegrations
   - securityintegrations
+  - notificationintegrations
   - passwordpolicies
   - networkrules
   - fieldexports
@@ -320,6 +324,7 @@ rules:
   - pipes/status
   - storageintegrations/status
   - securityintegrations/status
+  - notificationintegrations/status
   - passwordpolicies/status
   - networkrules/status
   - fieldexports/status
@@ -371,6 +376,7 @@ rules:
   - pipes
   - storageintegrations
   - securityintegrations
+  - notificationintegrations
   - passwordpolicies
   - networkrules
   - fieldexports
@@ -418,6 +424,7 @@ rules:
   - pipes/status
   - storageintegrations/status
   - securityintegrations/status
+  - notificationintegrations/status
   - passwordpolicies/status
   - networkrules/status
   - fieldexports/status

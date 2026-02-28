@@ -14,6 +14,7 @@ import (
 )
 
 const maxEventMessageLength = 1024
+const maxConditionMessageLength = 32768
 
 // sqlStmtRe matches SQL statement keywords followed by any content.
 // It is intentionally broad — the goal is to remove SQL fragments that
@@ -74,6 +75,31 @@ func ForLog(msg string) string {
 	msg = passwordFieldRe.ReplaceAllString(msg, "${1}=[REDACTED]")
 	msg = dsnRe.ReplaceAllString(msg, "[connection redacted]")
 	msg = hostRe.ReplaceAllString(msg, "[host redacted]")
+	return msg
+}
+
+// ForCondition sanitises msg so it is safe to include in a Kubernetes
+// status condition message. Conditions are stored in etcd and readable
+// by anyone with GET access to the CRD, so they must not contain SQL
+// fragments, connection strings, or credentials.
+//
+// It applies the same sanitisation as ForEvent (SQL stripping, DSN
+// removal, PEM key redaction) but uses a larger truncation limit
+// because condition messages are not displayed in event streams.
+func ForCondition(msg string) string {
+	msg = secretValueRe.ReplaceAllString(msg, "[REDACTED]")
+	msg = passwordFieldRe.ReplaceAllString(msg, "${1}=[REDACTED]")
+	msg = sqlStmtRe.ReplaceAllString(msg, "[SQL redacted]")
+	msg = dsnRe.ReplaceAllString(msg, "[connection redacted]")
+	msg = hostRe.ReplaceAllString(msg, "[host redacted]")
+	// Collapse runs of whitespace that may result from stripping.
+	msg = strings.Join(strings.Fields(msg), " ")
+
+	runes := []rune(msg)
+	if len(runes) > maxConditionMessageLength {
+		msg = string(runes[:maxConditionMessageLength-3]) + "..."
+	}
+
 	return msg
 }
 

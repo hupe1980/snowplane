@@ -49,7 +49,7 @@ Project layout, architecture principles, conventions, and workflow for contribut
 │   │   └── snowflake/         # Snowflake SDK wrapper
 │   ├── controller/
 │   │   ├── reconciler/        # Generic reconciler framework
-│   │   └── <resource>/        # 31 resource-specific controllers
+│   │   └── <resource>/        # Resource-specific controllers
 │   ├── drift/                 # Generic field-level drift engine
 │   ├── metrics/               # Custom Prometheus metrics
 │   ├── provider/              # Config builder & hash
@@ -112,7 +112,7 @@ This minimises Snowflake API calls and avoids unnecessary mutations.
 
 ### Generic Reconciler Framework
 
-All 31 resource reconcilers share the same state machine via `internal/controller/reconciler/`:
+All resource reconcilers share the same state machine via `internal/controller/reconciler/`:
 
 - **`GenericReconciler[T, S, D]`** — Type-parameterised reconciler handling finalizers, ProviderConfig resolution, client caching, SSA status patching, conditions, rate limiting, retry, metrics, and drift detection
 - **`ResourceAdapter[T, S, D]`** — Interface each resource implements for resource-specific behaviour
@@ -181,7 +181,7 @@ Every reconciler calls `spec.Validate()` before resolving the client — a safet
 Hierarchical `rate.Limiter` from `golang.org/x/time/rate` with two levels:
 
 1. **Per-controller** (keyed by provider+controller): ensures fairness so a noisy reconciler cannot starve others. Configurable via `--rate-limit-qps` (default 10) and `--rate-limit-burst` (default 20).
-2. **Per-account** (keyed by provider): caps aggregate QPS across all 33 controllers for a given Snowflake account, preventing HTTP 429 cascading failures. Configurable via `--account-rate-limit-qps` (default 50) and `--account-rate-limit-burst` (default 100).
+2. **Per-account** (keyed by provider): caps aggregate QPS across all controllers for a given Snowflake account, preventing HTTP 429 cascading failures. Configurable via `--account-rate-limit-qps` (default 50) and `--account-rate-limit-burst` (default 100).
 
 ### Retry for Transient Errors
 
@@ -232,8 +232,8 @@ Adopt pre-existing Snowflake resources via annotation:
 | Reconciler | Full loop, conditions, status, refs | `testing` + fake `client.Client` |
 | Fuzz | Denylist validators, escaping functions | Go built-in `testing.F` |
 | CEL validation | Immutable fields, defaults, blocklists | envtest |
-| Integration | Full CRD → reconciler pipeline | envtest (59 tests, 11 resources) |
-| E2E | Real Snowflake + k3s testcontainer | 27 tests |
+| Integration | Full CRD → reconciler pipeline | envtest |
+| E2E | Real Snowflake + k3s testcontainer | testcontainers-go |
 
 ### Integration Tests
 

@@ -5,7 +5,7 @@ nav_order: 2
 
 # 📖 API Reference
 
-Complete field-level documentation for all 35 Snowplane CRDs. Each resource supports full lifecycle management (create, alter, drop), drift detection, adoption of pre-existing objects, and deletion policies.
+Complete field-level documentation for all 36 Snowplane CRDs. Each resource supports full lifecycle management (create, alter, drop), drift detection, adoption of pre-existing objects, and deletion policies.
 
 > 💡 **Nil-means-unmanaged convention:** Pointer fields (`*string`, `*int32`, `*bool`) use `nil` to mean "not managed by Snowplane." When nil, the controller skips the parameter in CREATE/ALTER, leaving Snowflake's server-side default intact.
 

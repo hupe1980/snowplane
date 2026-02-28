@@ -1,0 +1,15 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: StreamOnExternalTable
+metadata:
+  name: my-stream-on-external-table
+spec:
+  name: MY_STREAM_ON_EXTERNAL_TABLE
+  providerRef:
+    name: default
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  externalTable: MY_EXTERNAL_TABLE
+  insertOnly: true
+  comment: "Stream on external table managed by Snowplane"

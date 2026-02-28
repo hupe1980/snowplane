@@ -90,6 +90,9 @@ controller:
   # If empty, all roles are allowed. Example: "SYSADMIN,USERADMIN,DATA_ENGINEER".
   # Set this to prevent namespace admins from escalating to ACCOUNTADMIN or SECURITYADMIN.
   allowedRoles: ""
+  # -- Per-operation timeout for Snowflake CRUD calls (Observe, Create, Alter, Drop).
+  # Increase for large Snowflake accounts or complex operations.
+  snowflakeOpTimeout: 60s
 
 # -- Circuit breaker configuration for per-provider failure isolation
 circuitBreaker:

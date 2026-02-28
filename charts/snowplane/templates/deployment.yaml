@@ -44,6 +44,7 @@ spec:
             - --health-probe-bind-address={{ .Values.healthProbes.bindAddress }}
             - --max-concurrent-reconciles={{ .Values.controller.maxConcurrentReconciles }}
             - --requeue-interval={{ .Values.controller.requeueInterval }}
+            - --snowflake-op-timeout={{ .Values.controller.snowflakeOpTimeout }}
             - --rate-limit-qps={{ .Values.rateLimit.qps }}
             - --rate-limit-burst={{ .Values.rateLimit.burst }}
             - --account-rate-limit-qps={{ .Values.rateLimit.accountQps }}

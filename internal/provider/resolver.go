@@ -151,7 +151,7 @@ func ResolveClient(
 	// 1. Per-controller: token bucket keyed by provider+controller, prevents a
 	//    noisy controller from starving others.
 	// 2. Per-account: aggregate token bucket keyed by provider, caps total QPS
-	//    to a single Snowflake account across all 30+ controllers.
+	//    to a single Snowflake account across all controllers.
 	if rl != nil {
 		controllerWaited, accountWaited, err := rl.Wait(ctx, pc.Name, controllerName)
 		if err != nil {

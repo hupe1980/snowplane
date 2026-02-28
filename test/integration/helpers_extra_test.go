@@ -220,6 +220,25 @@ func newTestSecurityIntegration(name, sfName string) *snowplanev1alpha1.Security
 	}
 }
 
+func newTestNotificationIntegration(name, sfName string) *snowplanev1alpha1.NotificationIntegration {
+	return &snowplanev1alpha1.NotificationIntegration{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.NotificationIntegrationSpec{
+			CommonSpec: snowplanev1alpha1.CommonSpec{
+				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
+			},
+			Name: sfName,
+			Type: snowplanev1alpha1.NotificationIntegrationTypeEmail,
+			Email: &snowplanev1alpha1.EmailNotificationConfig{
+				AllowedRecipients: []string{"admin@example.com"},
+			},
+		},
+	}
+}
+
 func newTestStorageIntegration(name, sfName string) *snowplanev1alpha1.StorageIntegration {
 	return &snowplanev1alpha1.StorageIntegration{
 		ObjectMeta: ctrl.ObjectMeta{
@@ -404,6 +423,22 @@ func securityIntegrationObservation(name string) *snowflake.SecurityIntegrationO
 			Type:      "SCIM",
 			Category:  "SECURITY",
 			Enabled:   true,
+		},
+	}
+}
+
+func notificationIntegrationObservation(name string) *snowflake.NotificationIntegrationObservation {
+	return &snowflake.NotificationIntegrationObservation{
+		Exists: true,
+		ShowOutput: &snowflake.NotificationIntegrationShowOutput{
+			CreatedOn: "2024-01-01",
+			Name:      name,
+			Type:      "EMAIL",
+			Category:  "NOTIFICATION",
+			Enabled:   true,
+		},
+		DescribeOutput: map[string]string{
+			"ALLOWED_RECIPIENTS": "admin@example.com",
 		},
 	}
 }

@@ -346,3 +346,59 @@ func TestEventsAdapter_Eventf(t *testing.T) {
 	require.Len(t, fake.calls, 1)
 	assert.Contains(t, fake.calls[0].note, "synced 5 resources")
 }
+
+// ── ForCondition tests ──────────────────────────────────────────────────
+
+func TestForCondition_PlainMessage(t *testing.T) {
+	t.Parallel()
+	got := ForCondition("validation failed: name is required")
+	assert.Equal(t, "validation failed: name is required", got)
+}
+
+func TestForCondition_StripsSQLFragments(t *testing.T) {
+	t.Parallel()
+	msg := `failed to execute: CREATE TABLE "secret_data" (id INT) — insufficient privileges`
+	got := ForCondition(msg)
+	assert.NotContains(t, got, "CREATE TABLE")
+	assert.NotContains(t, got, "secret_data")
+	assert.Contains(t, got, "[SQL redacted]")
+}
+
+func TestForCondition_StripsDSN(t *testing.T) {
+	t.Parallel()
+	msg := `failed connecting to user@acme.snowflakecomputing.com: timeout`
+	got := ForCondition(msg)
+	assert.NotContains(t, got, "user@acme")
+	assert.Contains(t, got, "[connection redacted]")
+}
+
+func TestForCondition_StripsPEMKey(t *testing.T) {
+	t.Parallel()
+	msg := `error parsing key: -----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAK\n-----END RSA PRIVATE KEY-----`
+	got := ForCondition(msg)
+	assert.NotContains(t, got, "-----BEGIN")
+	assert.NotContains(t, got, "MIIEpAIBAAK")
+	assert.Contains(t, got, "[REDACTED]")
+}
+
+func TestForCondition_StripsPassword(t *testing.T) {
+	t.Parallel()
+	msg := `error: password=SuperSecret123 in connection config`
+	got := ForCondition(msg)
+	assert.NotContains(t, got, "SuperSecret123")
+	assert.Contains(t, got, "[REDACTED]")
+}
+
+func TestForCondition_TruncatesLongMessages(t *testing.T) {
+	t.Parallel()
+	long := strings.Repeat("a", 40000)
+	got := ForCondition(long)
+	assert.LessOrEqual(t, len([]rune(got)), 32768)
+}
+
+func TestForCondition_DoesNotTruncateShortMessages(t *testing.T) {
+	t.Parallel()
+	msg := strings.Repeat("a", 1000)
+	got := ForCondition(msg)
+	assert.Len(t, got, 1000)
+}

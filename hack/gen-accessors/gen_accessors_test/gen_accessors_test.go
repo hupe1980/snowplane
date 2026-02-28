@@ -90,11 +90,11 @@ func TestGeneratedMethodCount(t *testing.T) {
 	content := string(src)
 	methodCount := strings.Count(content, "func (")
 
-	// 19 A1 types × 16 methods + 3 A3 types × 16 methods + 3 A2 types × 16 methods + 3 B types × 15 methods + 1 C type × 15 methods + 3 Phase6 types × 16 methods + 2 D types × 15 methods = 538
-	assert.Equal(t, 538, methodCount, "expected 538 accessor methods across 34 types")
+	// 19 A1 types × 16 methods + 3 A3 types × 16 methods + 3 A2 types × 16 methods + 3 B types × 15 methods + 1 C type × 15 methods + 4 Phase6 types × 16 methods + 2 D types × 15 methods = 554
+	assert.Equal(t, 554, methodCount, "expected 554 accessor methods across 35 types")
 }
 
-// TestGeneratedTypeHeaders verifies all 34 types have section headers.
+// TestGeneratedTypeHeaders verifies all 35 types have section headers.
 func TestGeneratedTypeHeaders(t *testing.T) {
 	t.Parallel()
 
@@ -113,7 +113,7 @@ func TestGeneratedTypeHeaders(t *testing.T) {
 		"Task", "Alert",
 		"View", "Table", "NetworkPolicy", "ResourceMonitor", "StorageIntegration",
 		"FileFormat", "Pipe", "DynamicTable",
-		"SecurityIntegration", "PasswordPolicy", "NetworkRule",
+		"SecurityIntegration", "NotificationIntegration", "PasswordPolicy", "NetworkRule",
 		"AccountRoleGrant", "DatabaseRoleGrant", "ShareGrant", "GrantOwnership",
 		"AccountRoleAssignment", "DatabaseRoleAssignment",
 	}

@@ -327,3 +327,54 @@ func TestDetector_CompareStringValueFold_Drift(t *testing.T) {
 	require.Len(t, r.Changes, 1)
 	assert.Equal(t, "RESOURCE_MONITOR", r.Changes[0].Field)
 }
+
+// --------------------------------------------------------------------------
+// Tests: SafeSummary (M-12)
+// --------------------------------------------------------------------------
+
+func TestResult_SafeSummary_NoDrift(t *testing.T) {
+	t.Parallel()
+	r := New().Result()
+	assert.Equal(t, "no drift detected", r.SafeSummary())
+}
+
+func TestResult_SafeSummary_SingleField(t *testing.T) {
+	t.Parallel()
+	r := New().
+		CompareString("COMMENT", ptrString("secret-value"), "old-secret", false).
+		Result()
+
+	safe := r.SafeSummary()
+	assert.Equal(t, "drifted fields: COMMENT", safe)
+	assert.NotContains(t, safe, "secret-value")
+	assert.NotContains(t, safe, "old-secret")
+}
+
+func TestResult_SafeSummary_MultipleFields(t *testing.T) {
+	t.Parallel()
+	r := New().
+		CompareString("COMMENT", ptrString("a"), "b", false).
+		CompareString("WAREHOUSE", ptrString("WH_NEW"), "WH_OLD", false).
+		Result()
+
+	safe := r.SafeSummary()
+	assert.Equal(t, "drifted fields: COMMENT, WAREHOUSE", safe)
+	assert.NotContains(t, safe, "WH_NEW")
+	assert.NotContains(t, safe, "WH_OLD")
+}
+
+func TestResult_SafeSummary_VsSummary(t *testing.T) {
+	t.Parallel()
+	r := New().
+		CompareString("SCIM_TOKEN", ptrString("secret-token"), "old-token", false).
+		Result()
+
+	// Summary includes values (for debug logs).
+	assert.Contains(t, r.Summary(), "secret-token")
+	assert.Contains(t, r.Summary(), "old-token")
+
+	// SafeSummary strips values (for status conditions).
+	assert.NotContains(t, r.SafeSummary(), "secret-token")
+	assert.NotContains(t, r.SafeSummary(), "old-token")
+	assert.Contains(t, r.SafeSummary(), "SCIM_TOKEN")
+}

@@ -1,0 +1,18 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: NotificationIntegration
+metadata:
+  name: my-email-notification
+spec:
+  providerRef:
+    name: default
+  name: MY_EMAIL_NOTIFICATION
+  type: EMAIL
+  email:
+    allowedRecipients:
+      - admin@example.com
+      - ops@example.com
+    defaultRecipients:
+      - ops@example.com
+    defaultSubject: "Snowflake Alert"
+  enabled: true
+  comment: "Email notifications managed by Snowplane"

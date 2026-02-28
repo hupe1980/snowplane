@@ -33,6 +33,7 @@ import (
 	grantownershipctl "github.com/hupe1980/snowplane/internal/controller/grantownership"
 	maskingpolicyctl "github.com/hupe1980/snowplane/internal/controller/maskingpolicy"
 	networkpolicyctl "github.com/hupe1980/snowplane/internal/controller/networkpolicy"
+	notificationintegrationctl "github.com/hupe1980/snowplane/internal/controller/notificationintegration"
 	passwordpolicyctl "github.com/hupe1980/snowplane/internal/controller/passwordpolicy"
 	pipectl "github.com/hupe1980/snowplane/internal/controller/pipe"
 	resourcemonitorctl "github.com/hupe1980/snowplane/internal/controller/resourcemonitor"
@@ -55,35 +56,36 @@ import (
 
 // Package-level state shared across all integration tests.
 var (
-	k8sClient                  client.Client
-	testEnv                    *envtest.Environment
-	ctx                        context.Context
-	cancel                     context.CancelFunc
-	dbMockSvc                  *mockDatabaseService
-	schemaMockSvc              *mockSchemaService
-	tableMockSvc               *mockTableService
-	viewMockSvc                *mockViewService
-	stageMockSvc               *mockStageService
-	warehouseMockSvc           *mockWarehouseService
-	userMockSvc                *mockUserService
-	accountRoleMockSvc         *mockAccountRoleService
-	databaseRoleMockSvc        *mockDatabaseRoleService
-	grantMockSvc               *mockGrantService
-	alertMockSvc               *mockAlertService
-	taskMockSvc                *mockTaskService
-	dynamicTableMockSvc        *mockDynamicTableService
-	networkPolicyMockSvc       *mockNetworkPolicyService
-	maskingPolicyMockSvc       *mockMaskingPolicyService
-	passwordPolicyMockSvc      *mockPasswordPolicyService
-	securityIntegrationMockSvc *mockSecurityIntegrationService
-	storageIntegrationMockSvc  *mockStorageIntegrationService
-	resourceMonitorMockSvc     *mockResourceMonitorService
-	pipeMockSvc                *mockPipeService
-	fileFormatMockSvc          *mockFileFormatService
-	tagMockSvc                 *mockTagService
-	rowAccessPolicyMockSvc     *mockRowAccessPolicyService
-	grantOwnershipMockSvc      *mockGrantOwnershipService
-	roleAssignmentMockSvc      *mockRoleAssignmentService
+	k8sClient                      client.Client
+	testEnv                        *envtest.Environment
+	ctx                            context.Context
+	cancel                         context.CancelFunc
+	dbMockSvc                      *mockDatabaseService
+	schemaMockSvc                  *mockSchemaService
+	tableMockSvc                   *mockTableService
+	viewMockSvc                    *mockViewService
+	stageMockSvc                   *mockStageService
+	warehouseMockSvc               *mockWarehouseService
+	userMockSvc                    *mockUserService
+	accountRoleMockSvc             *mockAccountRoleService
+	databaseRoleMockSvc            *mockDatabaseRoleService
+	grantMockSvc                   *mockGrantService
+	alertMockSvc                   *mockAlertService
+	taskMockSvc                    *mockTaskService
+	dynamicTableMockSvc            *mockDynamicTableService
+	networkPolicyMockSvc           *mockNetworkPolicyService
+	maskingPolicyMockSvc           *mockMaskingPolicyService
+	passwordPolicyMockSvc          *mockPasswordPolicyService
+	securityIntegrationMockSvc     *mockSecurityIntegrationService
+	storageIntegrationMockSvc      *mockStorageIntegrationService
+	resourceMonitorMockSvc         *mockResourceMonitorService
+	pipeMockSvc                    *mockPipeService
+	fileFormatMockSvc              *mockFileFormatService
+	tagMockSvc                     *mockTagService
+	rowAccessPolicyMockSvc         *mockRowAccessPolicyService
+	grantOwnershipMockSvc          *mockGrantOwnershipService
+	roleAssignmentMockSvc          *mockRoleAssignmentService
+	notificationIntegrationMockSvc *mockNotificationIntegrationService
 )
 
 const (
@@ -430,6 +432,21 @@ func TestMain(m *testing.M) {
 
 	if err := securityIntegrationReconciler.SetupWithManager(mgr, 1); err != nil {
 		panic("failed to setup securityintegration controller: " + err.Error())
+	}
+
+	// --- NotificationIntegration controller ---
+	notificationIntegrationMockSvc = &mockNotificationIntegrationService{}
+
+	notificationIntegrationServiceFactory := func(_ context.Context, _ notificationintegrationctl.SnowflakeClient, _ string) (notificationintegrationctl.Service, func(context.Context), error) {
+		return notificationIntegrationMockSvc, func(context.Context) {}, nil
+	}
+
+	notificationIntegrationReconciler := notificationintegrationctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, notificationIntegrationServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := notificationIntegrationReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup notificationintegration controller: " + err.Error())
 	}
 
 	// --- StorageIntegration controller ---

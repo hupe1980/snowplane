@@ -1632,40 +1632,41 @@ func (s *NetworkRuleSpec) Validate() error {
 //
 //nolint:gochecknoglobals // package-level constant set
 var ValidFieldExportSourceKinds = map[string]struct{}{
-	"Alert":                  {},
-	"Database":               {},
-	"Schema":                 {},
-	"Warehouse":              {},
-	"User":                   {},
-	"AccountRole":            {},
-	"DatabaseRole":           {},
-	"AccountRoleGrant":       {},
-	"DatabaseRoleGrant":      {},
-	"ShareGrant":             {},
-	"Table":                  {},
-	"View":                   {},
-	"Stage":                  {},
-	"Task":                   {},
-	"StreamOnTable":          {},
-	"StreamOnView":           {},
-	"StreamOnExternalTable":  {},
-	"StreamOnDirectoryTable": {},
-	"StreamOnDynamicTable":   {},
-	"Tag":                    {},
-	"NetworkPolicy":          {},
-	"ResourceMonitor":        {},
-	"MaskingPolicy":          {},
-	"RowAccessPolicy":        {},
-	"GrantOwnership":         {},
-	"StorageIntegration":     {},
-	"SecurityIntegration":    {},
-	"FileFormat":             {},
-	"Pipe":                   {},
-	"DynamicTable":           {},
-	"PasswordPolicy":         {},
-	"NetworkRule":            {},
-	"AccountRoleAssignment":  {},
-	"DatabaseRoleAssignment": {},
+	"Alert":                   {},
+	"Database":                {},
+	"Schema":                  {},
+	"Warehouse":               {},
+	"User":                    {},
+	"AccountRole":             {},
+	"DatabaseRole":            {},
+	"AccountRoleGrant":        {},
+	"DatabaseRoleGrant":       {},
+	"ShareGrant":              {},
+	"Table":                   {},
+	"View":                    {},
+	"Stage":                   {},
+	"Task":                    {},
+	"StreamOnTable":           {},
+	"StreamOnView":            {},
+	"StreamOnExternalTable":   {},
+	"StreamOnDirectoryTable":  {},
+	"StreamOnDynamicTable":    {},
+	"Tag":                     {},
+	"NetworkPolicy":           {},
+	"ResourceMonitor":         {},
+	"MaskingPolicy":           {},
+	"RowAccessPolicy":         {},
+	"GrantOwnership":          {},
+	"StorageIntegration":      {},
+	"SecurityIntegration":     {},
+	"NotificationIntegration": {},
+	"FileFormat":              {},
+	"Pipe":                    {},
+	"DynamicTable":            {},
+	"PasswordPolicy":          {},
+	"NetworkRule":             {},
+	"AccountRoleAssignment":   {},
+	"DatabaseRoleAssignment":  {},
 }
 
 // Validate checks that the FieldExport spec fields are semantically valid.
@@ -1865,6 +1866,53 @@ func (s *AccountRoleAssignmentSpec) Validate() error {
 
 	if targetCount != 1 {
 		errs = append(errs, errors.New("spec: exactly one of toRole, toRoleRef, toUser, or toUserRef must be set"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the NotificationIntegrationSpec for configuration errors.
+func (s *NotificationIntegrationSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if s.Type == "" {
+		errs = append(errs, errors.New("spec.type is required"))
+	}
+
+	// Type-specific sub-config validation.
+	switch s.Type {
+	case NotificationIntegrationTypeEmail:
+		if s.Email == nil {
+			errs = append(errs, errors.New("spec.email is required when type is EMAIL"))
+		} else {
+			if len(s.Email.AllowedRecipients) == 0 {
+				errs = append(errs, errors.New("spec.email.allowedRecipients is required"))
+			}
+		}
+	case NotificationIntegrationTypeQueue:
+		if s.Queue == nil {
+			errs = append(errs, errors.New("spec.queue is required when type is QUEUE"))
+		} else {
+			if s.Queue.NotificationProvider == "" {
+				errs = append(errs, errors.New("spec.queue.notificationProvider is required"))
+			}
+		}
+	case NotificationIntegrationTypeWebhook:
+		if s.Webhook == nil {
+			errs = append(errs, errors.New("spec.webhook is required when type is WEBHOOK"))
+		} else {
+			if s.Webhook.WebhookURL == "" {
+				errs = append(errs, errors.New("spec.webhook.webhookURL is required"))
+			}
+		}
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {

@@ -16,7 +16,7 @@
 
 ## ✨ Features
 
-### 🏗️ Resource Management (35 CRDs)
+### 🏗️ Resource Management
 
 | Category | Resources |
 |----------|-----------|
@@ -24,7 +24,7 @@
 | 📊 **Data Objects** | Table, View, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe |
 | 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
 | ⏰ **Orchestration** | Task (DAG scheduling, serverless or warehouse-backed), Alert (condition-based monitoring & notification) |
-| 🔗 **Integrations** | StorageIntegration, SecurityIntegration |
+| 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
 | 🛡️ **Security & Governance** | NetworkPolicy, NetworkRule, PasswordPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
 | 📤 **Utilities** | FieldExport (copy status fields into ConfigMaps/Secrets) |
 
@@ -84,7 +84,7 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 │  │  └──────────────────────────────────────────┘  ││
 │  │                                                ││
 │  │  ┌──────────────────────────────────────────┐  ││
-│  │  │  33 Resource Controllers (see above)     │  ││
+│  │  │  Resource Controllers (see above)        │  ││
 │  │  │  Observe → Diff → Apply reconciliation   │  ││
 │  │  └──────────────────────────────────────────┘  ││
 │  │                                                ││
@@ -316,7 +316,7 @@ Complete field-level documentation for all 35 Snowplane CRDs is available in the
 | 📊 **Data Objects** | Table, View, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe |
 | 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
 | ⏰ **Orchestration** | Task, Alert |
-| 🔗 **Integrations** | StorageIntegration, SecurityIntegration |
+| 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
 | 🛡️ **Security & Governance** | NetworkPolicy, NetworkRule, PasswordPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
 | 📤 **Utilities** | FieldExport |
 
@@ -437,8 +437,9 @@ Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped a
 | Guide | Description |
 |-------|-------------|
 | 📘 [Getting Started](docs/getting-started.md) | Installation, ProviderConfig setup, first resources |
-| 📖 [API Reference](docs/api-reference.md) | Complete field-level documentation for all 35 CRDs |
+| 📖 [API Reference](docs/api-reference.md) | Complete field-level documentation for all CRDs |
 | ☸️ [Helm Chart](docs/helm-chart.md) | Helm chart configuration and RBAC |
+| 🏭 [Production Guide](docs/production-guide.md) | Production hardening, security, scaling, DR |
 | 📊 [Observability](docs/observability.md) | Metrics, logging, events, probes, Grafana, circuit breaker |
 | 🔍 [Drift Detection](docs/drift-detection.md) | Drift engine, detect-only policy, field-level reporting |
 | 📋 [CRD Lifecycle](docs/crd-lifecycle.md) | Maturity classification and graduation |

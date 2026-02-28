@@ -44,6 +44,8 @@ type Result struct {
 }
 
 // Summary returns a human-readable one-line summary of all changes.
+// This includes field values and is intended for structured log output only.
+// For status conditions visible to end-users, use SafeSummary().
 func (r *Result) Summary() string {
 	if len(r.Changes) == 0 {
 		return "no drift detected"
@@ -55,6 +57,23 @@ func (r *Result) Summary() string {
 	}
 
 	return strings.Join(parts, "; ")
+}
+
+// SafeSummary returns a one-line summary listing only field names, without
+// the actual or expected values. This is safe for status conditions and
+// events where field values might contain sensitive data (e.g., comments,
+// SCIM configuration, connection strings).
+func (r *Result) SafeSummary() string {
+	if len(r.Changes) == 0 {
+		return "no drift detected"
+	}
+
+	fields := make([]string, 0, len(r.Changes))
+	for _, c := range r.Changes {
+		fields = append(fields, c.Field)
+	}
+
+	return fmt.Sprintf("drifted fields: %s", strings.Join(fields, ", "))
 }
 
 // FieldDiffs returns only the non-immutable field changes.

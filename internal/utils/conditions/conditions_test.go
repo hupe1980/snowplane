@@ -241,3 +241,61 @@ func TestIsRecoverable(t *testing.T) {
 	SetNotReady(obj, "TerminalError", "bad")
 	assert.False(t, IsRecoverable(obj))
 }
+
+// ── Sanitization tests ──────────────────────────────────────────────────
+
+func TestSetNotReady_SanitizesSQL(t *testing.T) {
+	t.Parallel()
+	obj := &fakeConditioned{}
+	SetNotReady(obj, "ReconcileError", `CREATE TABLE "secret_data" (id INT) failed: privilege error`)
+
+	c := Get(obj, "Ready")
+	require.NotNil(t, c)
+	assert.NotContains(t, c.Message, "CREATE TABLE")
+	assert.NotContains(t, c.Message, "secret_data")
+	assert.Contains(t, c.Message, "[SQL redacted]")
+}
+
+func TestSetNotSynced_SanitizesDSN(t *testing.T) {
+	t.Parallel()
+	obj := &fakeConditioned{}
+	SetNotSynced(obj, "ReconcileError", `error connecting to user@acme.snowflakecomputing.com:443`)
+
+	c := Get(obj, "Synced")
+	require.NotNil(t, c)
+	assert.NotContains(t, c.Message, "user@acme")
+	assert.Contains(t, c.Message, "[connection redacted]")
+}
+
+func TestSetDriftDetected_SanitizesSQL(t *testing.T) {
+	t.Parallel()
+	obj := &fakeConditioned{}
+	SetDriftDetected(obj, `comment: expected "DROP TABLE evil", found "old"`)
+
+	c := Get(obj, "DriftDetected")
+	require.NotNil(t, c)
+	assert.NotContains(t, c.Message, "DROP TABLE")
+	assert.Contains(t, c.Message, "[SQL redacted]")
+}
+
+func TestSetReferencesNotResolved_SanitizesPassword(t *testing.T) {
+	t.Parallel()
+	obj := &fakeConditioned{}
+	SetReferencesNotResolved(obj, "RefError", `password=SuperSecret123 in ref`)
+
+	c := Get(obj, "ReferencesResolved")
+	require.NotNil(t, c)
+	assert.NotContains(t, c.Message, "SuperSecret123")
+	assert.Contains(t, c.Message, "[REDACTED]")
+}
+
+func TestSetReady_NoSanitization(t *testing.T) {
+	t.Parallel()
+	obj := &fakeConditioned{}
+	// SetReady messages are controller-generated, not error-sourced.
+	SetReady(obj, "Database created successfully")
+
+	c := Get(obj, "Ready")
+	require.NotNil(t, c)
+	assert.Equal(t, "Database created successfully", c.Message)
+}

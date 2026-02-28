@@ -1,0 +1,15 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: StreamOnView
+metadata:
+  name: my-stream-on-view
+spec:
+  name: MY_STREAM_ON_VIEW
+  providerRef:
+    name: default
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  view: MY_SOURCE_VIEW
+  appendOnly: true
+  comment: "Stream on view managed by Snowplane"

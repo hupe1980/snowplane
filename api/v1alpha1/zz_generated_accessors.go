@@ -1896,6 +1896,79 @@ func (dt *DynamicTable) SetTrackedParametersList(val []string) {
 }
 
 // ---------------------------------------------------------------------------
+// NotificationIntegration
+// ---------------------------------------------------------------------------
+
+func (ni *NotificationIntegration) GetConditions() []metav1.Condition {
+	return ni.Status.Conditions
+}
+
+func (ni *NotificationIntegration) SetConditions(conditions []metav1.Condition) {
+	ni.Status.Conditions = conditions
+}
+
+func (ni *NotificationIntegration) GetDeletionPolicy() DeletionPolicy {
+	if ni.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return ni.Spec.DeletionPolicy
+}
+
+func (ni *NotificationIntegration) GetFullyQualifiedName() string {
+	return ni.Status.FullyQualifiedName
+}
+
+func (ni *NotificationIntegration) GetProviderRef() ProviderReference {
+	return ni.Spec.ProviderRef
+}
+
+func (ni *NotificationIntegration) GetSpecName() string {
+	return ni.Spec.Name
+}
+
+func (ni *NotificationIntegration) GetUseRole() *string {
+	return ni.Spec.UseRole
+}
+
+func (ni *NotificationIntegration) GetObservedGeneration() int64 {
+	return ni.Status.ObservedGeneration
+}
+
+func (ni *NotificationIntegration) SetObservedGeneration(val int64) {
+	ni.Status.ObservedGeneration = val
+}
+
+func (ni *NotificationIntegration) GetLastAppliedSpecHash() string {
+	return ni.Status.LastAppliedSpecHash
+}
+
+func (ni *NotificationIntegration) SetLastAppliedSpecHash(val string) {
+	ni.Status.LastAppliedSpecHash = val
+}
+
+func (ni *NotificationIntegration) ValidateSpec() error {
+	return ni.Spec.Validate()
+}
+
+func (ni *NotificationIntegration) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(ni.Spec)
+}
+
+func (ni *NotificationIntegration) GetOwner() string {
+	// SHOW NOTIFICATION INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (ni *NotificationIntegration) GetTrackedParametersList() []string {
+	return ni.Status.TrackedParameters
+}
+
+func (ni *NotificationIntegration) SetTrackedParametersList(val []string) {
+	ni.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
 // SecurityIntegration
 // ---------------------------------------------------------------------------
 

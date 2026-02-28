@@ -5,6 +5,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
+	"github.com/hupe1980/snowplane/internal/utils/sanitize"
 )
 
 // ConditionedObject can get and set conditions.
@@ -79,12 +80,14 @@ func SetReady(o ConditionedObject, message string) {
 }
 
 // SetNotReady sets the Ready condition to False.
+// The message is sanitised to strip SQL fragments and credentials
+// before being stored in the CRD status (readable via kubectl get).
 func SetNotReady(o ConditionedObject, reason, message string) {
 	Set(o, metav1.Condition{
 		Type:    snowplanev1alpha1.TypeReady,
 		Status:  metav1.ConditionFalse,
 		Reason:  reason,
-		Message: message,
+		Message: sanitize.ForCondition(message),
 	})
 }
 
@@ -99,12 +102,14 @@ func SetSynced(o ConditionedObject, message string) {
 }
 
 // SetNotSynced sets the Synced condition to False.
+// The message is sanitised to strip SQL fragments and credentials
+// before being stored in the CRD status (readable via kubectl get).
 func SetNotSynced(o ConditionedObject, reason, message string) {
 	Set(o, metav1.Condition{
 		Type:    snowplanev1alpha1.TypeSynced,
 		Status:  metav1.ConditionFalse,
 		Reason:  reason,
-		Message: message,
+		Message: sanitize.ForCondition(message),
 	})
 }
 
@@ -119,22 +124,26 @@ func SetReferencesResolved(o ConditionedObject, message string) {
 }
 
 // SetReferencesNotResolved sets the ReferencesResolved condition to False.
+// The message is sanitised to strip SQL fragments and credentials
+// before being stored in the CRD status (readable via kubectl get).
 func SetReferencesNotResolved(o ConditionedObject, reason, message string) {
 	Set(o, metav1.Condition{
 		Type:    snowplanev1alpha1.TypeReferencesResolved,
 		Status:  metav1.ConditionFalse,
 		Reason:  reason,
-		Message: message,
+		Message: sanitize.ForCondition(message),
 	})
 }
 
 // SetDriftDetected sets the DriftDetected condition to True with the given message.
+// The message is sanitised to strip SQL fragments and credentials
+// before being stored in the CRD status (readable via kubectl get).
 func SetDriftDetected(o ConditionedObject, message string) {
 	Set(o, metav1.Condition{
 		Type:    snowplanev1alpha1.TypeDriftDetected,
 		Status:  metav1.ConditionTrue,
 		Reason:  snowplanev1alpha1.ReasonDriftDetected,
-		Message: message,
+		Message: sanitize.ForCondition(message),
 	})
 }
 

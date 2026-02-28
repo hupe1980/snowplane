@@ -2502,6 +2502,161 @@ func TestDatabaseRoleAssignmentSpec_Validate_TwoTargets(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// NotificationIntegrationSpec.Validate — tests
+// ---------------------------------------------------------------------------
+
+func TestNotificationIntegrationSpec_Validate_ValidEmail(t *testing.T) {
+	t.Parallel()
+
+	spec := NotificationIntegrationSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_NI",
+		Type:       NotificationIntegrationTypeEmail,
+		Email:      &EmailNotificationConfig{AllowedRecipients: []string{"a@b.com"}},
+	}
+	require.NoError(t, spec.Validate())
+}
+
+func TestNotificationIntegrationSpec_Validate_ValidQueue(t *testing.T) {
+	t.Parallel()
+
+	spec := NotificationIntegrationSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_NI",
+		Type:       NotificationIntegrationTypeQueue,
+		Queue:      &QueueNotificationConfig{NotificationProvider: "AWS_SNS", Direction: "OUTBOUND"},
+	}
+	require.NoError(t, spec.Validate())
+}
+
+func TestNotificationIntegrationSpec_Validate_ValidWebhook(t *testing.T) {
+	t.Parallel()
+
+	spec := NotificationIntegrationSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_NI",
+		Type:       NotificationIntegrationTypeWebhook,
+		Webhook:    &WebhookNotificationConfig{WebhookURL: "https://example.com/hook"},
+	}
+	require.NoError(t, spec.Validate())
+}
+
+func TestNotificationIntegrationSpec_Validate_EmptyName(t *testing.T) {
+	t.Parallel()
+
+	spec := NotificationIntegrationSpec{
+		CommonSpec: validCommonSpec(),
+		Type:       NotificationIntegrationTypeEmail,
+		Email:      &EmailNotificationConfig{AllowedRecipients: []string{"a@b.com"}},
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.name is required")
+}
+
+func TestNotificationIntegrationSpec_Validate_EmptyType(t *testing.T) {
+	t.Parallel()
+
+	spec := NotificationIntegrationSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_NI",
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.type is required")
+}
+
+func TestNotificationIntegrationSpec_Validate_EmailMissingConfig(t *testing.T) {
+	t.Parallel()
+
+	spec := NotificationIntegrationSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_NI",
+		Type:       NotificationIntegrationTypeEmail,
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.email is required when type is EMAIL")
+}
+
+func TestNotificationIntegrationSpec_Validate_EmailMissingRecipients(t *testing.T) {
+	t.Parallel()
+
+	spec := NotificationIntegrationSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_NI",
+		Type:       NotificationIntegrationTypeEmail,
+		Email:      &EmailNotificationConfig{},
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.email.allowedRecipients is required")
+}
+
+func TestNotificationIntegrationSpec_Validate_QueueMissingConfig(t *testing.T) {
+	t.Parallel()
+
+	spec := NotificationIntegrationSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_NI",
+		Type:       NotificationIntegrationTypeQueue,
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.queue is required when type is QUEUE")
+}
+
+func TestNotificationIntegrationSpec_Validate_QueueMissingProvider(t *testing.T) {
+	t.Parallel()
+
+	spec := NotificationIntegrationSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_NI",
+		Type:       NotificationIntegrationTypeQueue,
+		Queue:      &QueueNotificationConfig{Direction: "OUTBOUND"},
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.queue.notificationProvider is required")
+}
+
+func TestNotificationIntegrationSpec_Validate_WebhookMissingConfig(t *testing.T) {
+	t.Parallel()
+
+	spec := NotificationIntegrationSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_NI",
+		Type:       NotificationIntegrationTypeWebhook,
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.webhook is required when type is WEBHOOK")
+}
+
+func TestNotificationIntegrationSpec_Validate_WebhookMissingURL(t *testing.T) {
+	t.Parallel()
+
+	spec := NotificationIntegrationSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_NI",
+		Type:       NotificationIntegrationTypeWebhook,
+		Webhook:    &WebhookNotificationConfig{},
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.webhook.webhookURL is required")
+}
+
+func TestNotificationIntegrationSpec_Validate_MultipleErrors(t *testing.T) {
+	t.Parallel()
+
+	err := (&NotificationIntegrationSpec{}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.name is required")
+	assert.Contains(t, err.Error(), "spec.type is required")
+}
+
+// ---------------------------------------------------------------------------
 // FieldExportSpec.Validate — tests
 // ---------------------------------------------------------------------------
 

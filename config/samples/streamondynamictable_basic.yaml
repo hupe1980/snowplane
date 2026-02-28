@@ -1,0 +1,15 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: StreamOnDynamicTable
+metadata:
+  name: my-stream-on-dynamic-table
+spec:
+  name: MY_STREAM_ON_DYNAMIC_TABLE
+  providerRef:
+    name: default
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  dynamicTable: MY_DYNAMIC_TABLE
+  appendOnly: true
+  comment: "Stream on dynamic table managed by Snowplane"
