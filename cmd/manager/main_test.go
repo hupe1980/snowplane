@@ -169,6 +169,7 @@ var controllerRegistrationNames = map[string]bool{
 	"networkrule":             true,
 	"accountroleassignment":   true,
 	"databaseroleassignment":  true,
+	"tagassociation":          true,
 	// standalone controller (not in GenericReconciler registration loop)
 	"fieldexport": true,
 }

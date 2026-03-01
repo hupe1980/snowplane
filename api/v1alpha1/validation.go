@@ -1667,6 +1667,7 @@ var ValidFieldExportSourceKinds = map[string]struct{}{
 	"NetworkRule":             {},
 	"AccountRoleAssignment":   {},
 	"DatabaseRoleAssignment":  {},
+	"TagAssociation":          {},
 }
 
 // Validate checks that the FieldExport spec fields are semantically valid.
@@ -1960,6 +1961,45 @@ func (s *DatabaseRoleAssignmentSpec) Validate() error {
 
 	if targetCount != 1 {
 		errs = append(errs, errors.New("spec: exactly one of toRole, toRoleRef, toDatabaseRole, or toDatabaseRoleRef must be set"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the TagAssociationSpec for configuration errors.
+func (s *TagAssociationSpec) Validate() error {
+	var errs []error
+
+	// Exactly one of tagName or tagRef must be set.
+	tagCount := 0
+	if s.TagName != "" {
+		tagCount++
+	}
+
+	if s.TagRef != nil {
+		tagCount++
+	}
+
+	if tagCount != 1 {
+		errs = append(errs, errors.New("spec: exactly one of tagName or tagRef must be set"))
+	}
+
+	if s.TagValue == "" {
+		errs = append(errs, errors.New("spec.tagValue is required"))
+	} else if len(s.TagValue) > 256 {
+		errs = append(errs, errors.New("spec.tagValue must be at most 256 characters"))
+	}
+
+	if s.ObjectType == "" {
+		errs = append(errs, errors.New("spec.objectType is required"))
+	}
+
+	if s.ObjectName == "" {
+		errs = append(errs, errors.New("spec.objectName is required"))
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {

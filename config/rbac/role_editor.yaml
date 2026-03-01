@@ -25,6 +25,7 @@ rules:
   - stages
   - tasks
   - tags
+  - tagassociations
   - networkpolicies
   - resourcemonitors
   - maskingpolicies
@@ -73,6 +74,7 @@ rules:
   - stages/status
   - tasks/status
   - tags/status
+  - tagassociations/status
   - networkpolicies/status
   - resourcemonitors/status
   - maskingpolicies/status

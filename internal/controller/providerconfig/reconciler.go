@@ -190,6 +190,7 @@ func managedResourceTypes() []managedResourceEntry {
 		{proto: &snowplanev1alpha1.NetworkRule{}, newList: func() client.ObjectList { return &snowplanev1alpha1.NetworkRuleList{} }},
 		{proto: &snowplanev1alpha1.AccountRoleAssignment{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AccountRoleAssignmentList{} }},
 		{proto: &snowplanev1alpha1.DatabaseRoleAssignment{}, newList: func() client.ObjectList { return &snowplanev1alpha1.DatabaseRoleAssignmentList{} }},
+		{proto: &snowplanev1alpha1.TagAssociation{}, newList: func() client.ObjectList { return &snowplanev1alpha1.TagAssociationList{} }},
 	}
 }
 

@@ -1,0 +1,11 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: TagAssociation
+metadata:
+  name: warehouse-cost-center
+spec:
+  providerRef:
+    name: default
+  tagName: '"MY_DB"."MY_SCHEMA"."COST_CENTER"'
+  tagValue: "finance"
+  objectType: WAREHOUSE
+  objectName: '"MY_WAREHOUSE"'

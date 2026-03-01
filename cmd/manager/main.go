@@ -52,6 +52,7 @@ import (
 	streamonviewctl "github.com/hupe1980/snowplane/internal/controller/streamonview"
 	tablectl "github.com/hupe1980/snowplane/internal/controller/table"
 	tagctl "github.com/hupe1980/snowplane/internal/controller/tag"
+	tagassociationctl "github.com/hupe1980/snowplane/internal/controller/tagassociation"
 	taskctl "github.com/hupe1980/snowplane/internal/controller/task"
 	userctl "github.com/hupe1980/snowplane/internal/controller/user"
 	viewctl "github.com/hupe1980/snowplane/internal/controller/view"
@@ -111,6 +112,7 @@ var validControllerNames = map[string]bool{
 	"networkrule":             true,
 	"accountroleassignment":   true,
 	"databaseroleassignment":  true,
+	"tagassociation":          true,
 }
 
 // parseDisabledControllers parses a comma-separated list of controller names
@@ -367,6 +369,7 @@ func main() {
 		{"networkrule", networkrulectl.NewReconciler(kc, factory, controllerRec("networkrule"), rl)},
 		{"accountroleassignment", roleassignmentctl.NewAccountRoleAssignmentReconciler(kc, factory, controllerRec("accountroleassignment"), rl)},
 		{"databaseroleassignment", roleassignmentctl.NewDatabaseRoleAssignmentReconciler(kc, factory, controllerRec("databaseroleassignment"), rl)},
+		{"tagassociation", tagassociationctl.NewReconciler(kc, factory, controllerRec("tagassociation"), rl)},
 	}
 
 	for _, entry := range controllers {

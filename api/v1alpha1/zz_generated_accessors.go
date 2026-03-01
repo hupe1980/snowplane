@@ -3016,3 +3016,80 @@ func (d *DatabaseRoleAssignment) GetOwner() string {
 func (d *DatabaseRoleAssignment) GetTrackedParametersList() []string { return nil }
 
 func (d *DatabaseRoleAssignment) SetTrackedParametersList(_ []string) {}
+
+// ---------------------------------------------------------------------------
+// TagAssociation
+// ---------------------------------------------------------------------------
+
+func (ta *TagAssociation) GetConditions() []metav1.Condition {
+	return ta.Status.Conditions
+}
+
+func (ta *TagAssociation) SetConditions(conditions []metav1.Condition) {
+	ta.Status.Conditions = conditions
+}
+
+func (ta *TagAssociation) GetDeletionPolicy() DeletionPolicy {
+	if ta.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return ta.Spec.DeletionPolicy
+}
+
+func (ta *TagAssociation) GetFullyQualifiedName() string {
+	return ta.Status.FullyQualifiedName
+}
+
+func (ta *TagAssociation) GetProviderRef() ProviderReference {
+	return ta.Spec.ProviderRef
+}
+
+func (ta *TagAssociation) GetUseRole() *string {
+	return ta.Spec.UseRole
+}
+
+func (ta *TagAssociation) GetPaused() bool {
+	return ta.Spec.Paused
+}
+
+func (ta *TagAssociation) GetManagementPolicies() ManagementPolicies {
+	return ta.Spec.ManagementPolicies
+}
+
+func (ta *TagAssociation) SetCreateOrAlter(val *bool) {
+	ta.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (ta *TagAssociation) GetObservedGeneration() int64 {
+	return ta.Status.ObservedGeneration
+}
+
+func (ta *TagAssociation) SetObservedGeneration(val int64) {
+	ta.Status.ObservedGeneration = val
+}
+
+func (ta *TagAssociation) GetLastAppliedSpecHash() string {
+	return ta.Status.LastAppliedSpecHash
+}
+
+func (ta *TagAssociation) SetLastAppliedSpecHash(val string) {
+	ta.Status.LastAppliedSpecHash = val
+}
+
+func (ta *TagAssociation) ValidateSpec() error {
+	return ta.Spec.Validate()
+}
+
+func (ta *TagAssociation) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(ta.Spec)
+}
+
+func (ta *TagAssociation) GetOwner() string {
+	// Tag associations do not have an owner.
+	return ""
+}
+
+func (ta *TagAssociation) GetTrackedParametersList() []string { return nil }
+
+func (ta *TagAssociation) SetTrackedParametersList(_ []string) {}

@@ -1,0 +1,13 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: TagAssociation
+metadata:
+  name: table-cost-center
+spec:
+  providerRef:
+    name: default
+  # Use a TagRef to reference an existing Tag CR instead of a raw tag name.
+  tagRef:
+    name: cost-center
+  tagValue: "engineering"
+  objectType: TABLE
+  objectName: '"MY_DB"."MY_SCHEMA"."MY_TABLE"'

@@ -638,6 +638,7 @@ func sourceResourceTypes() []client.Object {
 		&snowplanev1alpha1.StorageIntegration{},
 		&snowplanev1alpha1.SecurityIntegration{},
 		&snowplanev1alpha1.NotificationIntegration{},
+		&snowplanev1alpha1.TagAssociation{},
 	}
 }
 
