@@ -31,6 +31,7 @@ const (
 	DefaultMaxOpenConns    = 30
 	DefaultMaxIdleConns    = 10
 	DefaultConnMaxLifetime = 30 * time.Minute
+	DefaultConnMaxIdleTime = 5 * time.Minute
 	DefaultPingTimeout     = 10 * time.Second
 )
 
@@ -95,6 +96,10 @@ type Config struct {
 	// ConnMaxLifetime overrides the default maximum connection lifetime.
 	ConnMaxLifetime time.Duration
 
+	// ConnMaxIdleTime overrides the default maximum idle connection time.
+	// Idle connections older than this are closed proactively.
+	ConnMaxIdleTime time.Duration
+
 	// PingTimeout overrides the default timeout for health checks.
 	PingTimeout time.Duration
 }
@@ -121,6 +126,14 @@ func (c *Config) connMaxLifetime() time.Duration {
 	}
 
 	return DefaultConnMaxLifetime
+}
+
+func (c *Config) connMaxIdleTime() time.Duration {
+	if c.ConnMaxIdleTime > 0 {
+		return c.ConnMaxIdleTime
+	}
+
+	return DefaultConnMaxIdleTime
 }
 
 func (c *Config) pingTimeout() time.Duration {
@@ -238,6 +251,7 @@ func NewClient(cfg Config) (*Client, error) {
 	db.SetMaxOpenConns(cfg.maxOpenConns())
 	db.SetMaxIdleConns(cfg.maxIdleConns())
 	db.SetConnMaxLifetime(cfg.connMaxLifetime())
+	db.SetConnMaxIdleTime(cfg.connMaxIdleTime())
 
 	client := &Client{
 		db:          db,

@@ -44,8 +44,7 @@ type GrantOn struct {
 // GrantOnAccountObject specifies a grant on an account-level object.
 type GrantOnAccountObject struct {
 	// ObjectType is the type of the account object.
-	// Valid values: USER, RESOURCE MONITOR, WAREHOUSE, COMPUTE POOL, DATABASE,
-	// INTEGRATION, CONNECTION, FAILOVER GROUP, REPLICATION GROUP, EXTERNAL VOLUME.
+	// +kubebuilder:validation:Enum=USER;"RESOURCE MONITOR";WAREHOUSE;"COMPUTE POOL";DATABASE;INTEGRATION;CONNECTION;"FAILOVER GROUP";"REPLICATION GROUP";"EXTERNAL VOLUME"
 	ObjectType string `json:"objectType"`
 
 	// ObjectName is the identifier of the object.
@@ -58,6 +57,7 @@ type GrantOnAccountObject struct {
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaName) ? 1 : 0) + (has(self.schemaRef) ? 1 : 0) + (has(self.allInDatabase) ? 1 : 0) + (has(self.allInDatabaseRef) ? 1 : 0) + (has(self.futureInDatabase) ? 1 : 0) + (has(self.futureInDatabaseRef) ? 1 : 0) == 1",message="exactly one of schemaName, schemaRef, allInDatabase, allInDatabaseRef, futureInDatabase, or futureInDatabaseRef must be set"
 type GrantOnSchema struct {
 	// SchemaName is the fully qualified schema name (e.g. "MY_DB"."PUBLIC").
+	// The controller uses this verbatim in ON SCHEMA <schema_name>.
 	// For: ON SCHEMA <schema_name>
 	// +optional
 	SchemaName string `json:"schemaName,omitempty"`
@@ -94,8 +94,9 @@ type GrantOnSchema struct {
 //
 // +kubebuilder:validation:XValidation:rule="(has(self.objectType) && has(self.objectName) ? 1 : 0) + (has(self.all) ? 1 : 0) + (has(self.future) ? 1 : 0) == 1",message="exactly one of (objectType+objectName), all, or future must be set"
 type GrantOnSchemaObject struct {
-	// ObjectType is the schema object type (e.g. TABLE, VIEW, STAGE, FUNCTION, PROCEDURE, STREAM, TASK, PIPE).
+	// ObjectType is the schema object type.
 	// Required when granting on a specific object.
+	// +kubebuilder:validation:Enum=TABLE;VIEW;"MATERIALIZED VIEW";STAGE;"FILE FORMAT";FUNCTION;PROCEDURE;STREAM;TASK;PIPE;SEQUENCE;TAG;"MASKING POLICY";"ROW ACCESS POLICY";ALERT;SECRET;MODEL;"DYNAMIC TABLE";"ICEBERG TABLE";"EVENT TABLE";"EXTERNAL TABLE"
 	// +optional
 	ObjectType string `json:"objectType,omitempty"`
 
@@ -121,7 +122,8 @@ type GrantOnSchemaObject struct {
 // +kubebuilder:validation:XValidation:rule="!(has(self.inSchema) && has(self.inSchemaRef))",message="inSchema and inSchemaRef are mutually exclusive"
 // +kubebuilder:validation:XValidation:rule="(has(self.inDatabase) || has(self.inDatabaseRef) ? 1 : 0) + (has(self.inSchema) || has(self.inSchemaRef) ? 1 : 0) == 1",message="exactly one scope (database or schema) must be set"
 type GrantOnBulk struct {
-	// ObjectTypePlural is the plural form of the object type (e.g. TABLES, VIEWS, STAGES).
+	// ObjectTypePlural is the plural form of the object type.
+	// +kubebuilder:validation:Enum=TABLES;VIEWS;"MATERIALIZED VIEWS";STAGES;"FILE FORMATS";FUNCTIONS;PROCEDURES;STREAMS;TASKS;PIPES;SEQUENCES;TAGS;"MASKING POLICIES";"ROW ACCESS POLICIES";ALERTS;SECRETS;MODELS;"DYNAMIC TABLES";"ICEBERG TABLES";"EVENT TABLES";"EXTERNAL TABLES";SCHEMAS
 	ObjectTypePlural string `json:"objectTypePlural"`
 
 	// InDatabase scopes the grant to all objects of the type in the specified database.

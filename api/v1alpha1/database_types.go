@@ -58,52 +58,52 @@ type DatabaseSpec struct {
 	Name string `json:"name"`
 
 	// Comment is an optional description for the database.
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// DataRetentionTimeInDays specifies the Time Travel retention period (0–90 days).
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=90
-	DataRetentionTimeInDays *int32 `json:"dataRetentionTimeInDays,omitempty"`
+	DataRetentionTimeInDays *int32 `json:"dataRetentionTimeInDays,omitempty" snowflake:"DATA_RETENTION_TIME_IN_DAYS"`
 
 	// MaxDataExtensionTimeInDays specifies the maximum number of days Snowflake
 	// can extend the data retention period.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=90
-	MaxDataExtensionTimeInDays *int32 `json:"maxDataExtensionTimeInDays,omitempty"`
+	MaxDataExtensionTimeInDays *int32 `json:"maxDataExtensionTimeInDays,omitempty" snowflake:"MAX_DATA_EXTENSION_TIME_IN_DAYS"`
 
 	// Transient indicates this is a transient database (no Fail-safe). Immutable after creation.
 	// +kubebuilder:default=false
 	Transient bool `json:"transient,omitempty"`
 
 	// Catalog specifies an Apache Iceberg catalog integration name.
-	Catalog *string `json:"catalog,omitempty"`
+	Catalog *string `json:"catalog,omitempty" snowflake:"CATALOG"`
 
 	// ExternalVolume specifies the external volume for Iceberg table storage.
-	ExternalVolume *string `json:"externalVolume,omitempty"`
+	ExternalVolume *string `json:"externalVolume,omitempty" snowflake:"EXTERNAL_VOLUME"`
 
 	// ReplaceInvalidCharacters controls whether to replace invalid UTF-8 characters.
-	ReplaceInvalidCharacters *bool `json:"replaceInvalidCharacters,omitempty"`
+	ReplaceInvalidCharacters *bool `json:"replaceInvalidCharacters,omitempty" snowflake:"REPLACE_INVALID_CHARACTERS"`
 
 	// DefaultDDLCollation sets the default collation for string columns.
-	DefaultDDLCollation *string `json:"defaultDdlCollation,omitempty"`
+	DefaultDDLCollation *string `json:"defaultDDLCollation,omitempty" snowflake:"DEFAULT_DDL_COLLATION"`
 
 	// StorageSerializationPolicy controls storage serialization format.
 	// +kubebuilder:validation:Enum=COMPATIBLE;OPTIMIZED
-	StorageSerializationPolicy *StorageSerializationPolicy `json:"storageSerializationPolicy,omitempty"`
+	StorageSerializationPolicy *StorageSerializationPolicy `json:"storageSerializationPolicy,omitempty" snowflake:"STORAGE_SERIALIZATION_POLICY"`
 
 	// LogLevel controls the logging verbosity.
 	// +kubebuilder:validation:Enum=TRACE;DEBUG;INFO;WARN;ERROR;FATAL;OFF
-	LogLevel *LogLevel `json:"logLevel,omitempty"`
+	LogLevel *LogLevel `json:"logLevel,omitempty" snowflake:"LOG_LEVEL"`
 
 	// MetricLevel controls the metric collection level.
 	// +kubebuilder:validation:Enum=NONE;ALL
-	MetricLevel *MetricLevel `json:"metricLevel,omitempty"`
+	MetricLevel *MetricLevel `json:"metricLevel,omitempty" snowflake:"METRIC_LEVEL"`
 
 	// TraceLevel controls the trace collection level.
 	// +kubebuilder:validation:Enum=ALWAYS;ON_EVENT;OFF
-	TraceLevel *TraceLevel `json:"traceLevel,omitempty"`
+	TraceLevel *TraceLevel `json:"traceLevel,omitempty" snowflake:"TRACE_LEVEL"`
 }
 
 // DatabaseShowOutput mirrors the SHOW DATABASES output stored in status.
@@ -118,7 +118,7 @@ type DatabaseShowOutput struct {
 	Kind string `json:"kind,omitempty"`
 
 	// Comment is the database description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Owner is the role that owns the database.
 	Owner string `json:"owner,omitempty"`
@@ -147,6 +147,7 @@ type DatabaseStatus struct {
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type Database struct {
 	metav1.TypeMeta   `json:",inline"`

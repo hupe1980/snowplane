@@ -229,7 +229,7 @@ spec:
   dataRetentionTimeInDays: 14
   maxDataExtensionTimeInDays: 28
   replaceInvalidCharacters: true
-  defaultDdlCollation: "en-ci"
+  defaultDDLCollation: "en-ci"
   storageSerializationPolicy: OPTIMIZED
   logLevel: INFO
   metricLevel: ALL
@@ -324,6 +324,8 @@ Snowplane uses **CRD-embedded CEL validation rules** at the API server level —
 {: .note }
 > Immutable fields are enforced at two layers — CRD schema (CEL `self == oldSelf`) and reconciler-level terminal error.
 
+**Identifier fields:** `spec.databaseName` and `spec.schemaName` expect simple Snowflake identifiers (e.g. `ANALYTICS`, `PUBLIC`), **not** fully-qualified names. The controller constructs the FQN from `databaseName` + `schemaName` + `name`. Dots in these fields are rejected by CEL validation. Use `databaseRef`/`schemaRef` to reference Snowplane-managed parents instead.
+
 ---
 
 ## Create a Schema
@@ -407,9 +409,9 @@ spec:
 ### Detect-Only Drift Policy
 
 ```yaml
-metadata:
-  annotations:
-    snowplane.hupe1980.github.io/drift-policy: detect-only
+spec:
+  managementPolicies:
+    driftPolicy: detect-only
 ```
 
 See [Drift Detection]({% link drift-detection.md %}) for details.
@@ -532,9 +534,9 @@ spec:
 For Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, NetworkRule, RowAccessPolicy, and User, `CREATE OR ALTER` is **enabled by default**. To opt out and use the legacy `CREATE IF NOT EXISTS` + `ALTER` two-step flow:
 
 ```yaml
-metadata:
-  annotations:
-    snowplane.hupe1980.github.io/use-create-or-alter: "false"
+spec:
+  managementPolicies:
+    createOrAlter: false
 ```
 
 {: .note }

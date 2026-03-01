@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -21,6 +21,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -135,36 +136,25 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
-
-// --------------------------------------------------------------------------
-// Tests: Finalizer management
-// --------------------------------------------------------------------------
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-
-	ni := newTestNotificationIntegration("myni", "default")
-	r := newTestReconciler(&mockService{}, ni, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myni", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter)
-
-	got := &snowplanev1alpha1.NotificationIntegration{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "myni", Namespace: "default"}, got))
-	assert.Contains(t, got.Finalizers, finalizerName)
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+		},
+		NewFixture: func(name, ns string) client.Object {
+			return newTestNotificationIntegration(name, ns)
+		},
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.NotificationIntegration{}
+		},
+		FinalizerName: finalizerName,
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -342,7 +332,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 				AllowedRecipients: []string{"a@b.com"},
 			},
 		}
-		fields := computeTrackedParameters(spec)
+		fields := tracked.ComputeTracked(spec)
 		assert.Contains(t, fields, "ALLOWED_RECIPIENTS")
 	})
 
@@ -356,7 +346,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 				DefaultSubject:    testutil.PtrString("Alert"),
 			},
 		}
-		fields := computeTrackedParameters(spec)
+		fields := tracked.ComputeTracked(spec)
 		assert.Contains(t, fields, "ALLOWED_RECIPIENTS")
 		assert.Contains(t, fields, "DEFAULT_RECIPIENTS")
 		assert.Contains(t, fields, "DEFAULT_SUBJECT")
@@ -373,7 +363,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 				AWSSNSRoleARN:        testutil.PtrString("arn:aws:iam::123:role/myrole"),
 			},
 		}
-		fields := computeTrackedParameters(spec)
+		fields := tracked.ComputeTracked(spec)
 		assert.Contains(t, fields, "NOTIFICATION_PROVIDER")
 		assert.Contains(t, fields, "AWS_SNS_TOPIC_ARN")
 		assert.Contains(t, fields, "AWS_SNS_ROLE_ARN")
@@ -387,7 +377,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 				WebhookURL: "https://hooks.example.com/notify",
 			},
 		}
-		fields := computeTrackedParameters(spec)
+		fields := tracked.ComputeTracked(spec)
 		assert.Contains(t, fields, "WEBHOOK_URL")
 	})
 
@@ -403,7 +393,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 				},
 			},
 		}
-		fields := computeTrackedParameters(spec)
+		fields := tracked.ComputeTracked(spec)
 		assert.Contains(t, fields, "WEBHOOK_HEADER_X-Alpha")
 		assert.Contains(t, fields, "WEBHOOK_HEADER_X-Zebra")
 		// Verify sorted order: X-Alpha before X-Zebra.
@@ -426,7 +416,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 			Type:    snowplanev1alpha1.NotificationIntegrationTypeEmail,
 			Comment: testutil.PtrString("test"),
 		}
-		assert.Contains(t, computeTrackedParameters(spec), "COMMENT")
+		assert.Contains(t, tracked.ComputeTracked(spec), "COMMENT")
 	})
 }
 
@@ -443,7 +433,7 @@ func TestComputeUnsetFields(t *testing.T) {
 				},
 			},
 		}
-		assert.Nil(t, computeUnsetFields(ni))
+		assert.Nil(t, tracked.ComputeUnset(&ni.Spec, ni.Status.TrackedParameters))
 	})
 
 	t.Run("UnsetComment", func(t *testing.T) {
@@ -457,7 +447,7 @@ func TestComputeUnsetFields(t *testing.T) {
 			},
 		}
 		ni.Status.TrackedParameters = []string{"COMMENT"}
-		unset := computeUnsetFields(ni)
+		unset := tracked.ComputeUnset(&ni.Spec, ni.Status.TrackedParameters)
 		assert.Contains(t, unset, "COMMENT")
 	})
 
@@ -475,7 +465,7 @@ func TestComputeUnsetFields(t *testing.T) {
 			},
 		}
 		ni.Status.TrackedParameters = []string{"WEBHOOK_HEADER_X-Keep", "WEBHOOK_HEADER_X-Remove"}
-		unset := computeUnsetFields(ni)
+		unset := tracked.ComputeUnset(&ni.Spec, ni.Status.TrackedParameters)
 		assert.Contains(t, unset, "WEBHOOK_HEADER_X-Remove")
 		assert.NotContains(t, unset, "WEBHOOK_HEADER_X-Keep")
 	})
@@ -492,7 +482,7 @@ func TestComputeUnsetFields(t *testing.T) {
 			},
 		}
 		ni.Status.TrackedParameters = []string{"NOTIFICATION_PROVIDER", "AWS_SNS_TOPIC_ARN", "AWS_SNS_ROLE_ARN"}
-		unset := computeUnsetFields(ni)
+		unset := tracked.ComputeUnset(&ni.Spec, ni.Status.TrackedParameters)
 		assert.Contains(t, unset, "AWS_SNS_TOPIC_ARN")
 		assert.Contains(t, unset, "AWS_SNS_ROLE_ARN")
 	})

@@ -45,7 +45,7 @@ Complete field-level documentation for all Snowplane CRDs. Each resource support
 | `spec.catalog` | `*string` | Iceberg catalog integration name |
 | `spec.externalVolume` | `*string` | External volume for Iceberg tables |
 | `spec.replaceInvalidCharacters` | `*bool` | Replace invalid UTF-8 characters |
-| `spec.defaultDdlCollation` | `*string` | Default string column collation |
+| `spec.defaultDDLCollation` | `*string` | Default string column collation |
 | `spec.storageSerializationPolicy` | `*enum` | `COMPATIBLE` / `OPTIMIZED` |
 | `spec.logLevel` | `*enum` | `TRACE` / `DEBUG` / `INFO` / `WARN` / `ERROR` / `FATAL` / `OFF` |
 | `spec.metricLevel` | `*enum` | `NONE` / `ALL` |
@@ -250,7 +250,7 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.clusterBy` | `[]string` | Clustering key expressions |
 | `spec.changeTracking` | `*bool` | Enable change tracking |
 | `spec.enableSchemaEvolution` | `*bool` | Enable schema evolution |
-| `spec.defaultDdlCollation` | `*string` | Default DDL collation |
+| `spec.defaultDDLCollation` | `*string` | Default DDL collation |
 | `spec.comment` | `*string` | Table comment |
 
 </details>

@@ -14,6 +14,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -118,7 +119,7 @@ func buildCreateOptions(pp *snowplanev1alpha1.PasswordPolicy, id snowflake.Schem
 
 func buildAlterOptions(pp *snowplanev1alpha1.PasswordPolicy, id snowflake.SchemaObjectIdentifier, obs *snowflake.PasswordPolicyObservation) snowflake.AlterPasswordPolicyOptions {
 	opts := snowflake.AlterPasswordPolicyOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(pp)
+	opts.UnsetFields = tracked.ComputeUnset(&pp.Spec, pp.Status.TrackedParameters)
 
 	// Compare each field against DESCRIBE output before including in ALTER.
 	// This avoids unnecessary ALTER statements every reconciliation cycle.
@@ -175,101 +176,6 @@ func compareDescInt32(specVal *int32, key string, desc map[string]string) *int32
 	}
 
 	return specVal
-}
-
-func computeUnsetFields(pp *snowplanev1alpha1.PasswordPolicy) []string {
-	if len(pp.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(pp.Status.TrackedParameters))
-	for _, f := range pp.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if pp.Spec.PasswordMinLength == nil && managed["PASSWORD_MIN_LENGTH"] {
-		unset = append(unset, "PASSWORD_MIN_LENGTH")
-	}
-	if pp.Spec.PasswordMaxLength == nil && managed["PASSWORD_MAX_LENGTH"] {
-		unset = append(unset, "PASSWORD_MAX_LENGTH")
-	}
-	if pp.Spec.PasswordMinUpperCaseChars == nil && managed["PASSWORD_MIN_UPPER_CASE_CHARS"] {
-		unset = append(unset, "PASSWORD_MIN_UPPER_CASE_CHARS")
-	}
-	if pp.Spec.PasswordMinLowerCaseChars == nil && managed["PASSWORD_MIN_LOWER_CASE_CHARS"] {
-		unset = append(unset, "PASSWORD_MIN_LOWER_CASE_CHARS")
-	}
-	if pp.Spec.PasswordMinNumericChars == nil && managed["PASSWORD_MIN_NUMERIC_CHARS"] {
-		unset = append(unset, "PASSWORD_MIN_NUMERIC_CHARS")
-	}
-	if pp.Spec.PasswordMinSpecialChars == nil && managed["PASSWORD_MIN_SPECIAL_CHARS"] {
-		unset = append(unset, "PASSWORD_MIN_SPECIAL_CHARS")
-	}
-	if pp.Spec.PasswordMinAgeDays == nil && managed["PASSWORD_MIN_AGE_DAYS"] {
-		unset = append(unset, "PASSWORD_MIN_AGE_DAYS")
-	}
-	if pp.Spec.PasswordMaxAgeDays == nil && managed["PASSWORD_MAX_AGE_DAYS"] {
-		unset = append(unset, "PASSWORD_MAX_AGE_DAYS")
-	}
-	if pp.Spec.PasswordMaxRetries == nil && managed["PASSWORD_MAX_RETRIES"] {
-		unset = append(unset, "PASSWORD_MAX_RETRIES")
-	}
-	if pp.Spec.PasswordLockoutTimeMins == nil && managed["PASSWORD_LOCKOUT_TIME_MINS"] {
-		unset = append(unset, "PASSWORD_LOCKOUT_TIME_MINS")
-	}
-	if pp.Spec.PasswordHistory == nil && managed["PASSWORD_HISTORY"] {
-		unset = append(unset, "PASSWORD_HISTORY")
-	}
-	if pp.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.PasswordPolicySpec) []string {
-	var fields []string
-
-	if spec.PasswordMinLength != nil {
-		fields = append(fields, "PASSWORD_MIN_LENGTH")
-	}
-	if spec.PasswordMaxLength != nil {
-		fields = append(fields, "PASSWORD_MAX_LENGTH")
-	}
-	if spec.PasswordMinUpperCaseChars != nil {
-		fields = append(fields, "PASSWORD_MIN_UPPER_CASE_CHARS")
-	}
-	if spec.PasswordMinLowerCaseChars != nil {
-		fields = append(fields, "PASSWORD_MIN_LOWER_CASE_CHARS")
-	}
-	if spec.PasswordMinNumericChars != nil {
-		fields = append(fields, "PASSWORD_MIN_NUMERIC_CHARS")
-	}
-	if spec.PasswordMinSpecialChars != nil {
-		fields = append(fields, "PASSWORD_MIN_SPECIAL_CHARS")
-	}
-	if spec.PasswordMinAgeDays != nil {
-		fields = append(fields, "PASSWORD_MIN_AGE_DAYS")
-	}
-	if spec.PasswordMaxAgeDays != nil {
-		fields = append(fields, "PASSWORD_MAX_AGE_DAYS")
-	}
-	if spec.PasswordMaxRetries != nil {
-		fields = append(fields, "PASSWORD_MAX_RETRIES")
-	}
-	if spec.PasswordLockoutTimeMins != nil {
-		fields = append(fields, "PASSWORD_LOCKOUT_TIME_MINS")
-	}
-	if spec.PasswordHistory != nil {
-		fields = append(fields, "PASSWORD_HISTORY")
-	}
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	return fields
 }
 
 func detectDrift(pp *snowplanev1alpha1.PasswordPolicy, obs *snowflake.PasswordPolicyObservation) *drift.Result {

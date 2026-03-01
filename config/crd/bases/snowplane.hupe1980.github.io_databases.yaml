@@ -26,6 +26,10 @@ spec:
     - jsonPath: .spec.name
       name: SNOWFLAKE-NAME
       type: string
+    - jsonPath: .spec.providerRef.name
+      name: PROVIDER
+      priority: 1
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
@@ -68,7 +72,7 @@ spec:
                 maximum: 90
                 minimum: 0
                 type: integer
-              defaultDdlCollation:
+              defaultDDLCollation:
                 description: DefaultDDLCollation sets the default collation for string
                   columns.
                 type: string
@@ -96,6 +100,38 @@ spec:
                 - FATAL
                 - "OFF"
                 type: string
+              managementPolicies:
+                description: ManagementPolicies specifies lifecycle policies for this
+                  resource.
+                properties:
+                  adoptionPolicy:
+                    default: fail-if-exists
+                    description: |-
+                      AdoptionPolicy controls how the reconciler handles a pre-existing
+                      Snowflake resource on first reconciliation.
+                      Defaults to "fail-if-exists".
+                    enum:
+                    - adopt
+                    - fail-if-exists
+                    type: string
+                  createOrAlter:
+                    default: true
+                    description: |-
+                      CreateOrAlter controls whether CREATE OR ALTER is used instead of
+                      the legacy CREATE + ALTER two-step flow for supported resource types.
+                      Defaults to true.
+                    type: boolean
+                  driftPolicy:
+                    default: correct
+                    description: |-
+                      DriftPolicy controls whether detected drift is corrected or only
+                      reported via conditions and events.
+                      Defaults to "correct".
+                    enum:
+                    - correct
+                    - detect-only
+                    type: string
+                type: object
               maxDataExtensionTimeInDays:
                 description: |-
                   MaxDataExtensionTimeInDays specifies the maximum number of days Snowflake
@@ -115,6 +151,13 @@ spec:
                   creation.
                 minLength: 1
                 type: string
+              paused:
+                description: |-
+                  Paused suspends reconciliation of this resource. When true, the
+                  controller skips all Snowflake operations and sets Synced=False
+                  with reason ReconcilePaused. The Snowflake resource is not modified
+                  or deleted while paused.
+                type: boolean
               providerRef:
                 description: ProviderRef references the ProviderConfig to use for
                   Snowflake connectivity.

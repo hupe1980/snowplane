@@ -3,6 +3,7 @@ module github.com/hupe1980/snowplane
 go 1.25.6
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	github.com/snowflakedb/gosnowflake v1.19.0

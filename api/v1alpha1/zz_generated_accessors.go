@@ -40,6 +40,18 @@ func (d *Database) GetUseRole() *string {
 	return d.Spec.UseRole
 }
 
+func (d *Database) GetPaused() bool {
+	return d.Spec.Paused
+}
+
+func (d *Database) GetManagementPolicies() ManagementPolicies {
+	return d.Spec.ManagementPolicies
+}
+
+func (d *Database) SetCreateOrAlter(val *bool) {
+	d.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (d *Database) GetObservedGeneration() int64 {
 	return d.Status.ObservedGeneration
 }
@@ -114,6 +126,18 @@ func (s *Schema) GetSpecName() string {
 
 func (s *Schema) GetUseRole() *string {
 	return s.Spec.UseRole
+}
+
+func (s *Schema) GetPaused() bool {
+	return s.Spec.Paused
+}
+
+func (s *Schema) GetManagementPolicies() ManagementPolicies {
+	return s.Spec.ManagementPolicies
+}
+
+func (s *Schema) SetCreateOrAlter(val *bool) {
+	s.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (s *Schema) GetObservedGeneration() int64 {
@@ -192,6 +216,18 @@ func (w *Warehouse) GetUseRole() *string {
 	return w.Spec.UseRole
 }
 
+func (w *Warehouse) GetPaused() bool {
+	return w.Spec.Paused
+}
+
+func (w *Warehouse) GetManagementPolicies() ManagementPolicies {
+	return w.Spec.ManagementPolicies
+}
+
+func (w *Warehouse) SetCreateOrAlter(val *bool) {
+	w.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (w *Warehouse) GetObservedGeneration() int64 {
 	return w.Status.ObservedGeneration
 }
@@ -266,6 +302,18 @@ func (u *User) GetSpecName() string {
 
 func (u *User) GetUseRole() *string {
 	return u.Spec.UseRole
+}
+
+func (u *User) GetPaused() bool {
+	return u.Spec.Paused
+}
+
+func (u *User) GetManagementPolicies() ManagementPolicies {
+	return u.Spec.ManagementPolicies
+}
+
+func (u *User) SetCreateOrAlter(val *bool) {
+	u.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (u *User) GetObservedGeneration() int64 {
@@ -344,6 +392,18 @@ func (r *AccountRole) GetUseRole() *string {
 	return r.Spec.UseRole
 }
 
+func (r *AccountRole) GetPaused() bool {
+	return r.Spec.Paused
+}
+
+func (r *AccountRole) GetManagementPolicies() ManagementPolicies {
+	return r.Spec.ManagementPolicies
+}
+
+func (r *AccountRole) SetCreateOrAlter(val *bool) {
+	r.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (r *AccountRole) GetObservedGeneration() int64 {
 	return r.Status.ObservedGeneration
 }
@@ -418,6 +478,18 @@ func (r *DatabaseRole) GetSpecName() string {
 
 func (r *DatabaseRole) GetUseRole() *string {
 	return r.Spec.UseRole
+}
+
+func (r *DatabaseRole) GetPaused() bool {
+	return r.Spec.Paused
+}
+
+func (r *DatabaseRole) GetManagementPolicies() ManagementPolicies {
+	return r.Spec.ManagementPolicies
+}
+
+func (r *DatabaseRole) SetCreateOrAlter(val *bool) {
+	r.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (r *DatabaseRole) GetObservedGeneration() int64 {
@@ -496,6 +568,18 @@ func (t *Tag) GetUseRole() *string {
 	return t.Spec.UseRole
 }
 
+func (t *Tag) GetPaused() bool {
+	return t.Spec.Paused
+}
+
+func (t *Tag) GetManagementPolicies() ManagementPolicies {
+	return t.Spec.ManagementPolicies
+}
+
+func (t *Tag) SetCreateOrAlter(val *bool) {
+	t.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (t *Tag) GetObservedGeneration() int64 {
 	return t.Status.ObservedGeneration
 }
@@ -570,6 +654,18 @@ func (mp *MaskingPolicy) GetSpecName() string {
 
 func (mp *MaskingPolicy) GetUseRole() *string {
 	return mp.Spec.UseRole
+}
+
+func (mp *MaskingPolicy) GetPaused() bool {
+	return mp.Spec.Paused
+}
+
+func (mp *MaskingPolicy) GetManagementPolicies() ManagementPolicies {
+	return mp.Spec.ManagementPolicies
+}
+
+func (mp *MaskingPolicy) SetCreateOrAlter(val *bool) {
+	mp.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (mp *MaskingPolicy) GetObservedGeneration() int64 {
@@ -648,6 +744,18 @@ func (rap *RowAccessPolicy) GetUseRole() *string {
 	return rap.Spec.UseRole
 }
 
+func (rap *RowAccessPolicy) GetPaused() bool {
+	return rap.Spec.Paused
+}
+
+func (rap *RowAccessPolicy) GetManagementPolicies() ManagementPolicies {
+	return rap.Spec.ManagementPolicies
+}
+
+func (rap *RowAccessPolicy) SetCreateOrAlter(val *bool) {
+	rap.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (rap *RowAccessPolicy) GetObservedGeneration() int64 {
 	return rap.Status.ObservedGeneration
 }
@@ -722,6 +830,18 @@ func (s *Stage) GetSpecName() string {
 
 func (s *Stage) GetUseRole() *string {
 	return s.Spec.UseRole
+}
+
+func (s *Stage) GetPaused() bool {
+	return s.Spec.Paused
+}
+
+func (s *Stage) GetManagementPolicies() ManagementPolicies {
+	return s.Spec.ManagementPolicies
+}
+
+func (s *Stage) SetCreateOrAlter(val *bool) {
+	s.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (s *Stage) GetObservedGeneration() int64 {
@@ -800,6 +920,18 @@ func (s *StreamOnTable) GetUseRole() *string {
 	return s.Spec.UseRole
 }
 
+func (s *StreamOnTable) GetPaused() bool {
+	return s.Spec.Paused
+}
+
+func (s *StreamOnTable) GetManagementPolicies() ManagementPolicies {
+	return s.Spec.ManagementPolicies
+}
+
+func (s *StreamOnTable) SetCreateOrAlter(val *bool) {
+	s.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (s *StreamOnTable) GetObservedGeneration() int64 {
 	return s.Status.ObservedGeneration
 }
@@ -874,6 +1006,18 @@ func (s *StreamOnView) GetSpecName() string {
 
 func (s *StreamOnView) GetUseRole() *string {
 	return s.Spec.UseRole
+}
+
+func (s *StreamOnView) GetPaused() bool {
+	return s.Spec.Paused
+}
+
+func (s *StreamOnView) GetManagementPolicies() ManagementPolicies {
+	return s.Spec.ManagementPolicies
+}
+
+func (s *StreamOnView) SetCreateOrAlter(val *bool) {
+	s.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (s *StreamOnView) GetObservedGeneration() int64 {
@@ -952,6 +1096,18 @@ func (s *StreamOnExternalTable) GetUseRole() *string {
 	return s.Spec.UseRole
 }
 
+func (s *StreamOnExternalTable) GetPaused() bool {
+	return s.Spec.Paused
+}
+
+func (s *StreamOnExternalTable) GetManagementPolicies() ManagementPolicies {
+	return s.Spec.ManagementPolicies
+}
+
+func (s *StreamOnExternalTable) SetCreateOrAlter(val *bool) {
+	s.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (s *StreamOnExternalTable) GetObservedGeneration() int64 {
 	return s.Status.ObservedGeneration
 }
@@ -1026,6 +1182,18 @@ func (s *StreamOnDirectoryTable) GetSpecName() string {
 
 func (s *StreamOnDirectoryTable) GetUseRole() *string {
 	return s.Spec.UseRole
+}
+
+func (s *StreamOnDirectoryTable) GetPaused() bool {
+	return s.Spec.Paused
+}
+
+func (s *StreamOnDirectoryTable) GetManagementPolicies() ManagementPolicies {
+	return s.Spec.ManagementPolicies
+}
+
+func (s *StreamOnDirectoryTable) SetCreateOrAlter(val *bool) {
+	s.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (s *StreamOnDirectoryTable) GetObservedGeneration() int64 {
@@ -1104,6 +1272,18 @@ func (s *StreamOnDynamicTable) GetUseRole() *string {
 	return s.Spec.UseRole
 }
 
+func (s *StreamOnDynamicTable) GetPaused() bool {
+	return s.Spec.Paused
+}
+
+func (s *StreamOnDynamicTable) GetManagementPolicies() ManagementPolicies {
+	return s.Spec.ManagementPolicies
+}
+
+func (s *StreamOnDynamicTable) SetCreateOrAlter(val *bool) {
+	s.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (s *StreamOnDynamicTable) GetObservedGeneration() int64 {
 	return s.Status.ObservedGeneration
 }
@@ -1178,6 +1358,18 @@ func (t *Task) GetSpecName() string {
 
 func (t *Task) GetUseRole() *string {
 	return t.Spec.UseRole
+}
+
+func (t *Task) GetPaused() bool {
+	return t.Spec.Paused
+}
+
+func (t *Task) GetManagementPolicies() ManagementPolicies {
+	return t.Spec.ManagementPolicies
+}
+
+func (t *Task) SetCreateOrAlter(val *bool) {
+	t.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (t *Task) GetObservedGeneration() int64 {
@@ -1256,6 +1448,18 @@ func (a *Alert) GetUseRole() *string {
 	return a.Spec.UseRole
 }
 
+func (a *Alert) GetPaused() bool {
+	return a.Spec.Paused
+}
+
+func (a *Alert) GetManagementPolicies() ManagementPolicies {
+	return a.Spec.ManagementPolicies
+}
+
+func (a *Alert) SetCreateOrAlter(val *bool) {
+	a.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (a *Alert) GetObservedGeneration() int64 {
 	return a.Status.ObservedGeneration
 }
@@ -1330,6 +1534,18 @@ func (v *View) GetSpecName() string {
 
 func (v *View) GetUseRole() *string {
 	return v.Spec.UseRole
+}
+
+func (v *View) GetPaused() bool {
+	return v.Spec.Paused
+}
+
+func (v *View) GetManagementPolicies() ManagementPolicies {
+	return v.Spec.ManagementPolicies
+}
+
+func (v *View) SetCreateOrAlter(val *bool) {
+	v.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (v *View) GetObservedGeneration() int64 {
@@ -1408,6 +1624,18 @@ func (t *Table) GetUseRole() *string {
 	return t.Spec.UseRole
 }
 
+func (t *Table) GetPaused() bool {
+	return t.Spec.Paused
+}
+
+func (t *Table) GetManagementPolicies() ManagementPolicies {
+	return t.Spec.ManagementPolicies
+}
+
+func (t *Table) SetCreateOrAlter(val *bool) {
+	t.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (t *Table) GetObservedGeneration() int64 {
 	return t.Status.ObservedGeneration
 }
@@ -1484,6 +1712,18 @@ func (np *NetworkPolicy) GetUseRole() *string {
 	return np.Spec.UseRole
 }
 
+func (np *NetworkPolicy) GetPaused() bool {
+	return np.Spec.Paused
+}
+
+func (np *NetworkPolicy) GetManagementPolicies() ManagementPolicies {
+	return np.Spec.ManagementPolicies
+}
+
+func (np *NetworkPolicy) SetCreateOrAlter(val *bool) {
+	np.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (np *NetworkPolicy) GetObservedGeneration() int64 {
 	return np.Status.ObservedGeneration
 }
@@ -1555,6 +1795,18 @@ func (rm *ResourceMonitor) GetSpecName() string {
 
 func (rm *ResourceMonitor) GetUseRole() *string {
 	return rm.Spec.UseRole
+}
+
+func (rm *ResourceMonitor) GetPaused() bool {
+	return rm.Spec.Paused
+}
+
+func (rm *ResourceMonitor) GetManagementPolicies() ManagementPolicies {
+	return rm.Spec.ManagementPolicies
+}
+
+func (rm *ResourceMonitor) SetCreateOrAlter(val *bool) {
+	rm.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (rm *ResourceMonitor) GetObservedGeneration() int64 {
@@ -1630,6 +1882,18 @@ func (si *StorageIntegration) GetUseRole() *string {
 	return si.Spec.UseRole
 }
 
+func (si *StorageIntegration) GetPaused() bool {
+	return si.Spec.Paused
+}
+
+func (si *StorageIntegration) GetManagementPolicies() ManagementPolicies {
+	return si.Spec.ManagementPolicies
+}
+
+func (si *StorageIntegration) SetCreateOrAlter(val *bool) {
+	si.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (si *StorageIntegration) GetObservedGeneration() int64 {
 	return si.Status.ObservedGeneration
 }
@@ -1701,6 +1965,18 @@ func (ff *FileFormat) GetSpecName() string {
 
 func (ff *FileFormat) GetUseRole() *string {
 	return ff.Spec.UseRole
+}
+
+func (ff *FileFormat) GetPaused() bool {
+	return ff.Spec.Paused
+}
+
+func (ff *FileFormat) GetManagementPolicies() ManagementPolicies {
+	return ff.Spec.ManagementPolicies
+}
+
+func (ff *FileFormat) SetCreateOrAlter(val *bool) {
+	ff.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (ff *FileFormat) GetObservedGeneration() int64 {
@@ -1779,6 +2055,18 @@ func (p *Pipe) GetUseRole() *string {
 	return p.Spec.UseRole
 }
 
+func (p *Pipe) GetPaused() bool {
+	return p.Spec.Paused
+}
+
+func (p *Pipe) GetManagementPolicies() ManagementPolicies {
+	return p.Spec.ManagementPolicies
+}
+
+func (p *Pipe) SetCreateOrAlter(val *bool) {
+	p.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (p *Pipe) GetObservedGeneration() int64 {
 	return p.Status.ObservedGeneration
 }
@@ -1853,6 +2141,18 @@ func (dt *DynamicTable) GetSpecName() string {
 
 func (dt *DynamicTable) GetUseRole() *string {
 	return dt.Spec.UseRole
+}
+
+func (dt *DynamicTable) GetPaused() bool {
+	return dt.Spec.Paused
+}
+
+func (dt *DynamicTable) GetManagementPolicies() ManagementPolicies {
+	return dt.Spec.ManagementPolicies
+}
+
+func (dt *DynamicTable) SetCreateOrAlter(val *bool) {
+	dt.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (dt *DynamicTable) GetObservedGeneration() int64 {
@@ -1931,6 +2231,18 @@ func (ni *NotificationIntegration) GetUseRole() *string {
 	return ni.Spec.UseRole
 }
 
+func (ni *NotificationIntegration) GetPaused() bool {
+	return ni.Spec.Paused
+}
+
+func (ni *NotificationIntegration) GetManagementPolicies() ManagementPolicies {
+	return ni.Spec.ManagementPolicies
+}
+
+func (ni *NotificationIntegration) SetCreateOrAlter(val *bool) {
+	ni.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (ni *NotificationIntegration) GetObservedGeneration() int64 {
 	return ni.Status.ObservedGeneration
 }
@@ -2004,6 +2316,18 @@ func (si *SecurityIntegration) GetUseRole() *string {
 	return si.Spec.UseRole
 }
 
+func (si *SecurityIntegration) GetPaused() bool {
+	return si.Spec.Paused
+}
+
+func (si *SecurityIntegration) GetManagementPolicies() ManagementPolicies {
+	return si.Spec.ManagementPolicies
+}
+
+func (si *SecurityIntegration) SetCreateOrAlter(val *bool) {
+	si.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (si *SecurityIntegration) GetObservedGeneration() int64 {
 	return si.Status.ObservedGeneration
 }
@@ -2075,6 +2399,18 @@ func (pp *PasswordPolicy) GetSpecName() string {
 
 func (pp *PasswordPolicy) GetUseRole() *string {
 	return pp.Spec.UseRole
+}
+
+func (pp *PasswordPolicy) GetPaused() bool {
+	return pp.Spec.Paused
+}
+
+func (pp *PasswordPolicy) GetManagementPolicies() ManagementPolicies {
+	return pp.Spec.ManagementPolicies
+}
+
+func (pp *PasswordPolicy) SetCreateOrAlter(val *bool) {
+	pp.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (pp *PasswordPolicy) GetObservedGeneration() int64 {
@@ -2153,6 +2489,18 @@ func (nr *NetworkRule) GetUseRole() *string {
 	return nr.Spec.UseRole
 }
 
+func (nr *NetworkRule) GetPaused() bool {
+	return nr.Spec.Paused
+}
+
+func (nr *NetworkRule) GetManagementPolicies() ManagementPolicies {
+	return nr.Spec.ManagementPolicies
+}
+
+func (nr *NetworkRule) SetCreateOrAlter(val *bool) {
+	nr.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (nr *NetworkRule) GetObservedGeneration() int64 {
 	return nr.Status.ObservedGeneration
 }
@@ -2225,6 +2573,18 @@ func (r *AccountRoleGrant) GetUseRole() *string {
 	return r.Spec.UseRole
 }
 
+func (r *AccountRoleGrant) GetPaused() bool {
+	return r.Spec.Paused
+}
+
+func (r *AccountRoleGrant) GetManagementPolicies() ManagementPolicies {
+	return r.Spec.ManagementPolicies
+}
+
+func (r *AccountRoleGrant) SetCreateOrAlter(val *bool) {
+	r.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (r *AccountRoleGrant) GetObservedGeneration() int64 {
 	return r.Status.ObservedGeneration
 }
@@ -2291,6 +2651,18 @@ func (r *DatabaseRoleGrant) GetProviderRef() ProviderReference {
 
 func (r *DatabaseRoleGrant) GetUseRole() *string {
 	return r.Spec.UseRole
+}
+
+func (r *DatabaseRoleGrant) GetPaused() bool {
+	return r.Spec.Paused
+}
+
+func (r *DatabaseRoleGrant) GetManagementPolicies() ManagementPolicies {
+	return r.Spec.ManagementPolicies
+}
+
+func (r *DatabaseRoleGrant) SetCreateOrAlter(val *bool) {
+	r.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (r *DatabaseRoleGrant) GetObservedGeneration() int64 {
@@ -2361,6 +2733,18 @@ func (r *ShareGrant) GetUseRole() *string {
 	return r.Spec.UseRole
 }
 
+func (r *ShareGrant) GetPaused() bool {
+	return r.Spec.Paused
+}
+
+func (r *ShareGrant) GetManagementPolicies() ManagementPolicies {
+	return r.Spec.ManagementPolicies
+}
+
+func (r *ShareGrant) SetCreateOrAlter(val *bool) {
+	r.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (r *ShareGrant) GetObservedGeneration() int64 {
 	return r.Status.ObservedGeneration
 }
@@ -2429,6 +2813,18 @@ func (g *GrantOwnership) GetUseRole() *string {
 	return g.Spec.UseRole
 }
 
+func (g *GrantOwnership) GetPaused() bool {
+	return g.Spec.Paused
+}
+
+func (g *GrantOwnership) GetManagementPolicies() ManagementPolicies {
+	return g.Spec.ManagementPolicies
+}
+
+func (g *GrantOwnership) SetCreateOrAlter(val *bool) {
+	g.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func (g *GrantOwnership) GetObservedGeneration() int64 {
 	return g.Status.ObservedGeneration
 }
@@ -2491,6 +2887,18 @@ func (a *AccountRoleAssignment) GetProviderRef() ProviderReference {
 
 func (a *AccountRoleAssignment) GetUseRole() *string {
 	return a.Spec.UseRole
+}
+
+func (a *AccountRoleAssignment) GetPaused() bool {
+	return a.Spec.Paused
+}
+
+func (a *AccountRoleAssignment) GetManagementPolicies() ManagementPolicies {
+	return a.Spec.ManagementPolicies
+}
+
+func (a *AccountRoleAssignment) SetCreateOrAlter(val *bool) {
+	a.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (a *AccountRoleAssignment) GetObservedGeneration() int64 {
@@ -2559,6 +2967,18 @@ func (d *DatabaseRoleAssignment) GetProviderRef() ProviderReference {
 
 func (d *DatabaseRoleAssignment) GetUseRole() *string {
 	return d.Spec.UseRole
+}
+
+func (d *DatabaseRoleAssignment) GetPaused() bool {
+	return d.Spec.Paused
+}
+
+func (d *DatabaseRoleAssignment) GetManagementPolicies() ManagementPolicies {
+	return d.Spec.ManagementPolicies
+}
+
+func (d *DatabaseRoleAssignment) SetCreateOrAlter(val *bool) {
+	d.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
 func (d *DatabaseRoleAssignment) GetObservedGeneration() int64 {

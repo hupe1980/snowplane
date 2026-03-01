@@ -686,9 +686,7 @@ func TestDatabase_Adoption_AdoptSuccess(t *testing.T) {
 
 	// With adoption annotation → should adopt and become Ready.
 	db := newTestDatabase(dbName, sfName)
-	db.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationAdoptionPolicy: snowplanev1alpha1.AdoptionPolicyAdopt,
-	}
+	db.Spec.ManagementPolicies.AdoptionPolicy = snowplanev1alpha1.AdoptionPolicyTypeAdopt
 	require.NoError(t, k8sClient.Create(ctx, db))
 
 	key := types.NamespacedName{Name: dbName, Namespace: testNamespace}
@@ -738,11 +736,9 @@ func TestDatabase_Adoption_ExplicitFailIfExists(t *testing.T) {
 		return databaseObservation(sfName, "", "SYSADMIN"), nil
 	})
 
-	// Explicit `fail-if-exists` annotation → should become Terminal.
+	// Explicit `fail-if-exists` policy → should become Terminal.
 	db := newTestDatabase(dbName, sfName)
-	db.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationAdoptionPolicy: snowplanev1alpha1.AdoptionPolicyFailIfExists,
-	}
+	db.Spec.ManagementPolicies.AdoptionPolicy = snowplanev1alpha1.AdoptionPolicyTypeFailIfExists
 	require.NoError(t, k8sClient.Create(ctx, db))
 
 	key := types.NamespacedName{Name: dbName, Namespace: testNamespace}
@@ -919,10 +915,9 @@ func TestDatabase_UpdateUsesAlterWhenAnnotationDisabled(t *testing.T) {
 	initComment := "coa disabled initial"
 	db.Spec.Comment = &initComment
 
-	// Explicitly disable CREATE OR ALTER via annotation.
-	db.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
-	}
+	// Explicitly disable CREATE OR ALTER via spec field.
+	f := false
+	db.Spec.ManagementPolicies.CreateOrAlter = &f
 
 	require.NoError(t, k8sClient.Create(ctx, db))
 

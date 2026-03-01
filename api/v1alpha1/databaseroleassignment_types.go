@@ -81,6 +81,7 @@ type DatabaseRoleAssignmentStatus struct {
 // +kubebuilder:printcolumn:name="DB-ROLE",type=string,JSONPath=`.spec.databaseRoleName`,priority=0
 // +kubebuilder:printcolumn:name="TO-ROLE",type=string,JSONPath=`.spec.toRole`,priority=0
 // +kubebuilder:printcolumn:name="TO-DB-ROLE",type=string,JSONPath=`.spec.toDatabaseRole`,priority=0
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type DatabaseRoleAssignment struct {
 	metav1.TypeMeta   `json:",inline"`

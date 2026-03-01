@@ -56,4 +56,5 @@ const (
 	ReasonInUse                 = "InUse"
 	ReasonDeleteBlocked         = "DeleteBlocked"
 	ReasonRoleNotAllowed        = "RoleNotAllowed"
+	ReasonReconcilePaused       = "ReconcilePaused"
 )

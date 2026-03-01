@@ -16,6 +16,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 // adapter implements reconciler.ResourceAdapter for StreamOnView.
@@ -199,7 +200,7 @@ func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.StreamOnView, obs *rec
 }
 
 func (a *adapter) ComputeTrackedParameters(obj *snowplanev1alpha1.StreamOnView) []string {
-	return computeTrackedParameters(&obj.Spec)
+	return tracked.ComputeTracked(&obj.Spec)
 }
 
 func (a *adapter) DetectDrift(obj *snowplanev1alpha1.StreamOnView, obs *reconciler.Observation[*snowflake.StreamObservation]) *drift.Result {

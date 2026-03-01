@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -22,6 +23,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -137,65 +139,25 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 }
 
 // --------------------------------------------------------------------------
-// CR Not Found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("test-user", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
-
-// --------------------------------------------------------------------------
-// Provider Config
-// --------------------------------------------------------------------------
-
-func TestReconcile_ProviderConfigNotFound(t *testing.T) {
-	t.Parallel()
-
-	user := newTestUser("test-user", "default")
-	r := newTestReconciler(&mockService{}, user)
-
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("test-user", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "fetching ProviderConfig")
-}
-
-func TestReconcile_ProviderConfigNotReady(t *testing.T) {
-	t.Parallel()
-
-	user := newTestUser("test-user", "default")
-	pc := testutil.NewTestPC("default")
-	pc.Status.Conditions = nil
-
-	r := newTestReconciler(&mockService{}, user, pc, testutil.NewTestSecret("default"))
-
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("test-user", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "ProviderConfig not ready")
-}
-
-// --------------------------------------------------------------------------
-// Finalizer
-// --------------------------------------------------------------------------
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-
-	user := newTestUser("test-user", "default")
-	mock := &mockService{}
-	r := newTestReconciler(mock, user, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("test-user", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter)
-
-	updated := &snowplanev1alpha1.User{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "test-user", Namespace: "default"}, updated))
-	assert.Contains(t, updated.Finalizers, finalizerName)
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+		},
+		NewFixture: func(name, ns string) client.Object {
+			return newTestUser(name, ns)
+		},
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.User{}
+		},
+		FinalizerName: finalizerName,
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -329,7 +291,8 @@ func TestReconcile_CreatePostObserveError(t *testing.T) {
 
 	r := newTestReconciler(mock, user, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("test-user", "default"))
-	require.NoError(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "post-create observe")
 	assert.Equal(t, 5*time.Second, result.RequeueAfter)
 }
 
@@ -364,9 +327,7 @@ func TestReconcile_UpdateWithChanges(t *testing.T) {
 	user.Status.ObservedGeneration = 1
 	user.Generation = 2
 	user.Spec.Email = testutil.PtrString("alice@newdomain.com")
-	user.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
-	}
+	user.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 
 	var capturedAlterOpts snowflake.AlterUserOptions
 	mock := &mockService{
@@ -394,9 +355,7 @@ func TestReconcile_AlterFails(t *testing.T) {
 	user.Finalizers = []string{finalizerName}
 	user.Status.ObservedGeneration = 1
 	user.Spec.Email = testutil.PtrString("alice@example.com")
-	user.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
-	}
+	user.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.UserObservation, error) {
@@ -419,9 +378,7 @@ func TestReconcile_AlterTerminalError(t *testing.T) {
 	user.Finalizers = []string{finalizerName}
 	user.Status.ObservedGeneration = 1
 	user.Spec.Email = testutil.PtrString("alice@example.com")
-	user.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
-	}
+	user.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.UserObservation, error) {
@@ -947,7 +904,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 		Comment: testutil.PtrString("test"),
 	}
 
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.Contains(t, fields, "EMAIL")
 	assert.Contains(t, fields, "COMMENT")
 }
@@ -969,7 +926,7 @@ func TestComputeTrackedParameters_NewFields(t *testing.T) {
 		DisableMFA:      &disableMFA,
 	}
 
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.Contains(t, fields, "MIDDLE_NAME")
 	assert.Contains(t, fields, "DAYS_TO_EXPIRY")
 	assert.Contains(t, fields, "MINS_TO_UNLOCK")
@@ -982,7 +939,7 @@ func TestComputeTrackedParameters_Empty(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.UserSpec{}
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.Empty(t, fields)
 }
 
@@ -1029,7 +986,7 @@ func TestComputeUnsetFields(t *testing.T) {
 	user.Spec.LoginName = testutil.PtrString("alice_login")
 	user.Status.TrackedParameters = []string{"EMAIL", "COMMENT", "LOGIN_NAME"}
 
-	unset := computeUnsetFields(user)
+	unset := tracked.ComputeUnset(&user.Spec, user.Status.TrackedParameters)
 	assert.Contains(t, unset, "EMAIL")
 	assert.Contains(t, unset, "COMMENT")
 	assert.NotContains(t, unset, "LOGIN_NAME")
@@ -1040,7 +997,7 @@ func TestComputeUnsetFields_NoTrackedParameters(t *testing.T) {
 
 	user := newTestUser("test-user", "default")
 	user.Status.TrackedParameters = nil
-	unset := computeUnsetFields(user)
+	unset := tracked.ComputeUnset(&user.Spec, user.Status.TrackedParameters)
 	assert.Nil(t, unset)
 }
 
@@ -1059,7 +1016,7 @@ func TestComputeUnsetFields_NewFields(t *testing.T) {
 		"MINS_TO_BYPASS_MFA", "NETWORK_POLICY", "DISABLE_MFA",
 	}
 
-	unset := computeUnsetFields(user)
+	unset := tracked.ComputeUnset(&user.Spec, user.Status.TrackedParameters)
 	assert.Contains(t, unset, "MIDDLE_NAME")
 	assert.Contains(t, unset, "DAYS_TO_EXPIRY")
 	assert.Contains(t, unset, "MINS_TO_UNLOCK")
@@ -1104,9 +1061,7 @@ func TestReconcile_DriftCorrection(t *testing.T) {
 	user.Status.ObservedGeneration = 1
 	user.Generation = 1
 	user.Spec.Email = testutil.PtrString("correct@example.com")
-	user.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
-	}
+	user.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	hash, err := snowplanev1alpha1.ComputeSpecHash(user.Spec)
 	require.NoError(t, err)
 	user.Status.LastAppliedSpecHash = hash
@@ -1142,9 +1097,7 @@ func TestReconcile_DriftDetectOnlyPolicy(t *testing.T) {
 	user.Finalizers = []string{finalizerName}
 	user.Status.ObservedGeneration = 1
 	user.Generation = 1
-	user.Annotations = map[string]string{
-		"snowplane.hupe1980.github.io/drift-policy": "detect-only",
-	}
+	user.Spec.ManagementPolicies.DriftPolicy = snowplanev1alpha1.DriftPolicyDetectOnly
 	user.Spec.Email = testutil.PtrString("correct@example.com")
 	hash, err := snowplanev1alpha1.ComputeSpecHash(user.Spec)
 	require.NoError(t, err)
@@ -1306,9 +1259,7 @@ func TestReconcile_UnsetTriggered(t *testing.T) {
 	user.Finalizers = []string{finalizerName}
 	user.Status.ObservedGeneration = 1
 	user.Status.TrackedParameters = []string{"COMMENT"}
-	user.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
-	}
+	user.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"

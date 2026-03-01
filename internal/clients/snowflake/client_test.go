@@ -28,6 +28,7 @@ func TestConfigDefaults(t *testing.T) {
 	assert.Equal(t, DefaultMaxOpenConns, cfg.maxOpenConns())
 	assert.Equal(t, DefaultMaxIdleConns, cfg.maxIdleConns())
 	assert.Equal(t, DefaultConnMaxLifetime, cfg.connMaxLifetime())
+	assert.Equal(t, DefaultConnMaxIdleTime, cfg.connMaxIdleTime())
 	assert.Equal(t, DefaultPingTimeout, cfg.pingTimeout())
 }
 
@@ -38,12 +39,14 @@ func TestConfigOverrides(t *testing.T) {
 		MaxOpenConns:    20,
 		MaxIdleConns:    10,
 		ConnMaxLifetime: time.Hour,
+		ConnMaxIdleTime: 10 * time.Minute,
 		PingTimeout:     30 * time.Second,
 	}
 
 	assert.Equal(t, 20, cfg.maxOpenConns())
 	assert.Equal(t, 10, cfg.maxIdleConns())
 	assert.Equal(t, time.Hour, cfg.connMaxLifetime())
+	assert.Equal(t, 10*time.Minute, cfg.connMaxIdleTime())
 	assert.Equal(t, 30*time.Second, cfg.pingTimeout())
 }
 

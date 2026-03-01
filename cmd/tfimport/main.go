@@ -28,7 +28,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
@@ -188,7 +188,7 @@ func convertDatabase(attrs map[string]any, provider, namespace string) string {
 	emitField(&b, indent, "catalog", stringAttr(attrs, "catalog"))
 	emitField(&b, indent, "externalVolume", stringAttr(attrs, "external_volume"))
 	emitBool(&b, indent, "replaceInvalidCharacters", boolAttr(attrs, "replace_invalid_characters"))
-	emitField(&b, indent, "defaultDdlCollation", stringAttr(attrs, "default_ddl_collation"))
+	emitField(&b, indent, "defaultDDLCollation", stringAttr(attrs, "default_ddl_collation"))
 	emitField(&b, indent, "storageSerializationPolicy", stringAttr(attrs, "storage_serialization_policy"))
 	emitField(&b, indent, "logLevel", stringAttr(attrs, "log_level"))
 	emitField(&b, indent, "metricLevel", stringAttr(attrs, "metric_level"))
@@ -236,7 +236,7 @@ func convertSchema(attrs map[string]any, provider, namespace string) string {
 		fmt.Fprintf(&b, "  managedAccess: true\n")
 	}
 
-	emitField(&b, indent, "defaultDdlCollation", stringAttr(attrs, "default_ddl_collation"))
+	emitField(&b, indent, "defaultDDLCollation", stringAttr(attrs, "default_ddl_collation"))
 	emitBool(&b, indent, "replaceInvalidCharacters", boolAttr(attrs, "replace_invalid_characters"))
 	emitField(&b, indent, "storageSerializationPolicy", stringAttr(attrs, "storage_serialization_policy"))
 	emitField(&b, indent, "logLevel", stringAttr(attrs, "log_level"))
@@ -653,7 +653,7 @@ func convertTable(attrs map[string]any, provider, namespace string) string {
 
 	emitInt32(&b, indent, "dataRetentionTimeInDays", int32Attr(attrs, "data_retention_time_in_days"))
 	emitBool(&b, indent, "changeTracking", boolAttr(attrs, "change_tracking"))
-	emitField(&b, indent, "defaultDdlCollation", stringAttr(attrs, "default_ddl_collation"))
+	emitField(&b, indent, "defaultDDLCollation", stringAttr(attrs, "default_ddl_collation"))
 	emitBool(&b, indent, "enableSchemaEvolution", boolAttr(attrs, "enable_schema_evolution"))
 
 	// cluster_by is a list of strings in Terraform.
@@ -933,6 +933,8 @@ var resourceTypeMap = map[string]func(map[string]any, string, string) string{
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+
 	statePath := flag.String("state", "terraform.tfstate", "Path to Terraform state file")
 	provider := flag.String("provider", "default", "Name of the Snowplane ProviderConfig to reference")
 	namespace := flag.String("namespace", "default", "Kubernetes namespace for generated manifests")
@@ -942,12 +944,14 @@ func main() {
 
 	data, err := os.ReadFile(*statePath)
 	if err != nil {
-		log.Fatalf("Error reading state file: %v", err)
+		slog.Error("Failed to read state file", "path", *statePath, "error", err)
+		os.Exit(1)
 	}
 
 	var state TerraformState
 	if err := json.Unmarshal(data, &state); err != nil {
-		log.Fatalf("Error parsing state file: %v", err)
+		slog.Error("Failed to parse state file", "path", *statePath, "error", err)
+		os.Exit(1)
 	}
 
 	var manifests []string
@@ -973,13 +977,13 @@ func main() {
 	}
 
 	if len(manifests) == 0 {
-		log.Println("No supported Snowflake resources found in state file")
+		slog.Warn("No supported Snowflake resources found in state file", "path", *statePath)
 		return
 	}
 
 	fmt.Print(strings.Join(manifests, "---\n"))
 
-	log.Printf("Generated %d manifest(s)", len(manifests))
+	slog.Info("Generated manifests", "count", len(manifests))
 
 	if *removeScript != "" {
 		script := generateRemoveScript(stateAddresses)
@@ -988,10 +992,11 @@ func main() {
 			fmt.Fprint(os.Stderr, script)
 		} else {
 			if err := os.WriteFile(*removeScript, []byte(script), 0o755); err != nil { //nolint:gosec // G306: script needs execute permission
-				log.Fatalf("Error writing remove script: %v", err)
+				slog.Error("Failed to write remove script", "path", *removeScript, "error", err)
+				os.Exit(1)
 			}
 
-			log.Printf("Wrote state-removal script to %s", *removeScript)
+			slog.Info("Wrote state-removal script", "path", *removeScript)
 		}
 	}
 }

@@ -14,6 +14,8 @@ import (
 // +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !has(oldSelf.databaseName) || self.databaseName == oldSelf.databaseName",message="spec.databaseName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="!has(self.schemaRef) || !has(oldSelf.schemaRef) || self.schemaRef == oldSelf.schemaRef",message="spec.schemaRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !has(oldSelf.schemaName) || self.schemaName == oldSelf.schemaName",message="spec.schemaName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
+// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
 type PasswordPolicySpec struct {
 	CommonSpec `json:",inline"`
 
@@ -27,7 +29,7 @@ type PasswordPolicySpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.databaseRef is immutable"
 	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
 
-	// DatabaseName is the literal Snowflake database name.
+	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -40,7 +42,8 @@ type PasswordPolicySpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.schemaRef is immutable"
 	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
 
-	// SchemaName is the literal Snowflake fully-qualified schema name (DB.SCHEMA).
+	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
+	// The controller constructs the FQN from databaseName + schemaName + name.
 	// Mutually exclusive with SchemaRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -51,71 +54,71 @@ type PasswordPolicySpec struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=8
 	// +kubebuilder:validation:Maximum=256
-	PasswordMinLength *int32 `json:"passwordMinLength,omitempty"`
+	PasswordMinLength *int32 `json:"passwordMinLength,omitempty" snowflake:"PASSWORD_MIN_LENGTH"`
 
 	// PasswordMaxLength is the maximum number of characters the password can contain.
 	// +optional
 	// +kubebuilder:validation:Minimum=8
 	// +kubebuilder:validation:Maximum=256
-	PasswordMaxLength *int32 `json:"passwordMaxLength,omitempty"`
+	PasswordMaxLength *int32 `json:"passwordMaxLength,omitempty" snowflake:"PASSWORD_MAX_LENGTH"`
 
 	// PasswordMinUpperCaseChars is the minimum number of uppercase characters.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=256
-	PasswordMinUpperCaseChars *int32 `json:"passwordMinUpperCaseChars,omitempty"`
+	PasswordMinUpperCaseChars *int32 `json:"passwordMinUpperCaseChars,omitempty" snowflake:"PASSWORD_MIN_UPPER_CASE_CHARS"`
 
 	// PasswordMinLowerCaseChars is the minimum number of lowercase characters.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=256
-	PasswordMinLowerCaseChars *int32 `json:"passwordMinLowerCaseChars,omitempty"`
+	PasswordMinLowerCaseChars *int32 `json:"passwordMinLowerCaseChars,omitempty" snowflake:"PASSWORD_MIN_LOWER_CASE_CHARS"`
 
 	// PasswordMinNumericChars is the minimum number of numeric characters.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=256
-	PasswordMinNumericChars *int32 `json:"passwordMinNumericChars,omitempty"`
+	PasswordMinNumericChars *int32 `json:"passwordMinNumericChars,omitempty" snowflake:"PASSWORD_MIN_NUMERIC_CHARS"`
 
 	// PasswordMinSpecialChars is the minimum number of special characters.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=256
-	PasswordMinSpecialChars *int32 `json:"passwordMinSpecialChars,omitempty"`
+	PasswordMinSpecialChars *int32 `json:"passwordMinSpecialChars,omitempty" snowflake:"PASSWORD_MIN_SPECIAL_CHARS"`
 
 	// PasswordMinAgeDays is the minimum number of days before a password can be changed.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=999
-	PasswordMinAgeDays *int32 `json:"passwordMinAgeDays,omitempty"`
+	PasswordMinAgeDays *int32 `json:"passwordMinAgeDays,omitempty" snowflake:"PASSWORD_MIN_AGE_DAYS"`
 
 	// PasswordMaxAgeDays is the maximum number of days a password is valid (0 = no expiry).
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=999
-	PasswordMaxAgeDays *int32 `json:"passwordMaxAgeDays,omitempty"`
+	PasswordMaxAgeDays *int32 `json:"passwordMaxAgeDays,omitempty" snowflake:"PASSWORD_MAX_AGE_DAYS"`
 
 	// PasswordMaxRetries is the maximum number of failed login attempts before lockout.
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=10
-	PasswordMaxRetries *int32 `json:"passwordMaxRetries,omitempty"`
+	PasswordMaxRetries *int32 `json:"passwordMaxRetries,omitempty" snowflake:"PASSWORD_MAX_RETRIES"`
 
 	// PasswordLockoutTimeMins is the lockout duration in minutes after exceeding max retries.
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=999
-	PasswordLockoutTimeMins *int32 `json:"passwordLockoutTimeMins,omitempty"`
+	PasswordLockoutTimeMins *int32 `json:"passwordLockoutTimeMins,omitempty" snowflake:"PASSWORD_LOCKOUT_TIME_MINS"`
 
 	// PasswordHistory is the number of recent passwords that cannot be reused.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=24
-	PasswordHistory *int32 `json:"passwordHistory,omitempty"`
+	PasswordHistory *int32 `json:"passwordHistory,omitempty" snowflake:"PASSWORD_HISTORY"`
 
 	// Comment is an optional description for the password policy.
 	// +optional
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // PasswordPolicyShowOutput mirrors the SHOW PASSWORD POLICIES output stored in status.
@@ -136,7 +139,7 @@ type PasswordPolicyShowOutput struct {
 	Owner string `json:"owner,omitempty"`
 
 	// Comment is the policy description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // PasswordPolicyStatus defines the observed state of a PasswordPolicy.
@@ -166,6 +169,7 @@ type PasswordPolicyStatus struct {
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type PasswordPolicy struct {
 	metav1.TypeMeta   `json:",inline"`

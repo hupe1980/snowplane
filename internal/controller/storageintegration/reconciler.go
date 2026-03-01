@@ -15,6 +15,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -114,7 +115,7 @@ func buildCreateOptions(si *snowplanev1alpha1.StorageIntegration, id snowflake.A
 
 func buildAlterOptions(si *snowplanev1alpha1.StorageIntegration, id snowflake.AccountObjectIdentifier, obs *snowflake.StorageIntegrationObservation) snowflake.AlterStorageIntegrationOptions {
 	opts := snowflake.AlterStorageIntegrationOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(si)
+	opts.UnsetFields = tracked.ComputeUnset(&si.Spec, si.Status.TrackedParameters)
 
 	// Enabled — always send if set.
 	if si.Spec.Enabled != nil {
@@ -169,63 +170,6 @@ func buildAlterOptions(si *snowplanev1alpha1.StorageIntegration, id snowflake.Ac
 	}
 
 	return opts
-}
-
-func computeUnsetFields(si *snowplanev1alpha1.StorageIntegration) []string {
-	if len(si.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(si.Status.TrackedParameters))
-	for _, f := range si.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if si.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	if len(si.Spec.StorageBlockedLocations) == 0 && managed["STORAGE_BLOCKED_LOCATIONS"] {
-		unset = append(unset, "STORAGE_BLOCKED_LOCATIONS")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.StorageIntegrationSpec) []string {
-	var fields []string
-
-	if spec.Enabled != nil {
-		fields = append(fields, "ENABLED")
-	}
-
-	if len(spec.StorageAllowedLocations) > 0 {
-		fields = append(fields, "STORAGE_ALLOWED_LOCATIONS")
-	}
-
-	if len(spec.StorageBlockedLocations) > 0 {
-		fields = append(fields, "STORAGE_BLOCKED_LOCATIONS")
-	}
-
-	if spec.StorageAWSRoleARN != nil {
-		fields = append(fields, "STORAGE_AWS_ROLE_ARN")
-	}
-
-	if spec.StorageAWSExternalID != nil {
-		fields = append(fields, "STORAGE_AWS_EXTERNAL_ID")
-	}
-
-	if spec.AzureTenantID != nil {
-		fields = append(fields, "AZURE_TENANT_ID")
-	}
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	return fields
 }
 
 func detectDrift(si *snowplanev1alpha1.StorageIntegration, obs *snowflake.StorageIntegrationObservation) *drift.Result {

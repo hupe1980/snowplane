@@ -350,9 +350,7 @@ func TestWarehouse_Adoption_AdoptSuccess(t *testing.T) {
 
 	// With adoption annotation → should adopt and become Ready.
 	wh := newTestWarehouse(whK8s, sfWH)
-	wh.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationAdoptionPolicy: snowplanev1alpha1.AdoptionPolicyAdopt,
-	}
+	wh.Spec.ManagementPolicies.AdoptionPolicy = snowplanev1alpha1.AdoptionPolicyTypeAdopt
 	require.NoError(t, k8sClient.Create(ctx, wh))
 
 	key := types.NamespacedName{Name: whK8s, Namespace: testNamespace}
@@ -389,5 +387,117 @@ func TestWarehouse_Adoption_AdoptSuccess(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return k8sClient.Get(ctx, key, &snowplanev1alpha1.Warehouse{}) != nil
+	}, defaultTimeout, defaultInterval)
+}
+
+// ---------------------------------------------------------------------------
+// Warehouse Structural Drift Detection Test
+// ---------------------------------------------------------------------------
+// This test verifies that drift detection works for structural fields
+// (warehouse size), not just simple string fields like comments.
+
+func TestWarehouse_StructuralDriftDetection(t *testing.T) {
+	resetMocks()
+
+	whK8s := "wh-struct-drift-test"
+	sfWH := "WH_STRUCT_DRIFT_TEST"
+
+	var (
+		created atomic.Bool
+		curSize atomic.Value
+	)
+
+	desiredSize := snowplanev1alpha1.WarehouseSizeSmall
+	curSize.Store("SMALL")
+
+	warehouseMockSvc.SetObserve(func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.WarehouseObservation, error) {
+		if created.Load() {
+			return &snowflake.WarehouseObservation{
+				Exists: true,
+				ShowOutput: &snowflake.WarehouseShowOutput{
+					CreatedOn:       "2024-01-01",
+					Name:            sfWH,
+					State:           "STARTED",
+					Type:            "STANDARD",
+					Size:            curSize.Load().(string),
+					Comment:         "",
+					Owner:           "SYSADMIN",
+					AutoSuspend:     600,
+					AutoResume:      true,
+					MinClusterCount: 1,
+					MaxClusterCount: 1,
+					ScalingPolicy:   "STANDARD",
+				},
+				Parameters: &snowflake.WarehouseParameters{
+					MaxConcurrencyLevel:             ptrInt32(8),
+					StatementQueuedTimeoutInSeconds: ptrInt32(0),
+					StatementTimeoutInSeconds:       ptrInt32(172800),
+					EnableQueryAcceleration:         ptrBool(false),
+					QueryAccelerationMaxScaleFactor: ptrInt32(8),
+				},
+			}, nil
+		}
+
+		return &snowflake.WarehouseObservation{Exists: false}, nil
+	})
+
+	// Warehouse uses CREATE OR ALTER, so drift correction goes through Create.
+	warehouseMockSvc.SetCreate(func(_ context.Context, opts snowflake.CreateWarehouseOptions) error {
+		created.Store(true)
+
+		if opts.WarehouseSize != nil {
+			curSize.Store(*opts.WarehouseSize)
+		}
+
+		return nil
+	})
+
+	wh := newTestWarehouse(whK8s, sfWH)
+	wh.Spec.WarehouseSize = &desiredSize
+	require.NoError(t, k8sClient.Create(ctx, wh))
+
+	key := types.NamespacedName{Name: whK8s, Namespace: testNamespace}
+
+	// Wait for initial Ready.
+	require.Eventually(t, func() bool {
+		var obj snowplanev1alpha1.Warehouse
+		if err := k8sClient.Get(ctx, key, &obj); err != nil {
+			return false
+		}
+
+		return conditions.IsTrue(&obj, snowplanev1alpha1.TypeReady) && obj.Status.LastAppliedSpecHash != ""
+	}, defaultTimeout, defaultInterval)
+
+	// Verify initial size.
+	assert.Equal(t, "SMALL", curSize.Load().(string))
+
+	// Simulate external structural drift: warehouse size changed in Snowflake.
+	curSize.Store("XLARGE")
+
+	// Wait for reconciler to detect drift and correct it via CREATE OR ALTER.
+	require.Eventually(t, func() bool {
+		return curSize.Load().(string) == "SMALL"
+	}, defaultTimeout, defaultInterval, "structural drift on warehouse size should be detected and corrected")
+
+	// Verify the K8s status object also reflects the corrected size.
+	require.Eventually(t, func() bool {
+		var obj snowplanev1alpha1.Warehouse
+		if err := k8sClient.Get(ctx, key, &obj); err != nil {
+			return false
+		}
+
+		return obj.Status.ShowOutput != nil && obj.Status.ShowOutput.Size == "SMALL"
+	}, defaultTimeout, defaultInterval, "status.showOutput.size should reflect corrected value")
+
+	// Cleanup.
+	warehouseMockSvc.SetDrop(func(_ context.Context, _ snowflake.AccountObjectIdentifier) error { return nil })
+
+	var current snowplanev1alpha1.Warehouse
+	require.NoError(t, k8sClient.Get(ctx, key, &current))
+	require.NoError(t, k8sClient.Delete(ctx, &current))
+
+	require.Eventually(t, func() bool {
+		var obj snowplanev1alpha1.Warehouse
+		return k8sClient.Get(ctx, key, &obj) != nil
 	}, defaultTimeout, defaultInterval)
 }

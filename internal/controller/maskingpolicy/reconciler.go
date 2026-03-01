@@ -13,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -114,7 +115,7 @@ func buildCreateOptions(mp *snowplanev1alpha1.MaskingPolicy, id snowflake.Schema
 
 func buildAlterOptions(mp *snowplanev1alpha1.MaskingPolicy, id snowflake.SchemaObjectIdentifier, obs *snowflake.MaskingPolicyObservation) snowflake.AlterMaskingPolicyOptions {
 	opts := snowflake.AlterMaskingPolicyOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(mp)
+	opts.UnsetFields = tracked.ComputeUnset(&mp.Spec, mp.Status.TrackedParameters)
 
 	// Body is always sent to ensure convergence (not in SHOW output).
 	body := mp.Spec.Body
@@ -127,42 +128,6 @@ func buildAlterOptions(mp *snowplanev1alpha1.MaskingPolicy, id snowflake.SchemaO
 	}
 
 	return opts
-}
-
-func computeUnsetFields(mp *snowplanev1alpha1.MaskingPolicy) []string {
-	if len(mp.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(mp.Status.TrackedParameters))
-	for _, f := range mp.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if mp.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.MaskingPolicySpec) []string {
-	var fields []string
-
-	// Body is always tracked since it's required.
-	fields = append(fields, "BODY")
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	if spec.ExemptOtherPolicies != nil {
-		fields = append(fields, "EXEMPT_OTHER_POLICIES")
-	}
-
-	return fields
 }
 
 func detectDrift(mp *snowplanev1alpha1.MaskingPolicy, obs *snowflake.MaskingPolicyObservation) *drift.Result {

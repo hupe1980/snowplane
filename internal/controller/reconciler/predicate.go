@@ -11,12 +11,13 @@ import (
 // trigger immediate reconciliation when changed. Controller-internal annotations
 // (creation-initiated, late-initialized) are excluded — they are set by the
 // reconciler itself during a reconcile pass that already handles state changes.
+//
+// Note: adoption-policy, drift-policy, and use-create-or-alter were promoted
+// to spec.managementPolicies fields. Spec changes bump .metadata.generation
+// and are handled by GenerationChangedPredicate, so no annotation entry is needed.
 var snowplaneAnnotations = []string{
 	snowplanev1alpha1.AnnotationForceNew,
-	snowplanev1alpha1.AnnotationAdoptionPolicy,
-	snowplanev1alpha1.AnnotationDriftPolicy,
 	snowplanev1alpha1.AnnotationAllowDangerousGrant,
-	snowplanev1alpha1.AnnotationUseCreateOrAlter,
 	snowplanev1alpha1.AnnotationAbandonOnDelete,
 }
 
@@ -26,7 +27,7 @@ var snowplaneAnnotations = []string{
 //
 // This complements [predicate.GenerationChangedPredicate]: spec changes bump
 // .metadata.generation, but annotation changes do not. Without this predicate,
-// annotation-driven features (force-new, drift-policy, abandon-on-delete, etc.)
+// annotation-driven features (force-new, allow-dangerous-grant, abandon-on-delete)
 // would require waiting for the next periodic resync (up to 5 minutes).
 //
 // Design decision: Snowplane uses a *watched* annotation set rather than
@@ -60,7 +61,7 @@ func (AnnotationChangedPredicate) Update(e event.UpdateEvent) bool {
 //   - spec changes (via GenerationChangedPredicate — generation is bumped by the
 //     API server on spec mutations)
 //   - Snowplane annotation changes (via AnnotationChangedPredicate — annotations
-//     like force-new, drift-policy, abandon-on-delete do not bump generation)
+//     like force-new, allow-dangerous-grant, abandon-on-delete do not bump generation)
 //
 // Status-only updates, label changes, and non-Snowplane annotation changes are
 // filtered out, preventing self-triggering loops and noise from external tools.

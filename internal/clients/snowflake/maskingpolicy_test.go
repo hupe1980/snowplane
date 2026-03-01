@@ -18,7 +18,7 @@ func TestBuildSignatureClause(t *testing.T) {
 		t.Parallel()
 		args := []MaskingPolicyArgument{{Name: "val", Type: "VARCHAR"}}
 		got := buildSignatureClause(args)
-		assert.Equal(t, "AS (val VARCHAR) RETURNS VARCHAR", got)
+		assert.Equal(t, `AS ("val" VARCHAR) RETURNS VARCHAR`, got)
 	})
 
 	t.Run("MultipleArgs", func(t *testing.T) {
@@ -28,14 +28,14 @@ func TestBuildSignatureClause(t *testing.T) {
 			{Name: "role", Type: "VARCHAR"},
 		}
 		got := buildSignatureClause(args)
-		assert.Equal(t, "AS (val VARCHAR, role VARCHAR) RETURNS VARCHAR", got)
+		assert.Equal(t, `AS ("val" VARCHAR, "role" VARCHAR) RETURNS VARCHAR`, got)
 	})
 
 	t.Run("NumberType", func(t *testing.T) {
 		t.Parallel()
 		args := []MaskingPolicyArgument{{Name: "num", Type: "NUMBER"}}
 		got := buildSignatureClause(args)
-		assert.Equal(t, "AS (num NUMBER) RETURNS NUMBER", got)
+		assert.Equal(t, `AS ("num" NUMBER) RETURNS NUMBER`, got)
 	})
 }
 
@@ -51,7 +51,7 @@ func TestBuildCreateMaskingPolicySQL(t *testing.T) {
 		}
 		got := buildCreateMaskingPolicySQL(opts)
 		assert.Contains(t, got, `CREATE MASKING POLICY IF NOT EXISTS "DB"."SCH"."MASK_EMAIL"`)
-		assert.Contains(t, got, "AS (val VARCHAR) RETURNS VARCHAR")
+		assert.Contains(t, got, `AS ("val" VARCHAR) RETURNS VARCHAR`)
 		assert.Contains(t, got, "-> CASE WHEN current_role() IN ('ADMIN') THEN val ELSE '***' END")
 	})
 
@@ -105,7 +105,7 @@ func TestBuildCreateMaskingPolicySQL_CreateOrAlter(t *testing.T) {
 	got := buildCreateMaskingPolicySQL(opts)
 	assert.Contains(t, got, `CREATE OR ALTER MASKING POLICY "DB"."SCH"."MASK_EMAIL"`)
 	assert.NotContains(t, got, "IF NOT EXISTS")
-	assert.Contains(t, got, "AS (val VARCHAR) RETURNS VARCHAR")
+	assert.Contains(t, got, `AS ("val" VARCHAR) RETURNS VARCHAR`)
 }
 
 func TestBuildAlterMaskingPolicyStatements(t *testing.T) {

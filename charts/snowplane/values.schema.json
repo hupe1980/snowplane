@@ -1,0 +1,550 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Snowplane Helm Values",
+  "description": "JSON schema for the Snowplane Helm chart values.yaml.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of controller manager replicas."
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Container image repository."
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"],
+          "description": "Image pull policy."
+        },
+        "tag": {
+          "type": "string",
+          "description": "Overrides the image tag (defaults to chart appVersion)."
+        }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" }
+        },
+        "required": ["name"]
+      },
+      "description": "Image pull secrets."
+    },
+    "nameOverride": {
+      "type": "string",
+      "description": "Override the release name."
+    },
+    "fullnameOverride": {
+      "type": "string",
+      "description": "Override the full release name."
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create": {
+          "type": "boolean",
+          "description": "Create a ServiceAccount."
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Annotations to add to the ServiceAccount (e.g. for IRSA/Workload Identity)."
+        },
+        "name": {
+          "type": "string",
+          "description": "Override the ServiceAccount name."
+        }
+      }
+    },
+    "workloadIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable projected ServiceAccount token volume for Workload Identity Federation."
+        },
+        "audience": {
+          "type": "string",
+          "description": "Token audience (must match the Snowflake security integration configuration)."
+        },
+        "expirationSeconds": {
+          "type": "integer",
+          "minimum": 600,
+          "maximum": 86400,
+          "description": "Token expiration in seconds (kubelet refreshes before expiry)."
+        },
+        "mountPath": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Mount path for the projected token volume."
+        },
+        "tokenFileName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Token file name within the mount path."
+        }
+      }
+    },
+    "podAnnotations": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Pod annotations."
+    },
+    "podSecurityContext": {
+      "type": "object",
+      "description": "Pod security context.",
+      "properties": {
+        "runAsNonRoot": { "type": "boolean" },
+        "runAsUser": { "type": "integer" },
+        "runAsGroup": { "type": "integer" },
+        "fsGroup": { "type": "integer" },
+        "seccompProfile": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["RuntimeDefault", "Localhost", "Unconfined"]
+            },
+            "localhostProfile": { "type": "string" }
+          }
+        }
+      }
+    },
+    "securityContext": {
+      "type": "object",
+      "description": "Container security context.",
+      "properties": {
+        "allowPrivilegeEscalation": { "type": "boolean" },
+        "readOnlyRootFilesystem": { "type": "boolean" },
+        "runAsNonRoot": { "type": "boolean" },
+        "runAsUser": { "type": "integer" },
+        "runAsGroup": { "type": "integer" },
+        "capabilities": {
+          "type": "object",
+          "properties": {
+            "drop": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "add": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Container resource requests and limits.",
+      "properties": {
+        "limits": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": "string" },
+            "memory": { "type": "string" }
+          }
+        },
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": "string" },
+            "memory": { "type": "string" }
+          }
+        }
+      }
+    },
+    "nodeSelector": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Node selector for pod scheduling."
+    },
+    "tolerations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "operator": { "type": "string", "enum": ["Exists", "Equal"] },
+          "value": { "type": "string" },
+          "effect": { "type": "string", "enum": ["NoSchedule", "PreferNoSchedule", "NoExecute"] },
+          "tolerationSeconds": { "type": "integer" }
+        }
+      },
+      "description": "Tolerations for pod scheduling."
+    },
+    "affinity": {
+      "type": "object",
+      "description": "Affinity rules for pod scheduling."
+    },
+    "terminationGracePeriodSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Termination grace period in seconds."
+    },
+    "controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Controller manager configuration.",
+      "properties": {
+        "maxConcurrentReconciles": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum concurrent reconciles per controller."
+        },
+        "requeueInterval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$",
+          "description": "Requeue interval for drift detection (e.g. '5m', '30s')."
+        },
+        "enableAlphaResources": {
+          "type": "boolean",
+          "description": "Enable alpha-maturity resource controllers."
+        },
+        "disableControllers": {
+          "type": "string",
+          "description": "Comma-separated list of controllers to disable (e.g. 'grant,view')."
+        },
+        "allowedRoles": {
+          "type": "string",
+          "description": "Comma-separated allowlist of Snowflake roles permitted in ProviderConfig (case-insensitive). If empty, all roles are allowed."
+        },
+        "snowflakeOpTimeout": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$",
+          "description": "Per-operation timeout for Snowflake CRUD calls."
+        }
+      }
+    },
+    "circuitBreaker": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Circuit breaker configuration for per-provider failure isolation.",
+      "properties": {
+        "threshold": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Consecutive failures before the circuit opens."
+        },
+        "resetTimeout": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$",
+          "description": "Duration the circuit stays open before allowing a probe request."
+        }
+      }
+    },
+    "leaderElection": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Leader election configuration.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable leader election."
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Metrics endpoint configuration.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable metrics endpoint."
+        },
+        "bindAddress": {
+          "type": "string",
+          "description": "Metrics bind address."
+        },
+        "containerPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Container port for metrics endpoint."
+        },
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Create a Service for the metrics endpoint."
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "description": "Metrics service port."
+            }
+          }
+        },
+        "serviceMonitor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Create a Prometheus ServiceMonitor."
+            },
+            "additionalLabels": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "Additional labels for the ServiceMonitor."
+            },
+            "interval": {
+              "type": "string",
+              "pattern": "^[0-9]+(s|m|h)$",
+              "description": "Scrape interval."
+            }
+          }
+        }
+      }
+    },
+    "healthProbes": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Health probe configuration.",
+      "properties": {
+        "bindAddress": {
+          "type": "string",
+          "description": "Health probe bind address."
+        },
+        "containerPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Container port for health probes."
+        }
+      }
+    },
+    "rateLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Snowflake API rate limiting configuration.",
+      "properties": {
+        "qps": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum sustained queries per second to Snowflake per controller per provider (0 = disabled)."
+        },
+        "burst": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum burst size for per-controller Snowflake API rate limiter."
+        },
+        "accountQps": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum aggregate queries per second to Snowflake per account across all controllers (0 = disabled)."
+        },
+        "accountBurst": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum burst size for per-account aggregate Snowflake API rate limiter."
+        }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Logging configuration.",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["info", "debug", "error"],
+          "description": "Log level."
+        },
+        "development": {
+          "type": "boolean",
+          "description": "Enable development mode (human-readable output)."
+        }
+      }
+    },
+    "podDisruptionBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "PodDisruptionBudget configuration.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Create a PodDisruptionBudget."
+        },
+        "maxUnavailable": {
+          "type": ["integer", "string"],
+          "description": "Maximum unavailable pods (integer or percentage string)."
+        },
+        "minAvailable": {
+          "type": ["integer", "string"],
+          "description": "Minimum available pods (integer or percentage string)."
+        }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "NetworkPolicy configuration for defense-in-depth.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Create a NetworkPolicy for the controller pod."
+        },
+        "restrictDNS": {
+          "type": "boolean",
+          "description": "Restrict DNS egress to pods in the kube-system namespace."
+        },
+        "egressCIDRs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9./]+$"
+          },
+          "description": "Restrict HTTPS/Kubernetes API egress to specific CIDRs."
+        },
+        "metricsNamespace": {
+          "type": "string",
+          "description": "Restrict metrics ingress to pods in a specific namespace."
+        },
+        "extraEgress": {
+          "type": "array",
+          "items": { "type": "object" },
+          "description": "Additional egress rules appended to the generated policy."
+        },
+        "extraIngress": {
+          "type": "array",
+          "items": { "type": "object" },
+          "description": "Additional ingress rules appended to the generated policy."
+        }
+      }
+    },
+    "priorityClassName": {
+      "type": "string",
+      "description": "Priority class name for pod scheduling (e.g. system-cluster-critical)."
+    },
+    "topologySpreadConstraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "maxSkew": { "type": "integer", "minimum": 1 },
+          "topologyKey": { "type": "string" },
+          "whenUnsatisfiable": { "type": "string", "enum": ["DoNotSchedule", "ScheduleAnyway"] },
+          "labelSelector": { "type": "object" }
+        }
+      },
+      "description": "Topology spread constraints for pod scheduling."
+    },
+    "watchNamespaces": {
+      "type": "string",
+      "description": "Comma-separated list of namespaces to watch. Empty means all namespaces."
+    },
+    "rbac": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "RBAC configuration.",
+      "properties": {
+        "secrets": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "read": {
+              "type": "boolean",
+              "description": "Grant read access (get, list, watch) to Secrets cluster-wide."
+            },
+            "write": {
+              "type": "boolean",
+              "description": "Grant write access (create, patch, delete) to Secrets cluster-wide."
+            }
+          }
+        },
+        "configMaps": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "write": {
+              "type": "boolean",
+              "description": "Grant write access (create, patch, delete) to ConfigMaps cluster-wide."
+            }
+          }
+        }
+      }
+    },
+    "leaderElectionID": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Leader election identity. Override when running multiple Snowplane instances."
+    },
+    "extraEnv": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "value": { "type": "string" },
+          "valueFrom": { "type": "object" }
+        },
+        "required": ["name"]
+      },
+      "description": "Additional environment variables for the controller container."
+    },
+    "extraVolumes": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "Additional volumes for the pod."
+    },
+    "extraVolumeMounts": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "Additional volume mounts for the controller container."
+    },
+    "revisionHistoryLimit": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of old ReplicaSets to retain for rollback."
+    },
+    "grafana": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Grafana dashboard provisioning.",
+      "properties": {
+        "dashboard": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Deploy a Grafana dashboard ConfigMap."
+            },
+            "namespace": {
+              "type": "string",
+              "description": "Namespace to deploy the dashboard ConfigMap (defaults to release namespace)."
+            },
+            "labels": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "Additional labels for the dashboard ConfigMap."
+            },
+            "annotations": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "Annotations for the dashboard ConfigMap."
+            }
+          }
+        }
+      }
+    }
+  }
+}

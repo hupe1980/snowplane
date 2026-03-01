@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -21,6 +21,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -136,51 +137,25 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
-
-// --------------------------------------------------------------------------
-// Tests: ProviderConfig resolution
-// --------------------------------------------------------------------------
-
-func TestReconcile_ProviderConfigNotFound(t *testing.T) {
-	t.Parallel()
-
-	alert := newTestAlert("myalert", "default")
-	r := newTestReconciler(&mockService{}, alert)
-
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myalert", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "fetching ProviderConfig")
-}
-
-// --------------------------------------------------------------------------
-// Tests: Finalizer management
-// --------------------------------------------------------------------------
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-
-	alert := newTestAlert("myalert", "default")
-	r := newTestReconciler(&mockService{}, alert, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myalert", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter)
-
-	got := &snowplanev1alpha1.Alert{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "myalert", Namespace: "default"}, got))
-	assert.Contains(t, got.Finalizers, finalizerName)
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+		},
+		NewFixture: func(name, ns string) client.Object {
+			return newTestAlert(name, ns)
+		},
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.Alert{}
+		},
+		FinalizerName: finalizerName,
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -646,14 +621,14 @@ func TestComputeUnsetFields(t *testing.T) {
 
 	t.Run("NoTracked", func(t *testing.T) {
 		alert := newTestAlert("myalert", "default")
-		result := computeUnsetFields(alert)
+		result := tracked.ComputeUnset(&alert.Spec, alert.Status.TrackedParameters)
 		assert.Nil(t, result)
 	})
 
 	t.Run("CommentTracked_NowNil", func(t *testing.T) {
 		alert := newTestAlert("myalert", "default")
 		alert.Status.TrackedParameters = []string{"COMMENT"}
-		result := computeUnsetFields(alert)
+		result := tracked.ComputeUnset(&alert.Spec, alert.Status.TrackedParameters)
 		assert.Contains(t, result, "COMMENT")
 	})
 
@@ -661,7 +636,7 @@ func TestComputeUnsetFields(t *testing.T) {
 		alert := newTestAlert("myalert", "default")
 		alert.Status.TrackedParameters = []string{"COMMENT"}
 		alert.Spec.Comment = testutil.PtrString("still here")
-		result := computeUnsetFields(alert)
+		result := tracked.ComputeUnset(&alert.Spec, alert.Status.TrackedParameters)
 		assert.Empty(t, result)
 	})
 }
@@ -671,7 +646,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 
 	t.Run("NoneSet", func(t *testing.T) {
 		spec := &snowplanev1alpha1.AlertSpec{}
-		result := computeTrackedParameters(spec)
+		result := tracked.ComputeTracked(spec)
 		assert.Empty(t, result)
 	})
 
@@ -681,7 +656,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 			Schedule:  testutil.PtrString("s"),
 			Warehouse: testutil.PtrString("w"),
 		}
-		result := computeTrackedParameters(spec)
+		result := tracked.ComputeTracked(spec)
 		assert.Contains(t, result, "COMMENT")
 		assert.Contains(t, result, "SCHEDULE")
 		assert.Contains(t, result, "WAREHOUSE")

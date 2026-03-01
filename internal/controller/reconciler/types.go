@@ -40,6 +40,9 @@ type ManagedResource interface {
 	GetSpecName() string
 	GetProviderRef() snowplanev1alpha1.ProviderReference
 	GetUseRole() *string
+	GetPaused() bool
+	GetManagementPolicies() snowplanev1alpha1.ManagementPolicies
+	SetCreateOrAlter(v *bool)
 
 	// Status accessors.
 	GetObservedGeneration() int64
@@ -184,9 +187,9 @@ type PostUpdateHook[T ManagedResource] interface {
 
 // CreateOrAlterSupporter is an optional interface for adapters whose resource
 // type supports the CREATE OR ALTER SQL syntax. When implemented (returning
-// true) and the CR carries the use-create-or-alter annotation, the reconciler
-// uses a single CREATE OR ALTER statement for both create and update paths.
-// Default when absent: CREATE OR ALTER is not supported.
+// true) and spec.managementPolicies.createOrAlter is true (the default), the
+// reconciler uses a single CREATE OR ALTER statement for both create and update
+// paths. Default when absent: CREATE OR ALTER is not supported.
 type CreateOrAlterSupporter interface {
 	SupportsCreateOrAlter() bool
 }

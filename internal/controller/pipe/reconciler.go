@@ -13,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -115,7 +116,7 @@ func buildCreateOptions(pipe *snowplanev1alpha1.Pipe, id snowflake.SchemaObjectI
 
 func buildAlterOptions(pipe *snowplanev1alpha1.Pipe, id snowflake.SchemaObjectIdentifier, obs *snowflake.PipeObservation) snowflake.AlterPipeOptions {
 	opts := snowflake.AlterPipeOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(pipe)
+	opts.UnsetFields = tracked.ComputeUnset(&pipe.Spec, pipe.Status.TrackedParameters)
 
 	// Comment: set if changed.
 	if pipe.Spec.Comment != nil {
@@ -132,43 +133,6 @@ func buildAlterOptions(pipe *snowplanev1alpha1.Pipe, id snowflake.SchemaObjectId
 	}
 
 	return opts
-}
-
-func computeUnsetFields(pipe *snowplanev1alpha1.Pipe) []string {
-	if len(pipe.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(pipe.Status.TrackedParameters))
-	for _, f := range pipe.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if pipe.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	if pipe.Spec.ErrorIntegration == nil && managed["ERROR_INTEGRATION"] {
-		unset = append(unset, "ERROR_INTEGRATION")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.PipeSpec) []string {
-	var fields []string
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	if spec.ErrorIntegration != nil {
-		fields = append(fields, "ERROR_INTEGRATION")
-	}
-
-	return fields
 }
 
 func detectDrift(pipe *snowplanev1alpha1.Pipe, obs *snowflake.PipeObservation) *drift.Result {

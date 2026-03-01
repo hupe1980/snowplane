@@ -118,7 +118,7 @@ func NewMaskingPolicyClient(c SQLExecutor) *MaskingPolicyClient {
 func buildSignatureClause(args []MaskingPolicyArgument) string {
 	parts := make([]string, len(args))
 	for i, arg := range args {
-		parts[i] = fmt.Sprintf("%s %s", arg.Name, arg.Type)
+		parts[i] = fmt.Sprintf("%s %s", sqlbuilder.QuoteIdentifier(arg.Name), arg.Type)
 	}
 
 	returnType := args[0].Type

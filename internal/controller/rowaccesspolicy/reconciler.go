@@ -13,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -113,7 +114,7 @@ func buildCreateOptions(rap *snowplanev1alpha1.RowAccessPolicy, id snowflake.Sch
 
 func buildAlterOptions(rap *snowplanev1alpha1.RowAccessPolicy, id snowflake.SchemaObjectIdentifier, obs *snowflake.RowAccessPolicyObservation) snowflake.AlterRowAccessPolicyOptions {
 	opts := snowflake.AlterRowAccessPolicyOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(rap)
+	opts.UnsetFields = tracked.ComputeUnset(&rap.Spec, rap.Status.TrackedParameters)
 
 	// Body is always sent to ensure convergence (not in SHOW output).
 	body := rap.Spec.Body
@@ -126,38 +127,6 @@ func buildAlterOptions(rap *snowplanev1alpha1.RowAccessPolicy, id snowflake.Sche
 	}
 
 	return opts
-}
-
-func computeUnsetFields(rap *snowplanev1alpha1.RowAccessPolicy) []string {
-	if len(rap.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(rap.Status.TrackedParameters))
-	for _, f := range rap.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if rap.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.RowAccessPolicySpec) []string {
-	var fields []string
-
-	// Body is always tracked since it's required.
-	fields = append(fields, "BODY")
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	return fields
 }
 
 func detectDrift(rap *snowplanev1alpha1.RowAccessPolicy, obs *snowflake.RowAccessPolicyObservation) *drift.Result {

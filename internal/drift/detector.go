@@ -4,8 +4,6 @@ package drift
 import (
 	"fmt"
 	"strings"
-
-	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 )
 
 const (
@@ -270,16 +268,6 @@ func (d *Detector) Result() *Result {
 	}
 
 	return r
-}
-
-// IsDetectOnly checks the annotation on a resource and returns true if
-// drift should be reported but not corrected.
-func IsDetectOnly(annotations map[string]string) bool {
-	if annotations == nil {
-		return false
-	}
-
-	return annotations[snowplanev1alpha1.AnnotationDriftPolicy] == DriftPolicyDetectOnly
 }
 
 // PtrStringFrom converts a pointer to a string-based enum type to *string.

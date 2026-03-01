@@ -114,9 +114,11 @@ func sourceTypeKeyword(st StreamSourceType) string {
 		return "EXTERNAL TABLE"
 	case StreamSourceDynamicTable:
 		return "DYNAMIC TABLE"
-	default:
+	case StreamSourceTable, StreamSourceView, StreamSourceStage:
 		return string(st)
 	}
+
+	return string(st)
 }
 
 // buildCreateStreamSQL builds the CREATE STREAM SQL statement.

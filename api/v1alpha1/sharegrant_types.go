@@ -23,9 +23,8 @@ type ShareGrantSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	Privilege string `json:"privilege"`
 
-	// ObjectType is the type of object the privilege is granted on
-	// (e.g. DATABASE, SCHEMA, TABLE, VIEW).
-	// +kubebuilder:validation:MinLength=1
+	// ObjectType is the type of object the privilege is granted on.
+	// +kubebuilder:validation:Enum=DATABASE;SCHEMA;TABLE;VIEW;"MATERIALIZED VIEW";"FILE FORMAT";FUNCTION;PROCEDURE;STAGE;TASK;STREAM;PIPE;SEQUENCE;TAG;"MASKING POLICY";"ROW ACCESS POLICY"
 	ObjectType string `json:"objectType"`
 
 	// ObjectName is the fully qualified name of the object
@@ -54,6 +53,10 @@ type ShareGrantStatus struct {
 // +kubebuilder:resource:categories=snowplane
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
+// +kubebuilder:printcolumn:name="PRIVILEGE",type=string,JSONPath=`.spec.privilege`,priority=0
+// +kubebuilder:printcolumn:name="SHARE",type=string,JSONPath=`.spec.share`,priority=0
+// +kubebuilder:printcolumn:name="OBJECT-TYPE",type=string,JSONPath=`.spec.objectType`,priority=0
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type ShareGrant struct {
 	metav1.TypeMeta   `json:",inline"`

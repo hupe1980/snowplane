@@ -12,8 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
-	sigs "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -137,37 +136,25 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
-
-// --------------------------------------------------------------------------
-// Tests: Finalizer management
-// --------------------------------------------------------------------------
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-
-	grant := newTestAccountRoleGrant("my-grant", "default")
-	mock := &mockService{}
-	r := newTestReconciler(mock, grant, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("my-grant", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter, "should requeue after adding finalizer")
-
-	got := &snowplanev1alpha1.AccountRoleGrant{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "my-grant", Namespace: "default"}, got))
-	assert.Contains(t, got.Finalizers, accountRoleGrantFinalizer)
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+		},
+		NewFixture: func(name, ns string) client.Object {
+			return newTestAccountRoleGrant(name, ns)
+		},
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.AccountRoleGrant{}
+		},
+		FinalizerName: accountRoleGrantFinalizer,
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -750,7 +737,7 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 			&snowplanev1alpha1.AccountRole{},
 			&snowplanev1alpha1.DatabaseRole{},
 		).
-		WithIndex(&snowplanev1alpha1.AccountRoleGrant{}, argIndexAccountRoleRef, func(o sigs.Object) []string {
+		WithIndex(&snowplanev1alpha1.AccountRoleGrant{}, argIndexAccountRoleRef, func(o client.Object) []string {
 			g, ok := o.(*snowplanev1alpha1.AccountRoleGrant)
 			if !ok {
 				return nil
@@ -760,14 +747,14 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 			}
 			return nil
 		}).
-		WithIndex(&snowplanev1alpha1.AccountRoleGrant{}, argIndexDatabaseRef, func(o sigs.Object) []string {
+		WithIndex(&snowplanev1alpha1.AccountRoleGrant{}, argIndexDatabaseRef, func(o client.Object) []string {
 			g, ok := o.(*snowplanev1alpha1.AccountRoleGrant)
 			if !ok {
 				return nil
 			}
 			return extractDatabaseRefsFromOn(&g.Spec.On)
 		}).
-		WithIndex(&snowplanev1alpha1.AccountRoleGrant{}, argIndexSchemaRef, func(o sigs.Object) []string {
+		WithIndex(&snowplanev1alpha1.AccountRoleGrant{}, argIndexSchemaRef, func(o client.Object) []string {
 			g, ok := o.(*snowplanev1alpha1.AccountRoleGrant)
 			if !ok {
 				return nil

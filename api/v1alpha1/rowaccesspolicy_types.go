@@ -30,6 +30,8 @@ type RowAccessPolicyArgument struct {
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName) || self.schemaName == oldSelf.schemaName)",message="spec.schemaName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.signature == oldSelf.signature",message="spec.signature is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
+// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
 type RowAccessPolicySpec struct {
 	CommonSpec `json:",inline"`
 
@@ -42,7 +44,7 @@ type RowAccessPolicySpec struct {
 	// +optional
 	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
 
-	// DatabaseName is the raw Snowflake database identifier.
+	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -53,7 +55,7 @@ type RowAccessPolicySpec struct {
 	// +optional
 	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
 
-	// SchemaName is the raw Snowflake schema FQN.
+	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -67,11 +69,11 @@ type RowAccessPolicySpec struct {
 	// Body is the SQL expression that returns BOOLEAN to determine row visibility.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=65536
-	Body string `json:"body"`
+	Body string `json:"body" snowflake:"BODY,always"`
 
 	// Comment is an optional description for the row access policy.
 	// +optional
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // Validate checks the RowAccessPolicySpec for consistency.
@@ -128,7 +130,7 @@ type RowAccessPolicyShowOutput struct {
 	Owner string `json:"owner,omitempty"`
 
 	// Comment is the policy description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // RowAccessPolicyStatus defines the observed state of a RowAccessPolicy.
@@ -157,6 +159,7 @@ type RowAccessPolicyStatus struct {
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
 // +kubebuilder:printcolumn:name="DATABASE",type=string,JSONPath=`.status.databaseName`
 // +kubebuilder:printcolumn:name="SCHEMA",type=string,JSONPath=`.status.schemaName`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type RowAccessPolicy struct {
 	metav1.TypeMeta   `json:",inline"`

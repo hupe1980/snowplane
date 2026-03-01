@@ -13,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -139,7 +140,7 @@ func buildAlterOptions(schema *snowplanev1alpha1.Schema, id snowflake.DatabaseOb
 	// Detect fields that were previously managed but are now nil → UNSET.
 	// This must happen before the obs.Parameters nil guard because UNSET
 	// decisions are based on spec vs. TrackedParameters, not observed parameters.
-	opts.UnsetFields = computeUnsetFields(schema)
+	opts.UnsetFields = tracked.ComputeUnset(&schema.Spec, schema.Status.TrackedParameters)
 
 	if schema.Spec.Comment != nil {
 		if obs.ShowOutput == nil || *schema.Spec.Comment != obs.ShowOutput.Comment {
@@ -212,103 +213,6 @@ func buildAlterOptions(schema *snowplanev1alpha1.Schema, id snowflake.DatabaseOb
 	}
 
 	return opts
-}
-
-// computeUnsetFields returns the Snowflake parameter names that were
-// previously SET (tracked in status.TrackedParameters) but are now nil in the spec.
-func computeUnsetFields(schema *snowplanev1alpha1.Schema) []string {
-	if len(schema.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(schema.Status.TrackedParameters))
-	for _, f := range schema.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if schema.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	if schema.Spec.DataRetentionTimeInDays == nil && managed["DATA_RETENTION_TIME_IN_DAYS"] {
-		unset = append(unset, "DATA_RETENTION_TIME_IN_DAYS")
-	}
-
-	if schema.Spec.MaxDataExtensionTimeInDays == nil && managed["MAX_DATA_EXTENSION_TIME_IN_DAYS"] {
-		unset = append(unset, "MAX_DATA_EXTENSION_TIME_IN_DAYS")
-	}
-
-	if schema.Spec.DefaultDDLCollation == nil && managed["DEFAULT_DDL_COLLATION"] {
-		unset = append(unset, "DEFAULT_DDL_COLLATION")
-	}
-
-	if schema.Spec.ReplaceInvalidCharacters == nil && managed["REPLACE_INVALID_CHARACTERS"] {
-		unset = append(unset, "REPLACE_INVALID_CHARACTERS")
-	}
-
-	if schema.Spec.StorageSerializationPolicy == nil && managed["STORAGE_SERIALIZATION_POLICY"] {
-		unset = append(unset, "STORAGE_SERIALIZATION_POLICY")
-	}
-
-	if schema.Spec.LogLevel == nil && managed["LOG_LEVEL"] {
-		unset = append(unset, "LOG_LEVEL")
-	}
-
-	if schema.Spec.MetricLevel == nil && managed["METRIC_LEVEL"] {
-		unset = append(unset, "METRIC_LEVEL")
-	}
-
-	if schema.Spec.TraceLevel == nil && managed["TRACE_LEVEL"] {
-		unset = append(unset, "TRACE_LEVEL")
-	}
-
-	return unset
-}
-
-// computeTrackedParameters returns the Snowflake parameter names that are
-// actively managed (non-nil) in the schema spec.
-func computeTrackedParameters(spec *snowplanev1alpha1.SchemaSpec) []string {
-	var fields []string
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	if spec.DataRetentionTimeInDays != nil {
-		fields = append(fields, "DATA_RETENTION_TIME_IN_DAYS")
-	}
-
-	if spec.MaxDataExtensionTimeInDays != nil {
-		fields = append(fields, "MAX_DATA_EXTENSION_TIME_IN_DAYS")
-	}
-
-	if spec.DefaultDDLCollation != nil {
-		fields = append(fields, "DEFAULT_DDL_COLLATION")
-	}
-
-	if spec.ReplaceInvalidCharacters != nil {
-		fields = append(fields, "REPLACE_INVALID_CHARACTERS")
-	}
-
-	if spec.StorageSerializationPolicy != nil {
-		fields = append(fields, "STORAGE_SERIALIZATION_POLICY")
-	}
-
-	if spec.LogLevel != nil {
-		fields = append(fields, "LOG_LEVEL")
-	}
-
-	if spec.MetricLevel != nil {
-		fields = append(fields, "METRIC_LEVEL")
-	}
-
-	if spec.TraceLevel != nil {
-		fields = append(fields, "TRACE_LEVEL")
-	}
-
-	return fields
 }
 
 // detectDrift compares desired spec against the observed state and

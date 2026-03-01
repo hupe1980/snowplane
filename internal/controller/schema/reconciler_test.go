@@ -22,6 +22,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -204,113 +205,29 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
-	r := newTestReconciler(&mockService{})
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
 
-// --------------------------------------------------------------------------
-// Tests: Database reference resolution
-// --------------------------------------------------------------------------
-
-func TestReconcile_DatabaseRefNotFound(t *testing.T) {
-	t.Parallel()
-	schema := newTestSchema("myschema", "default")
-	r := newTestReconciler(&mockService{}, schema)
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
-	require.Error(t, err, "should return error for controller-runtime backoff")
-	assert.Zero(t, result.RequeueAfter)
-	got := &snowplanev1alpha1.Schema{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "myschema", Namespace: "default"}, got))
-	assert.False(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
-	assert.False(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReferencesResolved))
-}
-
-func TestReconcile_DatabaseRefNotReady(t *testing.T) {
-	t.Parallel()
-	schema := newTestSchema("myschema", "default")
-	db := newTestDB("analytics-db", "default")
-	db.Status.Conditions = nil
-	r := newTestReconciler(&mockService{}, schema, db)
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
-	require.Error(t, err, "should return error for controller-runtime backoff")
-	assert.Zero(t, result.RequeueAfter)
-	got := &snowplanev1alpha1.Schema{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "myschema", Namespace: "default"}, got))
-	assert.False(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReferencesResolved))
-}
-
-func TestReconcile_DatabaseRefEmptyFQN(t *testing.T) {
-	t.Parallel()
-	schema := newTestSchema("myschema", "default")
-	db := newTestDB("analytics-db", "default")
-	db.Status.FullyQualifiedName = ""
-	conditions.SetReady(db, "ok")
-	r := newTestReconciler(&mockService{}, schema, db)
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
-	require.Error(t, err, "should return error for controller-runtime backoff")
-	assert.Zero(t, result.RequeueAfter)
-}
-
-// --------------------------------------------------------------------------
-// Tests: ProviderConfig resolution
-// --------------------------------------------------------------------------
-
-func TestReconcile_ProviderConfigNotFound(t *testing.T) {
-	t.Parallel()
-	schema := newTestSchema("myschema", "default")
-	db := newTestDB("analytics-db", "default")
-	r := newTestReconciler(&mockService{}, schema, db)
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "fetching ProviderConfig")
-}
-
-func TestReconcile_ProviderConfigNotReady(t *testing.T) {
-	t.Parallel()
-	schema := newTestSchema("myschema", "default")
-	db := newTestDB("analytics-db", "default")
-	pc := testutil.NewTestPC("default")
-	pc.Status.Conditions = nil
-	r := newTestReconciler(&mockService{}, schema, db, pc, testutil.NewTestSecret("default"))
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "ProviderConfig not ready")
-}
-
-func TestReconcile_SecretNotFound(t *testing.T) {
-	t.Parallel()
-	schema := newTestSchema("myschema", "default")
-	db := newTestDB("analytics-db", "default")
-	pc := testutil.NewTestPC("default")
-	r := newTestReconciler(&mockService{}, schema, db, pc)
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "fetching secret")
-}
-
-// --------------------------------------------------------------------------
-// Tests: Finalizer management
-// --------------------------------------------------------------------------
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-	schema := newTestSchema("myschema", "default")
-	db := newTestDB("analytics-db", "default")
-	mock := &mockService{}
-	r := newTestReconciler(mock, schema, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter)
-	got := &snowplanev1alpha1.Schema{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "myschema", Namespace: "default"}, got))
-	assert.Contains(t, got.Finalizers, finalizerName)
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+		},
+		NewFixture: func(name, ns string) client.Object {
+			return newTestSchema(name, ns)
+		},
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.Schema{}
+		},
+		FinalizerName: finalizerName,
+		PrereqObjects: func() []runtime.Object {
+			db := newTestDB("analytics-db", "default")
+			return []runtime.Object{db}
+		},
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -471,7 +388,7 @@ func TestReconcile_UpdateSchema(t *testing.T) {
 	t.Parallel()
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
-	schema.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	schema.Status.ObservedGeneration = 1
 	schema.Spec.Comment = testutil.PtrString("updated comment")
 	db := newTestDB("analytics-db", "default")
@@ -525,7 +442,7 @@ func TestReconcile_AlterFails(t *testing.T) {
 	t.Parallel()
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
-	schema.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	schema.Status.ObservedGeneration = 1
 	schema.Spec.Comment = testutil.PtrString("boom")
 	db := newTestDB("analytics-db", "default")
@@ -859,7 +776,7 @@ func TestComputeSchemaTrackedParameters(t *testing.T) {
 		DataRetentionTimeInDays: testutil.PtrInt32(7),
 	}
 
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.ElementsMatch(t, []string{"COMMENT", "DATA_RETENTION_TIME_IN_DAYS"}, fields)
 }
 
@@ -908,7 +825,7 @@ func TestReconcile_UnsetTriggered(t *testing.T) {
 
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
-	schema.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	schema.Generation = 2
 	schema.Status.ObservedGeneration = 1
 	schema.Status.TrackedParameters = []string{"COMMENT"}
@@ -1131,7 +1048,7 @@ func TestReconcile_AlterTerminalError(t *testing.T) {
 
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
-	schema.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	schema.Status.ObservedGeneration = 1
 	schema.Spec.Comment = testutil.PtrString("bad")
 
@@ -1189,7 +1106,8 @@ func TestReconcile_CreatePostObserveError(t *testing.T) {
 	r := newTestReconciler(mock, schema, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
-	require.NoError(t, err) // should NOT propagate — short requeue instead
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "post-create observe")
 	assert.Equal(t, 5*time.Second, result.RequeueAfter)
 
 	got := &snowplanev1alpha1.Schema{}
@@ -1208,7 +1126,7 @@ func TestReconcile_DriftCorrection(t *testing.T) {
 	// ObservedGeneration == Generation, but observed state differs → drift.
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
-	schema.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	schema.Generation = 1
 	schema.Status.ObservedGeneration = 1 // same generation → drift path
 	schema.Spec.Comment = testutil.PtrString("desired comment")
@@ -1525,7 +1443,7 @@ func TestReconcile_DriftCorrection_SetsDriftDetectedCondition(t *testing.T) {
 
 	s := newTestSchema("myschema", "default")
 	s.Finalizers = []string{finalizerName}
-	s.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	s.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	s.Generation = 1
 	s.Status.ObservedGeneration = 1 // drift path
 	s.Status.DatabaseName = `"ANALYTICS"`
@@ -1581,9 +1499,7 @@ func TestReconcile_DriftDetectOnlyPolicy(t *testing.T) {
 	s.Generation = 1
 	s.Status.ObservedGeneration = 1 // drift path
 	s.Status.DatabaseName = `"ANALYTICS"`
-	s.Annotations = map[string]string{
-		"snowplane.hupe1980.github.io/drift-policy": "detect-only",
-	}
+	s.Spec.ManagementPolicies.DriftPolicy = snowplanev1alpha1.DriftPolicyDetectOnly
 	s.Spec.Comment = testutil.PtrString("desired")
 	hash, err := snowplanev1alpha1.ComputeSpecHash(s.Spec)
 	require.NoError(t, err)

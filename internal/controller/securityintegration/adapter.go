@@ -9,6 +9,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 // adapter implements reconciler.ResourceAdapter for SecurityIntegration.
@@ -108,7 +109,7 @@ func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.SecurityIntegration, o
 }
 
 func (a *adapter) ComputeTrackedParameters(obj *snowplanev1alpha1.SecurityIntegration) []string {
-	return computeTrackedParameters(&obj.Spec)
+	return tracked.ComputeTracked(&obj.Spec)
 }
 
 func (a *adapter) DetectDrift(obj *snowplanev1alpha1.SecurityIntegration, obs *reconciler.Observation[*snowflake.SecurityIntegrationObservation]) *drift.Result {

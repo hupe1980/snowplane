@@ -35,12 +35,12 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 - 🔗 **Cross-Resource References** — Schemas → Databases; Tables, Views, Stages, FileFormats, Pipes, DynamicTables, MaskingPolicies, PasswordPolicies, NetworkRules → Databases + Schemas with automatic dependency resolution and backoff
 - 🔄 **Observe-Diff-Apply Reconciliation** — Only altered fields are pushed to Snowflake, minimizing API calls
 - 🔍 **Drift Detection & Correction** — Field-level drift detection with structured reporting, detect-only policy option
-- 🏷️ **Resource Adoption** — Adopt pre-existing Snowflake resources via `adoption-policy: adopt` annotation
+- 🏷️ **Resource Adoption** — Adopt pre-existing Snowflake resources via `spec.managementPolicies.adoptionPolicy: adopt`
 - 🔒 **Immutable Field Enforcement** — Two layers: CRD schema (CEL `self == oldSelf`), reconciler-level errors
 - 🛡️ **Dangerous Grant Protection** — Blocks grants to ACCOUNTADMIN/SECURITYADMIN/ORGADMIN and dangerous privileges by default
 - 🛡️ **Policy Body Validation** — Blocklist-based SQL injection prevention for MaskingPolicy and RowAccessPolicy `body` fields
 - 🏷️ **Ownership Conflict Detection** — Prevents duplicate CRs from managing the same Snowflake object via label-based conflict detection
-- ⚛️ **CREATE OR ALTER** — Atomic `CREATE OR ALTER` enabled by default for Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, NetworkRule, RowAccessPolicy & User, with graceful fallback for unsupported Snowflake editions (opt out via annotation)
+- ⚛️ **CREATE OR ALTER** — Atomic `CREATE OR ALTER` enabled by default for Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, NetworkRule, RowAccessPolicy & User, with graceful fallback for unsupported Snowflake editions (opt out via `spec.managementPolicies.createOrAlter: false`)
 - 🗑️ **Deletion Policies** — `Delete` (drop resource) or `Orphan` (leave intact)
 - 🏷️ **ForceNew Annotation** — Delete+recreate on immutable field changes
 
@@ -212,14 +212,21 @@ kubectl get databases
 | `/healthz` | Ping | Returns 200 if the manager process is running |
 | `/readyz` | Snowflake connectivity | Pings all cached clients; 200 when all reachable |
 
-### 🏷️ Annotations Reference
+### 🏷️ Annotations & Spec Fields Reference
+
+**Spec Lifecycle Policies** (`spec.managementPolicies`):
+
+| Field | Default | Values | Description |
+|-------|---------|--------|-------------|
+| `adoptionPolicy` | `fail-if-exists` | `adopt` / `fail-if-exists` | Control adoption of pre-existing resources |
+| `driftPolicy` | `correct` | `correct` / `detect-only` | Report drift without correcting it, or correct automatically |
+| `createOrAlter` | `true` | `true` / `false` | Atomic `CREATE OR ALTER` (Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, NetworkRule, RowAccessPolicy, User) |
+
+**Annotations**:
 
 | Annotation | Default | Values | Description |
 |------------|---------|--------|-------------|
 | `snowplane.hupe1980.github.io/force-new` | `false` | `true` / `false` | Delete + recreate on immutable field change |
-| `snowplane.hupe1980.github.io/adoption-policy` | `fail-if-exists` | `adopt` / `fail-if-exists` | Control adoption of pre-existing resources |
-| `snowplane.hupe1980.github.io/drift-policy` | `correct` | `correct` / `detect-only` | Report drift without correcting it, or correct automatically |
-| `snowplane.hupe1980.github.io/use-create-or-alter` | `true` | `true` / `false` | Atomic `CREATE OR ALTER` (Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, NetworkRule, RowAccessPolicy, User) |
 | `snowplane.hupe1980.github.io/allow-dangerous-grant` | `false` | `true` / `false` | Allow grants to system roles / dangerous privileges |
 | `snowplane.hupe1980.github.io/abandon-on-delete` | `false` | `true` / `false` | Remove finalizer without dropping the Snowflake resource |
 
@@ -330,12 +337,12 @@ All controllers include field-level drift detection on each reconciliation cycle
 2. 📊 Compute field-level diffs between spec and observed
 3. 🔔 If drift detected: set `DriftDetected` condition → emit event → correct (or report only)
 
-**Detect-Only Policy** — annotate to report drift without correcting:
+**Detect-Only Policy** — report drift without correcting:
 
 ```yaml
-metadata:
-  annotations:
-    snowplane.hupe1980.github.io/drift-policy: detect-only
+spec:
+  managementPolicies:
+    driftPolicy: detect-only
 ```
 
 ## 🏷️ Resource Adoption
@@ -343,12 +350,12 @@ metadata:
 Adopt pre-existing Snowflake resources:
 
 ```yaml
-metadata:
-  annotations:
-    snowplane.hupe1980.github.io/adoption-policy: adopt
+spec:
+  managementPolicies:
+    adoptionPolicy: adopt
 ```
 
-Without this annotation, the reconciler returns a `Terminal` error if the resource already exists. With `adopt`, status is populated from current state and `LateInitialized` condition is set.
+Without this policy, the reconciler returns a `Terminal` error if the resource already exists. With `adopt`, status is populated from current state and `LateInitialized` condition is set.
 
 ## 🤝 Coexistence with Non-Managed Resources
 
@@ -428,6 +435,8 @@ Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped a
 │   ├── provider/           # Provider config builder & client resolution
 │   ├── ratelimit/          # Hierarchical per-controller + per-account rate limiter
 │   ├── sfretry/            # Retry wrapper for transient Snowflake errors
+│   ├── testutil/           # Shared test utilities and reconciler suite
+│   ├── tracked/            # Generic tracked parameter computation via struct tags
 │   └── utils/              # Conditions, finalizers, sanitizers
 └── test/
     ├── e2e/                # End-to-end tests (kind + real Snowflake)
@@ -445,7 +454,9 @@ Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped a
 | 📊 [Observability](docs/observability.md) | Metrics, logging, events, probes, Grafana, circuit breaker |
 | 🔍 [Drift Detection](docs/drift-detection.md) | Drift engine, detect-only policy, field-level reporting |
 | 📋 [CRD Lifecycle](docs/crd-lifecycle.md) | Maturity classification and graduation |
-| 🛠️ [Development](docs/development.md) | Architecture, project layout, contributing |
+| 🏗️ [Architecture](docs/architecture.md) | Reconciler state machine, adapter pattern, resilience layers |
+| 🛠️ [Development](docs/development.md) | Project layout, patterns, contributing |
+| 🔧 [Troubleshooting](docs/troubleshooting.md) | Condition reference, common scenarios, debug collection |
 | 🌐 [Workload Identity](docs/workload-identity.md) | External OAuth and Workload Identity Federation |
 | 🔐 [Snowflake Role Setup](docs/snowflake-role-setup.md) | Required Snowflake roles and permissions |
 | 🚀 [GitOps with Argo CD](docs/gitops-argocd.md) | Health checks, sync waves, ArgoCD setup |

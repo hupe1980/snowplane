@@ -34,7 +34,7 @@ type ColumnDefinition struct {
 
 	// Comment is an optional description for the column.
 	// +optional
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // TableConstraintType specifies the kind of table constraint.
@@ -90,6 +90,8 @@ type TableConstraint struct {
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.constraints) || !has(self.constraints) || self.constraints == oldSelf.constraints",message="spec.constraints is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
+// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
 type TableSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -102,7 +104,7 @@ type TableSpec struct {
 	// +optional
 	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
 
-	// DatabaseName is the raw Snowflake database identifier (e.g. "ANALYTICS").
+	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Use this when the database is NOT managed by Snowplane.
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
@@ -114,8 +116,9 @@ type TableSpec struct {
 	// +optional
 	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
 
-	// SchemaName is the raw Snowflake schema FQN (e.g. '"ANALYTICS"."PUBLIC"').
+	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// Use this when the schema is NOT managed by Snowplane.
+	// The controller constructs the FQN from databaseName + schemaName + name.
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -132,7 +135,7 @@ type TableSpec struct {
 
 	// Comment is an optional description for the table.
 	// +optional
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Transient indicates this is a transient table (no Fail-safe). Immutable after creation.
 	// +optional
@@ -143,26 +146,26 @@ type TableSpec struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=90
-	DataRetentionTimeInDays *int32 `json:"dataRetentionTimeInDays,omitempty"`
+	DataRetentionTimeInDays *int32 `json:"dataRetentionTimeInDays,omitempty" snowflake:"DATA_RETENTION_TIME_IN_DAYS"`
 
 	// MaxDataExtensionTimeInDays specifies the maximum number of days Snowflake
 	// can extend the data retention period.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=90
-	MaxDataExtensionTimeInDays *int32 `json:"maxDataExtensionTimeInDays,omitempty"`
+	MaxDataExtensionTimeInDays *int32 `json:"maxDataExtensionTimeInDays,omitempty" snowflake:"MAX_DATA_EXTENSION_TIME_IN_DAYS"`
 
 	// ChangeTracking enables change tracking on the table.
 	// +optional
-	ChangeTracking *bool `json:"changeTracking,omitempty"`
+	ChangeTracking *bool `json:"changeTracking,omitempty" snowflake:"CHANGE_TRACKING"`
 
 	// DefaultDDLCollation sets the default collation for string columns.
 	// +optional
-	DefaultDDLCollation *string `json:"defaultDdlCollation,omitempty"`
+	DefaultDDLCollation *string `json:"defaultDDLCollation,omitempty" snowflake:"DEFAULT_DDL_COLLATION"`
 
 	// EnableSchemaEvolution enables automatic schema evolution.
 	// +optional
-	EnableSchemaEvolution *bool `json:"enableSchemaEvolution,omitempty"`
+	EnableSchemaEvolution *bool `json:"enableSchemaEvolution,omitempty" snowflake:"ENABLE_SCHEMA_EVOLUTION"`
 
 	// ClusterBy specifies the clustering key expressions for the table.
 	// +optional
@@ -187,7 +190,7 @@ type TableShowOutput struct {
 	Kind string `json:"kind,omitempty"`
 
 	// Comment is the table description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Owner is the role that owns the table.
 	Owner string `json:"owner,omitempty"`
@@ -199,10 +202,10 @@ type TableShowOutput struct {
 	ClusterBy string `json:"clusterBy,omitempty"`
 
 	// ChangeTracking indicates whether change tracking is enabled.
-	ChangeTracking bool `json:"changeTracking,omitempty"`
+	ChangeTracking bool `json:"changeTracking,omitempty" snowflake:"CHANGE_TRACKING"`
 
 	// EnableSchemaEvolution indicates whether schema evolution is enabled.
-	EnableSchemaEvolution bool `json:"enableSchemaEvolution,omitempty"`
+	EnableSchemaEvolution bool `json:"enableSchemaEvolution,omitempty" snowflake:"ENABLE_SCHEMA_EVOLUTION"`
 }
 
 // TableStatus defines the observed state of a Table.
@@ -233,6 +236,7 @@ type TableStatus struct {
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
 // +kubebuilder:printcolumn:name="DATABASE",type=string,JSONPath=`.status.databaseName`
 // +kubebuilder:printcolumn:name="SCHEMA",type=string,JSONPath=`.status.schemaName`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type Table struct {
 	metav1.TypeMeta   `json:",inline"`

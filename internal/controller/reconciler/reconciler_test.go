@@ -668,9 +668,7 @@ func TestReconcile_DriftDetection_DetectOnlyPolicy(t *testing.T) {
 	db := newTestDB()
 	db.Finalizers = []string{"snowplane.test/database"}
 	db.Status.ObservedGeneration = 1
-	db.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationDriftPolicy: drift.DriftPolicyDetectOnly,
-	}
+	db.Spec.ManagementPolicies.DriftPolicy = snowplanev1alpha1.DriftPolicyDetectOnly
 	// Simulate spec-unchanged by pre-setting the hash.
 	hash, err := db.ComputeSpecHash()
 	require.NoError(t, err)
@@ -1202,9 +1200,7 @@ func TestReconcile_Adoption_ExistingResource_FailIfExists_Terminal(t *testing.T)
 	t.Parallel()
 	db := newTestDB()
 	db.Finalizers = []string{"snowplane.test/database"}
-	db.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationAdoptionPolicy: snowplanev1alpha1.AdoptionPolicyFailIfExists,
-	}
+	db.Spec.ManagementPolicies.AdoptionPolicy = snowplanev1alpha1.AdoptionPolicyTypeFailIfExists
 	adapter := &mockAdapter{
 		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
 			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
@@ -1227,9 +1223,7 @@ func TestReconcile_Adoption_Adopt_Success(t *testing.T) {
 	t.Parallel()
 	db := newTestDB()
 	db.Finalizers = []string{"snowplane.test/database"}
-	db.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationAdoptionPolicy: snowplanev1alpha1.AdoptionPolicyAdopt,
-	}
+	db.Spec.ManagementPolicies.AdoptionPolicy = snowplanev1alpha1.AdoptionPolicyTypeAdopt
 	adapter := &mockAdapter{
 		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
 			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
@@ -1275,9 +1269,7 @@ func TestReconcile_Adoption_InvalidAnnotation_DefaultsToReject(t *testing.T) {
 	t.Parallel()
 	db := newTestDB()
 	db.Finalizers = []string{"snowplane.test/database"}
-	db.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationAdoptionPolicy: "adopt-typo", // invalid value
-	}
+	db.Spec.ManagementPolicies.AdoptionPolicy = "adopt-typo" // invalid value
 	adapter := &mockAdapter{
 		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
 			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil

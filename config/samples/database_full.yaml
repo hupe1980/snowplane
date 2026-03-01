@@ -10,7 +10,7 @@ spec:
   dataRetentionTimeInDays: 14
   maxDataExtensionTimeInDays: 28
   replaceInvalidCharacters: true
-  defaultDdlCollation: "en-ci"
+  defaultDDLCollation: "en-ci"
   storageSerializationPolicy: OPTIMIZED
   logLevel: INFO
   metricLevel: ALL

@@ -13,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -113,7 +114,7 @@ func buildCreateOptions(alert *snowplanev1alpha1.Alert, id snowflake.SchemaObjec
 
 func buildAlterOptions(alert *snowplanev1alpha1.Alert, id snowflake.SchemaObjectIdentifier, obs *snowflake.AlertObservation) snowflake.AlterAlertOptions {
 	opts := snowflake.AlterAlertOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(alert)
+	opts.UnsetFields = tracked.ComputeUnset(&alert.Spec, alert.Status.TrackedParameters)
 
 	if alert.Spec.Comment != nil {
 		if obs.ShowOutput == nil || *alert.Spec.Comment != obs.ShowOutput.Comment {
@@ -158,51 +159,6 @@ func buildAlterOptions(alert *snowplanev1alpha1.Alert, id snowflake.SchemaObject
 	}
 
 	return opts
-}
-
-func computeUnsetFields(alert *snowplanev1alpha1.Alert) []string {
-	if len(alert.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(alert.Status.TrackedParameters))
-	for _, f := range alert.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if alert.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	if alert.Spec.Schedule == nil && managed["SCHEDULE"] {
-		unset = append(unset, "SCHEDULE")
-	}
-
-	if alert.Spec.Warehouse == nil && managed["WAREHOUSE"] {
-		unset = append(unset, "WAREHOUSE")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.AlertSpec) []string {
-	var fields []string
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	if spec.Schedule != nil {
-		fields = append(fields, "SCHEDULE")
-	}
-
-	if spec.Warehouse != nil {
-		fields = append(fields, "WAREHOUSE")
-	}
-
-	return fields
 }
 
 func detectDrift(alert *snowplanev1alpha1.Alert, obs *snowflake.AlertObservation) *drift.Result {

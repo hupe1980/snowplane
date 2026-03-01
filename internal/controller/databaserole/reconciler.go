@@ -13,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -108,7 +109,7 @@ func buildAlterOptions(role *snowplanev1alpha1.DatabaseRole, id snowflake.Databa
 	opts := snowflake.AlterDatabaseRoleOptions{Name: id}
 
 	// Detect fields that were previously managed but are now nil -> UNSET.
-	opts.UnsetFields = computeUnsetFields(role)
+	opts.UnsetFields = tracked.ComputeUnset(&role.Spec, role.Status.TrackedParameters)
 
 	if role.Spec.Comment != nil {
 		if obs.ShowOutput == nil || *role.Spec.Comment != obs.ShowOutput.Comment {
@@ -117,39 +118,6 @@ func buildAlterOptions(role *snowplanev1alpha1.DatabaseRole, id snowflake.Databa
 	}
 
 	return opts
-}
-
-// computeUnsetFields returns the Snowflake parameter names that were previously
-// SET (tracked in status.TrackedParameters) but are now nil in the spec.
-func computeUnsetFields(role *snowplanev1alpha1.DatabaseRole) []string {
-	if len(role.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(role.Status.TrackedParameters))
-	for _, f := range role.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if role.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	return unset
-}
-
-// computeTrackedParameters returns the Snowflake parameter names that are
-// actively managed (non-nil) in the database role spec.
-func computeTrackedParameters(spec *snowplanev1alpha1.DatabaseRoleSpec) []string {
-	var fields []string
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	return fields
 }
 
 // detectDrift compares desired spec against the observed state and

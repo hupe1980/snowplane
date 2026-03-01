@@ -1,0 +1,17 @@
+# Database with spec-level management policies and pause support.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Database
+metadata:
+  name: staging-database
+  namespace: snowplane-system
+spec:
+  name: STAGING_DB
+  comment: "Staging environment database"
+  paused: false
+  managementPolicies:
+    adoptionPolicy: adopt
+    driftPolicy: detect-only
+    createOrAlter: true
+  deletionPolicy: Delete
+  providerRef:
+    name: default

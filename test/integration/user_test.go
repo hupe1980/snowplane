@@ -119,9 +119,8 @@ func TestUser_UpdateTriggersAlter(t *testing.T) {
 
 	user := newTestUser(userK8s, sfUser)
 	// Disable CREATE OR ALTER so update goes through the ALTER path.
-	user.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
-	}
+	f := false
+	user.Spec.ManagementPolicies.CreateOrAlter = &f
 	initComment := "initial user comment"
 	user.Spec.Comment = &initComment
 	require.NoError(t, k8sClient.Create(ctx, user))

@@ -205,9 +205,9 @@ func ResolveSecretKeyRef(
 	return string(data), nil
 }
 
-// ResolveDatabaseSource resolves the database FQN from either a DatabaseRef (CR
+// ResolveDatabaseSource resolves the database identifier from either a DatabaseRef (CR
 // reference) or a raw DatabaseName string. Exactly one must be non-nil.
-// When databaseName is used, it is quoted as a Snowflake identifier.
+// When databaseName is used, it is passed through as a simple Snowflake identifier.
 func ResolveDatabaseSource(
 	ctx context.Context,
 	c client.Client,
@@ -226,8 +226,10 @@ func ResolveDatabaseSource(
 	return "", ErrNeitherRefNorNameSet
 }
 
-// ResolveSchemaSource resolves the schema FQN from either a SchemaRef (CR
+// ResolveSchemaSource resolves the schema identifier from either a SchemaRef (CR
 // reference) or a raw SchemaName string. Exactly one must be non-nil.
+// When schemaName is used, it should be a simple identifier (e.g. "PUBLIC").
+// The controller constructs the FQN from databaseName + schemaName + name.
 func ResolveSchemaSource(
 	ctx context.Context,
 	c client.Client,

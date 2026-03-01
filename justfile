@@ -46,6 +46,10 @@ fmt:
 vet:
     go vet ./...
 
+# Run vulnerability check
+security:
+    govulncheck ./...
+
 # Build Docker image
 docker-build img='ghcr.io/hupe1980/snowplane:dev':
     docker build -t {{img}} .
@@ -63,7 +67,7 @@ uninstall:
     kubectl delete -f config/crd/bases/
 
 # Run all checks (CI equivalent)
-ci: lint vet test build
+ci: lint vet security test build
 
 # Generate deepcopy methods, CRD manifests, and accessor boilerplate
 generate:

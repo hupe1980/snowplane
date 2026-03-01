@@ -850,3 +850,146 @@ func TestCEL_ResourceMonitor_ImmutableName(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.name is immutable")
 }
+
+// --------------------------------------------------------------------------
+// CEL Dot-Validation Tests — databaseName / schemaName must not contain dots
+//
+// These tests verify the L-13 dot-validation CEL rules that reject
+// fully-qualified names in databaseName / schemaName fields. Users must use
+// simple identifiers (e.g. "MY_DB") and set databaseName / schemaName
+// separately rather than using "MY_DB.MY_SCHEMA" in a single field.
+// --------------------------------------------------------------------------
+
+// TestCEL_Schema_DatabaseNameNoDots verifies that Schema's databaseName rejects dots.
+func TestCEL_Schema_DatabaseNameNoDots(t *testing.T) {
+	t.Parallel()
+
+	sch := &snowplanev1alpha1.Schema{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cel-schema-dbname-dots",
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.SchemaSpec{
+			Name:         "MY_SCHEMA",
+			DatabaseName: strPtr("MY_DB.EXTRA"),
+		},
+	}
+
+	err := k8sClient.Create(ctx, sch)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simple identifier")
+}
+
+// TestCEL_Table_DatabaseNameNoDots verifies that Table's databaseName rejects dots.
+func TestCEL_Table_DatabaseNameNoDots(t *testing.T) {
+	t.Parallel()
+
+	tbl := &snowplanev1alpha1.Table{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cel-tbl-dbname-dots",
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.TableSpec{
+			Name:         "MY_TABLE",
+			DatabaseName: strPtr("MY_DB.EXTRA"),
+			SchemaName:   strPtr("MY_SCHEMA"),
+			Columns: []snowplanev1alpha1.ColumnDefinition{
+				{Name: "ID", Type: "NUMBER(38,0)"},
+			},
+		},
+	}
+
+	err := k8sClient.Create(ctx, tbl)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simple identifier")
+}
+
+// TestCEL_Table_SchemaNameNoDots verifies that Table's schemaName rejects dots.
+func TestCEL_Table_SchemaNameNoDots(t *testing.T) {
+	t.Parallel()
+
+	tbl := &snowplanev1alpha1.Table{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cel-tbl-schemaname-dots",
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.TableSpec{
+			Name:         "MY_TABLE",
+			DatabaseName: strPtr("MY_DB"),
+			SchemaName:   strPtr("MY_DB.MY_SCHEMA"),
+			Columns: []snowplanev1alpha1.ColumnDefinition{
+				{Name: "ID", Type: "NUMBER(38,0)"},
+			},
+		},
+	}
+
+	err := k8sClient.Create(ctx, tbl)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simple identifier")
+}
+
+// TestCEL_View_DatabaseNameNoDots verifies that View's databaseName rejects dots.
+func TestCEL_View_DatabaseNameNoDots(t *testing.T) {
+	t.Parallel()
+
+	vw := &snowplanev1alpha1.View{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cel-view-dbname-dots",
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.ViewSpec{
+			Name:         "MY_VIEW",
+			DatabaseName: strPtr("DB.EXTRA"),
+			SchemaName:   strPtr("MY_SCHEMA"),
+			Statement:    "SELECT 1",
+		},
+	}
+
+	err := k8sClient.Create(ctx, vw)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simple identifier")
+}
+
+// TestCEL_Stage_SchemaNameNoDots verifies that Stage's schemaName rejects dots.
+func TestCEL_Stage_SchemaNameNoDots(t *testing.T) {
+	t.Parallel()
+
+	stg := &snowplanev1alpha1.Stage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cel-stage-schema-dots",
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.StageSpec{
+			Name:         "MY_STAGE",
+			DatabaseName: strPtr("MY_DB"),
+			SchemaName:   strPtr("MY_DB.MY_SCHEMA"),
+		},
+	}
+
+	err := k8sClient.Create(ctx, stg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simple identifier")
+}
+
+// TestCEL_ValidSimpleIdentifiers verifies that simple identifiers (no dots) are accepted.
+func TestCEL_ValidSimpleIdentifiers(t *testing.T) {
+	t.Parallel()
+
+	tbl := &snowplanev1alpha1.Table{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cel-tbl-simple-ids",
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.TableSpec{
+			Name:         "MY_TABLE",
+			DatabaseName: strPtr("MY_DB"),
+			SchemaName:   strPtr("MY_SCHEMA"),
+			Columns: []snowplanev1alpha1.ColumnDefinition{
+				{Name: "ID", Type: "NUMBER(38,0)"},
+			},
+		},
+	}
+
+	require.NoError(t, k8sClient.Create(ctx, tbl))
+	t.Cleanup(func() { _ = k8sClient.Delete(ctx, tbl) })
+}

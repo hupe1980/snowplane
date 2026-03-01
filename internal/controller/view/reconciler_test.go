@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -21,6 +20,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -242,16 +242,30 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+		},
+		NewFixture: func(name, ns string) client.Object {
+			return newTestView(name, ns)
+		},
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.View{}
+		},
+		FinalizerName: finalizerName,
+		PrereqObjects: func() []runtime.Object {
+			db := newTestDB("analytics-db", "default")
+			sch := newTestSchema("public-schema", "default")
+			return []runtime.Object{db, sch}
+		},
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -534,7 +548,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 		ChangeTracking: testutil.PtrBool(true),
 	}
 
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.Contains(t, fields, "COMMENT")
 	assert.Contains(t, fields, "CHANGE_TRACKING")
 }

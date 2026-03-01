@@ -183,6 +183,13 @@ func managedResourceTypes() []managedResourceEntry {
 		{proto: &snowplanev1alpha1.FileFormat{}, newList: func() client.ObjectList { return &snowplanev1alpha1.FileFormatList{} }},
 		{proto: &snowplanev1alpha1.Pipe{}, newList: func() client.ObjectList { return &snowplanev1alpha1.PipeList{} }},
 		{proto: &snowplanev1alpha1.DynamicTable{}, newList: func() client.ObjectList { return &snowplanev1alpha1.DynamicTableList{} }},
+		{proto: &snowplanev1alpha1.Alert{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AlertList{} }},
+		{proto: &snowplanev1alpha1.NotificationIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.NotificationIntegrationList{} }},
+		{proto: &snowplanev1alpha1.SecurityIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SecurityIntegrationList{} }},
+		{proto: &snowplanev1alpha1.PasswordPolicy{}, newList: func() client.ObjectList { return &snowplanev1alpha1.PasswordPolicyList{} }},
+		{proto: &snowplanev1alpha1.NetworkRule{}, newList: func() client.ObjectList { return &snowplanev1alpha1.NetworkRuleList{} }},
+		{proto: &snowplanev1alpha1.AccountRoleAssignment{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AccountRoleAssignmentList{} }},
+		{proto: &snowplanev1alpha1.DatabaseRoleAssignment{}, newList: func() client.ObjectList { return &snowplanev1alpha1.DatabaseRoleAssignmentList{} }},
 	}
 }
 
@@ -273,7 +280,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 
 	defer func() {
 		metrics.ReconcileDuration.With(prometheus.Labels{"controller": "providerconfig"}).Observe(time.Since(start).Seconds())
-		metrics.RecordReconcile("providerconfig", retErr)
+
+		reconcileResult := "success"
+		if retErr != nil {
+			reconcileResult = "error"
+		}
+
+		metrics.RecordReconcile("providerconfig", reconcileResult)
 	}()
 
 	logger := log.FromContext(ctx)

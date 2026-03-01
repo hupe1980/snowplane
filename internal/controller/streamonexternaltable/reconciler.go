@@ -13,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -112,7 +113,7 @@ func buildCreateOptions(obj *snowplanev1alpha1.StreamOnExternalTable, id snowfla
 
 func buildAlterOptions(obj *snowplanev1alpha1.StreamOnExternalTable, id snowflake.SchemaObjectIdentifier, obs *snowflake.StreamObservation) snowflake.AlterStreamOptions {
 	opts := snowflake.AlterStreamOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(obj)
+	opts.UnsetFields = tracked.ComputeUnset(&obj.Spec, obj.Status.TrackedParameters)
 
 	if obj.Spec.Comment != nil {
 		if obs.ShowOutput == nil || *obj.Spec.Comment != obs.ShowOutput.Comment {
@@ -121,35 +122,6 @@ func buildAlterOptions(obj *snowplanev1alpha1.StreamOnExternalTable, id snowflak
 	}
 
 	return opts
-}
-
-func computeUnsetFields(obj *snowplanev1alpha1.StreamOnExternalTable) []string {
-	if len(obj.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(obj.Status.TrackedParameters))
-	for _, f := range obj.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if obj.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.StreamOnExternalTableSpec) []string {
-	var fields []string
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	return fields
 }
 
 func detectDrift(obj *snowplanev1alpha1.StreamOnExternalTable, obs *snowflake.StreamObservation) *drift.Result {

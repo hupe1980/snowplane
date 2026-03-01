@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -21,6 +21,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -134,51 +135,25 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
-
-// --------------------------------------------------------------------------
-// Tests: ProviderConfig resolution
-// --------------------------------------------------------------------------
-
-func TestReconcile_ProviderConfigNotFound(t *testing.T) {
-	t.Parallel()
-
-	mp := newTestMaskingPolicy("mymp", "default")
-	r := newTestReconciler(&mockService{}, mp)
-
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mymp", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "fetching ProviderConfig")
-}
-
-// --------------------------------------------------------------------------
-// Tests: Finalizer management
-// --------------------------------------------------------------------------
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-
-	mp := newTestMaskingPolicy("mymp", "default")
-	r := newTestReconciler(&mockService{}, mp, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mymp", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter)
-
-	got := &snowplanev1alpha1.MaskingPolicy{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mymp", Namespace: "default"}, got))
-	assert.Contains(t, got.Finalizers, finalizerName)
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+		},
+		NewFixture: func(name, ns string) client.Object {
+			return newTestMaskingPolicy(name, ns)
+		},
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.MaskingPolicy{}
+		},
+		FinalizerName: finalizerName,
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -293,9 +268,7 @@ func TestReconcile_UpdateCommentChanged(t *testing.T) {
 	mp.Status.SchemaName = "MY_SCHEMA"
 	mp.Spec.Comment = testutil.PtrString("updated")
 
-	mp.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
-	}
+	mp.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -334,9 +307,7 @@ func TestReconcile_AlterFails(t *testing.T) {
 	mp.Status.SchemaName = "MY_SCHEMA"
 	mp.Spec.Comment = testutil.PtrString("change")
 
-	mp.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
-	}
+	mp.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -526,7 +497,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 		ExemptOtherPolicies: testutil.PtrBool(true),
 	}
 
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.ElementsMatch(t, []string{"BODY", "COMMENT", "EXEMPT_OTHER_POLICIES"}, fields)
 }
 
@@ -537,7 +508,7 @@ func TestComputeTrackedParameters_MinimalBody(t *testing.T) {
 		Body: "x",
 	}
 
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.Equal(t, []string{"BODY"}, fields)
 }
 
@@ -562,7 +533,7 @@ func TestComputeUnsetFields(t *testing.T) {
 	mp.Status.TrackedParameters = []string{"COMMENT", "BODY"}
 	mp.Spec.Comment = nil
 
-	unset := computeUnsetFields(mp)
+	unset := tracked.ComputeUnset(&mp.Spec, mp.Status.TrackedParameters)
 	assert.Contains(t, unset, "COMMENT")
 }
 
@@ -570,7 +541,7 @@ func TestComputeUnsetFields_NoTracked(t *testing.T) {
 	t.Parallel()
 
 	mp := newTestMaskingPolicy("mymp", "default")
-	unset := computeUnsetFields(mp)
+	unset := tracked.ComputeUnset(&mp.Spec, mp.Status.TrackedParameters)
 	assert.Nil(t, unset)
 }
 

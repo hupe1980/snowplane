@@ -18,6 +18,8 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.awsSnsTopic) == has(self.awsSnsTopic) && (!has(self.awsSnsTopic) || self.awsSnsTopic == oldSelf.awsSnsTopic)",message="spec.awsSnsTopic is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
+// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
+// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
 type PipeSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -30,7 +32,7 @@ type PipeSpec struct {
 	// +optional
 	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
 
-	// DatabaseName is the raw Snowflake database identifier.
+	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -41,7 +43,7 @@ type PipeSpec struct {
 	// +optional
 	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
 
-	// SchemaName is the raw Snowflake schema FQN.
+	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -71,11 +73,11 @@ type PipeSpec struct {
 
 	// ErrorIntegration specifies a notification integration for pipe error notifications.
 	// +optional
-	ErrorIntegration *string `json:"errorIntegration,omitempty"`
+	ErrorIntegration *string `json:"errorIntegration,omitempty" snowflake:"ERROR_INTEGRATION"`
 
 	// Comment is an optional description for the pipe.
 	// +optional
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // PipeShowOutput mirrors the SHOW PIPES output stored in status.
@@ -96,7 +98,7 @@ type PipeShowOutput struct {
 	Owner string `json:"owner,omitempty"`
 
 	// Comment is the pipe description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Definition is the COPY INTO statement.
 	Definition string `json:"definition,omitempty"`
@@ -108,7 +110,7 @@ type PipeShowOutput struct {
 	Integration string `json:"integration,omitempty"`
 
 	// ErrorIntegration is the error notification integration name.
-	ErrorIntegration string `json:"errorIntegration,omitempty"`
+	ErrorIntegration string `json:"errorIntegration,omitempty" snowflake:"ERROR_INTEGRATION"`
 
 	// AwsSnsTopic is the SNS topic ARN for S3 auto-ingest.
 	AwsSnsTopic string `json:"awsSnsTopic,omitempty"`
@@ -144,6 +146,7 @@ type PipeStatus struct {
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
 // +kubebuilder:printcolumn:name="DATABASE",type=string,JSONPath=`.status.databaseName`
 // +kubebuilder:printcolumn:name="SCHEMA",type=string,JSONPath=`.status.schemaName`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type Pipe struct {
 	metav1.TypeMeta   `json:",inline"`

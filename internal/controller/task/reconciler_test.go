@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -21,6 +21,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -136,51 +137,25 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
-
-// --------------------------------------------------------------------------
-// Tests: ProviderConfig resolution
-// --------------------------------------------------------------------------
-
-func TestReconcile_ProviderConfigNotFound(t *testing.T) {
-	t.Parallel()
-
-	task := newTestTask("mytask", "default")
-	r := newTestReconciler(&mockService{}, task)
-
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mytask", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "fetching ProviderConfig")
-}
-
-// --------------------------------------------------------------------------
-// Tests: Finalizer management
-// --------------------------------------------------------------------------
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-
-	task := newTestTask("mytask", "default")
-	r := newTestReconciler(&mockService{}, task, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mytask", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter)
-
-	got := &snowplanev1alpha1.Task{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mytask", Namespace: "default"}, got))
-	assert.Contains(t, got.Finalizers, finalizerName)
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+		},
+		NewFixture: func(name, ns string) client.Object {
+			return newTestTask(name, ns)
+		},
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.Task{}
+		},
+		FinalizerName: finalizerName,
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -645,7 +620,7 @@ func TestComputeUnsetFields(t *testing.T) {
 	task.Status.TrackedParameters = []string{"COMMENT", "SCHEDULE", "USER_TASK_TIMEOUT_MS", "ERROR_INTEGRATION"}
 
 	// Comment and Schedule nil → should unset both
-	unset := computeUnsetFields(task)
+	unset := tracked.ComputeUnset(&task.Spec, task.Status.TrackedParameters)
 	assert.Contains(t, unset, "COMMENT")
 	assert.Contains(t, unset, "SCHEDULE")
 	assert.Contains(t, unset, "USER_TASK_TIMEOUT_MS")
@@ -656,7 +631,7 @@ func TestComputeUnsetFields_NoTracked(t *testing.T) {
 	t.Parallel()
 
 	task := newTestTask("mytask", "default")
-	unset := computeUnsetFields(task)
+	unset := tracked.ComputeUnset(&task.Spec, task.Status.TrackedParameters)
 	assert.Nil(t, unset)
 }
 
@@ -674,7 +649,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 		TaskAutoRetryAttempts:       testutil.PtrInt32(1),
 	}
 
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.ElementsMatch(t, []string{
 		"COMMENT", "SCHEDULE", "USER_TASK_TIMEOUT_MS",
 		"SUSPEND_TASK_AFTER_NUM_FAILURES", "ERROR_INTEGRATION",
@@ -687,7 +662,7 @@ func TestComputeTrackedParameters_Empty(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.TaskSpec{}
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.Empty(t, fields)
 }
 

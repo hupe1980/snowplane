@@ -79,9 +79,7 @@ func TestReconcile_Adoption_OwnershipConflict_Rejected(t *testing.T) {
 	// CR-2 tries to adopt the same Snowflake resource.
 	newDB := newTestDBWithUID("duplicate-db", "default", "uid-duplicate")
 	newDB.Finalizers = []string{"snowplane.test/database"}
-	newDB.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationAdoptionPolicy: snowplanev1alpha1.AdoptionPolicyAdopt,
-	}
+	newDB.Spec.ManagementPolicies.AdoptionPolicy = snowplanev1alpha1.AdoptionPolicyTypeAdopt
 
 	adapter := &mockAdapter{
 		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
@@ -117,9 +115,7 @@ func TestReconcile_Adoption_NoConflict_Succeeds(t *testing.T) {
 	// Only one CR exists — no conflict.
 	db := newTestDBWithUID("solo-db", "default", "uid-solo")
 	db.Finalizers = []string{"snowplane.test/database"}
-	db.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationAdoptionPolicy: snowplanev1alpha1.AdoptionPolicyAdopt,
-	}
+	db.Spec.ManagementPolicies.AdoptionPolicy = snowplanev1alpha1.AdoptionPolicyTypeAdopt
 
 	adapter := &mockAdapter{
 		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
@@ -153,9 +149,7 @@ func TestReconcile_Adoption_SameUIDRetry_Succeeds(t *testing.T) {
 	// The CR already has the label from a previous partial adoption attempt.
 	db := newTestDBWithUID("retry-db", "default", "uid-retry")
 	db.Finalizers = []string{"snowplane.test/database"}
-	db.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationAdoptionPolicy: snowplanev1alpha1.AdoptionPolicyAdopt,
-	}
+	db.Spec.ManagementPolicies.AdoptionPolicy = snowplanev1alpha1.AdoptionPolicyTypeAdopt
 	db.Labels = map[string]string{
 		snowplanev1alpha1.LabelExternalNameHash: reconciler.ComputeExternalNameHash("test-id"),
 	}
@@ -190,9 +184,7 @@ func TestReconcile_Adoption_CrossNamespaceConflict_Rejected(t *testing.T) {
 	// (simulates cross-namespace — label-based conflict detection is namespace-agnostic).
 	newDB := newTestDBWithUID("conflict-ns-db", "default", "uid-ns-conflict")
 	newDB.Finalizers = []string{"snowplane.test/database"}
-	newDB.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationAdoptionPolicy: snowplanev1alpha1.AdoptionPolicyAdopt,
-	}
+	newDB.Spec.ManagementPolicies.AdoptionPolicy = snowplanev1alpha1.AdoptionPolicyTypeAdopt
 
 	adapter := &mockAdapter{
 		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {

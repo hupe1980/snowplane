@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -20,6 +19,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -169,75 +169,29 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
-
-// --------------------------------------------------------------------------
-// Tests: Database reference resolution
-// --------------------------------------------------------------------------
-
-func TestReconcile_DatabaseRefNotFound(t *testing.T) {
-	t.Parallel()
-
-	role := newTestDatabaseRole("myrole", "default")
-	r := newTestReconciler(&mockService{}, role, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myrole", "default"))
-	require.Error(t, err, "should return error for controller-runtime backoff")
-	assert.Zero(t, result.RequeueAfter)
-
-	got := &snowplanev1alpha1.DatabaseRole{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "myrole", Namespace: "default"}, got))
-	assert.False(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
-}
-
-func TestReconcile_DatabaseRefNotReady(t *testing.T) {
-	t.Parallel()
-
-	role := newTestDatabaseRole("myrole", "default")
-	db := newTestDatabase("my-db", "default")
-	db.Status.Conditions = nil // Not ready
-
-	r := newTestReconciler(&mockService{}, role, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myrole", "default"))
-	require.Error(t, err, "should return error for controller-runtime backoff")
-	assert.Zero(t, result.RequeueAfter)
-
-	got := &snowplanev1alpha1.DatabaseRole{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "myrole", Namespace: "default"}, got))
-	assert.False(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
-}
-
-// --------------------------------------------------------------------------
-// Tests: Finalizer management
-// --------------------------------------------------------------------------
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-
-	role := newTestDatabaseRole("myrole", "default")
-	mock := &mockService{}
-	db := newTestDatabase("my-db", "default")
-	r := newTestReconciler(mock, role, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myrole", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter, "should requeue after adding finalizer")
-
-	got := &snowplanev1alpha1.DatabaseRole{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "myrole", Namespace: "default"}, got))
-	assert.Contains(t, got.Finalizers, finalizerName)
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+		},
+		NewFixture: func(name, ns string) client.Object {
+			return newTestDatabaseRole(name, ns)
+		},
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.DatabaseRole{}
+		},
+		FinalizerName: finalizerName,
+		PrereqObjects: func() []runtime.Object {
+			db := newTestDatabase("my-db", "default")
+			return []runtime.Object{db}
+		},
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -453,14 +407,14 @@ func TestComputeUnsetFields(t *testing.T) {
 	t.Run("NoTrackedParameters", func(t *testing.T) {
 		t.Parallel()
 		role := &snowplanev1alpha1.DatabaseRole{}
-		assert.Nil(t, computeUnsetFields(role))
+		assert.Nil(t, tracked.ComputeUnset(&role.Spec, role.Status.TrackedParameters))
 	})
 
 	t.Run("CommentUnset", func(t *testing.T) {
 		t.Parallel()
 		role := &snowplanev1alpha1.DatabaseRole{}
 		role.Status.TrackedParameters = []string{"COMMENT"}
-		assert.Equal(t, []string{"COMMENT"}, computeUnsetFields(role))
+		assert.Equal(t, []string{"COMMENT"}, tracked.ComputeUnset(&role.Spec, role.Status.TrackedParameters))
 	})
 
 	t.Run("CommentStillSet", func(t *testing.T) {
@@ -469,7 +423,7 @@ func TestComputeUnsetFields(t *testing.T) {
 		role := &snowplanev1alpha1.DatabaseRole{}
 		role.Spec.Comment = &comment
 		role.Status.TrackedParameters = []string{"COMMENT"}
-		assert.Nil(t, computeUnsetFields(role))
+		assert.Nil(t, tracked.ComputeUnset(&role.Spec, role.Status.TrackedParameters))
 	})
 }
 
@@ -479,14 +433,14 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Run("NoFields", func(t *testing.T) {
 		t.Parallel()
 		spec := &snowplanev1alpha1.DatabaseRoleSpec{}
-		assert.Nil(t, computeTrackedParameters(spec))
+		assert.Nil(t, tracked.ComputeTracked(spec))
 	})
 
 	t.Run("WithComment", func(t *testing.T) {
 		t.Parallel()
 		comment := "test"
 		spec := &snowplanev1alpha1.DatabaseRoleSpec{Comment: &comment}
-		assert.Equal(t, []string{"COMMENT"}, computeTrackedParameters(spec))
+		assert.Equal(t, []string{"COMMENT"}, tracked.ComputeTracked(spec))
 	})
 }
 

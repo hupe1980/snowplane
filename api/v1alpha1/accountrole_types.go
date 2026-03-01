@@ -15,7 +15,7 @@ type AccountRoleSpec struct {
 	Name string `json:"name"`
 
 	// Comment is an optional description for the role.
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // AccountRoleShowOutput mirrors the SHOW ROLES output stored in status.
@@ -27,7 +27,7 @@ type AccountRoleShowOutput struct {
 	Name string `json:"name,omitempty"`
 
 	// Comment is the role description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Owner is the role that owns this role.
 	Owner string `json:"owner,omitempty"`
@@ -59,6 +59,7 @@ type AccountRoleStatus struct {
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type AccountRole struct {
 	metav1.TypeMeta   `json:",inline"`

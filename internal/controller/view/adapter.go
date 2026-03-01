@@ -16,6 +16,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 // adapter implements reconciler.ResourceAdapter for View.
@@ -133,7 +134,7 @@ func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha
 	}
 
 	opts := buildCreateOptions(obj, sid)
-	opts.UseCreateOrAlter = snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
+	opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
 
 	return svc.Create(ctx, opts)
 }
@@ -202,7 +203,7 @@ func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.View, obs *reconciler.
 }
 
 func (a *adapter) ComputeTrackedParameters(obj *snowplanev1alpha1.View) []string {
-	return computeTrackedParameters(&obj.Spec)
+	return tracked.ComputeTracked(&obj.Spec)
 }
 
 func (a *adapter) DetectDrift(obj *snowplanev1alpha1.View, obs *reconciler.Observation[*snowflake.ViewObservation]) *drift.Result {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -21,6 +21,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -144,36 +145,25 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
-
-// --------------------------------------------------------------------------
-// Tests: Finalizer management
-// --------------------------------------------------------------------------
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-
-	nr := newTestNetworkRule("mynr", "default")
-	r := newTestReconciler(&mockService{}, nr, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mynr", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter)
-
-	got := &snowplanev1alpha1.NetworkRule{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mynr", Namespace: "default"}, got))
-	assert.Contains(t, got.Finalizers, finalizerName)
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+		},
+		NewFixture: func(name, ns string) client.Object {
+			return newTestNetworkRule(name, ns)
+		},
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.NetworkRule{}
+		},
+		FinalizerName: finalizerName,
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -360,7 +350,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 		spec := &snowplanev1alpha1.NetworkRuleSpec{
 			ValueList: []string{"10.0.0.1"},
 		}
-		assert.Contains(t, computeTrackedParameters(spec), "VALUE_LIST")
+		assert.Contains(t, tracked.ComputeTracked(spec), "VALUE_LIST")
 	})
 
 	t.Run("CommentSet", func(t *testing.T) {
@@ -369,7 +359,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 			ValueList: []string{"10.0.0.1"},
 			Comment:   testutil.PtrString("test"),
 		}
-		fields := computeTrackedParameters(spec)
+		fields := tracked.ComputeTracked(spec)
 		assert.Contains(t, fields, "VALUE_LIST")
 		assert.Contains(t, fields, "COMMENT")
 	})

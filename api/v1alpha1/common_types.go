@@ -58,6 +58,76 @@ const (
 	DeletionPolicyOrphan DeletionPolicy = "Orphan"
 )
 
+// AdoptionPolicy controls how the reconciler handles pre-existing
+// Snowflake resources on first reconciliation.
+// +kubebuilder:validation:Enum=adopt;"fail-if-exists"
+type AdoptionPolicy string
+
+const (
+	// AdoptionPolicyTypeAdopt allows the reconciler to adopt an existing
+	// Snowflake resource, populating status from the current state.
+	AdoptionPolicyTypeAdopt AdoptionPolicy = "adopt"
+
+	// AdoptionPolicyTypeFailIfExists (the default) causes the reconciler to
+	// return a terminal error when the Snowflake resource already exists.
+	AdoptionPolicyTypeFailIfExists AdoptionPolicy = "fail-if-exists"
+)
+
+// DriftPolicy controls whether detected drift is corrected or only reported.
+// +kubebuilder:validation:Enum=correct;"detect-only"
+type DriftPolicy string
+
+const (
+	// DriftPolicyCorrect is the default: the reconciler issues ALTER
+	// statements to bring Snowflake state in line with the spec.
+	DriftPolicyCorrect DriftPolicy = "correct"
+
+	// DriftPolicyDetectOnly reports drift via conditions and events but
+	// does not issue any ALTER statements.
+	DriftPolicyDetectOnly DriftPolicy = "detect-only"
+)
+
+// ManagementPolicies specifies lifecycle-level policies for a managed
+// resource. These control adoption, drift correction, and CREATE OR ALTER
+// behaviour. All fields are optional and default to production-safe values.
+type ManagementPolicies struct {
+	// AdoptionPolicy controls how the reconciler handles a pre-existing
+	// Snowflake resource on first reconciliation.
+	// Defaults to "fail-if-exists".
+	// +kubebuilder:default="fail-if-exists"
+	// +optional
+	AdoptionPolicy AdoptionPolicy `json:"adoptionPolicy,omitempty"`
+
+	// DriftPolicy controls whether detected drift is corrected or only
+	// reported via conditions and events.
+	// Defaults to "correct".
+	// +kubebuilder:default=correct
+	// +optional
+	DriftPolicy DriftPolicy `json:"driftPolicy,omitempty"`
+
+	// CreateOrAlter controls whether CREATE OR ALTER is used instead of
+	// the legacy CREATE + ALTER two-step flow for supported resource types.
+	// Defaults to true.
+	// +kubebuilder:default=true
+	// +optional
+	CreateOrAlter *bool `json:"createOrAlter,omitempty"`
+}
+
+// IsCreateOrAlter returns true when CREATE OR ALTER should be used.
+// Returns the value of CreateOrAlter if explicitly set, otherwise defaults to true.
+func (m ManagementPolicies) IsCreateOrAlter() bool {
+	if m.CreateOrAlter == nil {
+		return true
+	}
+
+	return *m.CreateOrAlter
+}
+
+// IsDetectOnly returns true when the drift policy is set to detect-only.
+func (m ManagementPolicies) IsDetectOnly() bool {
+	return m.DriftPolicy == DriftPolicyDetectOnly
+}
+
 // CommonSpec contains fields shared by all managed resource specs.
 type CommonSpec struct {
 	// DeletionPolicy specifies what happens to the Snowflake resource when the CR is deleted.
@@ -77,6 +147,17 @@ type CommonSpec struct {
 	// +optional
 	// +kubebuilder:validation:MinLength=1
 	UseRole *string `json:"useRole,omitempty"`
+
+	// Paused suspends reconciliation of this resource. When true, the
+	// controller skips all Snowflake operations and sets Synced=False
+	// with reason ReconcilePaused. The Snowflake resource is not modified
+	// or deleted while paused.
+	// +optional
+	Paused bool `json:"paused,omitempty"`
+
+	// ManagementPolicies specifies lifecycle policies for this resource.
+	// +optional
+	ManagementPolicies ManagementPolicies `json:"managementPolicies,omitempty"`
 }
 
 // CommonStatus contains fields shared by all managed resource statuses.

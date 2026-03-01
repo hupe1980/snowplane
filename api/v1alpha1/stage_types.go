@@ -51,6 +51,8 @@ type StageDirectoryOptions struct {
 // +kubebuilder:validation:XValidation:rule="(has(self.url) && size(self.url) > 0) == (has(oldSelf.url) && size(oldSelf.url) > 0)",message="stage type (internal/external) is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
+// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
+// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
 type StageSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -63,7 +65,7 @@ type StageSpec struct {
 	// +optional
 	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
 
-	// DatabaseName is the raw Snowflake database identifier (e.g. "ANALYTICS").
+	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Use this when the database is NOT managed by Snowplane.
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
@@ -75,8 +77,9 @@ type StageSpec struct {
 	// +optional
 	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
 
-	// SchemaName is the raw Snowflake schema FQN (e.g. '"ANALYTICS"."PUBLIC"').
+	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// Use this when the schema is NOT managed by Snowplane.
+	// The controller constructs the FQN from databaseName + schemaName + name.
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -85,11 +88,11 @@ type StageSpec struct {
 	// URL is the external stage URL. Required for external stages, omitted for internal.
 	// Immutable: changing from internal to external (or vice versa) is not supported.
 	// +optional
-	URL *string `json:"url,omitempty"`
+	URL *string `json:"url,omitempty" snowflake:"URL"`
 
 	// StorageIntegration is the name of the storage integration for external stages.
 	// +optional
-	StorageIntegration *string `json:"storageIntegration,omitempty"`
+	StorageIntegration *string `json:"storageIntegration,omitempty" snowflake:"STORAGE_INTEGRATION"`
 
 	// Encryption specifies the encryption settings.
 	// +optional
@@ -97,15 +100,15 @@ type StageSpec struct {
 
 	// Directory configures the directory table settings.
 	// +optional
-	Directory *StageDirectoryOptions `json:"directory,omitempty"`
+	Directory *StageDirectoryOptions `json:"directory,omitempty" snowflake:"DIRECTORY"`
 
 	// FileFormat is the named file format (FORMAT_NAME) or inline options.
 	// +optional
-	FileFormat *string `json:"fileFormat,omitempty"`
+	FileFormat *string `json:"fileFormat,omitempty" snowflake:"FILE_FORMAT"`
 
 	// Comment is an optional description for the stage.
 	// +optional
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // StageShowOutput mirrors the SHOW STAGES output stored in status.
@@ -123,19 +126,19 @@ type StageShowOutput struct {
 	SchemaName string `json:"schemaName,omitempty"`
 
 	// URL is the external stage URL (blank for internal).
-	URL string `json:"url,omitempty"`
+	URL string `json:"url,omitempty" snowflake:"URL"`
 
 	// Owner is the role that owns the stage.
 	Owner string `json:"owner,omitempty"`
 
 	// Comment is the stage description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Type is the stage type (INTERNAL or EXTERNAL).
 	Type string `json:"type,omitempty"`
 
 	// StorageIntegration is the associated storage integration name.
-	StorageIntegration string `json:"storageIntegration,omitempty"`
+	StorageIntegration string `json:"storageIntegration,omitempty" snowflake:"STORAGE_INTEGRATION"`
 
 	// DirectoryEnabled indicates whether the directory table is enabled.
 	DirectoryEnabled bool `json:"directoryEnabled,omitempty"`
@@ -169,6 +172,7 @@ type StageStatus struct {
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
 // +kubebuilder:printcolumn:name="DATABASE",type=string,JSONPath=`.status.databaseName`
 // +kubebuilder:printcolumn:name="SCHEMA",type=string,JSONPath=`.status.schemaName`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type Stage struct {
 	metav1.TypeMeta   `json:",inline"`

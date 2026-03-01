@@ -332,12 +332,8 @@ func ObserveSnowflakeOp(controller, operation string, fn func() error) error {
 }
 
 // RecordReconcile emits the reconcile result counter.
-func RecordReconcile(controller string, err error) {
-	result := "success"
-	if err != nil {
-		result = "error"
-	}
-
+// result is one of: "success", "error", "terminal".
+func RecordReconcile(controller string, result string) {
 	ReconcileTotal.With(prometheus.Labels{"controller": controller, "result": result}).Inc()
 }
 

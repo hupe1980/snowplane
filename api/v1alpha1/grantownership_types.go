@@ -38,9 +38,7 @@ type GrantOwnershipSpec struct {
 	CommonSpec `json:",inline"`
 
 	// ObjectType is the Snowflake object type whose ownership is being transferred.
-	// Examples: DATABASE, SCHEMA, TABLE, VIEW, WAREHOUSE, STAGE, TASK, STREAM,
-	// TAG, MASKING POLICY, ROW ACCESS POLICY, NETWORK POLICY, RESOURCE MONITOR.
-	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Enum=DATABASE;SCHEMA;TABLE;VIEW;"MATERIALIZED VIEW";WAREHOUSE;STAGE;"FILE FORMAT";FUNCTION;PROCEDURE;STREAM;TASK;PIPE;SEQUENCE;TAG;"MASKING POLICY";"ROW ACCESS POLICY";"NETWORK POLICY";"RESOURCE MONITOR";USER;"COMPUTE POOL";INTEGRATION;CONNECTION;"FAILOVER GROUP";"REPLICATION GROUP";"EXTERNAL VOLUME";ALERT;SECRET;MODEL;"DYNAMIC TABLE";"ICEBERG TABLE";"EVENT TABLE";"EXTERNAL TABLE";"NETWORK RULE";"PASSWORD POLICY"
 	ObjectType string `json:"objectType"`
 
 	// ObjectName is the fully qualified name of the object
@@ -190,6 +188,7 @@ type GrantOwnershipShowOutput struct {
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="OBJECT-TYPE",type=string,JSONPath=`.spec.objectType`
 // +kubebuilder:printcolumn:name="OBJECT-NAME",type=string,JSONPath=`.spec.objectName`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type GrantOwnership struct {
 	metav1.TypeMeta   `json:",inline"`

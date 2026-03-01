@@ -13,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -144,7 +145,7 @@ func buildCreateOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectI
 
 func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectIdentifier, obs *snowflake.TaskObservation) snowflake.AlterTaskOptions {
 	opts := snowflake.AlterTaskOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(task)
+	opts.UnsetFields = tracked.ComputeUnset(&task.Spec, task.Status.TrackedParameters)
 
 	if task.Spec.Comment != nil {
 		if obs.ShowOutput == nil || *task.Spec.Comment != obs.ShowOutput.Comment {
@@ -269,153 +270,6 @@ func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectId
 	}
 
 	return opts
-}
-
-func computeUnsetFields(task *snowplanev1alpha1.Task) []string {
-	if len(task.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(task.Status.TrackedParameters))
-	for _, f := range task.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if task.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	if task.Spec.Schedule == nil && managed["SCHEDULE"] {
-		unset = append(unset, "SCHEDULE")
-	}
-
-	if task.Spec.UserTaskTimeoutMs == nil && managed["USER_TASK_TIMEOUT_MS"] {
-		unset = append(unset, "USER_TASK_TIMEOUT_MS")
-	}
-
-	if task.Spec.SuspendTaskAfterNumFailures == nil && managed["SUSPEND_TASK_AFTER_NUM_FAILURES"] {
-		unset = append(unset, "SUSPEND_TASK_AFTER_NUM_FAILURES")
-	}
-
-	if task.Spec.ErrorIntegration == nil && managed["ERROR_INTEGRATION"] {
-		unset = append(unset, "ERROR_INTEGRATION")
-	}
-
-	if task.Spec.SuccessIntegration == nil && managed["SUCCESS_INTEGRATION"] {
-		unset = append(unset, "SUCCESS_INTEGRATION")
-	}
-
-	if task.Spec.AllowOverlappingExecution == nil && managed["ALLOW_OVERLAPPING_EXECUTION"] {
-		unset = append(unset, "ALLOW_OVERLAPPING_EXECUTION")
-	}
-
-	if task.Spec.TaskAutoRetryAttempts == nil && managed["TASK_AUTO_RETRY_ATTEMPTS"] {
-		unset = append(unset, "TASK_AUTO_RETRY_ATTEMPTS")
-	}
-
-	if task.Spec.Config == nil && managed["CONFIG"] {
-		unset = append(unset, "CONFIG")
-	}
-
-	// FINALIZE is handled separately via UnsetFinalize, not via generic UnsetFields.
-
-	if task.Spec.LogLevel == nil && managed["LOG_LEVEL"] {
-		unset = append(unset, "LOG_LEVEL")
-	}
-
-	if task.Spec.TargetCompletionInterval == nil && managed["TARGET_COMPLETION_INTERVAL"] {
-		unset = append(unset, "TARGET_COMPLETION_INTERVAL")
-	}
-
-	if task.Spec.ServerlessTaskMinStatementSize == nil && managed["SERVERLESS_TASK_MIN_STATEMENT_SIZE"] {
-		unset = append(unset, "SERVERLESS_TASK_MIN_STATEMENT_SIZE")
-	}
-
-	if task.Spec.ServerlessTaskMaxStatementSize == nil && managed["SERVERLESS_TASK_MAX_STATEMENT_SIZE"] {
-		unset = append(unset, "SERVERLESS_TASK_MAX_STATEMENT_SIZE")
-	}
-
-	if task.Spec.UserTaskMinimumTriggerIntervalInSeconds == nil && managed["USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS"] {
-		unset = append(unset, "USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS")
-	}
-
-	if task.Spec.UserTaskManagedInitialWarehouseSize == nil && managed["USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE"] {
-		unset = append(unset, "USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.TaskSpec) []string {
-	var fields []string
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	if spec.Schedule != nil {
-		fields = append(fields, "SCHEDULE")
-	}
-
-	if spec.UserTaskTimeoutMs != nil {
-		fields = append(fields, "USER_TASK_TIMEOUT_MS")
-	}
-
-	if spec.SuspendTaskAfterNumFailures != nil {
-		fields = append(fields, "SUSPEND_TASK_AFTER_NUM_FAILURES")
-	}
-
-	if spec.ErrorIntegration != nil {
-		fields = append(fields, "ERROR_INTEGRATION")
-	}
-
-	if spec.SuccessIntegration != nil {
-		fields = append(fields, "SUCCESS_INTEGRATION")
-	}
-
-	if spec.AllowOverlappingExecution != nil {
-		fields = append(fields, "ALLOW_OVERLAPPING_EXECUTION")
-	}
-
-	if spec.TaskAutoRetryAttempts != nil {
-		fields = append(fields, "TASK_AUTO_RETRY_ATTEMPTS")
-	}
-
-	if spec.Config != nil {
-		fields = append(fields, "CONFIG")
-	}
-
-	if spec.Finalize != nil {
-		fields = append(fields, "FINALIZE")
-	}
-
-	if spec.LogLevel != nil {
-		fields = append(fields, "LOG_LEVEL")
-	}
-
-	if spec.UserTaskMinimumTriggerIntervalInSeconds != nil {
-		fields = append(fields, "USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS")
-	}
-
-	if spec.TargetCompletionInterval != nil {
-		fields = append(fields, "TARGET_COMPLETION_INTERVAL")
-	}
-
-	if spec.ServerlessTaskMinStatementSize != nil {
-		fields = append(fields, "SERVERLESS_TASK_MIN_STATEMENT_SIZE")
-	}
-
-	if spec.ServerlessTaskMaxStatementSize != nil {
-		fields = append(fields, "SERVERLESS_TASK_MAX_STATEMENT_SIZE")
-	}
-
-	if spec.UserTaskManagedInitialWarehouseSize != nil {
-		fields = append(fields, "USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE")
-	}
-
-	return fields
 }
 
 func detectDrift(task *snowplanev1alpha1.Task, obs *snowflake.TaskObservation) *drift.Result {

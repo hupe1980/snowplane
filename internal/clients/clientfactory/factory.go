@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
@@ -399,12 +400,31 @@ func (f *ClientFactory) CheckHealth(r *http.Request) error {
 	ctx, cancel := context.WithTimeout(baseCtx, healthCheckTimeout)
 	defer cancel()
 
-	var errs []error
+	// Ping all providers in parallel using errgroup. Errors are collected
+	// concurrently and joined into a single combined error.
+	var (
+		mu   sync.Mutex
+		errs []error
+	)
+
+	g, gCtx := errgroup.WithContext(ctx)
+
 	for i, c := range clients {
-		if err := c.Ping(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("provider %q: %w", providers[i], err))
-		}
+		provider := providers[i]
+		client := c
+
+		g.Go(func() error {
+			if err := client.Ping(gCtx); err != nil {
+				mu.Lock()
+				errs = append(errs, fmt.Errorf("provider %q: %w", provider, err))
+				mu.Unlock()
+			}
+
+			return nil // don't cancel other pings on individual failure
+		})
 	}
+
+	_ = g.Wait() // errors are collected in errs, not returned by goroutines
 
 	if len(errs) > 0 {
 		return fmt.Errorf("snowflake connectivity check failed: %w", errors.Join(errs...))

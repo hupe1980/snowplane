@@ -382,4 +382,4 @@ done
 ```
 
 {: .warning }
-> Set `adoption-policy: adopt` annotation on resources if the Snowflake objects already exist to prevent creation errors.
+> Set `spec.managementPolicies.adoptionPolicy: adopt` on resources if the Snowflake objects already exist to prevent creation errors.

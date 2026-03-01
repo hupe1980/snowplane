@@ -158,7 +158,7 @@ All Snowflake operations are behind interfaces. Unit tests inject mocks via `Ser
 
 ### UNSET Support & TrackedParameters
 
-Pointer fields use nil-means-unmanaged. When a user removes a field, `computeUnsetFields()` compares spec against `status.trackedParameters` and generates `ALTER ... UNSET` statements.
+Pointer fields use nil-means-unmanaged. When a user removes a field, `tracked.ComputeUnset()` compares spec against `status.trackedParameters` using reflection over `snowflake:"PARAM_NAME"` struct tags and generates `ALTER ... UNSET` statements. See [Architecture — Tracked Parameters]({% link architecture.md %}#tracked-parameters) for details.
 
 ### Recoverable vs Terminal Conditions
 
@@ -217,7 +217,7 @@ Adopt pre-existing Snowflake resources via annotation:
 
 ### Terraform Migration Tool
 
-`cmd/tfimport` reads Terraform state and generates Kubernetes manifests with `adopt` annotation:
+`cmd/tfimport` reads Terraform state and generates Kubernetes manifests with `adoptionPolicy: adopt`:
 
 ```bash
 ./tfimport -state terraform.tfstate -namespace snowflake > manifests.yaml

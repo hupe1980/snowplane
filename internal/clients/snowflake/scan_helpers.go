@@ -69,15 +69,7 @@ func scanDescribeKeyValue(rows *sql.Rows) (map[string]string, error) {
 		}
 	}
 
-	// Fallback: use first two columns if column names don't match.
-	if keyIdx == -1 && len(cols) >= 2 {
-		keyIdx = 0
-	}
-
-	if valIdx == -1 && len(cols) >= 2 {
-		valIdx = 1
-	}
-
+	// Require explicit column name matches — no silent fallback.
 	if keyIdx == -1 || valIdx == -1 {
 		return nil, fmt.Errorf("cannot determine key/value columns from: %v", cols)
 	}

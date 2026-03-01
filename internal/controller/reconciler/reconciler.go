@@ -21,7 +21,6 @@ import (
 	"github.com/hupe1980/snowplane/internal/circuitbreaker"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
-	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/metrics"
 	"github.com/hupe1980/snowplane/internal/provider"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
@@ -213,9 +212,19 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 	var providerName string       // populated after provider resolution, used in defer
 	var snowflakeOpAttempted bool // true once an actual Snowflake I/O call is made
 
+	obj := r.Adapter.NewObject()
+
 	defer func() {
 		metrics.ReconcileDuration.With(prometheus.Labels{"controller": resName}).Observe(time.Since(start).Seconds())
-		metrics.RecordReconcile(resName, retErr)
+
+		reconcileResult := "success"
+		if retErr != nil {
+			reconcileResult = "error"
+		} else if conditions.IsTerminal(obj) {
+			reconcileResult = "terminal"
+		}
+
+		metrics.RecordReconcile(resName, reconcileResult)
 
 		// Only update circuit breaker when a Snowflake operation was actually
 		// attempted.  Validation-only or adoption-only paths should not
@@ -231,7 +240,6 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 
 	logger := log.FromContext(ctx)
 
-	obj := r.Adapter.NewObject()
 	if err := r.Client.Get(ctx, req.NamespacedName, obj); err != nil {
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -242,6 +250,16 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 
 	// Snapshot for status patching (MergeFrom patch).
 	statusBase := obj.DeepCopyObject().(T)
+
+	// M-2: Paused resources skip all Snowflake operations.
+	if obj.GetPaused() {
+		logger.Info("reconciliation paused", "name", obj.GetName(), resName, obj.GetSpecName())
+		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonReconcilePaused,
+			"Reconciliation is paused via spec.paused — no Snowflake operations will be performed")
+		r.bestEffortPatchStatus(ctx, obj)
+
+		return ctrl.Result{}, nil
+	}
 
 	logger.Info("reconciling "+resName, "name", obj.GetName(), resName, obj.GetSpecName())
 
@@ -476,28 +494,31 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 
 	logger.V(1).Info("executing Snowflake CREATE", "resource", resName, "name", obj.GetSpecName())
 
-	useCoA := r.supportsCreateOrAlter() && snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
+	useCoA := r.supportsCreateOrAlter() && r.isCreateOrAlter(obj)
 
 	if err := r.executeSnowflakeOp(ctx, opCtx, obj, "create", "create", func() error {
 		return r.Adapter.Create(opCtx, svc, obj, id)
 	}); err != nil {
 		// Graceful fallback: if CREATE OR ALTER is not supported for this
-		// resource type on the current Snowflake account, disable the
-		// annotation and retry with plain CREATE ... IF NOT EXISTS.
+		// resource type on the current Snowflake account, disable
+		// createOrAlter in the spec and retry with plain CREATE ... IF NOT EXISTS.
 		if useCoA && isCreateOrAlterUnsupported(err) {
 			logger.Info("CREATE OR ALTER not supported for new resource, falling back to CREATE IF NOT EXISTS", "resource", resName, "name", obj.GetSpecName())
 
 			r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonCreateOrAlterFallback,
 				fmt.Sprintf("CREATE OR ALTER not supported for %s %q, falling back to CREATE IF NOT EXISTS", resName, obj.GetSpecName()))
 
-			// Temporarily disable the annotation for the retry.
-			ann := obj.GetAnnotations()
-			if ann == nil {
-				ann = make(map[string]string)
-			}
+			// Disable createOrAlter in-memory for the retry.
+			// Persist the spec change so subsequent reconciles skip
+			// the unsupported CREATE OR ALTER attempt.
+			patchBase := obj.DeepCopyObject().(T) // copy BEFORE mutation
 
-			ann[snowplanev1alpha1.AnnotationUseCreateOrAlter] = "false"
-			obj.SetAnnotations(ann)
+			f := false
+			obj.SetCreateOrAlter(&f)
+
+			if err := r.Client.Patch(ctx, obj, client.MergeFrom(patchBase)); err != nil {
+				logger.Error(err, "failed to persist createOrAlter=false fallback")
+			}
 
 			if err := r.executeSnowflakeOp(ctx, opCtx, obj, "create", "create", func() error {
 				return r.Adapter.Create(opCtx, svc, obj, id)
@@ -529,8 +550,15 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonCreating, "awaiting post-create verification")
 
 		// Use bestEffortPatchStatus so that a patch error doesn't defeat
-		// the explicit 5-second fast requeue.
+		// the explicit fast requeue.
 		r.bestEffortPatchStatus(ctx, obj)
+
+		// Return the error (if any) alongside RequeueAfter so that
+		// controller-runtime applies exponential backoff instead of a
+		// fixed 5-second polling loop.
+		if err != nil {
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("post-create observe: %w", err)
+		}
 
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
@@ -641,7 +669,8 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 		}
 
 		// Detect-only drift policy: skip the alter and requeue.
-		if isDrift && drift.IsDetectOnly(obj.GetAnnotations()) {
+		detectOnly := obj.GetManagementPolicies().IsDetectOnly()
+		if isDrift && detectOnly {
 			logger.Info("detect-only drift policy, skipping correction", resName, obj.GetSpecName())
 
 			conditions.SetReady(obj, resName+" is ready (drift detected, detect-only policy)")
@@ -659,9 +688,9 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 			return ctrl.Result{RequeueAfter: r.getRequeueInterval()}, nil
 		}
 
-		// Use CREATE OR ALTER when the annotation is set and the adapter
-		// supports it, otherwise fall through to the standard ALTER path.
-		useCoA := r.supportsCreateOrAlter() && snowplanev1alpha1.IsCreateOrAlter(obj.GetAnnotations())
+		// Use CREATE OR ALTER when enabled and the adapter supports it,
+		// otherwise fall through to the standard ALTER path.
+		useCoA := r.supportsCreateOrAlter() && r.isCreateOrAlter(obj)
 
 		if useCoA {
 			logger.Info("using CREATE OR ALTER (Snowflake preview feature)", "resource", resName, "name", obj.GetSpecName(), "isDrift", isDrift)
@@ -694,16 +723,11 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 				}
 			}
 		} else {
-			// Only warn when the annotation is explicitly set on an unsupported resource type.
-			// IsCreateOrAlter defaults to true when the annotation is absent, so we must check
-			// for explicit presence to avoid noisy warnings on every ALTER for resources that
-			// don't support CREATE OR ALTER.
-			if !r.supportsCreateOrAlter() {
-				if _, explicit := obj.GetAnnotations()[snowplanev1alpha1.AnnotationUseCreateOrAlter]; explicit {
-					logger.Info("use-create-or-alter annotation ignored: not supported for resource type", "resource", resName)
-					r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonUnsupportedAnnotation,
-						fmt.Sprintf("use-create-or-alter annotation is not supported for %s, using ALTER", resName))
-				}
+			// Warn when createOrAlter is explicitly enabled on an unsupported resource type.
+			if !r.supportsCreateOrAlter() && obj.GetManagementPolicies().CreateOrAlter != nil && *obj.GetManagementPolicies().CreateOrAlter {
+				logger.Info("spec.managementPolicies.createOrAlter ignored: not supported for resource type", "resource", resName)
+				r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonUnsupportedAnnotation,
+					fmt.Sprintf("spec.managementPolicies.createOrAlter is not supported for %s, using ALTER", resName))
 			}
 
 			logger.V(1).Info("executing Snowflake ALTER", "resource", resName, "name", obj.GetSpecName(), "isDrift", isDrift)
@@ -801,20 +825,19 @@ func (r *GenericReconciler[T, S, D]) reconcilePostCrashCreate(ctx context.Contex
 }
 
 // reconcileAdoptOrReject handles the first reconciliation when the Snowflake
-// resource already exists. Without the adoption annotation, this is a Terminal
-// error. With adoption-policy=adopt, the reconciler takes over management.
+// resource already exists. Without adoptionPolicy=adopt, this is a Terminal
+// error. With adopt, the reconciler takes over management.
 func (r *GenericReconciler[T, S, D]) reconcileAdoptOrReject(ctx context.Context, obj T, statusBase T, obs *Observation[D]) (ctrl.Result, error) {
 	resName := r.Adapter.ResourceName()
 	logger := log.FromContext(ctx)
 
 	policy := getAdoptionPolicy(obj)
 
-	if policy != snowplanev1alpha1.AdoptionPolicyAdopt {
+	if policy != snowplanev1alpha1.AdoptionPolicyTypeAdopt {
 		// Resource exists but adoption is not requested → Terminal error.
-		msg := fmt.Sprintf("%s %q already exists in Snowflake; set annotation %s=%s to adopt",
+		msg := fmt.Sprintf("%s %q already exists in Snowflake; set spec.managementPolicies.adoptionPolicy to %q to adopt",
 			resName, obj.GetSpecName(),
-			snowplanev1alpha1.AnnotationAdoptionPolicy,
-			snowplanev1alpha1.AdoptionPolicyAdopt)
+			snowplanev1alpha1.AdoptionPolicyTypeAdopt)
 		logger.Info("resource already exists, adoption not requested", resName, obj.GetSpecName())
 		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonResourceExists, msg)
 		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonResourceExists, msg)
@@ -880,26 +903,15 @@ func (r *GenericReconciler[T, S, D]) reconcileAdoptOrReject(ctx context.Context,
 	return ctrl.Result{RequeueAfter: r.getRequeueInterval()}, nil
 }
 
-// getAdoptionPolicy returns the adoption policy from the object's annotations.
-// Defaults to "fail-if-exists" when the annotation is absent or has an
-// unrecognised value (a warning is logged for invalid values).
-func getAdoptionPolicy[T ManagedResource](obj T) string {
-	if ann := obj.GetAnnotations(); ann != nil {
-		if v, ok := ann[snowplanev1alpha1.AnnotationAdoptionPolicy]; ok {
-			switch v {
-			case snowplanev1alpha1.AdoptionPolicyAdopt,
-				snowplanev1alpha1.AdoptionPolicyFailIfExists:
-				return v
-			default:
-				log.Log.Info("unrecognised adoption-policy annotation value, defaulting to fail-if-exists",
-					"value", v,
-					"resource", obj.GetName(),
-				)
-			}
-		}
+// getAdoptionPolicy returns the adoption policy for the object.
+// Reads from spec.managementPolicies.adoptionPolicy.
+// Defaults to "fail-if-exists" when not set.
+func getAdoptionPolicy[T ManagedResource](obj T) snowplanev1alpha1.AdoptionPolicy {
+	if p := obj.GetManagementPolicies().AdoptionPolicy; p != "" {
+		return p
 	}
 
-	return snowplanev1alpha1.AdoptionPolicyFailIfExists
+	return snowplanev1alpha1.AdoptionPolicyTypeFailIfExists
 }
 
 func (r *GenericReconciler[T, S, D]) reconcileDelete(ctx context.Context, obj T, svc S, id Identifier) (ctrl.Result, error) {
@@ -914,7 +926,7 @@ func (r *GenericReconciler[T, S, D]) reconcileDelete(ctx context.Context, obj T,
 	case snowplanev1alpha1.DeletionPolicyOrphan:
 		logger.Info("orphaning "+resName+" in Snowflake", resName, obj.GetSpecName())
 		r.Recorder.Event(obj, corev1.EventTypeNormal, snowplanev1alpha1.ReasonDeleting, fmt.Sprintf("%s %q orphaned", resName, obj.GetSpecName()))
-	default:
+	case snowplanev1alpha1.DeletionPolicyDelete:
 		// Escape hatch: if a DROP is permanently blocked (e.g., insufficient
 		// privileges), the user can annotate the resource with
 		// abandon-on-delete=true to remove the finalizer without dropping.
@@ -1123,6 +1135,12 @@ func (r *GenericReconciler[T, S, D]) finalizeSpec(ctx context.Context, obj T) er
 	obj.SetTrackedParametersList(r.Adapter.ComputeTrackedParameters(obj))
 
 	return nil
+}
+
+// isCreateOrAlter returns true when CREATE OR ALTER should be used.
+// Reads from spec.managementPolicies.createOrAlter (defaults to true).
+func (r *GenericReconciler[T, S, D]) isCreateOrAlter(obj T) bool {
+	return obj.GetManagementPolicies().IsCreateOrAlter()
 }
 
 // isCreateOrAlterUnsupported checks whether an error indicates that the

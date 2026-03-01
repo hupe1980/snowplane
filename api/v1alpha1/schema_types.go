@@ -12,6 +12,7 @@ import (
 // +kubebuilder:validation:XValidation:rule="self.transient == oldSelf.transient",message="spec.transient is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
+// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
 type SchemaSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -24,7 +25,7 @@ type SchemaSpec struct {
 	// +optional
 	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
 
-	// DatabaseName is the raw Snowflake database identifier (e.g. "ANALYTICS").
+	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Use this when the database is NOT managed by Snowplane.
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
@@ -32,20 +33,20 @@ type SchemaSpec struct {
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// Comment is an optional description for the schema.
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// DataRetentionTimeInDays specifies the Time Travel retention period (0–90 days).
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=90
-	DataRetentionTimeInDays *int32 `json:"dataRetentionTimeInDays,omitempty"`
+	DataRetentionTimeInDays *int32 `json:"dataRetentionTimeInDays,omitempty" snowflake:"DATA_RETENTION_TIME_IN_DAYS"`
 
 	// MaxDataExtensionTimeInDays specifies the maximum number of days Snowflake
 	// can extend the data retention period.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=90
-	MaxDataExtensionTimeInDays *int32 `json:"maxDataExtensionTimeInDays,omitempty"`
+	MaxDataExtensionTimeInDays *int32 `json:"maxDataExtensionTimeInDays,omitempty" snowflake:"MAX_DATA_EXTENSION_TIME_IN_DAYS"`
 
 	// Transient indicates this is a transient schema (no Fail-safe). Immutable after creation.
 	// +kubebuilder:default=false
@@ -55,22 +56,22 @@ type SchemaSpec struct {
 	ManagedAccess bool `json:"managedAccess,omitempty"`
 
 	// DefaultDDLCollation sets the default collation for string columns.
-	DefaultDDLCollation *string `json:"defaultDdlCollation,omitempty"`
+	DefaultDDLCollation *string `json:"defaultDDLCollation,omitempty" snowflake:"DEFAULT_DDL_COLLATION"`
 
 	// ReplaceInvalidCharacters controls whether to replace invalid UTF-8 characters.
-	ReplaceInvalidCharacters *bool `json:"replaceInvalidCharacters,omitempty"`
+	ReplaceInvalidCharacters *bool `json:"replaceInvalidCharacters,omitempty" snowflake:"REPLACE_INVALID_CHARACTERS"`
 
 	// StorageSerializationPolicy controls storage serialization format.
-	StorageSerializationPolicy *StorageSerializationPolicy `json:"storageSerializationPolicy,omitempty"`
+	StorageSerializationPolicy *StorageSerializationPolicy `json:"storageSerializationPolicy,omitempty" snowflake:"STORAGE_SERIALIZATION_POLICY"`
 
 	// LogLevel controls the logging verbosity.
-	LogLevel *LogLevel `json:"logLevel,omitempty"`
+	LogLevel *LogLevel `json:"logLevel,omitempty" snowflake:"LOG_LEVEL"`
 
 	// MetricLevel controls the metric collection level.
-	MetricLevel *MetricLevel `json:"metricLevel,omitempty"`
+	MetricLevel *MetricLevel `json:"metricLevel,omitempty" snowflake:"METRIC_LEVEL"`
 
 	// TraceLevel controls the trace collection level.
-	TraceLevel *TraceLevel `json:"traceLevel,omitempty"`
+	TraceLevel *TraceLevel `json:"traceLevel,omitempty" snowflake:"TRACE_LEVEL"`
 }
 
 // SchemaShowOutput mirrors the SHOW SCHEMAS output stored in status.
@@ -88,7 +89,7 @@ type SchemaShowOutput struct {
 	Kind string `json:"kind,omitempty"`
 
 	// Comment is the schema description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Owner is the role that owns the schema.
 	Owner string `json:"owner,omitempty"`
@@ -124,6 +125,7 @@ type SchemaStatus struct {
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
 // +kubebuilder:printcolumn:name="DATABASE",type=string,JSONPath=`.status.databaseName`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type Schema struct {
 	metav1.TypeMeta   `json:",inline"`

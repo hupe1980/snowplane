@@ -13,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -101,7 +102,7 @@ func buildCreateOptions(np *snowplanev1alpha1.NetworkPolicy, id snowflake.Accoun
 
 func buildAlterOptions(np *snowplanev1alpha1.NetworkPolicy, id snowflake.AccountObjectIdentifier, obs *snowflake.NetworkPolicyObservation) snowflake.AlterNetworkPolicyOptions {
 	opts := snowflake.AlterNetworkPolicyOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(np)
+	opts.UnsetFields = tracked.ComputeUnset(&np.Spec, np.Status.TrackedParameters)
 
 	// For IP lists we always SET the full list to converge.
 	// SHOW NETWORK POLICIES only shows counts, not actual IPs, so we
@@ -137,51 +138,6 @@ func buildAlterOptions(np *snowplanev1alpha1.NetworkPolicy, id snowflake.Account
 	}
 
 	return opts
-}
-
-func computeUnsetFields(np *snowplanev1alpha1.NetworkPolicy) []string {
-	if len(np.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(np.Status.TrackedParameters))
-	for _, f := range np.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if np.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.NetworkPolicySpec) []string {
-	var fields []string
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	if len(spec.AllowedIPList) > 0 {
-		fields = append(fields, "ALLOWED_IP_LIST")
-	}
-
-	if len(spec.BlockedIPList) > 0 {
-		fields = append(fields, "BLOCKED_IP_LIST")
-	}
-
-	if len(spec.AllowedNetworkRuleList) > 0 {
-		fields = append(fields, "ALLOWED_NETWORK_RULE_LIST")
-	}
-
-	if len(spec.BlockedNetworkRuleList) > 0 {
-		fields = append(fields, "BLOCKED_NETWORK_RULE_LIST")
-	}
-
-	return fields
 }
 
 func detectDrift(np *snowplanev1alpha1.NetworkPolicy, obs *snowflake.NetworkPolicyObservation) *drift.Result {

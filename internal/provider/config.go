@@ -95,6 +95,8 @@ func BuildSnowflakeConfig(pc *snowplanev1alpha1.ProviderConfig, secret *corev1.S
 			}
 		case snowplanev1alpha1.AuthenticationTypeUsernamePassword:
 			cfg.Password = append([]byte(nil), data...)
+		case snowplanev1alpha1.AuthenticationTypeWorkloadIdentity:
+			// Handled by the outer switch; unreachable here.
 		}
 
 		return cfg, nil

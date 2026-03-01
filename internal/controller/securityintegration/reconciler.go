@@ -14,6 +14,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -158,7 +159,7 @@ func buildAlterOptions(si *snowplanev1alpha1.SecurityIntegration, id snowflake.A
 		Name: id,
 		Type: string(si.Spec.Type),
 	}
-	opts.UnsetFields = computeUnsetFields(si)
+	opts.UnsetFields = tracked.ComputeUnset(&si.Spec, si.Status.TrackedParameters)
 
 	// Compare Enabled and Comment against observed values.
 	if si.Spec.Enabled != nil {
@@ -236,174 +237,6 @@ func buildAlterOptions(si *snowplanev1alpha1.SecurityIntegration, id snowflake.A
 	return opts
 }
 
-func computeUnsetFields(si *snowplanev1alpha1.SecurityIntegration) []string {
-	if len(si.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(si.Status.TrackedParameters))
-	for _, f := range si.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if si.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	switch si.Spec.Type {
-	case snowplanev1alpha1.SecurityIntegrationTypeExternalOAuth:
-		if c := si.Spec.ExternalOAuth; c != nil {
-			if c.JWSKeysURL == nil && managed["EXTERNAL_OAUTH_JWS_KEYS_URL"] {
-				unset = append(unset, "EXTERNAL_OAUTH_JWS_KEYS_URL")
-			}
-			if len(c.AudienceList) == 0 && managed["EXTERNAL_OAUTH_AUDIENCE_LIST"] {
-				unset = append(unset, "EXTERNAL_OAUTH_AUDIENCE_LIST")
-			}
-			if len(c.AllowedRoles) == 0 && managed["EXTERNAL_OAUTH_ALLOWED_ROLES_LIST"] {
-				unset = append(unset, "EXTERNAL_OAUTH_ALLOWED_ROLES_LIST")
-			}
-			if len(c.BlockedRoles) == 0 && managed["EXTERNAL_OAUTH_BLOCKED_ROLES_LIST"] {
-				unset = append(unset, "EXTERNAL_OAUTH_BLOCKED_ROLES_LIST")
-			}
-			if c.AnyRoleMode == nil && managed["EXTERNAL_OAUTH_ANY_ROLE_MODE"] {
-				unset = append(unset, "EXTERNAL_OAUTH_ANY_ROLE_MODE")
-			}
-			if c.ScopeDelimiter == nil && managed["EXTERNAL_OAUTH_SCOPE_DELIMITER"] {
-				unset = append(unset, "EXTERNAL_OAUTH_SCOPE_DELIMITER")
-			}
-			if c.NetworkPolicy == nil && managed["NETWORK_POLICY"] {
-				unset = append(unset, "NETWORK_POLICY")
-			}
-		}
-	case snowplanev1alpha1.SecurityIntegrationTypeSAML2:
-		if c := si.Spec.SAML2; c != nil {
-			if len(c.AllowedEmailPatterns) == 0 && managed["ALLOWED_EMAIL_PATTERNS"] {
-				unset = append(unset, "ALLOWED_EMAIL_PATTERNS")
-			}
-			if len(c.AllowedUserDomains) == 0 && managed["ALLOWED_USER_DOMAINS"] {
-				unset = append(unset, "ALLOWED_USER_DOMAINS")
-			}
-			if c.SPInitiatedLoginPageLabel == nil && managed["SAML2_SP_INITIATED_LOGIN_PAGE_LABEL"] {
-				unset = append(unset, "SAML2_SP_INITIATED_LOGIN_PAGE_LABEL")
-			}
-			if c.EnableSPInitiated == nil && managed["SAML2_ENABLE_SP_INITIATED"] {
-				unset = append(unset, "SAML2_ENABLE_SP_INITIATED")
-			}
-			if c.ForceAuthn == nil && managed["SAML2_FORCE_AUTHN"] {
-				unset = append(unset, "SAML2_FORCE_AUTHN")
-			}
-			if c.RequestedNameIDFormat == nil && managed["SAML2_REQUESTED_NAMEID_FORMAT"] {
-				unset = append(unset, "SAML2_REQUESTED_NAMEID_FORMAT")
-			}
-			if c.PostLogoutRedirectURL == nil && managed["SAML2_POST_LOGOUT_REDIRECT_URL"] {
-				unset = append(unset, "SAML2_POST_LOGOUT_REDIRECT_URL")
-			}
-		}
-	case snowplanev1alpha1.SecurityIntegrationTypeSCIM:
-		if c := si.Spec.SCIM; c != nil {
-			if c.NetworkPolicy == nil && managed["NETWORK_POLICY"] {
-				unset = append(unset, "NETWORK_POLICY")
-			}
-			if c.SyncPassword == nil && managed["SYNC_PASSWORD"] {
-				unset = append(unset, "SYNC_PASSWORD")
-			}
-		}
-	case snowplanev1alpha1.SecurityIntegrationTypeAPIAuthentication:
-		if c := si.Spec.APIAuthentication; c != nil {
-			if len(c.OAuthAllowedScopes) == 0 && managed["OAUTH_ALLOWED_SCOPES"] {
-				unset = append(unset, "OAUTH_ALLOWED_SCOPES")
-			}
-		}
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.SecurityIntegrationSpec) []string {
-	var fields []string
-
-	if spec.Enabled != nil {
-		fields = append(fields, "ENABLED")
-	}
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	// Track individual sub-type parameters.
-	switch spec.Type {
-	case snowplanev1alpha1.SecurityIntegrationTypeExternalOAuth:
-		if c := spec.ExternalOAuth; c != nil {
-			fields = append(fields, "EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM")
-			if c.JWSKeysURL != nil {
-				fields = append(fields, "EXTERNAL_OAUTH_JWS_KEYS_URL")
-			}
-			if len(c.AudienceList) > 0 {
-				fields = append(fields, "EXTERNAL_OAUTH_AUDIENCE_LIST")
-			}
-			if len(c.AllowedRoles) > 0 {
-				fields = append(fields, "EXTERNAL_OAUTH_ALLOWED_ROLES_LIST")
-			}
-			if len(c.BlockedRoles) > 0 {
-				fields = append(fields, "EXTERNAL_OAUTH_BLOCKED_ROLES_LIST")
-			}
-			if c.AnyRoleMode != nil {
-				fields = append(fields, "EXTERNAL_OAUTH_ANY_ROLE_MODE")
-			}
-			if c.ScopeDelimiter != nil {
-				fields = append(fields, "EXTERNAL_OAUTH_SCOPE_DELIMITER")
-			}
-			if c.NetworkPolicy != nil {
-				fields = append(fields, "NETWORK_POLICY")
-			}
-		}
-	case snowplanev1alpha1.SecurityIntegrationTypeSAML2:
-		if c := spec.SAML2; c != nil {
-			fields = append(fields, "SAML2_X509_CERT")
-			if len(c.AllowedEmailPatterns) > 0 {
-				fields = append(fields, "ALLOWED_EMAIL_PATTERNS")
-			}
-			if len(c.AllowedUserDomains) > 0 {
-				fields = append(fields, "ALLOWED_USER_DOMAINS")
-			}
-			if c.SPInitiatedLoginPageLabel != nil {
-				fields = append(fields, "SAML2_SP_INITIATED_LOGIN_PAGE_LABEL")
-			}
-			if c.EnableSPInitiated != nil {
-				fields = append(fields, "SAML2_ENABLE_SP_INITIATED")
-			}
-			if c.ForceAuthn != nil {
-				fields = append(fields, "SAML2_FORCE_AUTHN")
-			}
-			if c.RequestedNameIDFormat != nil {
-				fields = append(fields, "SAML2_REQUESTED_NAMEID_FORMAT")
-			}
-			if c.PostLogoutRedirectURL != nil {
-				fields = append(fields, "SAML2_POST_LOGOUT_REDIRECT_URL")
-			}
-		}
-	case snowplanev1alpha1.SecurityIntegrationTypeSCIM:
-		if c := spec.SCIM; c != nil {
-			if c.NetworkPolicy != nil {
-				fields = append(fields, "NETWORK_POLICY")
-			}
-			if c.SyncPassword != nil {
-				fields = append(fields, "SYNC_PASSWORD")
-			}
-		}
-	case snowplanev1alpha1.SecurityIntegrationTypeAPIAuthentication:
-		if c := spec.APIAuthentication; c != nil {
-			if len(c.OAuthAllowedScopes) > 0 {
-				fields = append(fields, "OAUTH_ALLOWED_SCOPES")
-			}
-		}
-	}
-
-	return fields
-}
-
 func detectDrift(si *snowplanev1alpha1.SecurityIntegration, obs *snowflake.SecurityIntegrationObservation) *drift.Result {
 	d := drift.New()
 
@@ -450,6 +283,8 @@ func detectDrift(si *snowplanev1alpha1.SecurityIntegration, obs *snowflake.Secur
 					d.CompareStringValueFold("SYNC_PASSWORD", expected, describeValue(obs, "SYNC_PASSWORD"), false)
 				}
 			}
+		case snowplanev1alpha1.SecurityIntegrationTypeAPIAuthentication:
+			// API Authentication integrations have no sub-type fields to compare via DESCRIBE.
 		}
 	}
 

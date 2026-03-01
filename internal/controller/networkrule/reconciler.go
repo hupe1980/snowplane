@@ -15,6 +15,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -109,7 +110,7 @@ func buildCreateOptions(nr *snowplanev1alpha1.NetworkRule, id snowflake.SchemaOb
 
 func buildAlterOptions(nr *snowplanev1alpha1.NetworkRule, id snowflake.SchemaObjectIdentifier, obs *snowflake.NetworkRuleObservation) snowflake.AlterNetworkRuleOptions {
 	opts := snowflake.AlterNetworkRuleOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(nr)
+	opts.UnsetFields = tracked.ComputeUnset(&nr.Spec, nr.Status.TrackedParameters)
 
 	// ValueList is always sent on update to ensure convergence
 	// (not fully available in SHOW output).
@@ -124,38 +125,6 @@ func buildAlterOptions(nr *snowplanev1alpha1.NetworkRule, id snowflake.SchemaObj
 	}
 
 	return opts
-}
-
-func computeUnsetFields(nr *snowplanev1alpha1.NetworkRule) []string {
-	if len(nr.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(nr.Status.TrackedParameters))
-	for _, f := range nr.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if nr.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.NetworkRuleSpec) []string {
-	var fields []string
-
-	// ValueList is always tracked since it's required.
-	fields = append(fields, "VALUE_LIST")
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	return fields
 }
 
 func detectDrift(nr *snowplanev1alpha1.NetworkRule, obs *snowflake.NetworkRuleObservation) *drift.Result {

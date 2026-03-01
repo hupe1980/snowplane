@@ -13,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -110,7 +111,7 @@ func buildCreateOptions(view *snowplanev1alpha1.View, id snowflake.SchemaObjectI
 
 func buildAlterOptions(view *snowplanev1alpha1.View, id snowflake.SchemaObjectIdentifier, obs *snowflake.ViewObservation) snowflake.AlterViewOptions {
 	opts := snowflake.AlterViewOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(view)
+	opts.UnsetFields = tracked.ComputeUnset(&view.Spec, view.Status.TrackedParameters)
 
 	// Detect statement change → requires CREATE OR REPLACE VIEW (R9-1).
 	if obs.ShowOutput != nil && view.Spec.Statement != obs.ShowOutput.Text {
@@ -150,43 +151,6 @@ func buildAlterOptions(view *snowplanev1alpha1.View, id snowflake.SchemaObjectId
 	}
 
 	return opts
-}
-
-func computeUnsetFields(view *snowplanev1alpha1.View) []string {
-	if len(view.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(view.Status.TrackedParameters))
-	for _, f := range view.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if view.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	if view.Spec.ChangeTracking == nil && managed["CHANGE_TRACKING"] {
-		unset = append(unset, "CHANGE_TRACKING")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.ViewSpec) []string {
-	var fields []string
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	if spec.ChangeTracking != nil {
-		fields = append(fields, "CHANGE_TRACKING")
-	}
-
-	return fields
 }
 
 func detectDrift(view *snowplanev1alpha1.View, obs *snowflake.ViewObservation) *drift.Result {

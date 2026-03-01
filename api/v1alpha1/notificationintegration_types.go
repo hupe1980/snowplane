@@ -19,22 +19,22 @@ const (
 type EmailNotificationConfig struct {
 	// AllowedRecipients is the list of email addresses that can receive notifications.
 	// +kubebuilder:validation:MinItems=1
-	AllowedRecipients []string `json:"allowedRecipients"`
+	AllowedRecipients []string `json:"allowedRecipients" snowflake:"ALLOWED_RECIPIENTS,nounset"`
 
 	// DefaultRecipients is the default list of email recipients.
 	// +optional
-	DefaultRecipients []string `json:"defaultRecipients,omitempty"`
+	DefaultRecipients []string `json:"defaultRecipients,omitempty" snowflake:"DEFAULT_RECIPIENTS"`
 
 	// DefaultSubject is the default email subject line.
 	// +optional
-	DefaultSubject *string `json:"defaultSubject,omitempty"`
+	DefaultSubject *string `json:"defaultSubject,omitempty" snowflake:"DEFAULT_SUBJECT"`
 }
 
 // QueueNotificationConfig holds configuration for QUEUE (cloud messaging) notification integrations.
 type QueueNotificationConfig struct {
 	// NotificationProvider is the cloud provider for the queue.
 	// +kubebuilder:validation:Enum=AWS_SNS;AWS_SQS;GCP_PUBSUB;AZURE_STORAGE_QUEUE;AZURE_EVENT_GRID
-	NotificationProvider string `json:"notificationProvider"`
+	NotificationProvider string `json:"notificationProvider" snowflake:"NOTIFICATION_PROVIDER,always,nounset"`
 
 	// Direction is the message direction (OUTBOUND or INBOUND).
 	// +kubebuilder:validation:Enum=OUTBOUND;INBOUND
@@ -43,58 +43,58 @@ type QueueNotificationConfig struct {
 
 	// AWSSNSTopicARN is the ARN of the SNS topic (required for AWS_SNS).
 	// +optional
-	AWSSNSTopicARN *string `json:"awsSNSTopicARN,omitempty"`
+	AWSSNSTopicARN *string `json:"awsSNSTopicARN,omitempty" snowflake:"AWS_SNS_TOPIC_ARN"`
 
 	// AWSSNSRoleARN is the ARN of the IAM role for SNS access (required for AWS_SNS).
 	// +optional
-	AWSSNSRoleARN *string `json:"awsSNSRoleARN,omitempty"`
+	AWSSNSRoleARN *string `json:"awsSNSRoleARN,omitempty" snowflake:"AWS_SNS_ROLE_ARN"`
 
 	// AWSSQSArn is the ARN of the SQS queue (required for AWS_SQS).
 	// +optional
-	AWSSQSArn *string `json:"awsSQSArn,omitempty"`
+	AWSSQSArn *string `json:"awsSQSArn,omitempty" snowflake:"AWS_SQS_ARN"`
 
 	// AWSSQSRoleARN is the ARN of the IAM role for SQS access (required for AWS_SQS).
 	// +optional
-	AWSSQSRoleARN *string `json:"awsSQSRoleARN,omitempty"`
+	AWSSQSRoleARN *string `json:"awsSQSRoleARN,omitempty" snowflake:"AWS_SQS_ROLE_ARN"`
 
 	// GCPPubSubTopicName is the Pub/Sub topic name (required for GCP_PUBSUB).
 	// +optional
-	GCPPubSubTopicName *string `json:"gcpPubSubTopicName,omitempty"`
+	GCPPubSubTopicName *string `json:"gcpPubSubTopicName,omitempty" snowflake:"GCP_PUBSUB_TOPIC_NAME"`
 
 	// GCPPubSubSubscriptionName is the Pub/Sub subscription name (optional for GCP_PUBSUB).
 	// +optional
-	GCPPubSubSubscriptionName *string `json:"gcpPubSubSubscriptionName,omitempty"`
+	GCPPubSubSubscriptionName *string `json:"gcpPubSubSubscriptionName,omitempty" snowflake:"GCP_PUBSUB_SUBSCRIPTION_NAME"`
 
 	// AzureStorageQueuePrimaryURI is the Azure Storage queue endpoint (required for AZURE_STORAGE_QUEUE).
 	// +optional
-	AzureStorageQueuePrimaryURI *string `json:"azureStorageQueuePrimaryURI,omitempty"`
+	AzureStorageQueuePrimaryURI *string `json:"azureStorageQueuePrimaryURI,omitempty" snowflake:"AZURE_STORAGE_QUEUE_PRIMARY_URI"`
 
 	// AzureTenantID is the Azure AD tenant ID (required for Azure providers).
 	// +optional
-	AzureTenantID *string `json:"azureTenantID,omitempty"`
+	AzureTenantID *string `json:"azureTenantID,omitempty" snowflake:"AZURE_TENANT_ID"`
 
 	// AzureEventGridTopicEndpoint is the Event Grid topic endpoint (required for AZURE_EVENT_GRID).
 	// +optional
-	AzureEventGridTopicEndpoint *string `json:"azureEventGridTopicEndpoint,omitempty"`
+	AzureEventGridTopicEndpoint *string `json:"azureEventGridTopicEndpoint,omitempty" snowflake:"AZURE_EVENT_GRID_TOPIC_ENDPOINT"`
 }
 
 // WebhookNotificationConfig holds configuration for WEBHOOK notification integrations.
 type WebhookNotificationConfig struct {
 	// WebhookURL is the endpoint URL for the webhook.
 	// +kubebuilder:validation:MinLength=1
-	WebhookURL string `json:"webhookURL"`
+	WebhookURL string `json:"webhookURL" snowflake:"WEBHOOK_URL,always,nounset"`
 
 	// WebhookSecret is the secret used to sign webhook payloads.
 	// +optional
-	WebhookSecret *string `json:"webhookSecret,omitempty"`
+	WebhookSecret *string `json:"webhookSecret,omitempty" snowflake:"WEBHOOK_SECRET"`
 
 	// WebhookBodyTemplate is a custom body template for the webhook payload.
 	// +optional
-	WebhookBodyTemplate *string `json:"webhookBodyTemplate,omitempty"`
+	WebhookBodyTemplate *string `json:"webhookBodyTemplate,omitempty" snowflake:"WEBHOOK_BODY_TEMPLATE"`
 
 	// WebhookHeaders is a map of custom HTTP headers to include in webhook requests.
 	// +optional
-	WebhookHeaders map[string]string `json:"webhookHeaders,omitempty"`
+	WebhookHeaders map[string]string `json:"webhookHeaders,omitempty" snowflake:"WEBHOOK_HEADER_,prefix"`
 }
 
 // NotificationIntegrationSpec defines the desired state of a Snowflake Notification Integration.
@@ -119,7 +119,7 @@ type NotificationIntegrationSpec struct {
 	// Enabled controls whether the integration is active.
 	// +optional
 	// +kubebuilder:default=true
-	Enabled *bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty" snowflake:"ENABLED,nounset"`
 
 	// Email holds configuration for EMAIL integrations.
 	// +optional
@@ -135,7 +135,7 @@ type NotificationIntegrationSpec struct {
 
 	// Comment is an optional description for the notification integration.
 	// +optional
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // NotificationIntegrationShowOutput mirrors the SHOW NOTIFICATION INTEGRATIONS output stored in status.
@@ -153,10 +153,10 @@ type NotificationIntegrationShowOutput struct {
 	Category string `json:"category,omitempty"`
 
 	// Enabled indicates whether the integration is active.
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty" snowflake:"ENABLED,nounset"`
 
 	// Comment is the integration description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // NotificationIntegrationStatus defines the observed state of a NotificationIntegration.
@@ -181,6 +181,7 @@ type NotificationIntegrationStatus struct {
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
 // +kubebuilder:printcolumn:name="TYPE",type=string,JSONPath=`.spec.type`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type NotificationIntegration struct {
 	metav1.TypeMeta   `json:",inline"`

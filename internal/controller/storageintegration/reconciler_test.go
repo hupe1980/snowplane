@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -140,226 +140,25 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
-
-// --------------------------------------------------------------------------
-// Tests: Finalizer management
-// --------------------------------------------------------------------------
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-
-	s := newTestStorageIntegration("mys", "default")
-	r := newTestReconciler(&mockService{}, s, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mys", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter)
-
-	got := &snowplanev1alpha1.StorageIntegration{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mys", Namespace: "default"}, got))
-	assert.Contains(t, got.Finalizers, finalizerName)
-}
-
-// --------------------------------------------------------------------------
-// Tests: Create flow
-// --------------------------------------------------------------------------
-
-func TestReconcile_Create(t *testing.T) {
-	t.Parallel()
-
-	s := newTestStorageIntegration("mys", "default")
-	s.Finalizers = []string{finalizerName}
-
-	var capturedOpts snowflake.CreateStorageIntegrationOptions
-	obs := successfulObservation()
-
-	mock := &mockService{
-		observeFn: func() func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.StorageIntegrationObservation, error) {
-			call := 0
-			return func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.StorageIntegrationObservation, error) {
-				call++
-				if call == 1 {
-					return &snowflake.StorageIntegrationObservation{Exists: false}, nil
-				}
-
-				return obs, nil
-			}
-		}(),
-		createFn: func(_ context.Context, opts snowflake.CreateStorageIntegrationOptions) error {
-			capturedOpts = opts
-			return nil
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
 		},
-	}
-
-	r := newTestReconciler(mock, s, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mys", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, reconciler.DefaultRequeueInterval, result.RequeueAfter)
-
-	assert.Equal(t, "MY_INT", capturedOpts.Name.Name())
-	assert.Equal(t, "EXTERNAL_STAGE", capturedOpts.Type)
-	assert.Equal(t, "S3", capturedOpts.StorageProvider)
-
-	got := &snowplanev1alpha1.StorageIntegration{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mys", Namespace: "default"}, got))
-	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
-}
-
-func TestReconcile_CreateFails(t *testing.T) {
-	t.Parallel()
-
-	s := newTestStorageIntegration("mys", "default")
-	s.Finalizers = []string{finalizerName}
-
-	mock := &mockService{
-		observeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.StorageIntegrationObservation, error) {
-			return &snowflake.StorageIntegrationObservation{Exists: false}, nil
+		NewFixture: func(name, ns string) client.Object {
+			return newTestStorageIntegration(name, ns)
 		},
-		createFn: func(_ context.Context, _ snowflake.CreateStorageIntegrationOptions) error {
-			return fmt.Errorf("permission denied")
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.StorageIntegration{}
 		},
-	}
-
-	r := newTestReconciler(mock, s, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mys", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "permission denied")
-}
-
-// --------------------------------------------------------------------------
-// Tests: Unit tests for helpers
-// --------------------------------------------------------------------------
-
-func TestBuildCreateOptions(t *testing.T) {
-	t.Parallel()
-
-	s := newTestStorageIntegration("mys", "default")
-	id := snowflake.NewAccountObjectIdentifier("MY_INT")
-
-	opts := buildCreateOptions(s, id)
-	assert.Equal(t, "MY_INT", opts.Name.Name())
-	assert.Equal(t, "EXTERNAL_STAGE", opts.Type)
-	assert.Equal(t, "S3", opts.StorageProvider)
-	assert.Equal(t, []string{"s3://mybucket/"}, opts.StorageAllowedLocations)
-	assert.NotNil(t, opts.StorageAWSRoleARN)
-}
-
-func TestComputeTrackedParameters(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Empty", func(t *testing.T) {
-		t.Parallel()
-		spec := &snowplanev1alpha1.StorageIntegrationSpec{}
-		assert.Empty(t, computeTrackedParameters(spec))
-	})
-
-	t.Run("CommentSet", func(t *testing.T) {
-		t.Parallel()
-		c := "test"
-		spec := &snowplanev1alpha1.StorageIntegrationSpec{Comment: &c}
-		assert.Contains(t, computeTrackedParameters(spec), "COMMENT")
-	})
-
-	t.Run("EnabledSet", func(t *testing.T) {
-		t.Parallel()
-		e := true
-		spec := &snowplanev1alpha1.StorageIntegrationSpec{Enabled: &e}
-		assert.Contains(t, computeTrackedParameters(spec), "ENABLED")
-	})
-}
-
-func TestSortedLocations(t *testing.T) {
-	t.Parallel()
-
-	t.Run("AlreadySorted", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, "a,b,c", sortedLocations([]string{"a", "b", "c"}))
-	})
-
-	t.Run("Unsorted", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, "a,b,c", sortedLocations([]string{"c", "a", "b"}))
-	})
-
-	t.Run("Empty", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, "", sortedLocations(nil))
-	})
-}
-
-func TestDetectDrift_NoDrift(t *testing.T) {
-	t.Parallel()
-
-	s := &snowplanev1alpha1.StorageIntegration{
-		Spec: snowplanev1alpha1.StorageIntegrationSpec{
-			Name:                    "MY_INT",
-			StorageAllowedLocations: []string{"s3://mybucket/"},
-		},
-	}
-
-	obs := &snowflake.StorageIntegrationObservation{
-		ShowOutput: &snowflake.StorageIntegrationShowOutput{
-			Name: "MY_INT",
-		},
-		DescribeOutput: map[string]string{
-			"STORAGE_ALLOWED_LOCATIONS": "s3://mybucket/",
-		},
-	}
-
-	result := detectDrift(s, obs)
-	assert.False(t, result.HasDrift)
-}
-
-func TestDetectDrift_WithDrift(t *testing.T) {
-	t.Parallel()
-
-	s := &snowplanev1alpha1.StorageIntegration{
-		Spec: snowplanev1alpha1.StorageIntegrationSpec{
-			Name:    "MY_INT",
-			Comment: testutil.PtrString("desired"),
-		},
-	}
-
-	obs := &snowflake.StorageIntegrationObservation{
-		ShowOutput: &snowflake.StorageIntegrationShowOutput{
-			Name:    "MY_INT",
-			Comment: "drifted",
-		},
-		DescribeOutput: map[string]string{},
-	}
-
-	result := detectDrift(s, obs)
-	assert.True(t, result.HasDrift)
-	assert.Contains(t, result.Summary(), "COMMENT")
-}
-
-// --------------------------------------------------------------------------
-// Tests: ProviderConfig resolution
-// --------------------------------------------------------------------------
-
-func TestReconcile_ProviderConfigNotFound(t *testing.T) {
-	t.Parallel()
-
-	s := newTestStorageIntegration("mys", "default")
-	r := newTestReconciler(&mockService{}, s)
-
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mys", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "fetching ProviderConfig")
+		FinalizerName: finalizerName,
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------

@@ -23,6 +23,19 @@ spec:
     - jsonPath: .status.conditions[?(@.type=="Synced")].status
       name: SYNCED
       type: string
+    - jsonPath: .spec.privilege
+      name: PRIVILEGE
+      type: string
+    - jsonPath: .spec.accountRole
+      name: ROLE
+      type: string
+    - jsonPath: .status.kind
+      name: KIND
+      type: string
+    - jsonPath: .spec.providerRef.name
+      name: PROVIDER
+      priority: 1
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
@@ -83,6 +96,38 @@ spec:
                 - Delete
                 - Orphan
                 type: string
+              managementPolicies:
+                description: ManagementPolicies specifies lifecycle policies for this
+                  resource.
+                properties:
+                  adoptionPolicy:
+                    default: fail-if-exists
+                    description: |-
+                      AdoptionPolicy controls how the reconciler handles a pre-existing
+                      Snowflake resource on first reconciliation.
+                      Defaults to "fail-if-exists".
+                    enum:
+                    - adopt
+                    - fail-if-exists
+                    type: string
+                  createOrAlter:
+                    default: true
+                    description: |-
+                      CreateOrAlter controls whether CREATE OR ALTER is used instead of
+                      the legacy CREATE + ALTER two-step flow for supported resource types.
+                      Defaults to true.
+                    type: boolean
+                  driftPolicy:
+                    default: correct
+                    description: |-
+                      DriftPolicy controls whether detected drift is corrected or only
+                      reported via conditions and events.
+                      Defaults to "correct".
+                    enum:
+                    - correct
+                    - detect-only
+                    type: string
+                type: object
               "on":
                 description: |-
                   On defines what the privilege is granted on.
@@ -102,10 +147,18 @@ spec:
                         description: ObjectName is the identifier of the object.
                         type: string
                       objectType:
-                        description: |-
-                          ObjectType is the type of the account object.
-                          Valid values: USER, RESOURCE MONITOR, WAREHOUSE, COMPUTE POOL, DATABASE,
-                          INTEGRATION, CONNECTION, FAILOVER GROUP, REPLICATION GROUP, EXTERNAL VOLUME.
+                        description: ObjectType is the type of the account object.
+                        enum:
+                        - USER
+                        - RESOURCE MONITOR
+                        - WAREHOUSE
+                        - COMPUTE POOL
+                        - DATABASE
+                        - INTEGRATION
+                        - CONNECTION
+                        - FAILOVER GROUP
+                        - REPLICATION GROUP
+                        - EXTERNAL VOLUME
                         type: string
                     required:
                     - objectName
@@ -152,6 +205,7 @@ spec:
                       schemaName:
                         description: |-
                           SchemaName is the fully qualified schema name (e.g. "MY_DB"."PUBLIC").
+                          The controller uses this verbatim in ON SCHEMA <schema_name>.
                           For: ON SCHEMA <schema_name>
                         type: string
                       schemaRef:
@@ -220,7 +274,30 @@ spec:
                             type: object
                           objectTypePlural:
                             description: ObjectTypePlural is the plural form of the
-                              object type (e.g. TABLES, VIEWS, STAGES).
+                              object type.
+                            enum:
+                            - TABLES
+                            - VIEWS
+                            - MATERIALIZED VIEWS
+                            - STAGES
+                            - FILE FORMATS
+                            - FUNCTIONS
+                            - PROCEDURES
+                            - STREAMS
+                            - TASKS
+                            - PIPES
+                            - SEQUENCES
+                            - TAGS
+                            - MASKING POLICIES
+                            - ROW ACCESS POLICIES
+                            - ALERTS
+                            - SECRETS
+                            - MODELS
+                            - DYNAMIC TABLES
+                            - ICEBERG TABLES
+                            - EVENT TABLES
+                            - EXTERNAL TABLES
+                            - SCHEMAS
                             type: string
                         required:
                         - objectTypePlural
@@ -274,7 +351,30 @@ spec:
                             type: object
                           objectTypePlural:
                             description: ObjectTypePlural is the plural form of the
-                              object type (e.g. TABLES, VIEWS, STAGES).
+                              object type.
+                            enum:
+                            - TABLES
+                            - VIEWS
+                            - MATERIALIZED VIEWS
+                            - STAGES
+                            - FILE FORMATS
+                            - FUNCTIONS
+                            - PROCEDURES
+                            - STREAMS
+                            - TASKS
+                            - PIPES
+                            - SEQUENCES
+                            - TAGS
+                            - MASKING POLICIES
+                            - ROW ACCESS POLICIES
+                            - ALERTS
+                            - SECRETS
+                            - MODELS
+                            - DYNAMIC TABLES
+                            - ICEBERG TABLES
+                            - EVENT TABLES
+                            - EXTERNAL TABLES
+                            - SCHEMAS
                             type: string
                         required:
                         - objectTypePlural
@@ -296,8 +396,30 @@ spec:
                         type: string
                       objectType:
                         description: |-
-                          ObjectType is the schema object type (e.g. TABLE, VIEW, STAGE, FUNCTION, PROCEDURE, STREAM, TASK, PIPE).
+                          ObjectType is the schema object type.
                           Required when granting on a specific object.
+                        enum:
+                        - TABLE
+                        - VIEW
+                        - MATERIALIZED VIEW
+                        - STAGE
+                        - FILE FORMAT
+                        - FUNCTION
+                        - PROCEDURE
+                        - STREAM
+                        - TASK
+                        - PIPE
+                        - SEQUENCE
+                        - TAG
+                        - MASKING POLICY
+                        - ROW ACCESS POLICY
+                        - ALERT
+                        - SECRET
+                        - MODEL
+                        - DYNAMIC TABLE
+                        - ICEBERG TABLE
+                        - EVENT TABLE
+                        - EXTERNAL TABLE
                         type: string
                     type: object
                     x-kubernetes-validations:
@@ -313,6 +435,13 @@ spec:
                   rule: '(has(self.account) && self.account ? 1 : 0) + (has(self.accountObject)
                     ? 1 : 0) + (has(self.schema) ? 1 : 0) + (has(self.schemaObject)
                     ? 1 : 0) == 1'
+              paused:
+                description: |-
+                  Paused suspends reconciliation of this resource. When true, the
+                  controller skips all Snowflake operations and sets Synced=False
+                  with reason ReconcilePaused. The Snowflake resource is not modified
+                  or deleted while paused.
+                type: boolean
               privilege:
                 description: Privilege is the Snowflake privilege to grant (e.g. USAGE,
                   SELECT, CREATE SCHEMA).

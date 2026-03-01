@@ -5,8 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 )
 
 func ptrString(s string) *string { return &s }
@@ -179,15 +177,6 @@ func TestResult_Summary_MultipleChanges(t *testing.T) {
 	summary := r.Summary()
 	assert.Contains(t, summary, `COMMENT: expected "new", found "old"`)
 	assert.Contains(t, summary, `SIZE: expected "10", found "5"`)
-}
-
-func TestIsDetectOnly(t *testing.T) {
-	t.Parallel()
-
-	assert.False(t, IsDetectOnly(nil))
-	assert.False(t, IsDetectOnly(map[string]string{}))
-	assert.False(t, IsDetectOnly(map[string]string{snowplanev1alpha1.AnnotationDriftPolicy: "correct"}))
-	assert.True(t, IsDetectOnly(map[string]string{snowplanev1alpha1.AnnotationDriftPolicy: "detect-only"}))
 }
 
 func TestResult_FieldDiffs_ExcludesImmutable(t *testing.T) {

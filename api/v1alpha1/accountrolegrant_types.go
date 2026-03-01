@@ -68,6 +68,10 @@ type AccountRoleGrantStatus struct {
 // +kubebuilder:resource:categories=snowplane
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
+// +kubebuilder:printcolumn:name="PRIVILEGE",type=string,JSONPath=`.spec.privilege`,priority=0
+// +kubebuilder:printcolumn:name="ROLE",type=string,JSONPath=`.spec.accountRole`,priority=0
+// +kubebuilder:printcolumn:name="KIND",type=string,JSONPath=`.status.kind`,priority=0
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type AccountRoleGrant struct {
 	metav1.TypeMeta   `json:",inline"`

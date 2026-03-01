@@ -209,6 +209,7 @@ func TestBreaker_ExponentialBackoff(t *testing.T) {
 		MaxResetTimeout:  80 * time.Second,
 	})
 	cb.now = func() time.Time { return now }
+	cb.jitterFrac = func() float64 { return 0 } // deterministic: no jitter
 
 	provider := "exp-backoff"
 
@@ -268,6 +269,7 @@ func TestBreaker_ExponentialBackoffCapsAtMax(t *testing.T) {
 		MaxResetTimeout:  30 * time.Second,
 	})
 	cb.now = func() time.Time { return now }
+	cb.jitterFrac = func() float64 { return 0 } // deterministic: no jitter
 
 	provider := "exp-cap"
 
@@ -295,4 +297,60 @@ func TestBreaker_ExponentialBackoffCapsAtMax(t *testing.T) {
 
 	cb.now = func() time.Time { return now.Add(11*time.Second + 21*time.Second + 31*time.Second + 31*time.Second) }
 	assert.Equal(t, StateHalfOpen, cb.State(provider))
+}
+
+func TestBreaker_JitterApplied(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+
+	// Test with positive jitter (+20% of 2*10s = +4s → 24s).
+	cb := New(Options{
+		FailureThreshold: 1,
+		ResetTimeout:     10 * time.Second,
+		MaxResetTimeout:  120 * time.Second,
+	})
+	cb.now = func() time.Time { return now }
+	cb.jitterFrac = func() float64 { return 1.0 } // max positive jitter
+
+	provider := "jitter-positive"
+
+	// Trip → initial 10s, then half-open fail → 2*10s + 20%*20s*1.0 = 20+4 = 24s.
+	cb.RecordFailure(provider)
+	cb.now = func() time.Time { return now.Add(11 * time.Second) }
+	require.NoError(t, cb.Allow(provider))
+	cb.RecordFailure(provider) // now backoff = 24s
+
+	// At 23s after second trip: still open.
+	cb.now = func() time.Time { return now.Add(11*time.Second + 23*time.Second) }
+	assert.ErrorIs(t, cb.Allow(provider), ErrCircuitOpen)
+
+	// At 25s: should be half-open (24s timeout elapsed).
+	cb.now = func() time.Time { return now.Add(11*time.Second + 25*time.Second) }
+	require.NoError(t, cb.Allow(provider))
+
+	// Test with negative jitter (-20% of 2*10s = -4s → 16s).
+	cb2 := New(Options{
+		FailureThreshold: 1,
+		ResetTimeout:     10 * time.Second,
+		MaxResetTimeout:  120 * time.Second,
+	})
+	cb2.now = func() time.Time { return now }
+	cb2.jitterFrac = func() float64 { return -1.0 } // max negative jitter
+
+	provider2 := "jitter-negative"
+
+	// Trip → initial 10s, then half-open fail → 2*10s + 20%*20s*(-1.0) = 20-4 = 16s.
+	cb2.RecordFailure(provider2)
+	cb2.now = func() time.Time { return now.Add(11 * time.Second) }
+	require.NoError(t, cb2.Allow(provider2))
+	cb2.RecordFailure(provider2) // now backoff = 16s
+
+	// At 15s after second trip: still open.
+	cb2.now = func() time.Time { return now.Add(11*time.Second + 15*time.Second) }
+	assert.ErrorIs(t, cb2.Allow(provider2), ErrCircuitOpen)
+
+	// At 17s: should be half-open (16s timeout elapsed).
+	cb2.now = func() time.Time { return now.Add(11*time.Second + 17*time.Second) }
+	require.NoError(t, cb2.Allow(provider2))
 }

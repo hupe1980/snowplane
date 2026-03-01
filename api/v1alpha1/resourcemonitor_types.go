@@ -56,30 +56,30 @@ type ResourceMonitorSpec struct {
 
 	// CreditQuota is the number of credits allocated per frequency interval.
 	// +optional
-	CreditQuota *int32 `json:"creditQuota,omitempty"`
+	CreditQuota *int32 `json:"creditQuota,omitempty" snowflake:"CREDIT_QUOTA,nounset"`
 
 	// Frequency is the interval at which credit usage resets to 0.
 	// If set, startTimestamp must also be set.
 	// +optional
-	Frequency *ResourceMonitorFrequency `json:"frequency,omitempty"`
+	Frequency *ResourceMonitorFrequency `json:"frequency,omitempty" snowflake:"FREQUENCY,nounset"`
 
 	// StartTimestamp is the date/time when monitoring begins. Use "IMMEDIATELY" for now.
 	// If set, frequency must also be set.
 	// +optional
-	StartTimestamp *string `json:"startTimestamp,omitempty"`
+	StartTimestamp *string `json:"startTimestamp,omitempty" snowflake:"START_TIMESTAMP,nounset"`
 
 	// EndTimestamp is the date/time when the monitor suspends assigned warehouses.
 	// +optional
-	EndTimestamp *string `json:"endTimestamp,omitempty"`
+	EndTimestamp *string `json:"endTimestamp,omitempty" snowflake:"END_TIMESTAMP,nounset"`
 
 	// NotifyUsers is the list of users to receive email notifications.
 	// +optional
-	NotifyUsers []string `json:"notifyUsers,omitempty"`
+	NotifyUsers []string `json:"notifyUsers,omitempty" snowflake:"NOTIFY_USERS,nounset"`
 
 	// Triggers defines the trigger thresholds and actions for the resource monitor.
 	// Each resource monitor supports up to 5 NOTIFY triggers.
 	// +optional
-	Triggers []ResourceMonitorTrigger `json:"triggers,omitempty"`
+	Triggers []ResourceMonitorTrigger `json:"triggers,omitempty" snowflake:"TRIGGERS,nounset"`
 }
 
 // Validate checks the ResourceMonitorSpec for consistency.
@@ -111,7 +111,7 @@ type ResourceMonitorShowOutput struct {
 	Name string `json:"name,omitempty"`
 
 	// CreditQuota is the credit quota.
-	CreditQuota string `json:"creditQuota,omitempty"`
+	CreditQuota string `json:"creditQuota,omitempty" snowflake:"CREDIT_QUOTA,nounset"`
 
 	// UsedCredits is the credits used in the current interval.
 	UsedCredits string `json:"usedCredits,omitempty"`
@@ -123,7 +123,7 @@ type ResourceMonitorShowOutput struct {
 	Level string `json:"level,omitempty"`
 
 	// Frequency is the reset frequency.
-	Frequency string `json:"frequency,omitempty"`
+	Frequency string `json:"frequency,omitempty" snowflake:"FREQUENCY,nounset"`
 
 	// StartTime is the monitoring start time.
 	StartTime string `json:"startTime,omitempty"`
@@ -141,7 +141,7 @@ type ResourceMonitorShowOutput struct {
 	SuspendImmediatelyAt string `json:"suspendImmediatelyAt,omitempty"`
 
 	// NotifyUsers is the comma-separated list of notification users.
-	NotifyUsers string `json:"notifyUsers,omitempty"`
+	NotifyUsers string `json:"notifyUsers,omitempty" snowflake:"NOTIFY_USERS,nounset"`
 }
 
 // ResourceMonitorStatus defines the observed state of a ResourceMonitor.
@@ -162,6 +162,7 @@ type ResourceMonitorStatus struct {
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type ResourceMonitor struct {
 	metav1.TypeMeta   `json:",inline"`

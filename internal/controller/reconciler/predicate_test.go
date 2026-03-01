@@ -69,29 +69,9 @@ func TestAnnotationChangedPredicate_Update(t *testing.T) {
 			newAnn: map[string]string{snowplanev1alpha1.AnnotationForceNew: "true"},
 			want:   false,
 		},
-		"AdoptionPolicy_Changed": {
-			oldAnn: map[string]string{snowplanev1alpha1.AnnotationAdoptionPolicy: snowplanev1alpha1.AdoptionPolicyFailIfExists},
-			newAnn: map[string]string{snowplanev1alpha1.AnnotationAdoptionPolicy: snowplanev1alpha1.AdoptionPolicyAdopt},
-			want:   true,
-		},
-		"DriftPolicy_Changed": {
-			oldAnn: map[string]string{},
-			newAnn: map[string]string{snowplanev1alpha1.AnnotationDriftPolicy: "detect-only"},
-			want:   true,
-		},
-		"DriftPolicy_Unchanged": {
-			oldAnn: map[string]string{snowplanev1alpha1.AnnotationDriftPolicy: "detect-only"},
-			newAnn: map[string]string{snowplanev1alpha1.AnnotationDriftPolicy: "detect-only"},
-			want:   false,
-		},
 		"AllowDangerousGrant_Changed": {
 			oldAnn: map[string]string{},
 			newAnn: map[string]string{snowplanev1alpha1.AnnotationAllowDangerousGrant: "true"},
-			want:   true,
-		},
-		"UseCreateOrAlter_Changed": {
-			oldAnn: map[string]string{},
-			newAnn: map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"},
 			want:   true,
 		},
 		"AbandonOnDelete_Changed": {
@@ -111,23 +91,23 @@ func TestAnnotationChangedPredicate_Update(t *testing.T) {
 		},
 		"MultipleSnowplane_OneChanged": {
 			oldAnn: map[string]string{
-				snowplanev1alpha1.AnnotationForceNew:    "true",
-				snowplanev1alpha1.AnnotationDriftPolicy: "correct",
+				snowplanev1alpha1.AnnotationForceNew:            "true",
+				snowplanev1alpha1.AnnotationAllowDangerousGrant: "false",
 			},
 			newAnn: map[string]string{
-				snowplanev1alpha1.AnnotationForceNew:    "true",
-				snowplanev1alpha1.AnnotationDriftPolicy: "detect-only",
+				snowplanev1alpha1.AnnotationForceNew:            "true",
+				snowplanev1alpha1.AnnotationAllowDangerousGrant: "true",
 			},
 			want: true,
 		},
 		"MultipleSnowplane_NoneChanged": {
 			oldAnn: map[string]string{
-				snowplanev1alpha1.AnnotationForceNew:    "true",
-				snowplanev1alpha1.AnnotationDriftPolicy: "correct",
+				snowplanev1alpha1.AnnotationForceNew:            "true",
+				snowplanev1alpha1.AnnotationAllowDangerousGrant: "true",
 			},
 			newAnn: map[string]string{
-				snowplanev1alpha1.AnnotationForceNew:    "true",
-				snowplanev1alpha1.AnnotationDriftPolicy: "correct",
+				snowplanev1alpha1.AnnotationForceNew:            "true",
+				snowplanev1alpha1.AnnotationAllowDangerousGrant: "true",
 			},
 			want: false,
 		},
@@ -248,7 +228,7 @@ func TestDesiredStateChanged_AnnotationChange(t *testing.T) {
 	oldObj := objWithAnnotations(map[string]string{})
 	oldObj.SetGeneration(1)
 
-	newObj := objWithAnnotations(map[string]string{snowplanev1alpha1.AnnotationDriftPolicy: "detect-only"})
+	newObj := objWithAnnotations(map[string]string{snowplanev1alpha1.AnnotationAllowDangerousGrant: "true"})
 	newObj.SetGeneration(1) // same generation — annotation-only change
 
 	assert.True(t, p.Update(event.UpdateEvent{
@@ -313,14 +293,12 @@ func TestSnowplaneAnnotations_Completeness(t *testing.T) {
 	t.Parallel()
 
 	// Verify that all user-facing annotations are in the watched set.
-	// If someone adds a new annotation constant to annotations.go and forgets
-	// to add it here, this test will remind them (via PR review / grep).
+	// Lifecycle policies (adoption, drift, createOrAlter) were promoted to
+	// spec.managementPolicies — spec changes bump generation and are handled
+	// by GenerationChangedPredicate, no annotation entry needed.
 	expected := map[string]bool{
 		snowplanev1alpha1.AnnotationForceNew:            true,
-		snowplanev1alpha1.AnnotationAdoptionPolicy:      true,
-		snowplanev1alpha1.AnnotationDriftPolicy:         true,
 		snowplanev1alpha1.AnnotationAllowDangerousGrant: true,
-		snowplanev1alpha1.AnnotationUseCreateOrAlter:    true,
 		snowplanev1alpha1.AnnotationAbandonOnDelete:     true,
 	}
 

@@ -293,8 +293,46 @@ The adapter implements the **required** `ResourceAdapter[T, S, D]` interface:
 | `ValidateImmutableFields` | Checks resource-specific immutability |
 | `BuildAlterOptions` | Diffs spec vs observation → alter options |
 | `ApplyObservation` | Maps observation into the CR status |
-| `ComputeTrackedParameters` | Returns actively-managed field names |
+| `ComputeTrackedParameters` | Returns actively-managed field names (via `tracked.ComputeTracked`) |
 | `DetectDrift` | Compares spec vs observation for reporting |
+
+#### Tracked Parameter Struct Tags
+
+Instead of hand-writing `ComputeTrackedParameters` and `computeUnsetFields` per resource, annotate spec fields with the `snowflake` struct tag and use the generic `internal/tracked` package:
+
+```go
+type ThingSpec struct {
+    // ... required/immutable fields (no snowflake tag) ...
+    Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
+    Size    *string `json:"size,omitempty"    snowflake:"SIZE"`
+}
+```
+
+Then in your adapter:
+
+```go
+func (a *adapter) ComputeTrackedParameters(obj *v1alpha1.Thing) []string {
+    return tracked.ComputeTracked(&obj.Spec)
+}
+```
+
+And in your reconciler's `buildAlterOptions`:
+
+```go
+opts.UnsetFields = tracked.ComputeUnset(&thing.Spec, thing.Status.TrackedParameters)
+```
+
+**Tag options:**
+
+| Syntax | Meaning |
+|:-------|:--------|
+| `snowflake:"PARAM_NAME"` | Tracked when pointer is non-nil or slice is non-empty |
+| `snowflake:"PARAM_NAME,always"` | Always included in the tracked list |
+| `snowflake:"PARAM_NAME,nounset"` | Tracked but excluded from UNSET computation |
+| `snowflake:"PREFIX_,prefix"` | Map keys: each key becomes `PREFIX_<key>` |
+| `snowflake:"-"` | Explicitly skipped |
+
+Nested struct-pointer fields (union types like `spec.Email *EmailConfig`) are recursed into automatically when non-nil.
 
 In addition, there are **optional interfaces** the reconciler detects via type assertion. Adapters that don't implement them get sensible defaults (no-op):
 
@@ -418,6 +456,10 @@ This function registers field indexers and powers the `isInUse()` check that pre
 
 // Immutable optional pointer field:
 //+kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable"
+
+// Dot-validation for schema-scoped resources (prevent accidental FQN injection):
+//+kubebuilder:validation:XValidation:rule="!self.databaseName.contains('.')",message="spec.databaseName must not contain dots — use separate databaseName and schemaName fields"
+//+kubebuilder:validation:XValidation:rule="!self.schemaName.contains('.')",message="spec.schemaName must not contain dots — use separate databaseName and schemaName fields"
 ```
 
 ```bash
@@ -442,6 +484,44 @@ Create examples in `config/samples/` with both `databaseRef` and `databaseName` 
 | `internal/controller/<resource>/reconciler_test.go` | Full loop with mock service |
 | `test/integration/<resource>_test.go` | Full CRD → reconciler pipeline with envtest |
 | `test/integration/cel_validation_test.go` | CEL immutability and cross-validation rules |
+
+### Standard Reconciler Test Suite
+
+Every resource controller must include the standard behavioral test suite. Add
+this to `reconciler_test.go`:
+
+```go
+func TestReconcile_StandardSuite(t *testing.T) {
+    t.Parallel()
+
+    testutil.ReconcileSuiteConfig{
+        NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+            r := newTestReconciler(&mockService{}, objs...)
+            return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+        },
+        NewFixture: func(name, ns string) client.Object {
+            return newTestMyResource(name, ns)
+        },
+        NewBlankObject: func() client.Object {
+            return &snowplanev1alpha1.MyResource{}
+        },
+        FinalizerName: finalizerName,
+    }.Run(t)
+}
+```
+
+For resources with cross-resource refs (e.g. DatabaseRef, SchemaRef), add
+`PrereqObjects` to seed the fake client with ready prerequisite resources:
+
+```go
+PrereqObjects: func() []runtime.Object {
+    db := newTestDB("my-db", "default")
+    return []runtime.Object{db}
+},
+```
+
+The suite automatically runs four sub-tests: **CRNotFound**,
+**ProviderConfigNotFound**, **ProviderConfigNotReady**, and **AddsFinalizer**.
 
 {: .note }
 > Several sync tests run automatically and will catch missing registrations:

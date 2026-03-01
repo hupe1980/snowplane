@@ -86,12 +86,12 @@ Immutable violations require manual intervention — delete/recreate the CR.
 ### Database
 {: .text-delta }
 
-`comment`, `dataRetentionTimeInDays`, `maxDataExtensionTimeInDays`, `defaultDdlCollation`, `replaceInvalidCharacters`, `catalog`, `externalVolume`, `storageSerializationPolicy`, `logLevel`, `metricLevel`, `traceLevel`
+`comment`, `dataRetentionTimeInDays`, `maxDataExtensionTimeInDays`, `defaultDDLCollation`, `replaceInvalidCharacters`, `catalog`, `externalVolume`, `storageSerializationPolicy`, `logLevel`, `metricLevel`, `traceLevel`
 
 ### Schema
 {: .text-delta }
 
-`comment`, `managedAccess`, `dataRetentionTimeInDays`, `maxDataExtensionTimeInDays`, `defaultDdlCollation`, `replaceInvalidCharacters`, `storageSerializationPolicy`, `logLevel`, `metricLevel`, `traceLevel`
+`comment`, `managedAccess`, `dataRetentionTimeInDays`, `maxDataExtensionTimeInDays`, `defaultDDLCollation`, `replaceInvalidCharacters`, `storageSerializationPolicy`, `logLevel`, `metricLevel`, `traceLevel`
 
 ### Warehouse
 {: .text-delta }
@@ -150,21 +150,23 @@ Immutable violations require manual intervention — delete/recreate the CR.
 
 ## Detect-Only Policy
 
-To **detect and report** drift without correcting it:
+To **detect and report** drift without correcting it, set the `driftPolicy` in `spec.managementPolicies`:
 
 ```yaml
 apiVersion: snowplane.hupe1980.github.io/v1alpha1
 kind: Database
 metadata:
   name: analytics
-  annotations:
-    snowplane.hupe1980.github.io/drift-policy: detect-only
 spec:
+  managementPolicies:
+    driftPolicy: detect-only
   providerRef:
     name: default
   name: ANALYTICS
   comment: "Analytics database"
 ```
+
+The `driftPolicy` field is enum-validated (`correct` / `detect-only`) and visible via `kubectl explain`.
 
 With `detect-only`:
 - Drift is detected and reported via conditions and events

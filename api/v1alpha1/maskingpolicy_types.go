@@ -30,6 +30,8 @@ type MaskingPolicyArgument struct {
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName) || self.schemaName == oldSelf.schemaName)",message="spec.schemaName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.signature == oldSelf.signature",message="spec.signature is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
+// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
 type MaskingPolicySpec struct {
 	CommonSpec `json:",inline"`
 
@@ -42,7 +44,7 @@ type MaskingPolicySpec struct {
 	// +optional
 	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
 
-	// DatabaseName is the raw Snowflake database identifier.
+	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -53,7 +55,7 @@ type MaskingPolicySpec struct {
 	// +optional
 	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
 
-	// SchemaName is the raw Snowflake schema FQN.
+	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -68,16 +70,16 @@ type MaskingPolicySpec struct {
 	// Body is the SQL expression that transforms the data.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=65536
-	Body string `json:"body"`
+	Body string `json:"body" snowflake:"BODY,always"`
 
 	// ExemptOtherPolicies specifies whether other policies can reference a masked column.
 	// Can only be set at creation time and cannot be altered. Use CREATE OR REPLACE to change.
 	// +optional
-	ExemptOtherPolicies *bool `json:"exemptOtherPolicies,omitempty"`
+	ExemptOtherPolicies *bool `json:"exemptOtherPolicies,omitempty" snowflake:"EXEMPT_OTHER_POLICIES,nounset"`
 
 	// Comment is an optional description for the masking policy.
 	// +optional
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // Validate checks the MaskingPolicySpec for consistency.
@@ -134,7 +136,7 @@ type MaskingPolicyShowOutput struct {
 	Owner string `json:"owner,omitempty"`
 
 	// Comment is the policy description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // MaskingPolicyStatus defines the observed state of a MaskingPolicy.
@@ -163,6 +165,7 @@ type MaskingPolicyStatus struct {
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
 // +kubebuilder:printcolumn:name="DATABASE",type=string,JSONPath=`.status.databaseName`
 // +kubebuilder:printcolumn:name="SCHEMA",type=string,JSONPath=`.status.schemaName`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type MaskingPolicy struct {
 	metav1.TypeMeta   `json:",inline"`

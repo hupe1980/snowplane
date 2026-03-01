@@ -14,6 +14,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -149,7 +150,7 @@ func buildAlterOptions(wh *snowplanev1alpha1.Warehouse, id snowflake.AccountObje
 	opts := snowflake.AlterWarehouseOptions{Name: id}
 
 	// Detect fields that were previously managed but are now nil -> UNSET.
-	opts.UnsetFields = computeUnsetFields(wh)
+	opts.UnsetFields = tracked.ComputeUnset(&wh.Spec, wh.Status.TrackedParameters)
 
 	if wh.Spec.WarehouseType != nil {
 		s := string(*wh.Spec.WarehouseType)
@@ -336,157 +337,4 @@ func detectDrift(wh *snowplanev1alpha1.Warehouse, obs *snowflake.WarehouseObserv
 	}
 
 	return d.Result()
-}
-
-// computeUnsetFields returns the Snowflake parameter names that were previously
-// SET (tracked in status.TrackedParameters) but are now nil in the spec.
-func computeUnsetFields(wh *snowplanev1alpha1.Warehouse) []string {
-	if len(wh.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(wh.Status.TrackedParameters))
-	for _, f := range wh.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if wh.Spec.WarehouseType == nil && managed["WAREHOUSE_TYPE"] {
-		unset = append(unset, "WAREHOUSE_TYPE")
-	}
-
-	if wh.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	if wh.Spec.WarehouseSize == nil && managed["WAREHOUSE_SIZE"] {
-		unset = append(unset, "WAREHOUSE_SIZE")
-	}
-
-	if wh.Spec.MinClusterCount == nil && managed["MIN_CLUSTER_COUNT"] {
-		unset = append(unset, "MIN_CLUSTER_COUNT")
-	}
-
-	if wh.Spec.MaxClusterCount == nil && managed["MAX_CLUSTER_COUNT"] {
-		unset = append(unset, "MAX_CLUSTER_COUNT")
-	}
-
-	if wh.Spec.ScalingPolicy == nil && managed["SCALING_POLICY"] {
-		unset = append(unset, "SCALING_POLICY")
-	}
-
-	if wh.Spec.AutoSuspend == nil && managed["AUTO_SUSPEND"] {
-		unset = append(unset, "AUTO_SUSPEND")
-	}
-
-	if wh.Spec.AutoResume == nil && managed["AUTO_RESUME"] {
-		unset = append(unset, "AUTO_RESUME")
-	}
-
-	if wh.Spec.ResourceMonitor == nil && managed["RESOURCE_MONITOR"] {
-		unset = append(unset, "RESOURCE_MONITOR")
-	}
-
-	if wh.Spec.EnableQueryAcceleration == nil && managed["ENABLE_QUERY_ACCELERATION"] {
-		unset = append(unset, "ENABLE_QUERY_ACCELERATION")
-	}
-
-	if wh.Spec.QueryAccelerationMaxScaleFactor == nil && managed["QUERY_ACCELERATION_MAX_SCALE_FACTOR"] {
-		unset = append(unset, "QUERY_ACCELERATION_MAX_SCALE_FACTOR")
-	}
-
-	if wh.Spec.MaxConcurrencyLevel == nil && managed["MAX_CONCURRENCY_LEVEL"] {
-		unset = append(unset, "MAX_CONCURRENCY_LEVEL")
-	}
-
-	if wh.Spec.StatementQueuedTimeoutInSeconds == nil && managed["STATEMENT_QUEUED_TIMEOUT_IN_SECONDS"] {
-		unset = append(unset, "STATEMENT_QUEUED_TIMEOUT_IN_SECONDS")
-	}
-
-	if wh.Spec.StatementTimeoutInSeconds == nil && managed["STATEMENT_TIMEOUT_IN_SECONDS"] {
-		unset = append(unset, "STATEMENT_TIMEOUT_IN_SECONDS")
-	}
-
-	if wh.Spec.ResourceConstraint == nil && managed["RESOURCE_CONSTRAINT"] {
-		unset = append(unset, "RESOURCE_CONSTRAINT")
-	}
-
-	if wh.Spec.Generation == nil && managed["GENERATION"] {
-		unset = append(unset, "GENERATION")
-	}
-
-	return unset
-}
-
-// computeTrackedParameters returns the Snowflake parameter names that are
-// actively managed (non-nil) in the warehouse spec.
-func computeTrackedParameters(spec *snowplanev1alpha1.WarehouseSpec) []string {
-	var fields []string
-
-	if spec.WarehouseType != nil {
-		fields = append(fields, "WAREHOUSE_TYPE")
-	}
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	if spec.WarehouseSize != nil {
-		fields = append(fields, "WAREHOUSE_SIZE")
-	}
-
-	if spec.MinClusterCount != nil {
-		fields = append(fields, "MIN_CLUSTER_COUNT")
-	}
-
-	if spec.MaxClusterCount != nil {
-		fields = append(fields, "MAX_CLUSTER_COUNT")
-	}
-
-	if spec.ScalingPolicy != nil {
-		fields = append(fields, "SCALING_POLICY")
-	}
-
-	if spec.AutoSuspend != nil {
-		fields = append(fields, "AUTO_SUSPEND")
-	}
-
-	if spec.AutoResume != nil {
-		fields = append(fields, "AUTO_RESUME")
-	}
-
-	if spec.ResourceMonitor != nil {
-		fields = append(fields, "RESOURCE_MONITOR")
-	}
-
-	if spec.EnableQueryAcceleration != nil {
-		fields = append(fields, "ENABLE_QUERY_ACCELERATION")
-	}
-
-	if spec.QueryAccelerationMaxScaleFactor != nil {
-		fields = append(fields, "QUERY_ACCELERATION_MAX_SCALE_FACTOR")
-	}
-
-	if spec.MaxConcurrencyLevel != nil {
-		fields = append(fields, "MAX_CONCURRENCY_LEVEL")
-	}
-
-	if spec.StatementQueuedTimeoutInSeconds != nil {
-		fields = append(fields, "STATEMENT_QUEUED_TIMEOUT_IN_SECONDS")
-	}
-
-	if spec.StatementTimeoutInSeconds != nil {
-		fields = append(fields, "STATEMENT_TIMEOUT_IN_SECONDS")
-	}
-
-	if spec.ResourceConstraint != nil {
-		fields = append(fields, "RESOURCE_CONSTRAINT")
-	}
-
-	if spec.Generation != nil {
-		fields = append(fields, "GENERATION")
-	}
-
-	return fields
 }

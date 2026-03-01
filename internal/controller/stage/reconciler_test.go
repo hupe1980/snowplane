@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -21,6 +20,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -242,16 +242,30 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+		},
+		NewFixture: func(name, ns string) client.Object {
+			return newTestStage(name, ns)
+		},
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.Stage{}
+		},
+		FinalizerName: finalizerName,
+		PrereqObjects: func() []runtime.Object {
+			db := newTestDB("analytics-db", "default")
+			sch := newTestSchema("public-schema", "default")
+			return []runtime.Object{db, sch}
+		},
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -523,7 +537,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 		StorageIntegration: testutil.PtrString("MY_INT"),
 	}
 
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.Contains(t, fields, "COMMENT")
 	assert.Contains(t, fields, "URL")
 	assert.Contains(t, fields, "STORAGE_INTEGRATION")
@@ -590,7 +604,7 @@ func TestComputeUnsetFields_NoPreviousTracking(t *testing.T) {
 	stage := newTestStage("s", "default")
 	stage.Status.TrackedParameters = nil // no previous tracking
 
-	unset := computeUnsetFields(stage)
+	unset := tracked.ComputeUnset(&stage.Spec, stage.Status.TrackedParameters)
 	assert.Empty(t, unset)
 }
 
@@ -602,7 +616,7 @@ func TestComputeUnsetFields_CommentRemoved(t *testing.T) {
 	stage.Spec.Comment = nil // was set → now removed
 	stage.Spec.URL = testutil.PtrString("s3://bucket/")
 
-	unset := computeUnsetFields(stage)
+	unset := tracked.ComputeUnset(&stage.Spec, stage.Status.TrackedParameters)
 	assert.Contains(t, unset, "COMMENT")
 	assert.NotContains(t, unset, "URL")
 }
@@ -618,7 +632,7 @@ func TestComputeUnsetFields_AllRemoved(t *testing.T) {
 	stage.Spec.FileFormat = nil
 	stage.Spec.Directory = nil
 
-	unset := computeUnsetFields(stage)
+	unset := tracked.ComputeUnset(&stage.Spec, stage.Status.TrackedParameters)
 	assert.Len(t, unset, 5)
 	assert.Contains(t, unset, "COMMENT")
 	assert.Contains(t, unset, "URL")
@@ -634,7 +648,7 @@ func TestComputeUnsetFields_NoneRemoved(t *testing.T) {
 	stage.Status.TrackedParameters = []string{"COMMENT"}
 	stage.Spec.Comment = testutil.PtrString("still here")
 
-	unset := computeUnsetFields(stage)
+	unset := tracked.ComputeUnset(&stage.Spec, stage.Status.TrackedParameters)
 	assert.Empty(t, unset)
 }
 

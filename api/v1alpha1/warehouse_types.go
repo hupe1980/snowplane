@@ -101,82 +101,82 @@ type WarehouseSpec struct {
 	// WarehouseType specifies the warehouse type (STANDARD or SNOWPARK-OPTIMIZED).
 	// Mutable — Snowflake supports changing warehouse type on a running warehouse.
 	// +kubebuilder:validation:Enum=STANDARD;SNOWPARK-OPTIMIZED
-	WarehouseType *WarehouseType `json:"warehouseType,omitempty"`
+	WarehouseType *WarehouseType `json:"warehouseType,omitempty" snowflake:"WAREHOUSE_TYPE"`
 
 	// WarehouseSize specifies the compute size.
 	// +kubebuilder:validation:Enum="XSMALL";"SMALL";"MEDIUM";"LARGE";"XLARGE";"2XLARGE";"3XLARGE";"4XLARGE";"5XLARGE";"6XLARGE"
-	WarehouseSize *WarehouseSize `json:"warehouseSize,omitempty"`
+	WarehouseSize *WarehouseSize `json:"warehouseSize,omitempty" snowflake:"WAREHOUSE_SIZE"`
 
 	// MinClusterCount is the minimum number of clusters (multi-cluster mode).
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=10
-	MinClusterCount *int32 `json:"minClusterCount,omitempty"`
+	MinClusterCount *int32 `json:"minClusterCount,omitempty" snowflake:"MIN_CLUSTER_COUNT"`
 
 	// MaxClusterCount is the maximum number of clusters (multi-cluster mode).
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=10
-	MaxClusterCount *int32 `json:"maxClusterCount,omitempty"`
+	MaxClusterCount *int32 `json:"maxClusterCount,omitempty" snowflake:"MAX_CLUSTER_COUNT"`
 
 	// ScalingPolicy controls multi-cluster scaling behavior.
 	// +kubebuilder:validation:Enum=STANDARD;ECONOMY
-	ScalingPolicy *ScalingPolicy `json:"scalingPolicy,omitempty"`
+	ScalingPolicy *ScalingPolicy `json:"scalingPolicy,omitempty" snowflake:"SCALING_POLICY"`
 
 	// AutoSuspend is the number of seconds of inactivity before auto-suspend.
 	// Must be 0 (disable) or >= 60.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
-	AutoSuspend *int32 `json:"autoSuspend,omitempty"`
+	AutoSuspend *int32 `json:"autoSuspend,omitempty" snowflake:"AUTO_SUSPEND"`
 
 	// AutoResume controls whether the warehouse auto-resumes on query.
-	AutoResume *bool `json:"autoResume,omitempty"`
+	AutoResume *bool `json:"autoResume,omitempty" snowflake:"AUTO_RESUME"`
 
 	// InitiallySuspended creates the warehouse in a suspended state.
 	// This is a CREATE-only field and is not applied on updates.
 	InitiallySuspended bool `json:"initiallySuspended,omitempty"`
 
 	// ResourceMonitor is the name of the resource monitor to attach.
-	ResourceMonitor *string `json:"resourceMonitor,omitempty"`
+	ResourceMonitor *string `json:"resourceMonitor,omitempty" snowflake:"RESOURCE_MONITOR"`
 
 	// Comment is an optional description.
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// EnableQueryAcceleration enables the query acceleration service.
-	EnableQueryAcceleration *bool `json:"enableQueryAcceleration,omitempty"`
+	EnableQueryAcceleration *bool `json:"enableQueryAcceleration,omitempty" snowflake:"ENABLE_QUERY_ACCELERATION"`
 
 	// QueryAccelerationMaxScaleFactor limits query acceleration scaling (0–100).
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=100
-	QueryAccelerationMaxScaleFactor *int32 `json:"queryAccelerationMaxScaleFactor,omitempty"`
+	QueryAccelerationMaxScaleFactor *int32 `json:"queryAccelerationMaxScaleFactor,omitempty" snowflake:"QUERY_ACCELERATION_MAX_SCALE_FACTOR"`
 
 	// MaxConcurrencyLevel limits concurrent queries (1–32, default 8).
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=32
-	MaxConcurrencyLevel *int32 `json:"maxConcurrencyLevel,omitempty"`
+	MaxConcurrencyLevel *int32 `json:"maxConcurrencyLevel,omitempty" snowflake:"MAX_CONCURRENCY_LEVEL"`
 
 	// StatementQueuedTimeoutInSeconds controls how long queries queue before timing out.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
-	StatementQueuedTimeoutInSeconds *int32 `json:"statementQueuedTimeoutInSeconds,omitempty"`
+	StatementQueuedTimeoutInSeconds *int32 `json:"statementQueuedTimeoutInSeconds,omitempty" snowflake:"STATEMENT_QUEUED_TIMEOUT_IN_SECONDS"`
 
 	// StatementTimeoutInSeconds controls the max execution time per statement.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
-	StatementTimeoutInSeconds *int32 `json:"statementTimeoutInSeconds,omitempty"`
+	StatementTimeoutInSeconds *int32 `json:"statementTimeoutInSeconds,omitempty" snowflake:"STATEMENT_TIMEOUT_IN_SECONDS"`
 
 	// ResourceConstraint specifies resource constraints (e.g., MEMORY, STANDARD_GEN_1, MEMORY_16X).
 	// +kubebuilder:validation:Enum=MEMORY;STANDARD_GEN_1;STANDARD_GEN_2;MEMORY_1X;MEMORY_1X_x86;MEMORY_16X;MEMORY_16X_x86;MEMORY_64X;MEMORY_64X_x86
-	ResourceConstraint *ResourceConstraint `json:"resourceConstraint,omitempty"`
+	ResourceConstraint *ResourceConstraint `json:"resourceConstraint,omitempty" snowflake:"RESOURCE_CONSTRAINT"`
 
 	// Generation specifies the warehouse generation for standard warehouses.
 	// Valid values are "1" (gen1) or "2" (gen2). This is a simplified alternative
 	// to using ResourceConstraint for generation selection.
 	// +optional
 	// +kubebuilder:validation:Enum="1";"2"
-	Generation *string `json:"generation,omitempty"`
+	Generation *string `json:"generation,omitempty" snowflake:"GENERATION"`
 }
 
 // WarehouseShowOutput mirrors the SHOW WAREHOUSES output stored in status.
@@ -186,14 +186,14 @@ type WarehouseShowOutput struct {
 	State           string `json:"state,omitempty"`
 	Type            string `json:"type,omitempty"`
 	Size            string `json:"size,omitempty"`
-	Comment         string `json:"comment,omitempty"`
+	Comment         string `json:"comment,omitempty" snowflake:"COMMENT"`
 	Owner           string `json:"owner,omitempty"`
-	AutoSuspend     int32  `json:"autoSuspend,omitempty"`
-	AutoResume      bool   `json:"autoResume,omitempty"`
-	MinClusterCount int32  `json:"minClusterCount,omitempty"`
-	MaxClusterCount int32  `json:"maxClusterCount,omitempty"`
-	ScalingPolicy   string `json:"scalingPolicy,omitempty"`
-	ResourceMonitor string `json:"resourceMonitor,omitempty"`
+	AutoSuspend     int32  `json:"autoSuspend,omitempty" snowflake:"AUTO_SUSPEND"`
+	AutoResume      bool   `json:"autoResume,omitempty" snowflake:"AUTO_RESUME"`
+	MinClusterCount int32  `json:"minClusterCount,omitempty" snowflake:"MIN_CLUSTER_COUNT"`
+	MaxClusterCount int32  `json:"maxClusterCount,omitempty" snowflake:"MAX_CLUSTER_COUNT"`
+	ScalingPolicy   string `json:"scalingPolicy,omitempty" snowflake:"SCALING_POLICY"`
+	ResourceMonitor string `json:"resourceMonitor,omitempty" snowflake:"RESOURCE_MONITOR"`
 }
 
 // WarehouseStatus defines the observed state of a Warehouse.
@@ -229,6 +229,7 @@ type WarehouseStatus struct {
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
 // +kubebuilder:printcolumn:name="SIZE",type=string,JSONPath=`.spec.warehouseSize`
 // +kubebuilder:printcolumn:name="STATE",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type Warehouse struct {
 	metav1.TypeMeta   `json:",inline"`

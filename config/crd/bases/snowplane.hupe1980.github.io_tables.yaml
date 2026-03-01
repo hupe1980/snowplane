@@ -32,6 +32,10 @@ spec:
     - jsonPath: .status.schemaName
       name: SCHEMA
       type: string
+    - jsonPath: .spec.providerRef.name
+      name: PROVIDER
+      priority: 1
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
@@ -164,7 +168,7 @@ spec:
                 type: integer
               databaseName:
                 description: |-
-                  DatabaseName is the raw Snowflake database identifier (e.g. "ANALYTICS").
+                  DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
                   Use this when the database is NOT managed by Snowplane.
                   Mutually exclusive with DatabaseRef. Immutable after creation.
                 minLength: 1
@@ -181,7 +185,7 @@ spec:
                 required:
                 - name
                 type: object
-              defaultDdlCollation:
+              defaultDDLCollation:
                 description: DefaultDDLCollation sets the default collation for string
                   columns.
                 type: string
@@ -197,6 +201,38 @@ spec:
               enableSchemaEvolution:
                 description: EnableSchemaEvolution enables automatic schema evolution.
                 type: boolean
+              managementPolicies:
+                description: ManagementPolicies specifies lifecycle policies for this
+                  resource.
+                properties:
+                  adoptionPolicy:
+                    default: fail-if-exists
+                    description: |-
+                      AdoptionPolicy controls how the reconciler handles a pre-existing
+                      Snowflake resource on first reconciliation.
+                      Defaults to "fail-if-exists".
+                    enum:
+                    - adopt
+                    - fail-if-exists
+                    type: string
+                  createOrAlter:
+                    default: true
+                    description: |-
+                      CreateOrAlter controls whether CREATE OR ALTER is used instead of
+                      the legacy CREATE + ALTER two-step flow for supported resource types.
+                      Defaults to true.
+                    type: boolean
+                  driftPolicy:
+                    default: correct
+                    description: |-
+                      DriftPolicy controls whether detected drift is corrected or only
+                      reported via conditions and events.
+                      Defaults to "correct".
+                    enum:
+                    - correct
+                    - detect-only
+                    type: string
+                type: object
               maxDataExtensionTimeInDays:
                 description: |-
                   MaxDataExtensionTimeInDays specifies the maximum number of days Snowflake
@@ -209,6 +245,13 @@ spec:
                 description: Name is the Snowflake table name. Immutable after creation.
                 minLength: 1
                 type: string
+              paused:
+                description: |-
+                  Paused suspends reconciliation of this resource. When true, the
+                  controller skips all Snowflake operations and sets Synced=False
+                  with reason ReconcilePaused. The Snowflake resource is not modified
+                  or deleted while paused.
+                type: boolean
               providerRef:
                 description: ProviderRef references the ProviderConfig to use for
                   Snowflake connectivity.
@@ -227,8 +270,9 @@ spec:
                 type: object
               schemaName:
                 description: |-
-                  SchemaName is the raw Snowflake schema FQN (e.g. '"ANALYTICS"."PUBLIC"').
+                  SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
                   Use this when the schema is NOT managed by Snowplane.
+                  The controller constructs the FQN from databaseName + schemaName + name.
                   Mutually exclusive with SchemaRef. Immutable after creation.
                 minLength: 1
                 type: string
@@ -301,6 +345,12 @@ spec:
                 to change)
               rule: '!has(oldSelf.constraints) || !has(self.constraints) || self.constraints
                 == oldSelf.constraints'
+            - message: spec.databaseName must be a simple identifier, not a fully-qualified
+                name
+              rule: '!has(self.databaseName) || !self.databaseName.contains(''.'')'
+            - message: spec.schemaName must be a simple identifier, not a fully-qualified
+                name; use spec.databaseName for the database part
+              rule: '!has(self.schemaName) || !self.schemaName.contains(''.'')'
           status:
             description: TableStatus defines the observed state of a Table.
             properties:

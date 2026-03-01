@@ -21,6 +21,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -354,7 +355,8 @@ func TestReconcile_CreatePostObserveError(t *testing.T) {
 	r := newTestReconciler(mock, role, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myrole", "default"))
-	require.NoError(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "post-create observe")
 	assert.Equal(t, 5*time.Second, result.RequeueAfter)
 
 	got := &snowplanev1alpha1.AccountRole{}
@@ -805,7 +807,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 		Comment: testutil.PtrString("x"),
 	}
 
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.ElementsMatch(t, []string{"COMMENT"}, fields)
 }
 
@@ -813,7 +815,7 @@ func TestComputeTrackedParameters_Empty(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.AccountRoleSpec{}
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.Empty(t, fields)
 }
 
@@ -933,9 +935,7 @@ func TestReconcile_DriftDetectOnlyPolicy(t *testing.T) {
 	role.Finalizers = []string{finalizerName}
 	role.Generation = 1
 	role.Status.ObservedGeneration = 1
-	role.Annotations = map[string]string{
-		"snowplane.hupe1980.github.io/drift-policy": "detect-only",
-	}
+	role.Spec.ManagementPolicies.DriftPolicy = snowplanev1alpha1.DriftPolicyDetectOnly
 	role.Spec.Comment = testutil.PtrString("desired")
 	hash, err := snowplanev1alpha1.ComputeSpecHash(role.Spec)
 	require.NoError(t, err)

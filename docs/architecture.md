@@ -1,0 +1,344 @@
+---
+layout: default
+title: Architecture
+parent: Concepts
+nav_order: 5
+description: "Reconciler state machine, adapter pattern, resilience layers, and component model."
+---
+
+# Architecture
+{: .fs-8 }
+
+A deep dive into Snowplane's controller architecture — the generic reconciler, adapter pattern, resilience layers, and crash-recovery mechanisms.
+{: .fs-5 .fw-300 }
+
+---
+
+## Component Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  Controller Manager                         │
+│                                                             │
+│  ┌───────────┐ ┌───────────┐ ┌───────────┐                │
+│  │ Database   │ │ Warehouse │ │ Schema    │  ... (31 CRDs) │
+│  │ Controller │ │ Controller│ │ Controller│                │
+│  └─────┬─────┘ └─────┬─────┘ └─────┬─────┘                │
+│        │              │              │                      │
+│  ┌─────▼──────────────▼──────────────▼─────┐               │
+│  │         GenericReconciler[T, S, D]       │               │
+│  │  ┌─────────────┐  ┌───────────────────┐ │               │
+│  │  │ResourceAdapter│  │ drift.Detector   │ │               │
+│  │  └──────┬──────┘  └───────────────────┘ │               │
+│  └─────────┼───────────────────────────────┘               │
+│            │                                                │
+│  ┌─────────▼───────────────────────────────┐               │
+│  │         Resilience Layer                 │               │
+│  │  ┌────────────┐ ┌──────────┐ ┌────────┐ │               │
+│  │  │RateLimiter │ │CircuitBkr│ │ Retry  │ │               │
+│  │  └────────────┘ └──────────┘ └────────┘ │               │
+│  └─────────┬───────────────────────────────┘               │
+│            │                                                │
+│  ┌─────────▼───────────────────────────────┐               │
+│  │    ClientFactory (LRU + Singleflight)   │               │
+│  └─────────┬───────────────────────────────┘               │
+└────────────┼────────────────────────────────────────────────┘
+             │
+             ▼
+    ┌──────────────────┐
+    │   Snowflake API  │
+    │  (SQL over HTTPS)│
+    └──────────────────┘
+```
+
+Every CRD controller is an instance of `GenericReconciler[T, S, D]` parameterized with:
+
+| Parameter | Purpose | Example |
+|:----------|:--------|:--------|
+| **T** | CRD Go type (implements `ManagedResource`) | `*v1alpha1.Database` |
+| **S** | Snowflake CRUD service interface | `database.Service` |
+| **D** | Observation detail type (resource-specific show output) | `database.ShowOutput` |
+
+All Snowflake-specific logic lives in the **ResourceAdapter** — the reconciler itself is resource-agnostic.
+
+---
+
+## Reconciler State Machine
+
+The reconciler follows an **Observe → Classify → Act** loop:
+
+```
+                         ┌──────────┐
+                         │  Fetch   │
+                         │   CR     │
+                         └────┬─────┘
+                              │
+                    ┌─────────▼──────────┐
+                    │ Paused? PreRecon?   │
+                    │ Resolve Provider?   │
+                    └─────────┬──────────┘
+                              │
+                   ┌──────────▼──────────┐
+                   │ DeletionTimestamp?   │──Yes──► reconcileDelete()
+                   └──────────┬──────────┘
+                              │ No
+                   ┌──────────▼──────────┐
+                   │  Add Finalizer      │
+                   │  Validate Spec      │
+                   └──────────┬──────────┘
+                              │
+                   ┌──────────▼──────────┐
+                   │     OBSERVE         │
+                   │  (SHOW + DESCRIBE)  │
+                   └──────────┬──────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              │               │               │
+       ┌──────▼──────┐┌──────▼──────┐ ┌──────▼──────────────┐
+       │ Not Exists  ││  Exists +   │ │  Exists +           │
+       │             ││ ObsGen == 0 │ │  ObsGen > 0         │
+       └──────┬──────┘└──────┬──────┘ └──────┬──────────────┘
+              │              │               │
+              ▼              ▼               ▼
+       reconcileCreate  Adopt/Crash?   reconcileUpdate
+```
+
+### Observe Phase
+
+Every cycle starts with an **Observe** call — typically a Snowflake `SHOW <resource>` query. The result is wrapped in an `Observation[D]` struct:
+
+```go
+type Observation[D any] struct {
+    Exists bool   // Whether the Snowflake resource exists
+    Detail D      // Resource-specific show output
+}
+```
+
+### Classification
+
+After observing, the reconciler classifies the situation:
+
+| Condition | Branch |
+|:----------|:-------|
+| Resource doesn't exist in Snowflake | `reconcileCreate()` |
+| Exists, `ObservedGeneration == 0`, **creation-initiated annotation** present | `reconcilePostCrashCreate()` |
+| Exists, `ObservedGeneration == 0`, no creation-initiated annotation | `reconcileAdoptOrReject()` |
+| Exists, `ObservedGeneration > 0` | `reconcileUpdate()` |
+
+---
+
+## Create Flow
+
+1. **Set creation-initiated annotation** — crash-recovery marker written *before* the Snowflake CREATE.
+2. **Stamp external-name label** — SHA-256 hash of the fully qualified name for cross-cluster conflict detection.
+3. **PATCH metadata** — persist annotation and label.
+4. **Execute Snowflake CREATE** — with fallback: if CREATE OR ALTER is unsupported, retry with CREATE IF NOT EXISTS.
+5. **Post-create observation** — re-observe to verify; requeue in 5s if not yet observable.
+6. **Apply observation** — write observed state to `status`, set `Ready=True`, `Synced=True`, compute spec hash and tracked parameters.
+7. **Invoke PostCreate hook** — optional adapter hook (e.g., hash initial password for User resources).
+8. **Remove creation-initiated annotation** — cleanup after status is committed.
+
+---
+
+## Update Flow
+
+1. **Apply observation** from the initial Observe call.
+2. **Build alter options** — adapter computes the diff between desired spec and observed state.
+3. **Check for changes** — if `HasChanges()`:
+   - Compute current spec hash. Compare with `lastAppliedSpecHash`.
+   - **Same hash** → external **drift** (Snowflake changed outside the controller). Invoke `DetectDrift()` for field-level diffs.
+   - **Different hash** → user **spec change**.
+4. **Drift policy check** — if `driftPolicy: detect-only`, report drift but skip correction.
+5. **Execute ALTER** — prefer CREATE OR ALTER if supported (with fallback to plain ALTER).
+6. **Re-observe** — verify the change was applied.
+7. **Finalize** — update spec hash, tracked parameters, generation, conditions.
+
+See [Drift Detection]({% link drift-detection.md %}) for the full drift engine documentation.
+
+---
+
+## Delete Flow
+
+```
+  DeletionTimestamp set
+          │
+  ┌───────▼───────┐
+  │ abandon-on-   │──Yes──► Remove finalizer, emit warning, done
+  │ delete annot? │
+  └───────┬───────┘
+          │ No
+  ┌───────▼───────┐
+  │ Orphan policy?│──Yes──► Remove finalizer, skip DROP, done
+  └───────┬───────┘
+          │ No
+  ┌───────▼───────┐
+  │  DROP resource │
+  └───────┬───────┘
+          │
+   ┌──────▼──────┐    ┌─────────────────────────────┐
+   │  Success?   │─No─► Set DeleteBlocked condition  │
+   └──────┬──────┘    │ Suggest abandon-on-delete    │
+          │ Yes       └─────────────────────────────┘
+   ┌──────▼──────┐
+   │  Remove     │
+   │  finalizer  │
+   └─────────────┘
+```
+
+If a DROP fails with a terminal error (e.g., dependencies exist, permissions revoked), the controller sets a `DeleteBlocked` condition and suggests the `abandon-on-delete` annotation as an escape hatch.
+
+---
+
+## Adoption Flow
+
+When a Snowflake resource **already exists** but the CRD has never been reconciled (`ObservedGeneration == 0`):
+
+| Policy | Behavior |
+|:-------|:---------|
+| `fail-if-exists` (default) | Terminal error — user must delete the Snowflake resource manually |
+| `adopt` | Check ownership label for conflicts, stamp label, apply observation, mark `Adopted` |
+
+Ownership conflict detection uses the `external-name` label (hash of FQN). If another CR in the same cluster already manages the same Snowflake object, adoption fails with `ConflictDetected`.
+
+---
+
+## Crash Recovery
+
+The **creation-initiated annotation** solves a specific failure mode:
+
+1. Controller sends CREATE to Snowflake — **succeeds**.
+2. Controller crashes before committing status to Kubernetes.
+3. On restart, the resource exists in Snowflake but `ObservedGeneration == 0` — looks like it should be adopted.
+
+Without the annotation, the controller would apply the adoption policy and potentially reject the resource. With the annotation present, the controller enters `reconcilePostCrashCreate()` — it applies the observation and marks the resource as recovered without requiring adoption policy configuration.
+
+---
+
+## Adapter Pattern
+
+Each resource implements the `ResourceAdapter[T, S, D]` interface with 14 required methods:
+
+| Method | Purpose |
+|:-------|:--------|
+| `ResourceName()` | Human-readable name for logs and events |
+| `FinalizerName()` | Finalizer string for deletion protection |
+| `NewObject()` | Factory for empty CRD instances |
+| `ServiceFromClient()` | Create the Snowflake CRUD service |
+| `BuildIdentifier()` | Construct the fully qualified Snowflake identifier |
+| `Observe()` | Execute SHOW query, return observation |
+| `Create()` | Execute CREATE statement |
+| `Alter()` | Execute ALTER statement |
+| `Drop()` | Execute DROP statement |
+| `ValidateImmutableFields()` | Check for forbidden field changes |
+| `BuildAlterOptions()` | Compute diff between spec and observed |
+| `ApplyObservation()` | Write observed state to CRD status |
+| `ComputeTrackedParameters()` | Return list of actively managed parameters |
+| `DetectDrift()` | Field-level drift comparison |
+
+### Optional Interfaces
+
+Adapters can implement additional interfaces for extended behavior:
+
+| Interface | Purpose |
+|:----------|:--------|
+| `PreReconciler[T]` | Pre-reconcile setup (e.g., Schema resolves databaseRef) |
+| `WatchConfigurer` | Extra watches (e.g., Schema watches Database) |
+| `PostCreateHook[T]` | Post-create logic (e.g., hash initial password) |
+| `PostUpdateHook[T]` | Post-update logic with access to alter options |
+| `CreateOrAlterSupporter` | Flag whether CREATE OR ALTER SQL is supported |
+
+---
+
+## Tracked Parameters
+
+The `tracked` package uses reflection over `snowflake:"PARAM_NAME"` struct tags to generically compute which Snowflake parameters a user actively manages.
+
+```go
+// In any spec struct:
+type DatabaseSpec struct {
+    DataRetentionTimeInDays *int32  `json:"dataRetentionTimeInDays,omitempty" snowflake:"DATA_RETENTION_TIME_IN_DAYS"`
+    MaxDataExtensionTime    *int32  `json:"maxDataExtensionTime,omitempty"    snowflake:"MAX_DATA_EXTENSION_TIME_IN_DAYS"`
+    Comment                 *string `json:"comment,omitempty"                 snowflake:"COMMENT"`
+}
+
+// Usage in adapter:
+func (a *Adapter) ComputeTrackedParameters(obj *v1alpha1.Database) []string {
+    return tracked.ComputeTracked(obj.Spec)
+}
+```
+
+**Tag modifiers:**
+
+| Modifier | Effect |
+|:---------|:-------|
+| `always` | Always included in tracked list regardless of nil |
+| `nounset` | Excluded from `ComputeUnset` (parameter cannot be UNSET) |
+| `prefix` | Map keys expanded to `PREFIX_<key>` entries |
+
+`ComputeUnset(spec, previouslyTracked)` returns parameters that were tracked in the previous reconciliation but are now nil — enabling the controller to issue `ALTER ... UNSET` for removed fields.
+
+See [Development Guide]({% link development.md %}) for more on the nil-means-unmanaged pattern.
+
+---
+
+## Resilience Layers
+
+### Circuit Breaker
+
+Per-provider circuit breaker with three states:
+
+| State | Behavior |
+|:------|:---------|
+| **Closed** | Normal operation |
+| **Open** | All calls rejected with `ErrCircuitOpen` after 5 consecutive failures |
+| **HalfOpen** | Single probe call after backoff. Success → Closed, failure → Open |
+
+Backoff starts at 60s and doubles with ±20% jitter on each failure, capped at 15 minutes. Each `ProviderConfig` gets an independent breaker.
+
+### Rate Limiter
+
+Hierarchical token-bucket rate limiting:
+
+| Level | Default QPS | Default Burst | Purpose |
+|:------|:------------|:--------------|:--------|
+| Per-controller | 10 | 20 | Fairness between controllers sharing one account |
+| Per-account | 50 | 100 | Aggregate cap across all controllers for one Snowflake account |
+
+### Client Factory
+
+LRU-cached client pool with singleflight deduplication:
+
+- **Keyed** by provider name + config hash (hash change → close + replace).
+- **Singleflight** — only one connection attempt per provider during thundering-herd scenarios.
+- **Idle TTL** — optional time-based eviction for unused clients.
+- **LRU eviction** — when `MaxSize` is reached, least-recently-used client is closed.
+
+### Retry
+
+Configurable retry with exponential backoff for transient Snowflake errors. Terminal errors (`snowflake.IsTerminalError`) exit the retry loop immediately.
+
+---
+
+## Error Classification
+
+| Category | Requeue | Examples |
+|:---------|:--------|:--------|
+| **Terminal** | No — reconciliation stops | Invalid SQL, validation failure, immutable field changes |
+| **Recoverable** | Yes — exponential backoff | Network errors, credential issues, rate limits |
+| **Transient** | Yes — fast retry within operation | Connection reset, temporary Snowflake unavailability |
+
+Terminal errors set `Ready=False` with `ReasonTerminalError` and emit a Kubernetes Warning event. The resource remains in this state until the user fixes the spec.
+
+---
+
+## Status Updates
+
+All status patches use **Server-Side Apply (SSA)** with field owner `snowplane-controller`. This avoids conflicts with other writers and enables clean field ownership tracking. Key status fields:
+
+| Field | Purpose |
+|:------|:--------|
+| `conditions` | Standard Kubernetes conditions (Ready, Synced, DriftDetected, ReferencesResolved) |
+| `observedGeneration` | Last successfully reconciled `metadata.generation` |
+| `lastAppliedSpecHash` | SHA-256 of the spec at last successful reconciliation |
+| `trackedParameters` | List of Snowflake parameters actively managed by the spec |
+| `showOutput` | Last observed Snowflake state (resource-specific) |

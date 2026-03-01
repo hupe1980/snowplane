@@ -67,7 +67,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 
 	defer func() {
 		metrics.ReconcileDuration.WithLabelValues(controllerName).Observe(time.Since(start).Seconds())
-		metrics.RecordReconcile(controllerName, retErr)
+
+		reconcileResult := "success"
+		if retErr != nil {
+			reconcileResult = "error"
+		}
+
+		metrics.RecordReconcile(controllerName, reconcileResult)
 	}()
 
 	// Handle deletion — clean up exported key, then remove finalizer.
@@ -171,6 +177,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 
 	fe.Status.LastExportedValueHash = newHash
 	conditions.SetReady(&fe, fmt.Sprintf("exported to %s/%s key=%q", fe.Spec.To.Kind, fe.Spec.To.Name, fe.Spec.To.Key))
+	conditions.SetSynced(&fe, "Export completed successfully")
 
 	if err := r.patchStatus(ctx, &fe); err != nil {
 		return ctrl.Result{}, err
@@ -315,6 +322,13 @@ func ExtractFieldValue(obj map[string]interface{}, path string) (interface{}, bo
 	p := strings.TrimPrefix(path, ".")
 	if p == "" {
 		return nil, false, fmt.Errorf("empty path")
+	}
+
+	// Defense-in-depth: reject paths that don't start with "status."
+	// CRD validation enforces this, but if bypassed (e.g. --validate=false),
+	// this prevents reading arbitrary fields like .metadata.annotations.
+	if !strings.HasPrefix(p, "status.") && p != "status" {
+		return nil, false, fmt.Errorf("path must start with .status (got %q)", path)
 	}
 
 	parts := strings.Split(p, ".")

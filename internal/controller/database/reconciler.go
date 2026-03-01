@@ -13,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -134,7 +135,7 @@ func buildAlterOptions(db *snowplanev1alpha1.Database, id snowflake.AccountObjec
 	// Detect fields that were previously managed but are now nil → UNSET.
 	// This must happen before the obs.Parameters nil guard because UNSET
 	// decisions are based on spec vs. TrackedParameters, not observed parameters.
-	opts.UnsetFields = computeUnsetFields(db)
+	opts.UnsetFields = tracked.ComputeUnset(&db.Spec, db.Status.TrackedParameters)
 
 	if db.Spec.Comment != nil {
 		if obs.ShowOutput == nil || *db.Spec.Comment != obs.ShowOutput.Comment {
@@ -207,119 +208,6 @@ func buildAlterOptions(db *snowplanev1alpha1.Database, id snowflake.AccountObjec
 	}
 
 	return opts
-}
-
-// computeUnsetFields returns the Snowflake parameter names that were previously
-// SET (tracked in status.TrackedParameters) but are now nil in the spec.
-func computeUnsetFields(db *snowplanev1alpha1.Database) []string {
-	if len(db.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(db.Status.TrackedParameters))
-	for _, f := range db.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if db.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	if db.Spec.DataRetentionTimeInDays == nil && managed["DATA_RETENTION_TIME_IN_DAYS"] {
-		unset = append(unset, "DATA_RETENTION_TIME_IN_DAYS")
-	}
-
-	if db.Spec.MaxDataExtensionTimeInDays == nil && managed["MAX_DATA_EXTENSION_TIME_IN_DAYS"] {
-		unset = append(unset, "MAX_DATA_EXTENSION_TIME_IN_DAYS")
-	}
-
-	if db.Spec.DefaultDDLCollation == nil && managed["DEFAULT_DDL_COLLATION"] {
-		unset = append(unset, "DEFAULT_DDL_COLLATION")
-	}
-
-	if db.Spec.ReplaceInvalidCharacters == nil && managed["REPLACE_INVALID_CHARACTERS"] {
-		unset = append(unset, "REPLACE_INVALID_CHARACTERS")
-	}
-
-	if db.Spec.Catalog == nil && managed["CATALOG"] {
-		unset = append(unset, "CATALOG")
-	}
-
-	if db.Spec.ExternalVolume == nil && managed["EXTERNAL_VOLUME"] {
-		unset = append(unset, "EXTERNAL_VOLUME")
-	}
-
-	if db.Spec.StorageSerializationPolicy == nil && managed["STORAGE_SERIALIZATION_POLICY"] {
-		unset = append(unset, "STORAGE_SERIALIZATION_POLICY")
-	}
-
-	if db.Spec.LogLevel == nil && managed["LOG_LEVEL"] {
-		unset = append(unset, "LOG_LEVEL")
-	}
-
-	if db.Spec.MetricLevel == nil && managed["METRIC_LEVEL"] {
-		unset = append(unset, "METRIC_LEVEL")
-	}
-
-	if db.Spec.TraceLevel == nil && managed["TRACE_LEVEL"] {
-		unset = append(unset, "TRACE_LEVEL")
-	}
-
-	return unset
-}
-
-// computeTrackedParameters returns the Snowflake parameter names that are
-// actively managed (non-nil) in the database spec.
-func computeTrackedParameters(spec *snowplanev1alpha1.DatabaseSpec) []string {
-	var fields []string
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	if spec.DataRetentionTimeInDays != nil {
-		fields = append(fields, "DATA_RETENTION_TIME_IN_DAYS")
-	}
-
-	if spec.MaxDataExtensionTimeInDays != nil {
-		fields = append(fields, "MAX_DATA_EXTENSION_TIME_IN_DAYS")
-	}
-
-	if spec.DefaultDDLCollation != nil {
-		fields = append(fields, "DEFAULT_DDL_COLLATION")
-	}
-
-	if spec.ReplaceInvalidCharacters != nil {
-		fields = append(fields, "REPLACE_INVALID_CHARACTERS")
-	}
-
-	if spec.Catalog != nil {
-		fields = append(fields, "CATALOG")
-	}
-
-	if spec.ExternalVolume != nil {
-		fields = append(fields, "EXTERNAL_VOLUME")
-	}
-
-	if spec.StorageSerializationPolicy != nil {
-		fields = append(fields, "STORAGE_SERIALIZATION_POLICY")
-	}
-
-	if spec.LogLevel != nil {
-		fields = append(fields, "LOG_LEVEL")
-	}
-
-	if spec.MetricLevel != nil {
-		fields = append(fields, "METRIC_LEVEL")
-	}
-
-	if spec.TraceLevel != nil {
-		fields = append(fields, "TRACE_LEVEL")
-	}
-
-	return fields
 }
 
 // detectDrift compares desired spec against the observed state and

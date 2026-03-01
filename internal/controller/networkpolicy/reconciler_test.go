@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -21,6 +21,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -112,45 +113,26 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 }
 
-func TestReconcile_CRNotFound(t *testing.T) {
-	t.Parallel()
-	r := newTestReconciler(&mockService{})
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
+// --------------------------------------------------------------------------
+// Tests: Standard reconcile behavioral suite
+// --------------------------------------------------------------------------
 
-func TestReconcile_ProviderConfigNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
-	np := newTestNetworkPolicy("mynp", "default")
-	r := newTestReconciler(&mockService{}, np)
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mynp", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "fetching ProviderConfig")
-}
 
-func TestReconcile_ProviderConfigNotReady(t *testing.T) {
-	t.Parallel()
-	np := newTestNetworkPolicy("mynp", "default")
-	pc := testutil.NewTestPC("default")
-	pc.Status.Conditions = nil
-	r := newTestReconciler(&mockService{}, np, pc, testutil.NewTestSecret("default"))
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mynp", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "ProviderConfig not ready")
-}
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-	np := newTestNetworkPolicy("mynp", "default")
-	mock := &mockService{}
-	r := newTestReconciler(mock, np, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mynp", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter, "should requeue after adding finalizer")
-	got := &snowplanev1alpha1.NetworkPolicy{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mynp", Namespace: "default"}, got))
-	assert.Contains(t, got.Finalizers, finalizerName)
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+		},
+		NewFixture: func(name, ns string) client.Object {
+			return newTestNetworkPolicy(name, ns)
+		},
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.NetworkPolicy{}
+		},
+		FinalizerName: finalizerName,
+	}.Run(t)
 }
 
 func TestReconcile_Create(t *testing.T) {
@@ -517,14 +499,14 @@ func TestComputeTrackedParameters(t *testing.T) {
 		AllowedNetworkRuleList: []string{"rule1"},
 		BlockedNetworkRuleList: []string{"rule2"},
 	}
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.ElementsMatch(t, []string{"COMMENT", "ALLOWED_IP_LIST", "BLOCKED_IP_LIST", "ALLOWED_NETWORK_RULE_LIST", "BLOCKED_NETWORK_RULE_LIST"}, fields)
 }
 
 func TestComputeTrackedParameters_Empty(t *testing.T) {
 	t.Parallel()
 	spec := &snowplanev1alpha1.NetworkPolicySpec{}
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.Empty(t, fields)
 }
 

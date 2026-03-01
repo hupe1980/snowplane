@@ -174,6 +174,18 @@ func ({{ .Receiver }} *{{ .TypeName }}) GetUseRole() *string {
 	return {{ .Receiver }}.Spec.UseRole
 }
 
+func ({{ .Receiver }} *{{ .TypeName }}) GetPaused() bool {
+	return {{ .Receiver }}.Spec.Paused
+}
+
+func ({{ .Receiver }} *{{ .TypeName }}) GetManagementPolicies() ManagementPolicies {
+	return {{ .Receiver }}.Spec.ManagementPolicies
+}
+
+func ({{ .Receiver }} *{{ .TypeName }}) SetCreateOrAlter(val *bool) {
+	{{ .Receiver }}.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
 func ({{ .Receiver }} *{{ .TypeName }}) GetObservedGeneration() int64 {
 	return {{ .Receiver }}.Status.ObservedGeneration
 }

@@ -11,6 +11,7 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName) || self.databaseName == oldSelf.databaseName)",message="spec.databaseName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
+// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
 type DatabaseRoleSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -23,7 +24,7 @@ type DatabaseRoleSpec struct {
 	// +optional
 	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
 
-	// DatabaseName is the raw Snowflake database identifier (e.g. "ANALYTICS").
+	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Use this when the database is NOT managed by Snowplane.
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
@@ -31,7 +32,7 @@ type DatabaseRoleSpec struct {
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// Comment is an optional description for the database role.
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // DatabaseRoleShowOutput mirrors the SHOW DATABASE ROLES output stored in status.
@@ -82,6 +83,7 @@ type DatabaseRoleStatus struct {
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
 // +kubebuilder:printcolumn:name="DATABASE",type=string,JSONPath=`.status.databaseName`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type DatabaseRole struct {
 	metav1.TypeMeta   `json:",inline"`

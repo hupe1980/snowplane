@@ -7,7 +7,7 @@ spec:
     name: default
   name: ENVIRONMENT
   databaseName: MY_DB
-  schemaName: MY_DB.MY_SCHEMA
+  schemaName: MY_SCHEMA
   allowedValues:
     - development
     - staging

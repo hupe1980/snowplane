@@ -14,6 +14,8 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
+// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
+// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
 type ViewSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -26,7 +28,7 @@ type ViewSpec struct {
 	// +optional
 	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
 
-	// DatabaseName is the raw Snowflake database identifier (e.g. "ANALYTICS").
+	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Use this when the database is NOT managed by Snowplane.
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
@@ -38,8 +40,9 @@ type ViewSpec struct {
 	// +optional
 	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
 
-	// SchemaName is the raw Snowflake schema FQN (e.g. '"ANALYTICS"."PUBLIC"').
+	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// Use this when the schema is NOT managed by Snowplane.
+	// The controller constructs the FQN from databaseName + schemaName + name.
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -62,11 +65,11 @@ type ViewSpec struct {
 
 	// Comment is an optional description for the view.
 	// +optional
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// ChangeTracking enables change tracking on the view.
 	// +optional
-	ChangeTracking *bool `json:"changeTracking,omitempty"`
+	ChangeTracking *bool `json:"changeTracking,omitempty" snowflake:"CHANGE_TRACKING"`
 }
 
 // ViewShowOutput mirrors the SHOW VIEWS output stored in status.
@@ -84,7 +87,7 @@ type ViewShowOutput struct {
 	SchemaName string `json:"schemaName,omitempty"`
 
 	// Comment is the view description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Owner is the role that owns the view.
 	Owner string `json:"owner,omitempty"`
@@ -96,7 +99,7 @@ type ViewShowOutput struct {
 	Text string `json:"text,omitempty"`
 
 	// ChangeTracking indicates whether change tracking is enabled.
-	ChangeTracking bool `json:"changeTracking,omitempty"`
+	ChangeTracking bool `json:"changeTracking,omitempty" snowflake:"CHANGE_TRACKING"`
 }
 
 // ViewStatus defines the observed state of a View.
@@ -127,6 +130,7 @@ type ViewStatus struct {
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
 // +kubebuilder:printcolumn:name="DATABASE",type=string,JSONPath=`.status.databaseName`
 // +kubebuilder:printcolumn:name="SCHEMA",type=string,JSONPath=`.status.schemaName`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type View struct {
 	metav1.TypeMeta   `json:",inline"`

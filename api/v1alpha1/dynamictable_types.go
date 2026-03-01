@@ -39,6 +39,8 @@ const (
 // +kubebuilder:validation:XValidation:rule="self.transient == oldSelf.transient",message="spec.transient is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
+// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
+// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
 type DynamicTableSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -51,7 +53,7 @@ type DynamicTableSpec struct {
 	// +optional
 	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
 
-	// DatabaseName is the raw Snowflake database identifier.
+	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -62,7 +64,7 @@ type DynamicTableSpec struct {
 	// +optional
 	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
 
-	// SchemaName is the raw Snowflake schema FQN.
+	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -94,7 +96,7 @@ type DynamicTableSpec struct {
 
 	// Comment is an optional description for the dynamic table.
 	// +optional
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Transient indicates this is a transient dynamic table (no Fail-safe).
 	// Immutable after creation.
@@ -104,16 +106,16 @@ type DynamicTableSpec struct {
 
 	// ClusterBy specifies the clustering key expressions for the dynamic table.
 	// +optional
-	ClusterBy []string `json:"clusterBy,omitempty"`
+	ClusterBy []string `json:"clusterBy,omitempty" snowflake:"CLUSTER_BY,nounset"`
 
 	// DataRetentionTimeInDays specifies the Time Travel retention period (0–90 days).
 	// +optional
-	DataRetentionTimeInDays *int32 `json:"dataRetentionTimeInDays,omitempty"`
+	DataRetentionTimeInDays *int32 `json:"dataRetentionTimeInDays,omitempty" snowflake:"DATA_RETENTION_TIME_IN_DAYS"`
 
 	// MaxDataExtensionTimeInDays specifies the maximum number of days Snowflake
 	// can extend the data retention period.
 	// +optional
-	MaxDataExtensionTimeInDays *int32 `json:"maxDataExtensionTimeInDays,omitempty"`
+	MaxDataExtensionTimeInDays *int32 `json:"maxDataExtensionTimeInDays,omitempty" snowflake:"MAX_DATA_EXTENSION_TIME_IN_DAYS"`
 }
 
 // DynamicTableShowOutput mirrors the SHOW DYNAMIC TABLES output stored in status.
@@ -134,7 +136,7 @@ type DynamicTableShowOutput struct {
 	Owner string `json:"owner,omitempty"`
 
 	// Comment is the dynamic table description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// TargetLag is the configured target lag.
 	TargetLag string `json:"targetLag,omitempty"`
@@ -152,7 +154,7 @@ type DynamicTableShowOutput struct {
 	SchedulingState string `json:"schedulingState,omitempty"`
 
 	// ClusterBy is the clustering key expression.
-	ClusterBy string `json:"clusterBy,omitempty"`
+	ClusterBy string `json:"clusterBy,omitempty" snowflake:"CLUSTER_BY,nounset"`
 
 	// DataTimestamp is the timestamp of the latest data refresh.
 	DataTimestamp string `json:"dataTimestamp,omitempty"`
@@ -184,6 +186,7 @@ type DynamicTableStatus struct {
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
 // +kubebuilder:printcolumn:name="DATABASE",type=string,JSONPath=`.status.databaseName`
 // +kubebuilder:printcolumn:name="SCHEMA",type=string,JSONPath=`.status.schemaName`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type DynamicTable struct {
 	metav1.TypeMeta   `json:",inline"`

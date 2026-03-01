@@ -28,7 +28,7 @@ type ExternalOAuthConfig struct {
 
 	// TokenUserMappingClaim is the claim in the access token that identifies the user.
 	// +kubebuilder:validation:MinLength=1
-	TokenUserMappingClaim string `json:"tokenUserMappingClaim"`
+	TokenUserMappingClaim string `json:"tokenUserMappingClaim" snowflake:"EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM,always,nounset"`
 
 	// SnowflakeUserMappingAttribute specifies how to map the claim to a Snowflake user
 	// (LOGIN_NAME or EMAIL_ADDRESS).
@@ -38,32 +38,32 @@ type ExternalOAuthConfig struct {
 
 	// JWSKeysURL is the endpoint to retrieve the JWKS (JSON Web Key Set) for token validation.
 	// +optional
-	JWSKeysURL *string `json:"jwsKeysURL,omitempty"`
+	JWSKeysURL *string `json:"jwsKeysURL,omitempty" snowflake:"EXTERNAL_OAUTH_JWS_KEYS_URL"`
 
 	// AudienceList is the list of allowed audience values in the access token.
 	// +optional
-	AudienceList []string `json:"audienceList,omitempty"`
+	AudienceList []string `json:"audienceList,omitempty" snowflake:"EXTERNAL_OAUTH_AUDIENCE_LIST"`
 
 	// AllowedRoles is the list of Snowflake roles that can be assumed via this integration.
 	// +optional
-	AllowedRoles []string `json:"allowedRoles,omitempty"`
+	AllowedRoles []string `json:"allowedRoles,omitempty" snowflake:"EXTERNAL_OAUTH_ALLOWED_ROLES_LIST"`
 
 	// BlockedRoles is the list of Snowflake roles that cannot be assumed via this integration.
 	// +optional
-	BlockedRoles []string `json:"blockedRoles,omitempty"`
+	BlockedRoles []string `json:"blockedRoles,omitempty" snowflake:"EXTERNAL_OAUTH_BLOCKED_ROLES_LIST"`
 
 	// AnyRoleMode controls whether the ANY role is allowed.
 	// +optional
 	// +kubebuilder:validation:Enum=DISABLE;ENABLE;ENABLE_FOR_PRIVILEGE
-	AnyRoleMode *string `json:"anyRoleMode,omitempty"`
+	AnyRoleMode *string `json:"anyRoleMode,omitempty" snowflake:"EXTERNAL_OAUTH_ANY_ROLE_MODE"`
 
 	// ScopeDelimiter is the character used to separate scopes.
 	// +optional
-	ScopeDelimiter *string `json:"scopeDelimiter,omitempty"`
+	ScopeDelimiter *string `json:"scopeDelimiter,omitempty" snowflake:"EXTERNAL_OAUTH_SCOPE_DELIMITER"`
 
 	// NetworkPolicy is the optional network policy attached to the integration.
 	// +optional
-	NetworkPolicy *string `json:"networkPolicy,omitempty"`
+	NetworkPolicy *string `json:"networkPolicy,omitempty" snowflake:"NETWORK_POLICY"`
 }
 
 // SAML2Config holds configuration for SAML2 security integrations.
@@ -82,36 +82,36 @@ type SAML2Config struct {
 
 	// X509Cert is the Base64-encoded X.509 certificate from the IdP for signature validation.
 	// +kubebuilder:validation:MinLength=1
-	X509Cert string `json:"x509Cert"`
+	X509Cert string `json:"x509Cert" snowflake:"SAML2_X509_CERT,always,nounset"`
 
 	// AllowedEmailPatterns is a list of email address patterns allowed for auto-provisioning.
 	// +optional
-	AllowedEmailPatterns []string `json:"allowedEmailPatterns,omitempty"`
+	AllowedEmailPatterns []string `json:"allowedEmailPatterns,omitempty" snowflake:"ALLOWED_EMAIL_PATTERNS"`
 
 	// AllowedUserDomains is a list of email domains allowed for authentication.
 	// +optional
-	AllowedUserDomains []string `json:"allowedUserDomains,omitempty"`
+	AllowedUserDomains []string `json:"allowedUserDomains,omitempty" snowflake:"ALLOWED_USER_DOMAINS"`
 
 	// SPInitiatedLoginPageLabel is the label for the SP-initiated login page.
 	// +optional
-	SPInitiatedLoginPageLabel *string `json:"spInitiatedLoginPageLabel,omitempty"`
+	SPInitiatedLoginPageLabel *string `json:"spInitiatedLoginPageLabel,omitempty" snowflake:"SAML2_SP_INITIATED_LOGIN_PAGE_LABEL"`
 
 	// EnableSPInitiated controls whether SP-initiated login is enabled.
 	// +optional
-	EnableSPInitiated *bool `json:"enableSPInitiated,omitempty"`
+	EnableSPInitiated *bool `json:"enableSPInitiated,omitempty" snowflake:"SAML2_ENABLE_SP_INITIATED"`
 
 	// ForceAuthn controls whether force authentication is requested.
 	// +optional
-	ForceAuthn *bool `json:"forceAuthn,omitempty"`
+	ForceAuthn *bool `json:"forceAuthn,omitempty" snowflake:"SAML2_FORCE_AUTHN"`
 
 	// RequestedNameIDFormat specifies the NameID format to request from the IdP.
 	// +optional
 	// +kubebuilder:validation:Enum="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified";"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress";"urn:oasis:names:tc:SAML:2.0:nameid-format:persistent";"urn:oasis:names:tc:SAML:2.0:nameid-format:transient"
-	RequestedNameIDFormat *string `json:"requestedNameIDFormat,omitempty"`
+	RequestedNameIDFormat *string `json:"requestedNameIDFormat,omitempty" snowflake:"SAML2_REQUESTED_NAMEID_FORMAT"`
 
 	// PostLogoutRedirectURL is the URL to redirect to after SAML logout.
 	// +optional
-	PostLogoutRedirectURL *string `json:"postLogoutRedirectURL,omitempty"`
+	PostLogoutRedirectURL *string `json:"postLogoutRedirectURL,omitempty" snowflake:"SAML2_POST_LOGOUT_REDIRECT_URL"`
 }
 
 // SCIMConfig holds configuration for SCIM security integrations.
@@ -126,11 +126,11 @@ type SCIMConfig struct {
 
 	// NetworkPolicy is the optional network policy attached to the SCIM integration.
 	// +optional
-	NetworkPolicy *string `json:"networkPolicy,omitempty"`
+	NetworkPolicy *string `json:"networkPolicy,omitempty" snowflake:"NETWORK_POLICY"`
 
 	// SyncPassword controls whether user passwords are synced from the IdP.
 	// +optional
-	SyncPassword *bool `json:"syncPassword,omitempty"`
+	SyncPassword *bool `json:"syncPassword,omitempty" snowflake:"SYNC_PASSWORD"`
 }
 
 // APIAuthenticationConfig holds configuration for API Authentication security integrations.
@@ -149,7 +149,7 @@ type APIAuthenticationConfig struct {
 
 	// OAuthAllowedScopes is the list of allowed OAuth scopes.
 	// +optional
-	OAuthAllowedScopes []string `json:"oauthAllowedScopes,omitempty"`
+	OAuthAllowedScopes []string `json:"oauthAllowedScopes,omitempty" snowflake:"OAUTH_ALLOWED_SCOPES"`
 
 	// OAuthGrantType is the method for getting the access token.
 	// +optional
@@ -176,7 +176,7 @@ type SecurityIntegrationSpec struct {
 	// Enabled controls whether the integration is active.
 	// +optional
 	// +kubebuilder:default=true
-	Enabled *bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty" snowflake:"ENABLED,nounset"`
 
 	// ExternalOAuth holds configuration for EXTERNAL_OAUTH integrations.
 	// +optional
@@ -196,7 +196,7 @@ type SecurityIntegrationSpec struct {
 
 	// Comment is an optional description for the security integration.
 	// +optional
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // SecurityIntegrationShowOutput mirrors the SHOW SECURITY INTEGRATIONS output stored in status.
@@ -214,10 +214,10 @@ type SecurityIntegrationShowOutput struct {
 	Category string `json:"category,omitempty"`
 
 	// Enabled indicates whether the integration is active.
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty" snowflake:"ENABLED,nounset"`
 
 	// Comment is the integration description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // SecurityIntegrationStatus defines the observed state of a SecurityIntegration.
@@ -242,6 +242,7 @@ type SecurityIntegrationStatus struct {
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
 // +kubebuilder:printcolumn:name="TYPE",type=string,JSONPath=`.spec.type`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type SecurityIntegration struct {
 	metav1.TypeMeta   `json:",inline"`

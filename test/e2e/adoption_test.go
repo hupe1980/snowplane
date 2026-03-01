@@ -17,10 +17,12 @@ func TestAdoption_Database(t *testing.T) {
 
 	require.True(t, sfExists(t, "DATABASES", sfName), "pre-created database should exist")
 
-	cr := withAnnotation(
-		newDatabaseCR(name, sfName, "adopted"),
-		"snowplane.hupe1980.github.io/adoption-policy", "adopt",
-	)
+	cr := newDatabaseCR(name, sfName, "adopted")
+	// Set adoption policy via spec field.
+	spec := cr.Object["spec"].(map[string]interface{})
+	spec["managementPolicies"] = map[string]interface{}{
+		"adoptionPolicy": "adopt",
+	}
 	cleanup := createCR(t, gvrDatabase, cr)
 	defer cleanup()
 
@@ -28,7 +30,7 @@ func TestAdoption_Database(t *testing.T) {
 
 	obj := getCR(t, gvrDatabase, name)
 	annotations := obj.GetAnnotations()
-	require.Equal(t, "true", annotations["snowplane.hupe1980.github.io/late-initialized"],
+	require.Equal(t, "true", annotations["internal.snowplane.hupe1980.github.io/late-initialized"],
 		"late-initialized annotation should be set after adoption")
 
 	deleteCR(t, gvrDatabase, name)

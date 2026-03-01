@@ -8,13 +8,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -22,6 +22,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -142,134 +143,25 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
-
-// --------------------------------------------------------------------------
-// Tests: ProviderConfig resolution
-// --------------------------------------------------------------------------
-
-func TestReconcile_ProviderConfigNotFound(t *testing.T) {
-	t.Parallel()
-
-	db := newTestDB("mydb", "default")
-	r := newTestReconciler(&mockService{}, db)
-
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "fetching ProviderConfig")
-}
-
-func TestReconcile_ProviderConfigNotReady(t *testing.T) {
-	t.Parallel()
-
-	db := newTestDB("mydb", "default")
-	pc := testutil.NewTestPC("default")
-	// Override: remove Ready condition so PC is not ready.
-	pc.Status.Conditions = nil
-
-	r := newTestReconciler(&mockService{}, db, pc, testutil.NewTestSecret("default"))
-
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "ProviderConfig not ready")
-}
-
-func TestReconcile_ProviderConfigNamespaceMatchesDB(t *testing.T) {
-	t.Parallel()
-
-	// DB in "team-a" namespace must find PC in "team-a" namespace.
-	db := newTestDB("mydb", "team-a")
-	pc := testutil.NewTestPC("team-a")
-	secret := testutil.NewTestSecret("team-a")
-
-	mock := &mockService{
-		observeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.DatabaseObservation, error) {
-			return &snowflake.DatabaseObservation{Exists: false}, nil
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
 		},
-		createFn: func(_ context.Context, _ snowflake.CreateDatabaseOptions) error {
-			return nil
+		NewFixture: func(name, ns string) client.Object {
+			return newTestDB(name, ns)
 		},
-	}
-
-	r := newTestReconciler(mock, db, pc, secret)
-
-	// Should not error on PC lookup — the namespace is correctly resolved.
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "team-a"))
-	require.NoError(t, err)
-}
-
-func TestReconcile_SecretNamespaceFallback(t *testing.T) {
-	t.Parallel()
-
-	// Secret ref namespace is empty → should fall back to PC namespace.
-	db := newTestDB("mydb", "ns1")
-	pc := testutil.NewTestPC("ns1")
-	pc.Spec.Credentials.SecretRef.Namespace = "" // empty → fallback to pc.Namespace
-
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "snowflake-creds", Namespace: "ns1"},
-		Data:       map[string][]byte{"password": []byte("pw")},
-	}
-
-	mock := &mockService{
-		observeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.DatabaseObservation, error) {
-			return &snowflake.DatabaseObservation{Exists: false}, nil
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.Database{}
 		},
-		createFn: func(_ context.Context, _ snowflake.CreateDatabaseOptions) error {
-			return nil
-		},
-	}
-
-	r := newTestReconciler(mock, db, pc, secret)
-
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "ns1"))
-	require.NoError(t, err)
-}
-
-func TestReconcile_SecretNotFound(t *testing.T) {
-	t.Parallel()
-
-	db := newTestDB("mydb", "default")
-	pc := testutil.NewTestPC("default")
-	// No secret created.
-
-	r := newTestReconciler(&mockService{}, db, pc)
-
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "fetching secret")
-}
-
-// --------------------------------------------------------------------------
-// Tests: Finalizer management
-// --------------------------------------------------------------------------
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-
-	db := newTestDB("mydb", "default")
-	mock := &mockService{}
-	r := newTestReconciler(mock, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter, "should requeue after adding finalizer")
-
-	// Verify finalizer was added.
-	got := &snowplanev1alpha1.Database{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mydb", Namespace: "default"}, got))
-	assert.Contains(t, got.Finalizers, finalizerName)
+		FinalizerName: finalizerName,
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -509,7 +401,7 @@ func TestReconcile_UpdateWithChanges(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	db.Status.ObservedGeneration = 1
 	db.Generation = 2
 	db.Spec.Comment = testutil.PtrString("new comment")
@@ -545,7 +437,7 @@ func TestReconcile_DriftCorrection(t *testing.T) {
 	// ObservedGeneration == Generation, but observed state differs from spec → drift.
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	db.Generation = 1
 	db.Status.ObservedGeneration = 1 // same generation → drift path
 	db.Spec.Comment = testutil.PtrString("desired comment")
@@ -578,7 +470,7 @@ func TestReconcile_DriftCorrection_DataRetention(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	db.Generation = 1
 	db.Status.ObservedGeneration = 1
 	db.Spec.DataRetentionTimeInDays = testutil.PtrInt32(30) // desired
@@ -611,7 +503,7 @@ func TestReconcile_AlterFails(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	db.Status.ObservedGeneration = 1
 	db.Spec.Comment = testutil.PtrString("changed")
 
@@ -643,7 +535,7 @@ func TestReconcile_AlterTerminalError(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	db.Status.ObservedGeneration = 1
 	db.Spec.Comment = testutil.PtrString("bad")
 
@@ -1168,7 +1060,8 @@ func TestReconcile_CreatePostObserveError(t *testing.T) {
 	r := newTestReconciler(mock, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "default"))
-	require.NoError(t, err) // should NOT propagate — short requeue instead
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "post-create observe")
 	assert.Equal(t, 5*time.Second, result.RequeueAfter)
 
 	got := &snowplanev1alpha1.Database{}
@@ -1363,7 +1256,7 @@ func TestComputeDatabaseTrackedParameters(t *testing.T) {
 		DataRetentionTimeInDays: testutil.PtrInt32(7),
 	}
 
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.ElementsMatch(t, []string{"COMMENT", "DATA_RETENTION_TIME_IN_DAYS"}, fields)
 }
 
@@ -1371,7 +1264,7 @@ func TestComputeDatabaseTrackedParameters_Empty(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.DatabaseSpec{}
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.Empty(t, fields)
 }
 
@@ -1419,7 +1312,7 @@ func TestReconcile_UnsetTriggered(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	db.Generation = 2
 	db.Status.ObservedGeneration = 1
 	// Previously managed comment, now removed from spec.
@@ -1599,7 +1492,7 @@ func TestReconcile_DriftCorrection_SetsDriftDetectedCondition(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	db.Generation = 1
 	db.Status.ObservedGeneration = 1 // drift path
 	db.Spec.Comment = testutil.PtrString("desired")
@@ -1654,9 +1547,7 @@ func TestReconcile_DriftDetectOnlyPolicy(t *testing.T) {
 	db.Finalizers = []string{finalizerName}
 	db.Generation = 1
 	db.Status.ObservedGeneration = 1 // drift path
-	db.Annotations = map[string]string{
-		"snowplane.hupe1980.github.io/drift-policy": "detect-only",
-	}
+	db.Spec.ManagementPolicies.DriftPolicy = snowplanev1alpha1.DriftPolicyDetectOnly
 	db.Spec.Comment = testutil.PtrString("desired")
 	hash, err := snowplanev1alpha1.ComputeSpecHash(db.Spec)
 	require.NoError(t, err)

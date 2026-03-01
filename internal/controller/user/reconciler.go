@@ -19,6 +19,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -163,7 +164,7 @@ func buildCreateOptions(ctx context.Context, c client.Client, user *snowplanev1a
 
 func buildAlterOptions(ctx context.Context, c client.Client, user *snowplanev1alpha1.User, id snowflake.AccountObjectIdentifier, obs *snowflake.UserObservation) (snowflake.AlterUserOptions, error) {
 	opts := snowflake.AlterUserOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(user)
+	opts.UnsetFields = tracked.ComputeUnset(&user.Spec, user.Status.TrackedParameters)
 
 	show := obs.ShowOutput
 
@@ -320,159 +321,6 @@ func applyObservation(user *snowplanev1alpha1.User, obs *snowflake.UserObservati
 			NetworkPolicy:   obs.DescribeOutput.NetworkPolicy,
 		}
 	}
-}
-
-// computeUnsetFields returns the Snowflake parameter names that were previously
-// SET (tracked in status.TrackedParameters) but are now nil in the spec.
-func computeUnsetFields(user *snowplanev1alpha1.User) []string {
-	if len(user.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(user.Status.TrackedParameters))
-	for _, f := range user.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if user.Spec.LoginName == nil && managed["LOGIN_NAME"] {
-		unset = append(unset, "LOGIN_NAME")
-	}
-	if user.Spec.DisplayName == nil && managed["DISPLAY_NAME"] {
-		unset = append(unset, "DISPLAY_NAME")
-	}
-	if user.Spec.Email == nil && managed["EMAIL"] {
-		unset = append(unset, "EMAIL")
-	}
-	if user.Spec.FirstName == nil && managed["FIRST_NAME"] {
-		unset = append(unset, "FIRST_NAME")
-	}
-	if user.Spec.LastName == nil && managed["LAST_NAME"] {
-		unset = append(unset, "LAST_NAME")
-	}
-	if user.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-	if user.Spec.DefaultRole == nil && managed["DEFAULT_ROLE"] {
-		unset = append(unset, "DEFAULT_ROLE")
-	}
-	if user.Spec.DefaultSecondaryRoles == nil && managed["DEFAULT_SECONDARY_ROLES"] {
-		unset = append(unset, "DEFAULT_SECONDARY_ROLES")
-	}
-	if user.Spec.DefaultWarehouse == nil && managed["DEFAULT_WAREHOUSE"] {
-		unset = append(unset, "DEFAULT_WAREHOUSE")
-	}
-	if user.Spec.DefaultNamespace == nil && managed["DEFAULT_NAMESPACE"] {
-		unset = append(unset, "DEFAULT_NAMESPACE")
-	}
-	if user.Spec.MustChangePassword == nil && managed["MUST_CHANGE_PASSWORD"] {
-		unset = append(unset, "MUST_CHANGE_PASSWORD")
-	}
-	if user.Spec.Disabled == nil && managed["DISABLED"] {
-		unset = append(unset, "DISABLED")
-	}
-	if user.Spec.Password == nil && managed["PASSWORD"] {
-		unset = append(unset, "PASSWORD")
-	}
-	if user.Spec.RSAPublicKey == nil && managed["RSA_PUBLIC_KEY"] {
-		unset = append(unset, "RSA_PUBLIC_KEY")
-	}
-	if user.Spec.RSAPublicKey2 == nil && managed["RSA_PUBLIC_KEY_2"] {
-		unset = append(unset, "RSA_PUBLIC_KEY_2")
-	}
-	if user.Spec.MiddleName == nil && managed["MIDDLE_NAME"] {
-		unset = append(unset, "MIDDLE_NAME")
-	}
-	if user.Spec.DaysToExpiry == nil && managed["DAYS_TO_EXPIRY"] {
-		unset = append(unset, "DAYS_TO_EXPIRY")
-	}
-	if user.Spec.MinsToUnlock == nil && managed["MINS_TO_UNLOCK"] {
-		unset = append(unset, "MINS_TO_UNLOCK")
-	}
-	if user.Spec.MinsToBypassMFA == nil && managed["MINS_TO_BYPASS_MFA"] {
-		unset = append(unset, "MINS_TO_BYPASS_MFA")
-	}
-	if user.Spec.NetworkPolicy == nil && managed["NETWORK_POLICY"] {
-		unset = append(unset, "NETWORK_POLICY")
-	}
-	if user.Spec.DisableMFA == nil && managed["DISABLE_MFA"] {
-		unset = append(unset, "DISABLE_MFA")
-	}
-
-	return unset
-}
-
-// computeTrackedParameters returns the Snowflake parameter names that are
-// actively managed (non-nil) in the user spec.
-func computeTrackedParameters(spec *snowplanev1alpha1.UserSpec) []string {
-	var fields []string
-
-	if spec.LoginName != nil {
-		fields = append(fields, "LOGIN_NAME")
-	}
-	if spec.DisplayName != nil {
-		fields = append(fields, "DISPLAY_NAME")
-	}
-	if spec.Email != nil {
-		fields = append(fields, "EMAIL")
-	}
-	if spec.FirstName != nil {
-		fields = append(fields, "FIRST_NAME")
-	}
-	if spec.LastName != nil {
-		fields = append(fields, "LAST_NAME")
-	}
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-	if spec.DefaultRole != nil {
-		fields = append(fields, "DEFAULT_ROLE")
-	}
-	if spec.DefaultSecondaryRoles != nil {
-		fields = append(fields, "DEFAULT_SECONDARY_ROLES")
-	}
-	if spec.DefaultWarehouse != nil {
-		fields = append(fields, "DEFAULT_WAREHOUSE")
-	}
-	if spec.DefaultNamespace != nil {
-		fields = append(fields, "DEFAULT_NAMESPACE")
-	}
-	if spec.MustChangePassword != nil {
-		fields = append(fields, "MUST_CHANGE_PASSWORD")
-	}
-	if spec.Disabled != nil {
-		fields = append(fields, "DISABLED")
-	}
-	if spec.Password != nil {
-		fields = append(fields, "PASSWORD")
-	}
-	if spec.RSAPublicKey != nil {
-		fields = append(fields, "RSA_PUBLIC_KEY")
-	}
-	if spec.RSAPublicKey2 != nil {
-		fields = append(fields, "RSA_PUBLIC_KEY_2")
-	}
-	if spec.MiddleName != nil {
-		fields = append(fields, "MIDDLE_NAME")
-	}
-	if spec.DaysToExpiry != nil {
-		fields = append(fields, "DAYS_TO_EXPIRY")
-	}
-	if spec.MinsToUnlock != nil {
-		fields = append(fields, "MINS_TO_UNLOCK")
-	}
-	if spec.MinsToBypassMFA != nil {
-		fields = append(fields, "MINS_TO_BYPASS_MFA")
-	}
-	if spec.NetworkPolicy != nil {
-		fields = append(fields, "NETWORK_POLICY")
-	}
-	if spec.DisableMFA != nil {
-		fields = append(fields, "DISABLE_MFA")
-	}
-
-	return fields
 }
 
 // detectDrift compares desired spec against the observed state.

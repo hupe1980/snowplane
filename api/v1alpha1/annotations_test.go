@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func ptrBool(b bool) *bool { return &b }
+
 func TestIsForceNew(t *testing.T) {
 	t.Parallel()
 
@@ -16,15 +18,21 @@ func TestIsForceNew(t *testing.T) {
 	assert.False(t, IsForceNew(nil))
 }
 
-func TestIsCreateOrAlter(t *testing.T) {
+func TestIsCreateOrAlter_ManagementPolicies(t *testing.T) {
 	t.Parallel()
 
-	// Enabled by default (annotation absent).
-	assert.True(t, IsCreateOrAlter(map[string]string{}))
-	assert.True(t, IsCreateOrAlter(nil))
-	assert.True(t, IsCreateOrAlter(map[string]string{AnnotationUseCreateOrAlter: "true"}))
-	// Opt-out.
-	assert.False(t, IsCreateOrAlter(map[string]string{AnnotationUseCreateOrAlter: "false"}))
+	// Defaults to true when nil.
+	assert.True(t, ManagementPolicies{}.IsCreateOrAlter())
+	assert.True(t, ManagementPolicies{CreateOrAlter: ptrBool(true)}.IsCreateOrAlter())
+	assert.False(t, ManagementPolicies{CreateOrAlter: ptrBool(false)}.IsCreateOrAlter())
+}
+
+func TestIsDetectOnly_ManagementPolicies(t *testing.T) {
+	t.Parallel()
+
+	assert.False(t, ManagementPolicies{}.IsDetectOnly())
+	assert.False(t, ManagementPolicies{DriftPolicy: DriftPolicyCorrect}.IsDetectOnly())
+	assert.True(t, ManagementPolicies{DriftPolicy: DriftPolicyDetectOnly}.IsDetectOnly())
 }
 
 func TestIsAbandonOnDelete(t *testing.T) {

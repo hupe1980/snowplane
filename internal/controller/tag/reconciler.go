@@ -15,6 +15,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -108,7 +109,7 @@ func buildCreateOptions(tag *snowplanev1alpha1.Tag, id snowflake.SchemaObjectIde
 
 func buildAlterOptions(tag *snowplanev1alpha1.Tag, id snowflake.SchemaObjectIdentifier, obs *snowflake.TagObservation) snowflake.AlterTagOptions {
 	opts := snowflake.AlterTagOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(tag)
+	opts.UnsetFields = tracked.ComputeUnset(&tag.Spec, tag.Status.TrackedParameters)
 
 	// Compare allowed values.
 	if len(tag.Spec.AllowedValues) > 0 {
@@ -140,39 +141,6 @@ func buildAlterOptions(tag *snowplanev1alpha1.Tag, id snowflake.SchemaObjectIden
 	}
 
 	return opts
-}
-
-func computeUnsetFields(tag *snowplanev1alpha1.Tag) []string {
-	if len(tag.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(tag.Status.TrackedParameters))
-	for _, f := range tag.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if tag.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.TagSpec) []string {
-	var fields []string
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	if len(spec.AllowedValues) > 0 {
-		fields = append(fields, "ALLOWED_VALUES")
-	}
-
-	return fields
 }
 
 func detectDrift(tag *snowplanev1alpha1.Tag, obs *snowflake.TagObservation) *drift.Result {

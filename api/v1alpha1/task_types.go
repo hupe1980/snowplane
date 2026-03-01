@@ -17,6 +17,8 @@ import (
 // +kubebuilder:validation:XValidation:rule="!(has(self.warehouse) && has(self.userTaskManagedInitialWarehouseSize))",message="spec.warehouse and spec.userTaskManagedInitialWarehouseSize are mutually exclusive"
 // +kubebuilder:validation:XValidation:rule="!has(self.finalize) || !has(self.schedule)",message="spec.finalize and spec.schedule are mutually exclusive"
 // +kubebuilder:validation:XValidation:rule="!has(self.finalize) || !has(self.after) || size(self.after) == 0",message="spec.finalize and spec.after are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
+// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
 type TaskSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -29,7 +31,7 @@ type TaskSpec struct {
 	// +optional
 	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
 
-	// DatabaseName is the raw Snowflake database identifier.
+	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -40,7 +42,7 @@ type TaskSpec struct {
 	// +optional
 	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
 
-	// SchemaName is the raw Snowflake schema FQN.
+	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -55,12 +57,12 @@ type TaskSpec struct {
 	// Mutually exclusive with Warehouse.
 	// +optional
 	// +kubebuilder:validation:Enum=XSMALL;SMALL;MEDIUM;LARGE;XLARGE;XXLARGE
-	UserTaskManagedInitialWarehouseSize *string `json:"userTaskManagedInitialWarehouseSize,omitempty"`
+	UserTaskManagedInitialWarehouseSize *string `json:"userTaskManagedInitialWarehouseSize,omitempty" snowflake:"USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE"`
 
 	// Schedule defines when the task runs. Required for standalone and root tasks.
 	// Examples: "5 MINUTES", "USING CRON 0 9-17 * * SUN America/Los_Angeles"
 	// +optional
-	Schedule *string `json:"schedule,omitempty"`
+	Schedule *string `json:"schedule,omitempty" snowflake:"SCHEDULE"`
 
 	// SQLStatement is the SQL code executed when the task runs.
 	// +kubebuilder:validation:MinLength=1
@@ -76,37 +78,37 @@ type TaskSpec struct {
 
 	// Comment is an optional description for the task.
 	// +optional
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// AllowOverlappingExecution allows multiple instances of the task graph to run concurrently.
 	// +optional
-	AllowOverlappingExecution *bool `json:"allowOverlappingExecution,omitempty"`
+	AllowOverlappingExecution *bool `json:"allowOverlappingExecution,omitempty" snowflake:"ALLOW_OVERLAPPING_EXECUTION"`
 
 	// UserTaskTimeoutMs specifies the time limit on a single run in milliseconds (0-604800000).
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=604800000
-	UserTaskTimeoutMs *int32 `json:"userTaskTimeoutMs,omitempty"`
+	UserTaskTimeoutMs *int32 `json:"userTaskTimeoutMs,omitempty" snowflake:"USER_TASK_TIMEOUT_MS"`
 
 	// SuspendTaskAfterNumFailures specifies the number of consecutive failed runs
 	// before the task is automatically suspended.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
-	SuspendTaskAfterNumFailures *int32 `json:"suspendTaskAfterNumFailures,omitempty"`
+	SuspendTaskAfterNumFailures *int32 `json:"suspendTaskAfterNumFailures,omitempty" snowflake:"SUSPEND_TASK_AFTER_NUM_FAILURES"`
 
 	// ErrorIntegration is the notification integration for error notifications.
 	// +optional
-	ErrorIntegration *string `json:"errorIntegration,omitempty"`
+	ErrorIntegration *string `json:"errorIntegration,omitempty" snowflake:"ERROR_INTEGRATION"`
 
 	// SuccessIntegration is the notification integration for success notifications.
 	// +optional
-	SuccessIntegration *string `json:"successIntegration,omitempty"`
+	SuccessIntegration *string `json:"successIntegration,omitempty" snowflake:"SUCCESS_INTEGRATION"`
 
 	// TaskAutoRetryAttempts specifies the number of automatic retry attempts (0-30).
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=30
-	TaskAutoRetryAttempts *int32 `json:"taskAutoRetryAttempts,omitempty"`
+	TaskAutoRetryAttempts *int32 `json:"taskAutoRetryAttempts,omitempty" snowflake:"TASK_AUTO_RETRY_ATTEMPTS"`
 
 	// Suspend indicates whether the task should be suspended. Default is true
 	// (tasks are created in suspended state).
@@ -117,43 +119,43 @@ type TaskSpec struct {
 	// Config specifies the default configuration string in valid JSON format
 	// that all tasks in a task graph can access via SYSTEM$GET_TASK_GRAPH_CONFIG.
 	// +optional
-	Config *string `json:"config,omitempty"`
+	Config *string `json:"config,omitempty" snowflake:"CONFIG"`
 
 	// Finalize specifies the name of a root task that this finalizer task is
 	// associated with. Finalizer tasks run after all other tasks in the task
 	// graph complete. Mutually exclusive with Schedule and After.
 	// +optional
-	Finalize *string `json:"finalize,omitempty"`
+	Finalize *string `json:"finalize,omitempty" snowflake:"FINALIZE,nounset"`
 
 	// LogLevel specifies the severity level of events for the task.
 	// +optional
 	// +kubebuilder:validation:Enum=TRACE;DEBUG;INFO;WARN;ERROR;FATAL;OFF
-	LogLevel *string `json:"logLevel,omitempty"`
+	LogLevel *string `json:"logLevel,omitempty" snowflake:"LOG_LEVEL"`
 
 	// UserTaskMinimumTriggerIntervalInSeconds defines how frequently a triggered task
 	// can execute, in seconds. Changes within this interval are batched together.
 	// +optional
 	// +kubebuilder:validation:Minimum=10
 	// +kubebuilder:validation:Maximum=604800
-	UserTaskMinimumTriggerIntervalInSeconds *int32 `json:"userTaskMinimumTriggerIntervalInSeconds,omitempty"`
+	UserTaskMinimumTriggerIntervalInSeconds *int32 `json:"userTaskMinimumTriggerIntervalInSeconds,omitempty" snowflake:"USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS"`
 
 	// TargetCompletionInterval specifies the desired task completion time.
 	// Only applies to serverless tasks. Required for serverless triggered tasks.
 	// Examples: "10 MINUTES", "1 HOURS"
 	// +optional
-	TargetCompletionInterval *string `json:"targetCompletionInterval,omitempty"`
+	TargetCompletionInterval *string `json:"targetCompletionInterval,omitempty" snowflake:"TARGET_COMPLETION_INTERVAL"`
 
 	// ServerlessTaskMinStatementSize specifies the minimum warehouse size for
 	// the serverless task. Only applies to serverless tasks.
 	// +optional
 	// +kubebuilder:validation:Enum=XSMALL;SMALL;MEDIUM;LARGE;XLARGE;XXLARGE
-	ServerlessTaskMinStatementSize *string `json:"serverlessTaskMinStatementSize,omitempty"`
+	ServerlessTaskMinStatementSize *string `json:"serverlessTaskMinStatementSize,omitempty" snowflake:"SERVERLESS_TASK_MIN_STATEMENT_SIZE"`
 
 	// ServerlessTaskMaxStatementSize specifies the maximum warehouse size for
 	// the serverless task. Only applies to serverless tasks.
 	// +optional
 	// +kubebuilder:validation:Enum=XSMALL;SMALL;MEDIUM;LARGE;XLARGE;XXLARGE
-	ServerlessTaskMaxStatementSize *string `json:"serverlessTaskMaxStatementSize,omitempty"`
+	ServerlessTaskMaxStatementSize *string `json:"serverlessTaskMaxStatementSize,omitempty" snowflake:"SERVERLESS_TASK_MAX_STATEMENT_SIZE"`
 }
 
 // TaskShowOutput mirrors the SHOW TASKS output stored in status.
@@ -174,13 +176,13 @@ type TaskShowOutput struct {
 	Owner string `json:"owner,omitempty"`
 
 	// Comment is the task description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Warehouse is the warehouse used by the task.
 	Warehouse string `json:"warehouse,omitempty"`
 
 	// Schedule is the task schedule expression.
-	Schedule string `json:"schedule,omitempty"`
+	Schedule string `json:"schedule,omitempty" snowflake:"SCHEDULE"`
 
 	// State is the task state (started or suspended).
 	State string `json:"state,omitempty"`
@@ -195,37 +197,37 @@ type TaskShowOutput struct {
 	Predecessors string `json:"predecessors,omitempty"`
 
 	// ErrorIntegration is the error notification integration.
-	ErrorIntegration string `json:"errorIntegration,omitempty"`
+	ErrorIntegration string `json:"errorIntegration,omitempty" snowflake:"ERROR_INTEGRATION"`
 
 	// AllowOverlappingExecution indicates whether concurrent graph runs are allowed.
-	AllowOverlappingExecution bool `json:"allowOverlappingExecution,omitempty"`
+	AllowOverlappingExecution bool `json:"allowOverlappingExecution,omitempty" snowflake:"ALLOW_OVERLAPPING_EXECUTION"`
 
 	// Config is the task configuration JSON string.
-	Config string `json:"config,omitempty"`
+	Config string `json:"config,omitempty" snowflake:"CONFIG"`
 }
 
 // TaskParameters contains relevant session-level task parameters from SHOW PARAMETERS IN TASK.
 type TaskParameters struct {
 	// UserTaskTimeoutMs is the task timeout in milliseconds.
-	UserTaskTimeoutMs *int32 `json:"userTaskTimeoutMs,omitempty"`
+	UserTaskTimeoutMs *int32 `json:"userTaskTimeoutMs,omitempty" snowflake:"USER_TASK_TIMEOUT_MS"`
 
 	// SuspendTaskAfterNumFailures is the number of consecutive failures before suspension.
-	SuspendTaskAfterNumFailures *int32 `json:"suspendTaskAfterNumFailures,omitempty"`
+	SuspendTaskAfterNumFailures *int32 `json:"suspendTaskAfterNumFailures,omitempty" snowflake:"SUSPEND_TASK_AFTER_NUM_FAILURES"`
 
 	// TaskAutoRetryAttempts is the number of automatic retry attempts.
-	TaskAutoRetryAttempts *int32 `json:"taskAutoRetryAttempts,omitempty"`
+	TaskAutoRetryAttempts *int32 `json:"taskAutoRetryAttempts,omitempty" snowflake:"TASK_AUTO_RETRY_ATTEMPTS"`
 
 	// LogLevel is the severity level of events for the task.
-	LogLevel string `json:"logLevel,omitempty"`
+	LogLevel string `json:"logLevel,omitempty" snowflake:"LOG_LEVEL"`
 
 	// UserTaskMinimumTriggerIntervalInSeconds defines how frequently a triggered task can execute.
-	UserTaskMinimumTriggerIntervalInSeconds *int32 `json:"userTaskMinimumTriggerIntervalInSeconds,omitempty"`
+	UserTaskMinimumTriggerIntervalInSeconds *int32 `json:"userTaskMinimumTriggerIntervalInSeconds,omitempty" snowflake:"USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS"`
 
 	// TargetCompletionInterval is the target completion interval for the task.
-	TargetCompletionInterval *string `json:"targetCompletionInterval,omitempty"`
+	TargetCompletionInterval *string `json:"targetCompletionInterval,omitempty" snowflake:"TARGET_COMPLETION_INTERVAL"`
 
 	// UserTaskManagedInitialWarehouseSize is the initial warehouse size for serverless tasks.
-	UserTaskManagedInitialWarehouseSize *string `json:"userTaskManagedInitialWarehouseSize,omitempty"`
+	UserTaskManagedInitialWarehouseSize *string `json:"userTaskManagedInitialWarehouseSize,omitempty" snowflake:"USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE"`
 }
 
 // TaskStatus defines the observed state of a Task.
@@ -258,6 +260,7 @@ type TaskStatus struct {
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
 // +kubebuilder:printcolumn:name="DATABASE",type=string,JSONPath=`.status.databaseName`
 // +kubebuilder:printcolumn:name="SCHEMA",type=string,JSONPath=`.status.schemaName`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type Task struct {
 	metav1.TypeMeta   `json:",inline"`

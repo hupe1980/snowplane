@@ -41,6 +41,8 @@ const (
 // +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !has(oldSelf.schemaName) || self.schemaName == oldSelf.schemaName",message="spec.schemaName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.type == oldSelf.type",message="spec.type is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.mode == oldSelf.mode",message="spec.mode is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
+// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
 type NetworkRuleSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -54,7 +56,7 @@ type NetworkRuleSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.databaseRef is immutable"
 	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
 
-	// DatabaseName is the literal Snowflake database name.
+	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -67,7 +69,8 @@ type NetworkRuleSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.schemaRef is immutable"
 	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
 
-	// SchemaName is the literal Snowflake fully-qualified schema name (DB.SCHEMA).
+	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
+	// The controller constructs the FQN from databaseName + schemaName + name.
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
@@ -84,11 +87,11 @@ type NetworkRuleSpec struct {
 
 	// ValueList is the list of network identifiers for this rule.
 	// +kubebuilder:validation:MinItems=1
-	ValueList []string `json:"valueList"`
+	ValueList []string `json:"valueList" snowflake:"VALUE_LIST,always"`
 
 	// Comment is an optional description for the network rule.
 	// +optional
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // NetworkRuleShowOutput mirrors the SHOW NETWORK RULES output stored in status.
@@ -115,7 +118,7 @@ type NetworkRuleShowOutput struct {
 	Mode string `json:"mode,omitempty"`
 
 	// Comment is the rule description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
 // NetworkRuleStatus defines the observed state of a NetworkRule.
@@ -146,6 +149,7 @@ type NetworkRuleStatus struct {
 // +kubebuilder:printcolumn:name="MODE",type=string,JSONPath=`.spec.mode`
 // +kubebuilder:printcolumn:name="DATABASE",type=string,JSONPath=`.status.databaseName`
 // +kubebuilder:printcolumn:name="SCHEMA",type=string,JSONPath=`.status.schemaName`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type NetworkRule struct {
 	metav1.TypeMeta   `json:",inline"`

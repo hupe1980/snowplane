@@ -27,33 +27,33 @@ type UserSpec struct {
 
 	// LoginName is the name that the user enters to log into the system.
 	// Defaults to the user Name if not set.
-	LoginName *string `json:"loginName,omitempty"`
+	LoginName *string `json:"loginName,omitempty" snowflake:"LOGIN_NAME"`
 
 	// DisplayName is the user's display name in the Snowflake UI.
-	DisplayName *string `json:"displayName,omitempty"`
+	DisplayName *string `json:"displayName,omitempty" snowflake:"DISPLAY_NAME"`
 
 	// Email is the user's email address.
-	Email *string `json:"email,omitempty"`
+	Email *string `json:"email,omitempty" snowflake:"EMAIL"`
 
 	// FirstName is the user's first name.
-	FirstName *string `json:"firstName,omitempty"`
+	FirstName *string `json:"firstName,omitempty" snowflake:"FIRST_NAME"`
 
 	// LastName is the user's last name.
-	LastName *string `json:"lastName,omitempty"`
+	LastName *string `json:"lastName,omitempty" snowflake:"LAST_NAME"`
 
 	// Comment is an optional description for the user.
-	Comment *string `json:"comment,omitempty"`
+	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Password references a Kubernetes Secret containing the user's password.
-	Password *SecretKeyReference `json:"password,omitempty"`
+	Password *SecretKeyReference `json:"password,omitempty" snowflake:"PASSWORD"`
 
 	// RSAPublicKey references a Kubernetes Secret containing the user's RSA public key
 	// for key-pair authentication.
-	RSAPublicKey *SecretKeyReference `json:"rsaPublicKey,omitempty"`
+	RSAPublicKey *SecretKeyReference `json:"rsaPublicKey,omitempty" snowflake:"RSA_PUBLIC_KEY"`
 
 	// RSAPublicKey2 references a Kubernetes Secret containing the user's second RSA public key
 	// for key rotation.
-	RSAPublicKey2 *SecretKeyReference `json:"rsaPublicKey2,omitempty"`
+	RSAPublicKey2 *SecretKeyReference `json:"rsaPublicKey2,omitempty" snowflake:"RSA_PUBLIC_KEY_2"`
 
 	// Type specifies the user type: PERSON, SERVICE, or LEGACY_SERVICE.
 	// Defaults to PERSON. Immutable after creation.
@@ -62,53 +62,53 @@ type UserSpec struct {
 	Type *UserType `json:"type,omitempty"`
 
 	// DefaultRole is the default role assigned to the user on login.
-	DefaultRole *string `json:"defaultRole,omitempty"`
+	DefaultRole *string `json:"defaultRole,omitempty" snowflake:"DEFAULT_ROLE"`
 
 	// DefaultSecondaryRoles specifies secondary roles activated on login.
 	// Set to "ALL" to enable all granted roles as secondary.
-	DefaultSecondaryRoles *string `json:"defaultSecondaryRoles,omitempty"`
+	DefaultSecondaryRoles *string `json:"defaultSecondaryRoles,omitempty" snowflake:"DEFAULT_SECONDARY_ROLES"`
 
 	// DefaultWarehouse is the default virtual warehouse for the user.
-	DefaultWarehouse *string `json:"defaultWarehouse,omitempty"`
+	DefaultWarehouse *string `json:"defaultWarehouse,omitempty" snowflake:"DEFAULT_WAREHOUSE"`
 
 	// DefaultNamespace is the default database.schema namespace for the user.
-	DefaultNamespace *string `json:"defaultNamespace,omitempty"`
+	DefaultNamespace *string `json:"defaultNamespace,omitempty" snowflake:"DEFAULT_NAMESPACE"`
 
 	// MustChangePassword forces a password change on next login.
-	MustChangePassword *bool `json:"mustChangePassword,omitempty"`
+	MustChangePassword *bool `json:"mustChangePassword,omitempty" snowflake:"MUST_CHANGE_PASSWORD"`
 
 	// Disabled controls whether the user is disabled.
-	Disabled *bool `json:"disabled,omitempty"`
+	Disabled *bool `json:"disabled,omitempty" snowflake:"DISABLED"`
 
 	// MiddleName is the user's middle name.
-	MiddleName *string `json:"middleName,omitempty"`
+	MiddleName *string `json:"middleName,omitempty" snowflake:"MIDDLE_NAME"`
 
 	// DaysToExpiry sets the number of days after which the user's login
 	// credentials (password) expire. After expiry the user must reset their
 	// password before logging in. 0 means no expiry.
 	// +kubebuilder:validation:Minimum=0
-	DaysToExpiry *int32 `json:"daysToExpiry,omitempty"`
+	DaysToExpiry *int32 `json:"daysToExpiry,omitempty" snowflake:"DAYS_TO_EXPIRY"`
 
 	// MinsToUnlock sets the number of minutes until a locked user account
 	// is automatically unlocked. 0 means the account remains locked until
 	// an administrator unlocks it.
 	// +kubebuilder:validation:Minimum=0
-	MinsToUnlock *int32 `json:"minsToUnlock,omitempty"`
+	MinsToUnlock *int32 `json:"minsToUnlock,omitempty" snowflake:"MINS_TO_UNLOCK"`
 
 	// MinsToBypassMFA sets the number of minutes to temporarily bypass
 	// multi-factor authentication. Use this when a user has lost their MFA
 	// device and needs temporary access.
 	// +kubebuilder:validation:Minimum=0
-	MinsToBypassMFA *int32 `json:"minsToBypassMFA,omitempty"`
+	MinsToBypassMFA *int32 `json:"minsToBypassMFA,omitempty" snowflake:"MINS_TO_BYPASS_MFA"`
 
 	// NetworkPolicy assigns a user-level network policy that overrides the
 	// account-level network policy. Set to the name of an existing Snowflake
 	// network policy.
-	NetworkPolicy *string `json:"networkPolicy,omitempty"`
+	NetworkPolicy *string `json:"networkPolicy,omitempty" snowflake:"NETWORK_POLICY"`
 
 	// DisableMFA disables multi-factor authentication for the user when set
 	// to true.
-	DisableMFA *bool `json:"disableMFA,omitempty"`
+	DisableMFA *bool `json:"disableMFA,omitempty" snowflake:"DISABLE_MFA"`
 }
 
 // UserShowOutput mirrors the SHOW USERS output stored in status.
@@ -120,46 +120,46 @@ type UserShowOutput struct {
 	Name string `json:"name,omitempty"`
 
 	// LoginName is the login name.
-	LoginName string `json:"loginName,omitempty"`
+	LoginName string `json:"loginName,omitempty" snowflake:"LOGIN_NAME"`
 
 	// DisplayName is the display name.
-	DisplayName string `json:"displayName,omitempty"`
+	DisplayName string `json:"displayName,omitempty" snowflake:"DISPLAY_NAME"`
 
 	// Email is the email address.
-	Email string `json:"email,omitempty"`
+	Email string `json:"email,omitempty" snowflake:"EMAIL"`
 
 	// FirstName is the first name.
-	FirstName string `json:"firstName,omitempty"`
+	FirstName string `json:"firstName,omitempty" snowflake:"FIRST_NAME"`
 
 	// LastName is the last name.
-	LastName string `json:"lastName,omitempty"`
+	LastName string `json:"lastName,omitempty" snowflake:"LAST_NAME"`
 
 	// MiddleName is the middle name.
-	MiddleName string `json:"middleName,omitempty"`
+	MiddleName string `json:"middleName,omitempty" snowflake:"MIDDLE_NAME"`
 
 	// Comment is the user description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// DefaultRole is the default role.
-	DefaultRole string `json:"defaultRole,omitempty"`
+	DefaultRole string `json:"defaultRole,omitempty" snowflake:"DEFAULT_ROLE"`
 
 	// DefaultSecondaryRoles is the default secondary roles setting.
-	DefaultSecondaryRoles string `json:"defaultSecondaryRoles,omitempty"`
+	DefaultSecondaryRoles string `json:"defaultSecondaryRoles,omitempty" snowflake:"DEFAULT_SECONDARY_ROLES"`
 
 	// DefaultWarehouse is the default warehouse.
-	DefaultWarehouse string `json:"defaultWarehouse,omitempty"`
+	DefaultWarehouse string `json:"defaultWarehouse,omitempty" snowflake:"DEFAULT_WAREHOUSE"`
 
 	// DefaultNamespace is the default namespace.
-	DefaultNamespace string `json:"defaultNamespace,omitempty"`
+	DefaultNamespace string `json:"defaultNamespace,omitempty" snowflake:"DEFAULT_NAMESPACE"`
 
 	// Owner is the role that owns the user.
 	Owner string `json:"owner,omitempty"`
 
 	// Disabled indicates whether the user is disabled.
-	Disabled bool `json:"disabled,omitempty"`
+	Disabled bool `json:"disabled,omitempty" snowflake:"DISABLED"`
 
 	// MustChangePassword indicates whether the user must change password.
-	MustChangePassword bool `json:"mustChangePassword,omitempty"`
+	MustChangePassword bool `json:"mustChangePassword,omitempty" snowflake:"MUST_CHANGE_PASSWORD"`
 
 	// HasRSAPublicKey indicates whether an RSA public key is set.
 	HasRSAPublicKey bool `json:"hasRsaPublicKey,omitempty"`
@@ -168,16 +168,16 @@ type UserShowOutput struct {
 	Type string `json:"type,omitempty"`
 
 	// DaysToExpiry is the number of days until the user's credentials expire.
-	DaysToExpiry string `json:"daysToExpiry,omitempty"`
+	DaysToExpiry string `json:"daysToExpiry,omitempty" snowflake:"DAYS_TO_EXPIRY"`
 
 	// MinsToUnlock is the number of minutes until a locked account auto-unlocks.
-	MinsToUnlock string `json:"minsToUnlock,omitempty"`
+	MinsToUnlock string `json:"minsToUnlock,omitempty" snowflake:"MINS_TO_UNLOCK"`
 
 	// MinsToBypassMFA is the number of minutes to bypass MFA.
-	MinsToBypassMFA string `json:"minsToBypassMFA,omitempty"`
+	MinsToBypassMFA string `json:"minsToBypassMFA,omitempty" snowflake:"MINS_TO_BYPASS_MFA"`
 
 	// DisableMFA indicates whether MFA is disabled for the user.
-	DisableMFA bool `json:"disableMFA,omitempty"`
+	DisableMFA bool `json:"disableMFA,omitempty" snowflake:"DISABLE_MFA"`
 }
 
 // UserDescribeOutput holds additional fields from DESCRIBE USER that
@@ -190,7 +190,7 @@ type UserDescribeOutput struct {
 	RSAPublicKey2FP string `json:"rsaPublicKey2Fp,omitempty"`
 
 	// NetworkPolicy is the user-level network policy name, if set.
-	NetworkPolicy string `json:"networkPolicy,omitempty"`
+	NetworkPolicy string `json:"networkPolicy,omitempty" snowflake:"NETWORK_POLICY"`
 }
 
 // UserStatus defines the observed state of a User.
@@ -233,6 +233,7 @@ type UserStatus struct {
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type User struct {
 	metav1.TypeMeta   `json:",inline"`

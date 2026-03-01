@@ -12,6 +12,7 @@ package circuitbreaker
 
 import (
 	"errors"
+	rand "math/rand/v2"
 	"sync"
 	"time"
 
@@ -84,10 +85,11 @@ type providerBreaker struct {
 // Breaker provides per-provider circuit breaker state management.
 // Each provider (ProviderConfig name) gets its own independent breaker.
 type Breaker struct {
-	mu       sync.RWMutex
-	breakers map[string]*providerBreaker
-	opts     Options
-	now      func() time.Time // injectable clock for testing
+	mu         sync.RWMutex
+	breakers   map[string]*providerBreaker
+	opts       Options
+	now        func() time.Time // injectable clock for testing
+	jitterFrac func() float64   // injectable jitter source for testing; returns [-1, +1)
 }
 
 // New creates a new per-provider circuit breaker.
@@ -109,9 +111,10 @@ func New(opts Options) *Breaker {
 	}
 
 	return &Breaker{
-		breakers: make(map[string]*providerBreaker),
-		opts:     opts,
-		now:      time.Now,
+		breakers:   make(map[string]*providerBreaker),
+		opts:       opts,
+		now:        time.Now,
+		jitterFrac: func() float64 { return rand.Float64()*2 - 1 }, //nolint:gosec // jitter does not require crypto-grade randomness
 	}
 }
 
@@ -182,10 +185,13 @@ func (b *Breaker) RecordFailure(provider string) {
 	if pb.consecutiveFailures >= b.opts.FailureThreshold {
 		pb.state = StateOpen
 
-		// Exponential backoff: double the timeout on each half-open failure,
-		// capped at MaxResetTimeout.
+		// Exponential backoff with jitter: double the timeout on each
+		// half-open failure, add ±20% jitter to prevent synchronized
+		// recovery storms across providers, then cap at MaxResetTimeout.
 		if wasHalfOpen {
-			pb.currentResetTimeout = min(pb.currentResetTimeout*2, b.opts.MaxResetTimeout)
+			base := pb.currentResetTimeout * 2
+			jitter := time.Duration(float64(base) * 0.2 * b.jitterFrac())
+			pb.currentResetTimeout = min(base+jitter, b.opts.MaxResetTimeout)
 		}
 
 		metrics.RecordCircuitBreakerTrip(provider)

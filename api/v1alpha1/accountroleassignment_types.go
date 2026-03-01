@@ -81,6 +81,7 @@ type AccountRoleAssignmentStatus struct {
 // +kubebuilder:printcolumn:name="ROLE",type=string,JSONPath=`.spec.roleName`,priority=0
 // +kubebuilder:printcolumn:name="TO-ROLE",type=string,JSONPath=`.spec.toRole`,priority=0
 // +kubebuilder:printcolumn:name="TO-USER",type=string,JSONPath=`.spec.toUser`,priority=0
+// +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 type AccountRoleAssignment struct {
 	metav1.TypeMeta   `json:",inline"`

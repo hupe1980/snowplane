@@ -31,7 +31,7 @@ spec:
   maxDataExtensionTimeInDays: 14
   changeTracking: true
   enableSchemaEvolution: true
-  defaultDdlCollation: "en-ci"
+  defaultDDLCollation: "en-ci"
   clusterBy:
     - CUSTOMER_ID
     - CREATED_AT

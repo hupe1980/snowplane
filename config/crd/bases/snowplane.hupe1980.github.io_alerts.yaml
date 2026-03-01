@@ -32,6 +32,10 @@ spec:
     - jsonPath: .status.schemaName
       name: SCHEMA
       type: string
+    - jsonPath: .spec.providerRef.name
+      name: PROVIDER
+      priority: 1
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
@@ -77,7 +81,7 @@ spec:
                 type: string
               databaseName:
                 description: |-
-                  DatabaseName is the raw Snowflake database identifier.
+                  DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
                   Mutually exclusive with DatabaseRef. Immutable after creation.
                 minLength: 1
                 type: string
@@ -102,10 +106,49 @@ spec:
                 - Delete
                 - Orphan
                 type: string
+              managementPolicies:
+                description: ManagementPolicies specifies lifecycle policies for this
+                  resource.
+                properties:
+                  adoptionPolicy:
+                    default: fail-if-exists
+                    description: |-
+                      AdoptionPolicy controls how the reconciler handles a pre-existing
+                      Snowflake resource on first reconciliation.
+                      Defaults to "fail-if-exists".
+                    enum:
+                    - adopt
+                    - fail-if-exists
+                    type: string
+                  createOrAlter:
+                    default: true
+                    description: |-
+                      CreateOrAlter controls whether CREATE OR ALTER is used instead of
+                      the legacy CREATE + ALTER two-step flow for supported resource types.
+                      Defaults to true.
+                    type: boolean
+                  driftPolicy:
+                    default: correct
+                    description: |-
+                      DriftPolicy controls whether detected drift is corrected or only
+                      reported via conditions and events.
+                      Defaults to "correct".
+                    enum:
+                    - correct
+                    - detect-only
+                    type: string
+                type: object
               name:
                 description: Name is the Snowflake alert name. Immutable after creation.
                 minLength: 1
                 type: string
+              paused:
+                description: |-
+                  Paused suspends reconciliation of this resource. When true, the
+                  controller skips all Snowflake operations and sets Synced=False
+                  with reason ReconcilePaused. The Snowflake resource is not modified
+                  or deleted while paused.
+                type: boolean
               providerRef:
                 description: ProviderRef references the ProviderConfig to use for
                   Snowflake connectivity.
@@ -130,7 +173,7 @@ spec:
                 type: string
               schemaName:
                 description: |-
-                  SchemaName is the raw Snowflake schema FQN.
+                  SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
                   Mutually exclusive with SchemaRef. Immutable after creation.
                 minLength: 1
                 type: string
@@ -203,6 +246,12 @@ spec:
             - message: exactly one of spec.schemaRef or spec.schemaName must be set
               rule: (has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef)
                 && has(self.schemaName))
+            - message: spec.databaseName must be a simple identifier, not a fully-qualified
+                name
+              rule: '!has(self.databaseName) || !self.databaseName.contains(''.'')'
+            - message: spec.schemaName must be a simple identifier, not a fully-qualified
+                name; use spec.databaseName for the database part
+              rule: '!has(self.schemaName) || !self.schemaName.contains(''.'')'
           status:
             description: AlertStatus defines the observed state of an Alert.
             properties:

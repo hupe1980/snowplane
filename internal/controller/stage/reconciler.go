@@ -13,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -157,72 +158,9 @@ func buildAlterOptions(stage *snowplanev1alpha1.Stage, id snowflake.SchemaObject
 		}
 	}
 
-	opts.UnsetFields = computeUnsetFields(stage)
+	opts.UnsetFields = tracked.ComputeUnset(&stage.Spec, stage.Status.TrackedParameters)
 
 	return opts
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.StageSpec) []string {
-	var fields []string
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	if spec.URL != nil {
-		fields = append(fields, "URL")
-	}
-
-	if spec.StorageIntegration != nil {
-		fields = append(fields, "STORAGE_INTEGRATION")
-	}
-
-	if spec.FileFormat != nil {
-		fields = append(fields, "FILE_FORMAT")
-	}
-
-	if spec.Directory != nil {
-		fields = append(fields, "DIRECTORY")
-	}
-
-	return fields
-}
-
-// computeUnsetFields returns the Snowflake parameter names that were previously
-// SET (tracked in status.TrackedParameters) but are now nil in the spec.
-func computeUnsetFields(stage *snowplanev1alpha1.Stage) []string {
-	if len(stage.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(stage.Status.TrackedParameters))
-	for _, f := range stage.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if stage.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	if stage.Spec.URL == nil && managed["URL"] {
-		unset = append(unset, "URL")
-	}
-
-	if stage.Spec.StorageIntegration == nil && managed["STORAGE_INTEGRATION"] {
-		unset = append(unset, "STORAGE_INTEGRATION")
-	}
-
-	if stage.Spec.FileFormat == nil && managed["FILE_FORMAT"] {
-		unset = append(unset, "FILE_FORMAT")
-	}
-
-	if stage.Spec.Directory == nil && managed["DIRECTORY"] {
-		unset = append(unset, "DIRECTORY")
-	}
-
-	return unset
 }
 
 func detectDrift(stage *snowplanev1alpha1.Stage, obs *snowflake.StageObservation) *drift.Result {

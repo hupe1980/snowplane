@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -135,245 +135,25 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
-
-// --------------------------------------------------------------------------
-// Tests: Finalizer management
-// --------------------------------------------------------------------------
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-
-	ff := newTestFileFormat("myff", "default")
-	r := newTestReconciler(&mockService{}, ff, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myff", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter)
-
-	got := &snowplanev1alpha1.FileFormat{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "myff", Namespace: "default"}, got))
-	assert.Contains(t, got.Finalizers, finalizerName)
-}
-
-// --------------------------------------------------------------------------
-// Tests: Create flow
-// --------------------------------------------------------------------------
-
-func TestReconcile_Create(t *testing.T) {
-	t.Parallel()
-
-	ff := newTestFileFormat("myff", "default")
-	ff.Finalizers = []string{finalizerName}
-	ff.Status.DatabaseName = "MY_DB"
-	ff.Status.SchemaName = "MY_SCHEMA"
-
-	var capturedOpts snowflake.CreateFileFormatOptions
-	obs := successfulObservation()
-
-	mock := &mockService{
-		observeFn: func() func(ctx context.Context, name snowflake.SchemaObjectIdentifier) (*snowflake.FileFormatObservation, error) {
-			call := 0
-			return func(_ context.Context, _ snowflake.SchemaObjectIdentifier) (*snowflake.FileFormatObservation, error) {
-				call++
-				if call == 1 {
-					return &snowflake.FileFormatObservation{Exists: false}, nil
-				}
-
-				return obs, nil
-			}
-		}(),
-		createFn: func(_ context.Context, opts snowflake.CreateFileFormatOptions) error {
-			capturedOpts = opts
-			return nil
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
 		},
-	}
-
-	r := newTestReconciler(mock, ff, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myff", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, reconciler.DefaultRequeueInterval, result.RequeueAfter)
-
-	assert.Equal(t, "MY_FF", capturedOpts.Name.Name())
-	assert.Equal(t, "CSV", capturedOpts.Type)
-
-	got := &snowplanev1alpha1.FileFormat{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "myff", Namespace: "default"}, got))
-	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
-}
-
-func TestReconcile_CreateFails(t *testing.T) {
-	t.Parallel()
-
-	ff := newTestFileFormat("myff", "default")
-	ff.Finalizers = []string{finalizerName}
-	ff.Status.DatabaseName = "MY_DB"
-	ff.Status.SchemaName = "MY_SCHEMA"
-
-	mock := &mockService{
-		observeFn: func(_ context.Context, _ snowflake.SchemaObjectIdentifier) (*snowflake.FileFormatObservation, error) {
-			return &snowflake.FileFormatObservation{Exists: false}, nil
+		NewFixture: func(name, ns string) client.Object {
+			return newTestFileFormat(name, ns)
 		},
-		createFn: func(_ context.Context, _ snowflake.CreateFileFormatOptions) error {
-			return fmt.Errorf("permission denied")
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.FileFormat{}
 		},
-	}
-
-	r := newTestReconciler(mock, ff, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myff", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "permission denied")
-}
-
-// --------------------------------------------------------------------------
-// Tests: Unit tests for helpers
-// --------------------------------------------------------------------------
-
-func TestBuildCreateOptions(t *testing.T) {
-	t.Parallel()
-
-	ff := newTestFileFormat("myff", "default")
-	ff.Spec.FieldDelimiter = testutil.PtrString("|")
-	ff.Spec.Comment = testutil.PtrString("test")
-	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_FF")
-
-	opts := buildCreateOptions(ff, id)
-	assert.Equal(t, "MY_FF", opts.Name.Name())
-	assert.Equal(t, "CSV", opts.Type)
-	assert.Equal(t, "|", *opts.FieldDelimiter)
-	assert.Equal(t, "test", *opts.Comment)
-}
-
-func TestComputeTrackedParameters(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Empty", func(t *testing.T) {
-		t.Parallel()
-		spec := &snowplanev1alpha1.FileFormatSpec{}
-		assert.Empty(t, computeTrackedParameters(spec))
-	})
-
-	t.Run("CommentSet", func(t *testing.T) {
-		t.Parallel()
-		spec := &snowplanev1alpha1.FileFormatSpec{
-			Comment: testutil.PtrString("x"),
-		}
-		assert.Contains(t, computeTrackedParameters(spec), "COMMENT")
-	})
-
-	t.Run("FieldDelimiterSet", func(t *testing.T) {
-		t.Parallel()
-		spec := &snowplanev1alpha1.FileFormatSpec{
-			FieldDelimiter: testutil.PtrString(","),
-		}
-		assert.Contains(t, computeTrackedParameters(spec), "FIELD_DELIMITER")
-	})
-}
-
-func TestComputeUnsetFields(t *testing.T) {
-	t.Parallel()
-
-	t.Run("NoTrackedParameters", func(t *testing.T) {
-		t.Parallel()
-		ff := &snowplanev1alpha1.FileFormat{}
-		assert.Nil(t, computeUnsetFields(ff))
-	})
-
-	t.Run("CommentRemoved", func(t *testing.T) {
-		t.Parallel()
-		ff := &snowplanev1alpha1.FileFormat{
-			Status: snowplanev1alpha1.FileFormatStatus{
-				TrackedParameters: []string{"COMMENT"},
-			},
-		}
-		unset := computeUnsetFields(ff)
-		assert.Contains(t, unset, "COMMENT")
-	})
-}
-
-func TestDetectDrift_NoDrift(t *testing.T) {
-	t.Parallel()
-
-	ff := &snowplanev1alpha1.FileFormat{
-		Spec: snowplanev1alpha1.FileFormatSpec{
-			Name: "MY_FF",
-			Type: snowplanev1alpha1.FileFormatTypeCSV,
-		},
-		Status: snowplanev1alpha1.FileFormatStatus{
-			DatabaseName: "MY_DB",
-			SchemaName:   "MY_SCHEMA",
-		},
-	}
-
-	obs := &snowflake.FileFormatObservation{
-		ShowOutput: &snowflake.FileFormatShowOutput{
-			Name:         "MY_FF",
-			DatabaseName: "MY_DB",
-			SchemaName:   "MY_SCHEMA",
-			Type:         "CSV",
-		},
-	}
-
-	result := detectDrift(ff, obs)
-	assert.False(t, result.HasDrift)
-}
-
-func TestDetectDrift_WithDrift(t *testing.T) {
-	t.Parallel()
-
-	ff := &snowplanev1alpha1.FileFormat{
-		Spec: snowplanev1alpha1.FileFormatSpec{
-			Name:    "MY_FF",
-			Type:    snowplanev1alpha1.FileFormatTypeCSV,
-			Comment: testutil.PtrString("desired"),
-		},
-		Status: snowplanev1alpha1.FileFormatStatus{
-			DatabaseName: "MY_DB",
-			SchemaName:   "MY_SCHEMA",
-		},
-	}
-
-	obs := &snowflake.FileFormatObservation{
-		ShowOutput: &snowflake.FileFormatShowOutput{
-			Name:         "MY_FF",
-			DatabaseName: "MY_DB",
-			SchemaName:   "MY_SCHEMA",
-			Type:         "CSV",
-			Comment:      "drifted",
-		},
-	}
-
-	result := detectDrift(ff, obs)
-	assert.True(t, result.HasDrift)
-	assert.Contains(t, result.Summary(), "COMMENT")
-}
-
-// --------------------------------------------------------------------------
-// Tests: ProviderConfig resolution
-// --------------------------------------------------------------------------
-
-func TestReconcile_ProviderConfigNotFound(t *testing.T) {
-	t.Parallel()
-
-	ff := newTestFileFormat("myff", "default")
-	r := newTestReconciler(&mockService{}, ff)
-
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myff", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "fetching ProviderConfig")
+		FinalizerName: finalizerName,
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -446,9 +226,7 @@ func TestReconcile_UpdateComment(t *testing.T) {
 	ff.Status.DatabaseName = "MY_DB"
 	ff.Status.SchemaName = "MY_SCHEMA"
 
-	ff.Annotations = map[string]string{
-		snowplanev1alpha1.AnnotationUseCreateOrAlter: "false",
-	}
+	ff.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old comment"

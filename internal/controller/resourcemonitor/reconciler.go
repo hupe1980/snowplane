@@ -17,6 +17,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -121,7 +122,7 @@ func buildCreateOptions(rm *snowplanev1alpha1.ResourceMonitor, id snowflake.Acco
 
 func buildAlterOptions(rm *snowplanev1alpha1.ResourceMonitor, id snowflake.AccountObjectIdentifier, obs *snowflake.ResourceMonitorObservation) snowflake.AlterResourceMonitorOptions {
 	opts := snowflake.AlterResourceMonitorOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(rm)
+	opts.UnsetFields = tracked.ComputeUnset(&rm.Spec, rm.Status.TrackedParameters)
 
 	// Compare against observed values to avoid unnecessary ALTERs.
 	if rm.Spec.CreditQuota != nil {
@@ -164,43 +165,6 @@ func buildAlterOptions(rm *snowplanev1alpha1.ResourceMonitor, id snowflake.Accou
 	}
 
 	return opts
-}
-
-func computeUnsetFields(_ *snowplanev1alpha1.ResourceMonitor) []string {
-	// Resource Monitor fields cannot be UNSET in Snowflake DDL.
-	// Clearing notify_users or triggers is handled by sending empty values
-	// in ALTER rather than UNSET, so this always returns nil.
-	return nil
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.ResourceMonitorSpec) []string {
-	var fields []string
-
-	if spec.CreditQuota != nil {
-		fields = append(fields, "CREDIT_QUOTA")
-	}
-
-	if spec.Frequency != nil {
-		fields = append(fields, "FREQUENCY")
-	}
-
-	if spec.StartTimestamp != nil {
-		fields = append(fields, "START_TIMESTAMP")
-	}
-
-	if spec.EndTimestamp != nil {
-		fields = append(fields, "END_TIMESTAMP")
-	}
-
-	if len(spec.NotifyUsers) > 0 {
-		fields = append(fields, "NOTIFY_USERS")
-	}
-
-	if len(spec.Triggers) > 0 {
-		fields = append(fields, "TRIGGERS")
-	}
-
-	return fields
 }
 
 func detectDrift(rm *snowplanev1alpha1.ResourceMonitor, obs *snowflake.ResourceMonitorObservation) *drift.Result {

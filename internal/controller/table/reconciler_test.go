@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -22,6 +20,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/testutil"
+	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -248,100 +247,30 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 }
 
 // --------------------------------------------------------------------------
-// Tests: CR not found
+// Tests: Standard reconcile behavioral suite
 // --------------------------------------------------------------------------
 
-func TestReconcile_CRNotFound(t *testing.T) {
+func TestReconcile_StandardSuite(t *testing.T) {
 	t.Parallel()
 
-	r := newTestReconciler(&mockService{})
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("gone", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, ctrl.Result{}, result)
-}
-
-// --------------------------------------------------------------------------
-// Tests: Reference resolution
-// --------------------------------------------------------------------------
-
-func TestReconcile_DatabaseRefNotFound(t *testing.T) {
-	t.Parallel()
-
-	table := newTestTable("mytable", "default")
-	r := newTestReconciler(&mockService{}, table)
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mytable", "default"))
-	require.Error(t, err, "should return error for controller-runtime backoff")
-	assert.Zero(t, result.RequeueAfter)
-
-	got := &snowplanev1alpha1.Table{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mytable", Namespace: "default"}, got))
-	assert.False(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
-	assert.False(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReferencesResolved))
-}
-
-func TestReconcile_SchemaRefNotFound(t *testing.T) {
-	t.Parallel()
-
-	table := newTestTable("mytable", "default")
-	db := newTestDB("analytics-db", "default")
-	r := newTestReconciler(&mockService{}, table, db)
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mytable", "default"))
-	require.Error(t, err, "should return error for controller-runtime backoff")
-	assert.Zero(t, result.RequeueAfter)
-
-	got := &snowplanev1alpha1.Table{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mytable", Namespace: "default"}, got))
-	assert.False(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
-}
-
-func TestReconcile_SchemaRefNotReady(t *testing.T) {
-	t.Parallel()
-
-	table := newTestTable("mytable", "default")
-	db := newTestDB("analytics-db", "default")
-	schema := newTestSchema("public-schema", "default")
-	schema.Status.Conditions = nil // Not ready
-	r := newTestReconciler(&mockService{}, table, db, schema)
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mytable", "default"))
-	require.Error(t, err, "should return error for controller-runtime backoff")
-	assert.Zero(t, result.RequeueAfter)
-}
-
-// --------------------------------------------------------------------------
-// Tests: ProviderConfig resolution
-// --------------------------------------------------------------------------
-
-func TestReconcile_ProviderConfigNotFound(t *testing.T) {
-	t.Parallel()
-
-	table := newTestTable("mytable", "default")
-	db := newTestDB("analytics-db", "default")
-	schema := newTestSchema("public-schema", "default")
-	r := newTestReconciler(&mockService{}, table, db, schema)
-	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mytable", "default"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "fetching ProviderConfig")
-}
-
-// --------------------------------------------------------------------------
-// Tests: Finalizer management
-// --------------------------------------------------------------------------
-
-func TestReconcile_AddsFinalizer(t *testing.T) {
-	t.Parallel()
-
-	table := newTestTable("mytable", "default")
-	db := newTestDB("analytics-db", "default")
-	schema := newTestSchema("public-schema", "default")
-	mock := &mockService{}
-	r := newTestReconciler(mock, table, db, schema, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mytable", "default"))
-	require.NoError(t, err)
-	assert.Equal(t, time.Second, result.RequeueAfter)
-
-	got := &snowplanev1alpha1.Table{}
-	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mytable", Namespace: "default"}, got))
-	assert.Contains(t, got.Finalizers, finalizerName)
+	testutil.ReconcileSuiteConfig{
+		NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+			r := newTestReconciler(&mockService{}, objs...)
+			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+		},
+		NewFixture: func(name, ns string) client.Object {
+			return newTestTable(name, ns)
+		},
+		NewBlankObject: func() client.Object {
+			return &snowplanev1alpha1.Table{}
+		},
+		FinalizerName: finalizerName,
+		PrereqObjects: func() []runtime.Object {
+			db := newTestDB("analytics-db", "default")
+			sch := newTestSchema("public-schema", "default")
+			return []runtime.Object{db, sch}
+		},
+	}.Run(t)
 }
 
 // --------------------------------------------------------------------------
@@ -465,7 +394,7 @@ func TestReconcile_UpdateComment(t *testing.T) {
 
 	table := newTestTable("mytable", "default")
 	table.Finalizers = []string{finalizerName}
-	table.Annotations = map[string]string{snowplanev1alpha1.AnnotationUseCreateOrAlter: "false"}
+	table.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
 	table.Spec.Comment = testutil.PtrString("updated comment")
 	table.Status.ObservedGeneration = 1
 	db := newTestDB("analytics-db", "default")
@@ -690,7 +619,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 		DataRetentionTimeInDays: testutil.PtrInt32(7),
 	}
 
-	fields := computeTrackedParameters(spec)
+	fields := tracked.ComputeTracked(spec)
 	assert.Contains(t, fields, "COMMENT")
 	assert.Contains(t, fields, "CHANGE_TRACKING")
 	assert.Contains(t, fields, "DATA_RETENTION_TIME_IN_DAYS")
@@ -703,7 +632,7 @@ func TestComputeUnsetFields(t *testing.T) {
 	table.Status.TrackedParameters = []string{"COMMENT", "CHANGE_TRACKING"}
 	// Spec has no comment or changeTracking → both should be unset.
 
-	unset := computeUnsetFields(table)
+	unset := tracked.ComputeUnset(&table.Spec, table.Status.TrackedParameters)
 	assert.Contains(t, unset, "COMMENT")
 	assert.Contains(t, unset, "CHANGE_TRACKING")
 }

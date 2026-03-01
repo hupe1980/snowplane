@@ -14,6 +14,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -131,7 +132,7 @@ func buildCreateOptions(dt *snowplanev1alpha1.DynamicTable, id snowflake.SchemaO
 
 func buildAlterOptions(dt *snowplanev1alpha1.DynamicTable, id snowflake.SchemaObjectIdentifier, obs *snowflake.DynamicTableObservation) snowflake.AlterDynamicTableOptions {
 	opts := snowflake.AlterDynamicTableOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(dt)
+	opts.UnsetFields = tracked.ComputeUnset(&dt.Spec, dt.Status.TrackedParameters)
 
 	// Target lag — always send if it differs.
 	if obs.ShowOutput != nil && !strings.EqualFold(dt.Spec.TargetLag, obs.ShowOutput.TargetLag) {
@@ -178,57 +179,6 @@ func buildAlterOptions(dt *snowplanev1alpha1.DynamicTable, id snowflake.SchemaOb
 	}
 
 	return opts
-}
-
-func computeUnsetFields(dt *snowplanev1alpha1.DynamicTable) []string {
-	if len(dt.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(dt.Status.TrackedParameters))
-	for _, f := range dt.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if dt.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	if dt.Spec.DataRetentionTimeInDays == nil && managed["DATA_RETENTION_TIME_IN_DAYS"] {
-		unset = append(unset, "DATA_RETENTION_TIME_IN_DAYS")
-	}
-
-	if dt.Spec.MaxDataExtensionTimeInDays == nil && managed["MAX_DATA_EXTENSION_TIME_IN_DAYS"] {
-		unset = append(unset, "MAX_DATA_EXTENSION_TIME_IN_DAYS")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.DynamicTableSpec) []string {
-	var fields []string
-
-	// TargetLag and Warehouse are required, not optional — do not track.
-	// only optional fields that can be UNSET need tracking.
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	if len(spec.ClusterBy) > 0 {
-		fields = append(fields, "CLUSTER_BY")
-	}
-
-	if spec.DataRetentionTimeInDays != nil {
-		fields = append(fields, "DATA_RETENTION_TIME_IN_DAYS")
-	}
-
-	if spec.MaxDataExtensionTimeInDays != nil {
-		fields = append(fields, "MAX_DATA_EXTENSION_TIME_IN_DAYS")
-	}
-
-	return fields
 }
 
 func detectDrift(dt *snowplanev1alpha1.DynamicTable, obs *snowflake.DynamicTableObservation) *drift.Result {

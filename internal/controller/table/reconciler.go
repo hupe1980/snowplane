@@ -14,6 +14,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/tracked"
 )
 
 const (
@@ -153,7 +154,7 @@ func buildCreateOptions(table *snowplanev1alpha1.Table, id snowflake.SchemaObjec
 
 func buildAlterOptions(table *snowplanev1alpha1.Table, id snowflake.SchemaObjectIdentifier, obs *snowflake.TableObservation) snowflake.AlterTableOptions {
 	opts := snowflake.AlterTableOptions{Name: id}
-	opts.UnsetFields = computeUnsetFields(table)
+	opts.UnsetFields = tracked.ComputeUnset(&table.Spec, table.Status.TrackedParameters)
 
 	if table.Spec.Comment != nil {
 		if obs.ShowOutput == nil || *table.Spec.Comment != obs.ShowOutput.Comment {
@@ -327,75 +328,6 @@ func computeColumnChanges(
 }
 
 func ptrBool(b bool) *bool { return &b }
-
-func computeUnsetFields(table *snowplanev1alpha1.Table) []string {
-	if len(table.Status.TrackedParameters) == 0 {
-		return nil
-	}
-
-	managed := make(map[string]bool, len(table.Status.TrackedParameters))
-	for _, f := range table.Status.TrackedParameters {
-		managed[f] = true
-	}
-
-	var unset []string
-
-	if table.Spec.Comment == nil && managed["COMMENT"] {
-		unset = append(unset, "COMMENT")
-	}
-
-	if table.Spec.DataRetentionTimeInDays == nil && managed["DATA_RETENTION_TIME_IN_DAYS"] {
-		unset = append(unset, "DATA_RETENTION_TIME_IN_DAYS")
-	}
-
-	if table.Spec.MaxDataExtensionTimeInDays == nil && managed["MAX_DATA_EXTENSION_TIME_IN_DAYS"] {
-		unset = append(unset, "MAX_DATA_EXTENSION_TIME_IN_DAYS")
-	}
-
-	if table.Spec.ChangeTracking == nil && managed["CHANGE_TRACKING"] {
-		unset = append(unset, "CHANGE_TRACKING")
-	}
-
-	if table.Spec.DefaultDDLCollation == nil && managed["DEFAULT_DDL_COLLATION"] {
-		unset = append(unset, "DEFAULT_DDL_COLLATION")
-	}
-
-	if table.Spec.EnableSchemaEvolution == nil && managed["ENABLE_SCHEMA_EVOLUTION"] {
-		unset = append(unset, "ENABLE_SCHEMA_EVOLUTION")
-	}
-
-	return unset
-}
-
-func computeTrackedParameters(spec *snowplanev1alpha1.TableSpec) []string {
-	var fields []string
-
-	if spec.Comment != nil {
-		fields = append(fields, "COMMENT")
-	}
-
-	if spec.DataRetentionTimeInDays != nil {
-		fields = append(fields, "DATA_RETENTION_TIME_IN_DAYS")
-	}
-
-	if spec.MaxDataExtensionTimeInDays != nil {
-		fields = append(fields, "MAX_DATA_EXTENSION_TIME_IN_DAYS")
-	}
-
-	if spec.ChangeTracking != nil {
-		fields = append(fields, "CHANGE_TRACKING")
-	}
-
-	if spec.DefaultDDLCollation != nil {
-		fields = append(fields, "DEFAULT_DDL_COLLATION")
-	}
-
-	if spec.EnableSchemaEvolution != nil {
-		fields = append(fields, "ENABLE_SCHEMA_EVOLUTION")
-	}
-
-	return fields
-}
 
 func detectDrift(table *snowplanev1alpha1.Table, obs *snowflake.TableObservation) *drift.Result {
 	d := drift.New()
