@@ -1,0 +1,110 @@
+# SnowflakeRBAC — Role-Based Access Control Stack
+#
+# Creates an account role with N privilege grants and an optional role
+# assignment using kro's forEach collections. Grants are specified as a
+# simple list — kro fans out to one AccountRoleGrant per entry.
+#
+# Usage:
+#   kubectl apply -f rbac-stack.yaml
+#   kubectl get rgd snowflake-rbac -owide   # State: Active
+#
+# Then create instances:
+#   apiVersion: kro.run/v1alpha1
+#   kind: SnowflakeRBAC
+#   metadata:
+#     name: analytics-reader
+#   spec:
+#     roleName: ANALYTICS_READER
+#     comment: "Read-only access to analytics database"
+#     grants:
+#       - privilege: USAGE
+#         on:
+#           accountObject:
+#             objectType: DATABASE
+#             objectName: ANALYTICS
+#       - privilege: USAGE
+#         on:
+#           schema:
+#             schemaName: '"ANALYTICS"."PUBLIC"'
+#       - privilege: SELECT
+#         on:
+#           schemaObject:
+#             future:
+#               objectType: TABLE
+#               inSchema: '"ANALYTICS"."PUBLIC"'
+#     assignToRole: SYSADMIN
+#
+apiVersion: kro.run/v1alpha1
+kind: ResourceGraphDefinition
+metadata:
+  name: snowflake-rbac
+spec:
+  schema:
+    apiVersion: v1alpha1
+    kind: SnowflakeRBAC
+    spec:
+      # Snowflake role name.
+      roleName: string
+      # Optional description for the role.
+      comment: string | default=""
+      # List of privilege grants. Each entry creates an AccountRoleGrant.
+      # Format: [{privilege: "USAGE", on: {accountObject: {objectType: "DATABASE", objectName: "MY_DB"}}}]
+      grants: "[]object"
+      # Optional: assign this role to a parent role (e.g. SYSADMIN).
+      # Leave empty to skip role assignment.
+      assignToRole: string | default=""
+      # ProviderConfig to use for Snowflake connectivity.
+      providerRef: string | default="default"
+    status:
+      roleReady: ${role.status.conditions[?(@.type=="Ready")].status}
+
+  resources:
+    # ── 1. Account Role ──────────────────────────────────────────────────
+    - id: role
+      template:
+        apiVersion: snowplane.hupe1980.github.io/v1alpha1
+        kind: AccountRole
+        metadata:
+          name: ${schema.metadata.name}
+        spec:
+          providerRef:
+            name: ${schema.spec.providerRef}
+          name: ${schema.spec.roleName}
+          comment: ${schema.spec.comment}
+
+    # ── 2. Grants (forEach — one per grant entry) ────────────────────────
+    #
+    # kro iterates over spec.grants and creates one AccountRoleGrant per entry.
+    # Each grant waits for the role to be ready via the accountRoleRef dependency.
+    # Adding or removing grants from the list causes kro to create or revoke
+    # the corresponding AccountRoleGrant resources.
+    - id: grants
+      forEach:
+        - grant: ${schema.spec.grants}
+      template:
+        apiVersion: snowplane.hupe1980.github.io/v1alpha1
+        kind: AccountRoleGrant
+        metadata:
+          name: ${schema.metadata.name + '-grant-' + string(i)}
+        spec:
+          providerRef:
+            name: ${schema.spec.providerRef}
+          privilege: ${grant.privilege}
+          accountRoleRef:
+            name: ${role.metadata.name}
+          on: ${grant.on}
+
+    # ── 3. Role Assignment (conditional) ─────────────────────────────────
+    - id: assignment
+      includeWhen:
+        - ${schema.spec.assignToRole != ""}
+      template:
+        apiVersion: snowplane.hupe1980.github.io/v1alpha1
+        kind: AccountRoleAssignment
+        metadata:
+          name: ${schema.metadata.name}-assignment
+        spec:
+          providerRef:
+            name: ${schema.spec.providerRef}
+          roleName: ${role.spec.name}
+          toRole: ${schema.spec.assignToRole}

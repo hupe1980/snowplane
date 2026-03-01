@@ -1,0 +1,101 @@
+# TaggedTable — Table with Governance Tags
+#
+# Creates a Table and N TagAssociations from a single resource using
+# kro's forEach collections. Tags are specified as a simple list —
+# kro fans out to one TagAssociation per entry automatically.
+#
+# Usage:
+#   kubectl apply -f tagged-table.yaml
+#   kubectl get rgd tagged-table -owide   # State: Active
+#
+# Then create instances:
+#   apiVersion: kro.run/v1alpha1
+#   kind: TaggedTable
+#   metadata:
+#     name: orders
+#   spec:
+#     name: ORDERS
+#     databaseRef: my-db
+#     schemaRef: my-schema
+#     columns:
+#       - name: ID
+#         type: NUMBER(38,0)
+#         nullable: false
+#       - name: CUSTOMER_ID
+#         type: VARCHAR(255)
+#     tags:
+#       - tagRef: cost-center
+#         value: engineering
+#       - tagRef: environment
+#         value: production
+#
+apiVersion: kro.run/v1alpha1
+kind: ResourceGraphDefinition
+metadata:
+  name: tagged-table
+spec:
+  schema:
+    apiVersion: v1alpha1
+    kind: TaggedTable
+    spec:
+      # Snowflake table name.
+      name: string
+      # Reference to a Database CR in the same namespace.
+      databaseRef: string
+      # Reference to a Schema CR in the same namespace.
+      schemaRef: string
+      # Column definitions (name, type, nullable, default, comment).
+      columns: "[]object"
+      # Tags to associate with the table. Each entry creates a TagAssociation.
+      # Format: [{tagRef: "<tag-cr-name>", value: "<string>"}]
+      tags: "[]object"
+      # Optional table comment.
+      comment: string | default=""
+      # ProviderConfig to use for Snowflake connectivity.
+      providerRef: string | default="default"
+    status:
+      tableReady: ${table.status.conditions[?(@.type=="Ready")].status}
+      fullyQualifiedName: ${table.status.fullyQualifiedName}
+
+  resources:
+    # ── 1. Table ─────────────────────────────────────────────────────────
+    - id: table
+      template:
+        apiVersion: snowplane.hupe1980.github.io/v1alpha1
+        kind: Table
+        metadata:
+          name: ${schema.metadata.name}
+        spec:
+          providerRef:
+            name: ${schema.spec.providerRef}
+          name: ${schema.spec.name}
+          databaseRef:
+            name: ${schema.spec.databaseRef}
+          schemaRef:
+            name: ${schema.spec.schemaRef}
+          columns: ${schema.spec.columns}
+          comment: ${schema.spec.comment}
+
+    # ── 2. TagAssociations (forEach — one per tag entry) ─────────────────
+    #
+    # kro iterates over spec.tags and creates one TagAssociation per entry.
+    # The ${table.status.fullyQualifiedName} expression creates an implicit
+    # DAG dependency — tags are applied only after the table is ready.
+    # Adding or removing entries from spec.tags causes kro to create or
+    # delete the corresponding TagAssociation resources.
+    - id: tagAssociations
+      forEach:
+        - tag: ${schema.spec.tags}
+      template:
+        apiVersion: snowplane.hupe1980.github.io/v1alpha1
+        kind: TagAssociation
+        metadata:
+          name: ${schema.metadata.name + '-tag-' + tag.tagRef}
+        spec:
+          providerRef:
+            name: ${schema.spec.providerRef}
+          tagRef:
+            name: ${tag.tagRef}
+          tagValue: ${tag.value}
+          objectType: TABLE
+          objectName: ${table.status.fullyQualifiedName}

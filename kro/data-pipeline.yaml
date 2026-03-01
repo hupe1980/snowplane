@@ -1,0 +1,126 @@
+# SnowflakePipeline — Data Pipeline Stack
+#
+# Creates a streaming data pipeline from a single resource:
+#   Table → StreamOnTable (conditional) → Task
+#
+# The Table serves as the landing zone, the Stream captures CDC events,
+# and the Task runs a SQL transformation on a schedule.
+#
+# Usage:
+#   kubectl apply -f data-pipeline.yaml
+#   kubectl get rgd snowflake-pipeline -owide   # State: Active
+#
+# Then create instances:
+#   apiVersion: kro.run/v1alpha1
+#   kind: SnowflakePipeline
+#   metadata:
+#     name: orders-pipeline
+#   spec:
+#     name: ORDERS_PIPELINE
+#     databaseRef: analytics-db
+#     schemaRef: analytics-schema
+#     warehouseRef: analytics-wh
+#     columns:
+#       - name: ID
+#         type: NUMBER(38,0)
+#       - name: PAYLOAD
+#         type: VARIANT
+#     enableStream: true
+#     taskSchedule: "5 MINUTES"
+#     taskSQL: |
+#       INSERT INTO ANALYTICS.PUBLIC.ORDERS_PROCESSED
+#       SELECT * FROM ANALYTICS.PUBLIC.ORDERS_PIPELINE_STREAM
+#       WHERE METADATA$ACTION = 'INSERT'
+#
+apiVersion: kro.run/v1alpha1
+kind: ResourceGraphDefinition
+metadata:
+  name: snowflake-pipeline
+spec:
+  schema:
+    apiVersion: v1alpha1
+    kind: SnowflakePipeline
+    spec:
+      # Pipeline name — used to derive Snowflake object names.
+      name: string
+      # Reference to a Database CR in the same namespace.
+      databaseRef: string
+      # Reference to a Schema CR in the same namespace.
+      schemaRef: string
+      # Reference to a Warehouse CR for the task. Required when enableStream=true.
+      warehouseRef: string | default=""
+      # Column definitions for the landing table.
+      columns: "[]object"
+      # Whether to create a change stream on the table.
+      enableStream: boolean | default=false
+      # Cron or interval schedule for the task (e.g. "5 MINUTES").
+      # Only used when enableStream=true.
+      taskSchedule: string | default="5 MINUTES"
+      # SQL statement for the task. Only used when enableStream=true.
+      taskSQL: string | default="SELECT 1"
+      # ProviderConfig to use for Snowflake connectivity.
+      providerRef: string | default="default"
+    status:
+      tableReady: ${table.status.conditions[?(@.type=="Ready")].status}
+      tableFQN: ${table.status.fullyQualifiedName}
+
+  resources:
+    # ── 1. Landing Table ─────────────────────────────────────────────────
+    - id: table
+      template:
+        apiVersion: snowplane.hupe1980.github.io/v1alpha1
+        kind: Table
+        metadata:
+          name: ${schema.metadata.name}-table
+        spec:
+          providerRef:
+            name: ${schema.spec.providerRef}
+          name: ${schema.spec.name}
+          databaseRef:
+            name: ${schema.spec.databaseRef}
+          schemaRef:
+            name: ${schema.spec.schemaRef}
+          columns: ${schema.spec.columns}
+          comment: "Landing table for pipeline ${schema.spec.name}"
+
+    # ── 2. Stream on Table (conditional) ─────────────────────────────────
+    - id: stream
+      includeWhen:
+        - ${schema.spec.enableStream}
+      template:
+        apiVersion: snowplane.hupe1980.github.io/v1alpha1
+        kind: StreamOnTable
+        metadata:
+          name: ${schema.metadata.name}-stream
+        spec:
+          providerRef:
+            name: ${schema.spec.providerRef}
+          name: ${schema.spec.name}_STREAM
+          databaseRef:
+            name: ${schema.spec.databaseRef}
+          schemaRef:
+            name: ${schema.spec.schemaRef}
+          table: ${table.status.fullyQualifiedName}
+          appendOnly: false
+
+    # ── 3. Scheduled Task (conditional — only when stream is enabled) ────
+    - id: task
+      includeWhen:
+        - ${schema.spec.enableStream}
+      template:
+        apiVersion: snowplane.hupe1980.github.io/v1alpha1
+        kind: Task
+        metadata:
+          name: ${schema.metadata.name}-task
+        spec:
+          providerRef:
+            name: ${schema.spec.providerRef}
+          name: ${schema.spec.name}_TASK
+          databaseRef:
+            name: ${schema.spec.databaseRef}
+          schemaRef:
+            name: ${schema.spec.schemaRef}
+          warehouse: ${schema.spec.warehouseRef}
+          schedule: ${schema.spec.taskSchedule}
+          sqlStatement: ${schema.spec.taskSQL}
+          comment: "Pipeline task for ${schema.spec.name}"

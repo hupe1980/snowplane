@@ -1,0 +1,120 @@
+# SnowflakeProject — Project Bootstrap Stack
+#
+# Creates a complete Snowflake project environment from a single resource:
+#   Database → Schema → Warehouse → AccountRole → AccountRoleGrant
+#
+# Usage:
+#   kubectl apply -f snowflake-project.yaml
+#   kubectl get rgd snowflake-project -owide   # State: Active
+#
+# Then create instances:
+#   apiVersion: kro.run/v1alpha1
+#   kind: SnowflakeProject
+#   metadata:
+#     name: analytics
+#   spec:
+#     name: analytics
+#     environment: prod
+#     warehouseSize: MEDIUM
+#     retentionDays: 7
+#
+apiVersion: kro.run/v1alpha1
+kind: ResourceGraphDefinition
+metadata:
+  name: snowflake-project
+spec:
+  schema:
+    apiVersion: v1alpha1
+    kind: SnowflakeProject
+    spec:
+      # Project name — used to derive Snowflake object names.
+      name: string
+      # Environment label (dev, staging, prod). Appended to object names.
+      environment: string | default="dev"
+      # Warehouse size.
+      warehouseSize: string | default="XSMALL"
+      # Time Travel retention period in days (0–90).
+      retentionDays: integer | default=1
+      # ProviderConfig to use for Snowflake connectivity.
+      providerRef: string | default="default"
+    status:
+      databaseReady: ${database.status.conditions[?(@.type=="Ready")].status}
+      warehouseReady: ${warehouse.status.conditions[?(@.type=="Ready")].status}
+      roleName: ${role.spec.name}
+
+  resources:
+    # ── 1. Database ──────────────────────────────────────────────────────
+    - id: database
+      template:
+        apiVersion: snowplane.hupe1980.github.io/v1alpha1
+        kind: Database
+        metadata:
+          name: ${schema.spec.name}-${schema.spec.environment}-db
+        spec:
+          providerRef:
+            name: ${schema.spec.providerRef}
+          name: ${schema.spec.name}_${schema.spec.environment}
+          dataRetentionTimeInDays: ${schema.spec.retentionDays}
+          comment: "Managed by kro – project ${schema.spec.name}"
+
+    # ── 2. Schema (depends on Database via databaseRef) ──────────────────
+    - id: dbschema
+      template:
+        apiVersion: snowplane.hupe1980.github.io/v1alpha1
+        kind: Schema
+        metadata:
+          name: ${schema.spec.name}-${schema.spec.environment}-schema
+        spec:
+          providerRef:
+            name: ${schema.spec.providerRef}
+          name: PUBLIC
+          databaseRef:
+            name: ${database.metadata.name}
+          dataRetentionTimeInDays: ${schema.spec.retentionDays}
+
+    # ── 3. Warehouse ─────────────────────────────────────────────────────
+    - id: warehouse
+      template:
+        apiVersion: snowplane.hupe1980.github.io/v1alpha1
+        kind: Warehouse
+        metadata:
+          name: ${schema.spec.name}-${schema.spec.environment}-wh
+        spec:
+          providerRef:
+            name: ${schema.spec.providerRef}
+          name: ${schema.spec.name}_${schema.spec.environment}_WH
+          warehouseSize: ${schema.spec.warehouseSize}
+          autoSuspend: 60
+          autoResume: true
+          comment: "Managed by kro – project ${schema.spec.name}"
+
+    # ── 4. Account Role ──────────────────────────────────────────────────
+    - id: role
+      template:
+        apiVersion: snowplane.hupe1980.github.io/v1alpha1
+        kind: AccountRole
+        metadata:
+          name: ${schema.spec.name}-${schema.spec.environment}-role
+        spec:
+          providerRef:
+            name: ${schema.spec.providerRef}
+          name: ${schema.spec.name}_${schema.spec.environment}_ROLE
+          comment: "Managed by kro – project ${schema.spec.name}"
+
+    # ── 5. Grant USAGE on Database to Role ───────────────────────────────
+    - id: grant
+      template:
+        apiVersion: snowplane.hupe1980.github.io/v1alpha1
+        kind: AccountRoleGrant
+        metadata:
+          name: ${schema.spec.name}-${schema.spec.environment}-db-usage
+        spec:
+          providerRef:
+            name: ${schema.spec.providerRef}
+          privilege: USAGE
+          accountRoleRef:
+            name: ${role.metadata.name}
+          on:
+            accountObject:
+              objectType: DATABASE
+              objectName: ${database.status.fullyQualifiedName}

@@ -47,114 +47,27 @@ kubectl get pods -n kro-system
 
 ---
 
-## Example: Snowflake Project Stack
+## Ready-to-Use Compositions
 
-This RGD creates a reusable **SnowflakeProject** API that provisions a complete Snowflake project environment — Database, Schema, Warehouse, Role, and an access Grant — from a single custom resource.
-
-### ResourceGraphDefinition
-
-```yaml
-apiVersion: kro.run/v1alpha1
-kind: ResourceGraphDefinition
-metadata:
-  name: snowflake-project
-spec:
-  schema:
-    apiVersion: v1alpha1
-    kind: SnowflakeProject
-    spec:
-      name: string
-      environment: string | default="dev"
-      warehouseSize: string | default="XSMALL"
-      retentionDays: integer | default=1
-      providerConfigRef: string | default="default"
-    status:
-      databaseReady: ${database.status.conditions[?(@.type=="Ready")].status}
-      warehouseReady: ${warehouse.status.conditions[?(@.type=="Ready")].status}
-
-  resources:
-    # 1. Database
-    - id: database
-      template:
-        apiVersion: snowplane.hupe1980.github.io/v1alpha1
-        kind: Database
-        metadata:
-          name: ${schema.spec.name}-${schema.spec.environment}-db
-        spec:
-          providerConfigRef:
-            name: ${schema.spec.providerConfigRef}
-          name: ${schema.spec.name}_${schema.spec.environment}
-          dataRetentionTimeInDays: ${schema.spec.retentionDays}
-          comment: "Managed by kro – project ${schema.spec.name}"
-
-    # 2. Schema (depends on Database)
-    - id: dbschema
-      template:
-        apiVersion: snowplane.hupe1980.github.io/v1alpha1
-        kind: Schema
-        metadata:
-          name: ${schema.spec.name}-${schema.spec.environment}-schema
-        spec:
-          providerConfigRef:
-            name: ${schema.spec.providerConfigRef}
-          name: PUBLIC
-          databaseRef:
-            name: ${database.metadata.name}
-          dataRetentionTimeInDays: ${schema.spec.retentionDays}
-
-    # 3. Warehouse
-    - id: warehouse
-      template:
-        apiVersion: snowplane.hupe1980.github.io/v1alpha1
-        kind: Warehouse
-        metadata:
-          name: ${schema.spec.name}-${schema.spec.environment}-wh
-        spec:
-          providerConfigRef:
-            name: ${schema.spec.providerConfigRef}
-          name: ${schema.spec.name}_${schema.spec.environment}_WH
-          warehouseSize: ${schema.spec.warehouseSize}
-          autoSuspend: 60
-          autoResume: true
-          comment: "Managed by kro – project ${schema.spec.name}"
-
-    # 4. Role
-    - id: role
-      template:
-        apiVersion: snowplane.hupe1980.github.io/v1alpha1
-        kind: AccountRole
-        metadata:
-          name: ${schema.spec.name}-${schema.spec.environment}-role
-        spec:
-          providerConfigRef:
-            name: ${schema.spec.providerConfigRef}
-          name: ${schema.spec.name}_${schema.spec.environment}_ROLE
-          comment: "Managed by kro – project ${schema.spec.name}"
-
-    # 5. Grant USAGE on Database to Role
-    - id: grant
-      template:
-        apiVersion: snowplane.hupe1980.github.io/v1alpha1
-        kind: AccountRoleGrant
-        metadata:
-          name: ${schema.spec.name}-${schema.spec.environment}-grant
-        spec:
-          providerConfigRef:
-            name: ${schema.spec.providerConfigRef}
-          roleName: ${schema.spec.name}_${schema.spec.environment}_ROLE
-          privileges:
-            - privilege: USAGE
-              onDatabase: ${schema.spec.name}_${schema.spec.environment}
-```
-
-### Deploy the RGD
+Snowplane ships ready-to-use RGDs in the [`kro/`](../kro/) directory. Install all of them at once:
 
 ```bash
-kubectl apply -f snowflake-project-rgd.yaml
-
-# Verify — should show State: Active
-kubectl get rgd snowflake-project -owide
+kubectl apply -f kro/
+kubectl get rgd -owide   # All should show State: Active
 ```
+
+| RGD | Custom Kind | Resources Created | Key Feature |
+|:----|:------------|:------------------|:------------|
+| [`snowflake-project.yaml`](../kro/snowflake-project.yaml) | `SnowflakeProject` | Database, Schema, Warehouse, AccountRole, AccountRoleGrant | Project bootstrap |
+| [`tagged-table.yaml`](../kro/tagged-table.yaml) | `TaggedTable` | Table, N × TagAssociation | `forEach` collections |
+| [`data-pipeline.yaml`](../kro/data-pipeline.yaml) | `SnowflakePipeline` | Table, StreamOnTable, Task | Conditional resources |
+| [`rbac-stack.yaml`](../kro/rbac-stack.yaml) | `SnowflakeRBAC` | AccountRole, N × AccountRoleGrant, AccountRoleAssignment | `forEach` grants |
+
+---
+
+## Example: Snowflake Project Stack
+
+The **SnowflakeProject** RGD ([source](../kro/snowflake-project.yaml)) provisions a complete Snowflake project environment — Database, Schema, Warehouse, Role, and an access Grant — from a single custom resource.
 
 ### Create a Project Instance
 
@@ -169,7 +82,6 @@ spec:
   environment: prod
   warehouseSize: MEDIUM
   retentionDays: 7
-  providerConfigRef: default
 ```
 
 ```bash
@@ -191,59 +103,128 @@ kubectl delete snowflakeproject analytics -n data-team
 
 ## Example: Data Pipeline Stack
 
-A more advanced RGD that creates resources for a data pipeline — Stage, Pipe, Task, and a Stream — with conditional resource inclusion:
+The **SnowflakePipeline** RGD ([source](../kro/data-pipeline.yaml)) creates a streaming data pipeline — Table, StreamOnTable, and Task — with conditional resource inclusion via `includeWhen`. When `enableStream` is false, only the landing table is created.
+
+### Create a Pipeline Instance
 
 ```yaml
 apiVersion: kro.run/v1alpha1
-kind: ResourceGraphDefinition
+kind: SnowflakePipeline
 metadata:
-  name: snowflake-pipeline
+  name: orders-pipeline
+  namespace: data-team
 spec:
-  schema:
-    apiVersion: v1alpha1
-    kind: SnowflakePipeline
-    spec:
-      name: string
-      databaseRef: string
-      schemaRef: string
-      enableStream: boolean | default=false
-      providerConfigRef: string | default="default"
-    status:
-      stageReady: ${stage.status.conditions[?(@.type=="Ready")].status}
-
-  resources:
-    - id: stage
-      template:
-        apiVersion: snowplane.hupe1980.github.io/v1alpha1
-        kind: Stage
-        metadata:
-          name: ${schema.spec.name}-stage
-        spec:
-          providerConfigRef:
-            name: ${schema.spec.providerConfigRef}
-          name: ${schema.spec.name}_STAGE
-          databaseRef:
-            name: ${schema.spec.databaseRef}
-          schemaRef:
-            name: ${schema.spec.schemaRef}
-
-    - id: stream
-      includeWhen:
-        - ${schema.spec.enableStream}
-      template:
-        apiVersion: snowplane.hupe1980.github.io/v1alpha1
-        kind: Stream
-        metadata:
-          name: ${schema.spec.name}-stream
-        spec:
-          providerConfigRef:
-            name: ${schema.spec.providerConfigRef}
-          name: ${schema.spec.name}_STREAM
-          databaseRef:
-            name: ${schema.spec.databaseRef}
-          schemaRef:
-            name: ${schema.spec.schemaRef}
+  name: ORDERS_PIPELINE
+  databaseRef: analytics-db
+  schemaRef: analytics-schema
+  warehouseRef: analytics-wh
+  columns:
+    - name: ID
+      type: NUMBER(38,0)
+    - name: PAYLOAD
+      type: VARIANT
+  enableStream: true
+  taskSchedule: "5 MINUTES"
+  taskSQL: |
+    INSERT INTO ANALYTICS.PUBLIC.ORDERS_PROCESSED
+    SELECT * FROM ANALYTICS.PUBLIC.ORDERS_PIPELINE_STREAM
+    WHERE METADATA$ACTION = 'INSERT'
 ```
+
+```bash
+kubectl apply -f orders-pipeline.yaml
+kubectl get tables,streamontables,tasks -n data-team
+```
+
+---
+
+## Example: Tagged Table
+
+The **TaggedTable** RGD ([source](../kro/tagged-table.yaml)) provisions a Table with N tag associations using `forEach` collections. Tags are specified as a simple list — kro fans out to one `TagAssociation` per entry automatically.
+
+### Create a Tagged Table
+
+```yaml
+apiVersion: kro.run/v1alpha1
+kind: TaggedTable
+metadata:
+  name: orders
+  namespace: data-team
+spec:
+  name: ORDERS
+  databaseRef: analytics-db
+  schemaRef: analytics-schema
+  comment: "Order events table with governance tags"
+  columns:
+    - name: ID
+      type: NUMBER(38,0)
+      nullable: false
+    - name: CUSTOMER_ID
+      type: VARCHAR(255)
+    - name: CREATED_AT
+      type: TIMESTAMP_NTZ
+  tags:
+    - tagRef: cost-center
+      value: engineering
+    - tagRef: environment
+      value: production
+    - tagRef: pii-level
+      value: "none"
+```
+
+```bash
+kubectl apply -f orders.yaml
+
+# kro creates: 1 Table + 3 TagAssociations
+kubectl get tables,tagassociations -n data-team
+```
+
+> **How `forEach` works here:** kro iterates over `spec.tags` and creates one `TagAssociation` per entry. The `${table.status.fullyQualifiedName}` expression in the RGD ensures tag associations wait for the Table to be ready — kro resolves this as a DAG dependency automatically. Adding or removing entries from the `tags` list causes kro to create or delete the corresponding `TagAssociation` resources.
+
+---
+
+## Example: RBAC Stack
+
+The **SnowflakeRBAC** RGD ([source](../kro/rbac-stack.yaml)) creates an account role with N privilege grants (via `forEach`) and an optional role assignment (via `includeWhen`).
+
+### Create an RBAC Stack
+
+```yaml
+apiVersion: kro.run/v1alpha1
+kind: SnowflakeRBAC
+metadata:
+  name: analytics-reader
+  namespace: data-team
+spec:
+  roleName: ANALYTICS_READER
+  comment: "Read-only access to analytics database"
+  grants:
+    - privilege: USAGE
+      on:
+        accountObject:
+          objectType: DATABASE
+          objectName: ANALYTICS
+    - privilege: USAGE
+      on:
+        schema:
+          schemaName: '"ANALYTICS"."PUBLIC"'
+    - privilege: SELECT
+      on:
+        schemaObject:
+          future:
+            objectType: TABLE
+            inSchema: '"ANALYTICS"."PUBLIC"'
+  assignToRole: SYSADMIN
+```
+
+```bash
+kubectl apply -f analytics-reader.yaml
+
+# kro creates: 1 AccountRole + 3 AccountRoleGrants + 1 AccountRoleAssignment
+kubectl get accountroles,accountrolegrants,accountroleassignments -n data-team
+```
+
+> **How `forEach` works here:** kro iterates over `spec.grants` and creates one `AccountRoleGrant` per entry, each linked to the role via `accountRoleRef`. The `assignToRole` field uses `includeWhen` to conditionally create an `AccountRoleAssignment` — leave it empty to skip the assignment.
 
 ---
 
@@ -305,5 +286,6 @@ kro is complementary to GitOps tools — you can manage RGD manifests and instan
 - [kro documentation](https://kro.run/docs/overview)
 - [kro GitHub repository](https://github.com/kubernetes-sigs/kro)
 - [ResourceGraphDefinition concepts](https://kro.run/docs/concepts/rgd/overview)
+- [Shipped RGDs](../kro/) — ready-to-use compositions
 - [GitOps with Argo CD](gitops-argocd.md) — combine kro with Argo CD
 - [GitOps with Flux](gitops-flux.md) — combine kro with Flux
