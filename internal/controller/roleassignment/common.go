@@ -17,6 +17,15 @@ type roleAssignmentAlterOptions struct{}
 
 func (roleAssignmentAlterOptions) HasChanges() bool { return false }
 
+// derefStr safely dereferences a *string, returning "" if nil.
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+
+	return *s
+}
+
 // roleAssignmentObserve queries Snowflake for the current state of a role assignment.
 func roleAssignmentObserve(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation[*snowflake.RoleAssignmentObservation], error) {
 	raID, err := reconciler.AssertIdentifier[snowflake.RoleAssignmentIdentifier](id)

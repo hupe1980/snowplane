@@ -928,7 +928,7 @@ func TestValidateDangerousAccountRoleGrant_SafeGrant(t *testing.T) {
 	spec := &AccountRoleGrantSpec{
 		Privilege:   "USAGE",
 		On:          GrantOn{Account: true},
-		AccountRole: "DATA_READER",
+		AccountRole: ptrStr("DATA_READER"),
 	}
 
 	err := ValidateDangerousAccountRoleGrant(spec)
@@ -956,7 +956,7 @@ func TestValidateDangerousAccountRoleGrant_DangerousSystemRoles(t *testing.T) {
 			spec := &AccountRoleGrantSpec{
 				Privilege:   "USAGE",
 				On:          GrantOn{Account: true},
-				AccountRole: tt.role,
+				AccountRole: ptrStr(tt.role),
 			}
 
 			err := ValidateDangerousAccountRoleGrant(spec)
@@ -986,7 +986,7 @@ func TestValidateDangerousAccountRoleGrant_DangerousPrivilegesOnAccount(t *testi
 			spec := &AccountRoleGrantSpec{
 				Privilege:   tt.privilege,
 				On:          GrantOn{Account: true},
-				AccountRole: "CUSTOM_ROLE",
+				AccountRole: ptrStr("CUSTOM_ROLE"),
 			}
 
 			err := ValidateDangerousAccountRoleGrant(spec)
@@ -1006,7 +1006,7 @@ func TestValidateDangerousAccountRoleGrant_DangerousPrivilegeNotOnAccount(t *tes
 			ObjectType: "DATABASE",
 			ObjectName: "MY_DB",
 		}},
-		AccountRole: "DBA_ROLE",
+		AccountRole: ptrStr("DBA_ROLE"),
 	}
 
 	err := ValidateDangerousAccountRoleGrant(spec)
@@ -1019,7 +1019,7 @@ func TestValidateDangerousAccountRoleGrant_BothDangerousPrivAndTarget(t *testing
 	spec := &AccountRoleGrantSpec{
 		Privilege:   "MANAGE GRANTS",
 		On:          GrantOn{Account: true},
-		AccountRole: "ACCOUNTADMIN",
+		AccountRole: ptrStr("ACCOUNTADMIN"),
 	}
 
 	err := ValidateDangerousAccountRoleGrant(spec)
@@ -1036,7 +1036,7 @@ func TestValidateDangerousAccountRoleGrant_NonSystemRoleAllowed(t *testing.T) {
 	spec := &AccountRoleGrantSpec{
 		Privilege:   "USAGE",
 		On:          GrantOn{Account: true},
-		AccountRole: "MY_CUSTOM_ROLE",
+		AccountRole: ptrStr("MY_CUSTOM_ROLE"),
 	}
 
 	err := ValidateDangerousAccountRoleGrant(spec)
@@ -1375,7 +1375,7 @@ func TestTableSpec_Validate_ConstraintPrimaryKey(t *testing.T) {
 			{Name: "ID", Type: "NUMBER"},
 			{Name: "NAME", Type: "VARCHAR"},
 		},
-		Constraints: []TableConstraint{
+		Constraints: []InlineTableConstraint{
 			{Name: "pk_id", Type: TableConstraintPrimaryKey, Columns: []string{"ID"}},
 		},
 	}).Validate()
@@ -1395,7 +1395,7 @@ func TestTableSpec_Validate_ConstraintForeignKey(t *testing.T) {
 			{Name: "ID", Type: "NUMBER"},
 			{Name: "PARENT_ID", Type: "NUMBER"},
 		},
-		Constraints: []TableConstraint{
+		Constraints: []InlineTableConstraint{
 			{
 				Name:    "fk_parent",
 				Type:    TableConstraintForeignKey,
@@ -1422,7 +1422,7 @@ func TestTableSpec_Validate_ConstraintUndefinedColumn(t *testing.T) {
 		Columns: []ColumnDefinition{
 			{Name: "ID", Type: "NUMBER"},
 		},
-		Constraints: []TableConstraint{
+		Constraints: []InlineTableConstraint{
 			{Name: "pk_bad", Type: TableConstraintPrimaryKey, Columns: []string{"NONEXISTENT"}},
 		},
 	}).Validate()
@@ -1442,7 +1442,7 @@ func TestTableSpec_Validate_ConstraintNoColumns(t *testing.T) {
 		Columns: []ColumnDefinition{
 			{Name: "ID", Type: "NUMBER"},
 		},
-		Constraints: []TableConstraint{
+		Constraints: []InlineTableConstraint{
 			{Name: "pk", Type: TableConstraintPrimaryKey, Columns: []string{}},
 		},
 	}).Validate()
@@ -1462,7 +1462,7 @@ func TestTableSpec_Validate_ConstraintFKMissingRef(t *testing.T) {
 		Columns: []ColumnDefinition{
 			{Name: "ID", Type: "NUMBER"},
 		},
-		Constraints: []TableConstraint{
+		Constraints: []InlineTableConstraint{
 			{Name: "fk", Type: TableConstraintForeignKey, Columns: []string{"ID"}},
 		},
 	}).Validate()
@@ -1480,7 +1480,7 @@ func TestTableSpec_Validate_ConstraintFKEmptyTable(t *testing.T) {
 		DatabaseName: &dbName,
 		SchemaName:   &schemaName,
 		Columns:      []ColumnDefinition{{Name: "ID", Type: "NUMBER"}},
-		Constraints: []TableConstraint{
+		Constraints: []InlineTableConstraint{
 			{
 				Name:       "fk",
 				Type:       TableConstraintForeignKey,
@@ -1503,7 +1503,7 @@ func TestTableSpec_Validate_ConstraintFKEmptyColumns(t *testing.T) {
 		DatabaseName: &dbName,
 		SchemaName:   &schemaName,
 		Columns:      []ColumnDefinition{{Name: "ID", Type: "NUMBER"}},
-		Constraints: []TableConstraint{
+		Constraints: []InlineTableConstraint{
 			{
 				Name:       "fk",
 				Type:       TableConstraintForeignKey,
@@ -1529,7 +1529,7 @@ func TestTableSpec_Validate_ConstraintFKColumnMismatch(t *testing.T) {
 			{Name: "A", Type: "NUMBER"},
 			{Name: "B", Type: "NUMBER"},
 		},
-		Constraints: []TableConstraint{
+		Constraints: []InlineTableConstraint{
 			{
 				Name:    "fk",
 				Type:    TableConstraintForeignKey,
@@ -1557,7 +1557,7 @@ func TestTableSpec_Validate_ConstraintInvalidType(t *testing.T) {
 		Columns: []ColumnDefinition{
 			{Name: "ID", Type: "NUMBER"},
 		},
-		Constraints: []TableConstraint{
+		Constraints: []InlineTableConstraint{
 			{Name: "c", Type: "INVALID", Columns: []string{"ID"}},
 		},
 	}).Validate()
@@ -1577,7 +1577,7 @@ func TestTableSpec_Validate_ConstraintPKWithForeignKey(t *testing.T) {
 		Columns: []ColumnDefinition{
 			{Name: "ID", Type: "NUMBER"},
 		},
-		Constraints: []TableConstraint{
+		Constraints: []InlineTableConstraint{
 			{
 				Name:    "pk",
 				Type:    TableConstraintPrimaryKey,
@@ -1606,7 +1606,7 @@ func TestTableSpec_Validate_ConstraintCaseInsensitiveColumnRef(t *testing.T) {
 		Columns: []ColumnDefinition{
 			{Name: "MyColumn", Type: "VARCHAR"},
 		},
-		Constraints: []TableConstraint{
+		Constraints: []InlineTableConstraint{
 			{Name: "uq", Type: TableConstraintUnique, Columns: []string{"mycolumn"}},
 		},
 	}).Validate()
@@ -1888,7 +1888,7 @@ func validAccountRoleGrantSpec() *AccountRoleGrantSpec {
 		CommonSpec:  validCommonSpec(),
 		Privilege:   "CREATE DATABASE",
 		On:          GrantOn{Account: true},
-		AccountRole: "MY_ROLE",
+		AccountRole: ptrStr("MY_ROLE"),
 	}
 }
 
@@ -1898,7 +1898,7 @@ func validDatabaseRoleGrantSpec() *DatabaseRoleGrantSpec {
 		CommonSpec:   validCommonSpec(),
 		Privilege:    "USAGE",
 		On:           GrantOn{AccountObject: &GrantOnAccountObject{ObjectType: "DATABASE", ObjectName: "MY_DB"}},
-		DatabaseRole: "MY_DB.MY_ROLE",
+		DatabaseRole: ptrStr("MY_DB.MY_ROLE"),
 	}
 }
 
@@ -1930,7 +1930,7 @@ func TestAccountRoleGrantSpec_Validate_Valid_SchemaGrant_SchemaName(t *testing.T
 	t.Parallel()
 	spec := validAccountRoleGrantSpec()
 	spec.Privilege = "USAGE"
-	spec.On = GrantOn{Schema: &GrantOnSchema{SchemaName: `"DB"."SCH"`}}
+	spec.On = GrantOn{Schema: &GrantOnSchema{SchemaName: ptrStr(`"DB"."SCH"`)}}
 	assert.NoError(t, spec.Validate())
 }
 
@@ -1946,7 +1946,7 @@ func TestAccountRoleGrantSpec_Validate_Valid_SchemaGrant_AllInDatabase(t *testin
 	t.Parallel()
 	spec := validAccountRoleGrantSpec()
 	spec.Privilege = "USAGE"
-	spec.On = GrantOn{Schema: &GrantOnSchema{AllInDatabase: "MY_DB"}}
+	spec.On = GrantOn{Schema: &GrantOnSchema{AllInDatabase: ptrStr("MY_DB")}}
 	assert.NoError(t, spec.Validate())
 }
 
@@ -1962,7 +1962,7 @@ func TestAccountRoleGrantSpec_Validate_Valid_SchemaGrant_FutureInDatabase(t *tes
 	t.Parallel()
 	spec := validAccountRoleGrantSpec()
 	spec.Privilege = "USAGE"
-	spec.On = GrantOn{Schema: &GrantOnSchema{FutureInDatabase: "MY_DB"}}
+	spec.On = GrantOn{Schema: &GrantOnSchema{FutureInDatabase: ptrStr("MY_DB")}}
 	assert.NoError(t, spec.Validate())
 }
 
@@ -1987,7 +1987,7 @@ func TestAccountRoleGrantSpec_Validate_Valid_SchemaObjectAllGrant(t *testing.T) 
 	spec := validAccountRoleGrantSpec()
 	spec.Privilege = "SELECT"
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{
-		All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: "MY_DB"},
+		All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptrStr("MY_DB")},
 	}}
 	assert.NoError(t, spec.Validate())
 }
@@ -1997,7 +1997,7 @@ func TestAccountRoleGrantSpec_Validate_Valid_SchemaObjectFutureGrant(t *testing.
 	spec := validAccountRoleGrantSpec()
 	spec.Privilege = "SELECT"
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{
-		Future: &GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: `"DB"."SCH"`},
+		Future: &GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: ptrStr(`"DB"."SCH"`)},
 	}}
 	assert.NoError(t, spec.Validate())
 }
@@ -2005,7 +2005,7 @@ func TestAccountRoleGrantSpec_Validate_Valid_SchemaObjectFutureGrant(t *testing.
 func TestAccountRoleGrantSpec_Validate_Valid_AccountRoleRef(t *testing.T) {
 	t.Parallel()
 	spec := validAccountRoleGrantSpec()
-	spec.AccountRole = ""
+	spec.AccountRole = nil
 	spec.AccountRoleRef = &LocalObjectReference{Name: "my-role"}
 	assert.NoError(t, spec.Validate())
 }
@@ -2079,8 +2079,8 @@ func TestAccountRoleGrantSpec_Validate_Schema_MultipleSet(t *testing.T) {
 	t.Parallel()
 	spec := validAccountRoleGrantSpec()
 	spec.On = GrantOn{Schema: &GrantOnSchema{
-		SchemaName:    "DB.SCH",
-		AllInDatabase: "DB",
+		SchemaName:    ptrStr("DB.SCH"),
+		AllInDatabase: ptrStr("DB"),
 	}}
 	err := spec.Validate()
 	require.Error(t, err)
@@ -2097,17 +2097,17 @@ func TestAccountRoleGrantSpec_Validate_Schema_RawAndRefMutuallyExclusive(t *test
 	}{
 		{
 			"schemaName+schemaRef",
-			GrantOnSchema{SchemaName: "DB.SCH", SchemaRef: &LocalObjectReference{Name: "s"}},
+			GrantOnSchema{SchemaName: ptrStr("DB.SCH"), SchemaRef: &LocalObjectReference{Name: "s"}},
 			"schemaName and schemaRef are mutually exclusive",
 		},
 		{
 			"allInDatabase+allInDatabaseRef",
-			GrantOnSchema{AllInDatabase: "DB", AllInDatabaseRef: &LocalObjectReference{Name: "d"}},
+			GrantOnSchema{AllInDatabase: ptrStr("DB"), AllInDatabaseRef: &LocalObjectReference{Name: "d"}},
 			"allInDatabase and allInDatabaseRef are mutually exclusive",
 		},
 		{
 			"futureInDatabase+futureInDatabaseRef",
-			GrantOnSchema{FutureInDatabase: "DB", FutureInDatabaseRef: &LocalObjectReference{Name: "d"}},
+			GrantOnSchema{FutureInDatabase: ptrStr("DB"), FutureInDatabaseRef: &LocalObjectReference{Name: "d"}},
 			"futureInDatabase and futureInDatabaseRef are mutually exclusive",
 		},
 	}
@@ -2141,7 +2141,7 @@ func TestAccountRoleGrantSpec_Validate_SchemaObject_MultipleSet(t *testing.T) {
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{
 		ObjectType: "TABLE",
 		ObjectName: "T",
-		All:        &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: "DB"},
+		All:        &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptrStr("DB")},
 	}}
 	err := spec.Validate()
 	require.Error(t, err)
@@ -2172,7 +2172,7 @@ func TestAccountRoleGrantSpec_Validate_BulkGrant_MissingObjectTypePlural(t *test
 	t.Parallel()
 	spec := validAccountRoleGrantSpec()
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{
-		All: &GrantOnBulk{InDatabase: "DB"},
+		All: &GrantOnBulk{InDatabase: ptrStr("DB")},
 	}}
 	err := spec.Validate()
 	require.Error(t, err)
@@ -2194,7 +2194,7 @@ func TestAccountRoleGrantSpec_Validate_BulkGrant_MultipleScope(t *testing.T) {
 	t.Parallel()
 	spec := validAccountRoleGrantSpec()
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{
-		All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: "DB", InSchema: "DB.SCH"},
+		All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptrStr("DB"), InSchema: ptrStr("DB.SCH")},
 	}}
 	err := spec.Validate()
 	require.Error(t, err)
@@ -2211,12 +2211,12 @@ func TestAccountRoleGrantSpec_Validate_BulkGrant_RawAndRefMutuallyExclusive(t *t
 	}{
 		{
 			"inDatabase+inDatabaseRef",
-			GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: "DB", InDatabaseRef: &LocalObjectReference{Name: "d"}},
+			GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptrStr("DB"), InDatabaseRef: &LocalObjectReference{Name: "d"}},
 			"inDatabase and inDatabaseRef are mutually exclusive",
 		},
 		{
 			"inSchema+inSchemaRef",
-			GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: "DB.SCH", InSchemaRef: &LocalObjectReference{Name: "s"}},
+			GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: ptrStr("DB.SCH"), InSchemaRef: &LocalObjectReference{Name: "s"}},
 			"inSchema and inSchemaRef are mutually exclusive",
 		},
 	}
@@ -2240,9 +2240,9 @@ func TestAccountRoleGrantSpec_Validate_BulkGrant_ValidScopes(t *testing.T) {
 		name string
 		bulk GrantOnBulk
 	}{
-		{"inDatabase", GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: "DB"}},
+		{"inDatabase", GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptrStr("DB")}},
 		{"inDatabaseRef", GrantOnBulk{ObjectTypePlural: "TABLES", InDatabaseRef: &LocalObjectReference{Name: "d"}}},
-		{"inSchema", GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: "DB.SCH"}},
+		{"inSchema", GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: ptrStr("DB.SCH")}},
 		{"inSchemaRef", GrantOnBulk{ObjectTypePlural: "TABLES", InSchemaRef: &LocalObjectReference{Name: "s"}}},
 	}
 
@@ -2262,7 +2262,7 @@ func TestAccountRoleGrantSpec_Validate_BulkGrant_ValidScopes(t *testing.T) {
 func TestAccountRoleGrantSpec_Validate_AccountRoleAndRefMutuallyExclusive(t *testing.T) {
 	t.Parallel()
 	spec := validAccountRoleGrantSpec()
-	spec.AccountRole = "R"
+	spec.AccountRole = ptrStr("R")
 	spec.AccountRoleRef = &LocalObjectReference{Name: "r"}
 	err := spec.Validate()
 	require.Error(t, err)
@@ -2298,7 +2298,7 @@ func TestAccountRoleGrantSpec_ResolveKind_Regular(t *testing.T) {
 	}{
 		{"account", GrantOn{Account: true}},
 		{"accountObject", GrantOn{AccountObject: &GrantOnAccountObject{ObjectType: "DATABASE", ObjectName: "DB"}}},
-		{"schemaName", GrantOn{Schema: &GrantOnSchema{SchemaName: "DB.SCH"}}},
+		{"schemaName", GrantOn{Schema: &GrantOnSchema{SchemaName: ptrStr("DB.SCH")}}},
 		{"schemaRef", GrantOn{Schema: &GrantOnSchema{SchemaRef: &LocalObjectReference{Name: "s"}}}},
 		{"schemaObject", GrantOn{SchemaObject: &GrantOnSchemaObject{ObjectType: "TABLE", ObjectName: "T"}}},
 	}
@@ -2319,9 +2319,9 @@ func TestAccountRoleGrantSpec_ResolveKind_Future(t *testing.T) {
 		name string
 		on   GrantOn
 	}{
-		{"futureInDatabase", GrantOn{Schema: &GrantOnSchema{FutureInDatabase: "DB"}}},
+		{"futureInDatabase", GrantOn{Schema: &GrantOnSchema{FutureInDatabase: ptrStr("DB")}}},
 		{"futureInDatabaseRef", GrantOn{Schema: &GrantOnSchema{FutureInDatabaseRef: &LocalObjectReference{Name: "d"}}}},
-		{"futureSchemaObject", GrantOn{SchemaObject: &GrantOnSchemaObject{Future: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: "DB"}}}},
+		{"futureSchemaObject", GrantOn{SchemaObject: &GrantOnSchemaObject{Future: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptrStr("DB")}}}},
 	}
 
 	for _, tt := range tests {
@@ -2340,9 +2340,9 @@ func TestAccountRoleGrantSpec_ResolveKind_All(t *testing.T) {
 		name string
 		on   GrantOn
 	}{
-		{"allInDatabase", GrantOn{Schema: &GrantOnSchema{AllInDatabase: "DB"}}},
+		{"allInDatabase", GrantOn{Schema: &GrantOnSchema{AllInDatabase: ptrStr("DB")}}},
 		{"allInDatabaseRef", GrantOn{Schema: &GrantOnSchema{AllInDatabaseRef: &LocalObjectReference{Name: "d"}}}},
-		{"allSchemaObject", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: "DB"}}}},
+		{"allSchemaObject", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptrStr("DB")}}}},
 	}
 
 	for _, tt := range tests {
@@ -2368,18 +2368,18 @@ func TestGrantOn_Description(t *testing.T) {
 	}{
 		{"account", GrantOn{Account: true}, "ON ACCOUNT"},
 		{"accountObject", GrantOn{AccountObject: &GrantOnAccountObject{ObjectType: "DATABASE", ObjectName: "DB"}}, "ON DATABASE DB"},
-		{"schemaName", GrantOn{Schema: &GrantOnSchema{SchemaName: "DB.SCH"}}, "ON SCHEMA DB.SCH"},
+		{"schemaName", GrantOn{Schema: &GrantOnSchema{SchemaName: ptrStr("DB.SCH")}}, "ON SCHEMA DB.SCH"},
 		{"schemaRef", GrantOn{Schema: &GrantOnSchema{SchemaRef: &LocalObjectReference{Name: "s"}}}, "ON SCHEMA (ref: s)"},
-		{"allInDatabase", GrantOn{Schema: &GrantOnSchema{AllInDatabase: "DB"}}, "ON ALL SCHEMAS IN DATABASE DB"},
+		{"allInDatabase", GrantOn{Schema: &GrantOnSchema{AllInDatabase: ptrStr("DB")}}, "ON ALL SCHEMAS IN DATABASE DB"},
 		{"allInDatabaseRef", GrantOn{Schema: &GrantOnSchema{AllInDatabaseRef: &LocalObjectReference{Name: "d"}}}, "ON ALL SCHEMAS IN DATABASE (ref: d)"},
-		{"futureInDatabase", GrantOn{Schema: &GrantOnSchema{FutureInDatabase: "DB"}}, "ON FUTURE SCHEMAS IN DATABASE DB"},
+		{"futureInDatabase", GrantOn{Schema: &GrantOnSchema{FutureInDatabase: ptrStr("DB")}}, "ON FUTURE SCHEMAS IN DATABASE DB"},
 		{"futureInDatabaseRef", GrantOn{Schema: &GrantOnSchema{FutureInDatabaseRef: &LocalObjectReference{Name: "d"}}}, "ON FUTURE SCHEMAS IN DATABASE (ref: d)"},
 		{"schemaObject", GrantOn{SchemaObject: &GrantOnSchemaObject{ObjectType: "TABLE", ObjectName: "T"}}, "ON TABLE T"},
-		{"allInDB", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: "DB"}}}, "ON ALL TABLES IN DATABASE DB"},
+		{"allInDB", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptrStr("DB")}}}, "ON ALL TABLES IN DATABASE DB"},
 		{"allInDBRef", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabaseRef: &LocalObjectReference{Name: "d"}}}}, "ON ALL TABLES IN DATABASE (ref: d)"},
-		{"allInSchema", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: "DB.SCH"}}}, "ON ALL TABLES IN SCHEMA DB.SCH"},
+		{"allInSchema", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: ptrStr("DB.SCH")}}}, "ON ALL TABLES IN SCHEMA DB.SCH"},
 		{"allInSchemaRef", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InSchemaRef: &LocalObjectReference{Name: "s"}}}}, "ON ALL TABLES IN SCHEMA (ref: s)"},
-		{"futureInDB", GrantOn{SchemaObject: &GrantOnSchemaObject{Future: &GrantOnBulk{ObjectTypePlural: "VIEWS", InDatabase: "DB"}}}, "ON FUTURE VIEWS IN DATABASE DB"},
+		{"futureInDB", GrantOn{SchemaObject: &GrantOnSchemaObject{Future: &GrantOnBulk{ObjectTypePlural: "VIEWS", InDatabase: ptrStr("DB")}}}, "ON FUTURE VIEWS IN DATABASE DB"},
 		{"unknown", GrantOn{}, "ON <unknown>"},
 	}
 
@@ -2398,7 +2398,7 @@ func TestGrantOn_Description(t *testing.T) {
 func TestAccountRoleAssignmentSpec_Validate_Valid_RoleName_ToRole(t *testing.T) {
 	t.Parallel()
 	assert.NoError(t, (&AccountRoleAssignmentSpec{
-		CommonSpec: validCommonSpec(), RoleName: "ANALYST", ToRole: "SYSADMIN",
+		CommonSpec: validCommonSpec(), RoleName: ptrStr("ANALYST"), ToRole: ptrStr("SYSADMIN"),
 	}).Validate())
 }
 
@@ -2413,7 +2413,7 @@ func TestAccountRoleAssignmentSpec_Validate_Valid_RoleRef_ToUserRef(t *testing.T
 
 func TestAccountRoleAssignmentSpec_Validate_NoRole(t *testing.T) {
 	t.Parallel()
-	err := (&AccountRoleAssignmentSpec{CommonSpec: validCommonSpec(), ToRole: "SYSADMIN"}).Validate()
+	err := (&AccountRoleAssignmentSpec{CommonSpec: validCommonSpec(), ToRole: ptrStr("SYSADMIN")}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of roleName or roleRef")
 }
@@ -2422,9 +2422,9 @@ func TestAccountRoleAssignmentSpec_Validate_BothRoleAndRef(t *testing.T) {
 	t.Parallel()
 	err := (&AccountRoleAssignmentSpec{
 		CommonSpec: validCommonSpec(),
-		RoleName:   "X",
+		RoleName:   ptrStr("X"),
 		RoleRef:    &LocalObjectReference{Name: "y"},
-		ToRole:     "SYSADMIN",
+		ToRole:     ptrStr("SYSADMIN"),
 	}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of roleName or roleRef")
@@ -2432,7 +2432,7 @@ func TestAccountRoleAssignmentSpec_Validate_BothRoleAndRef(t *testing.T) {
 
 func TestAccountRoleAssignmentSpec_Validate_NoTarget(t *testing.T) {
 	t.Parallel()
-	err := (&AccountRoleAssignmentSpec{CommonSpec: validCommonSpec(), RoleName: "R"}).Validate()
+	err := (&AccountRoleAssignmentSpec{CommonSpec: validCommonSpec(), RoleName: ptrStr("R")}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of toRole")
 }
@@ -2440,7 +2440,7 @@ func TestAccountRoleAssignmentSpec_Validate_NoTarget(t *testing.T) {
 func TestAccountRoleAssignmentSpec_Validate_TwoTargets(t *testing.T) {
 	t.Parallel()
 	err := (&AccountRoleAssignmentSpec{
-		CommonSpec: validCommonSpec(), RoleName: "R", ToRole: "A", ToUser: "B",
+		CommonSpec: validCommonSpec(), RoleName: ptrStr("R"), ToRole: ptrStr("A"), ToUser: ptrStr("B"),
 	}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of toRole")
@@ -2453,7 +2453,7 @@ func TestAccountRoleAssignmentSpec_Validate_TwoTargets(t *testing.T) {
 func TestDatabaseRoleAssignmentSpec_Validate_Valid_ToRole(t *testing.T) {
 	t.Parallel()
 	assert.NoError(t, (&DatabaseRoleAssignmentSpec{
-		CommonSpec: validCommonSpec(), DatabaseRoleName: "MY_DB.READER", ToRole: "SYSADMIN",
+		CommonSpec: validCommonSpec(), DatabaseRoleName: ptrStr("MY_DB.READER"), ToRole: ptrStr("SYSADMIN"),
 	}).Validate())
 }
 
@@ -2462,13 +2462,13 @@ func TestDatabaseRoleAssignmentSpec_Validate_Valid_ToDatabaseRole(t *testing.T) 
 	assert.NoError(t, (&DatabaseRoleAssignmentSpec{
 		CommonSpec:      validCommonSpec(),
 		DatabaseRoleRef: &LocalObjectReference{Name: "my-dr"},
-		ToDatabaseRole:  "MY_DB.WRITER",
+		ToDatabaseRole:  ptrStr("MY_DB.WRITER"),
 	}).Validate())
 }
 
 func TestDatabaseRoleAssignmentSpec_Validate_NoRole(t *testing.T) {
 	t.Parallel()
-	err := (&DatabaseRoleAssignmentSpec{CommonSpec: validCommonSpec(), ToRole: "SYSADMIN"}).Validate()
+	err := (&DatabaseRoleAssignmentSpec{CommonSpec: validCommonSpec(), ToRole: ptrStr("SYSADMIN")}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of databaseRoleName or databaseRoleRef")
 }
@@ -2477,9 +2477,9 @@ func TestDatabaseRoleAssignmentSpec_Validate_BothRoleAndRef(t *testing.T) {
 	t.Parallel()
 	err := (&DatabaseRoleAssignmentSpec{
 		CommonSpec:       validCommonSpec(),
-		DatabaseRoleName: "X",
+		DatabaseRoleName: ptrStr("X"),
 		DatabaseRoleRef:  &LocalObjectReference{Name: "y"},
-		ToRole:           "SYSADMIN",
+		ToRole:           ptrStr("SYSADMIN"),
 	}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of databaseRoleName or databaseRoleRef")
@@ -2487,7 +2487,7 @@ func TestDatabaseRoleAssignmentSpec_Validate_BothRoleAndRef(t *testing.T) {
 
 func TestDatabaseRoleAssignmentSpec_Validate_NoTarget(t *testing.T) {
 	t.Parallel()
-	err := (&DatabaseRoleAssignmentSpec{CommonSpec: validCommonSpec(), DatabaseRoleName: "D.R"}).Validate()
+	err := (&DatabaseRoleAssignmentSpec{CommonSpec: validCommonSpec(), DatabaseRoleName: ptrStr("D.R")}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of toRole")
 }
@@ -2495,7 +2495,7 @@ func TestDatabaseRoleAssignmentSpec_Validate_NoTarget(t *testing.T) {
 func TestDatabaseRoleAssignmentSpec_Validate_TwoTargets(t *testing.T) {
 	t.Parallel()
 	err := (&DatabaseRoleAssignmentSpec{
-		CommonSpec: validCommonSpec(), DatabaseRoleName: "D.R", ToRole: "A", ToDatabaseRole: "D.B",
+		CommonSpec: validCommonSpec(), DatabaseRoleName: ptrStr("D.R"), ToRole: ptrStr("A"), ToDatabaseRole: ptrStr("D.B"),
 	}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of toRole")
@@ -2846,7 +2846,7 @@ func TestDatabaseRoleGrantSpec_Validate_EmptyPrivilege(t *testing.T) {
 func TestDatabaseRoleGrantSpec_Validate_NoRoleOrRef(t *testing.T) {
 	t.Parallel()
 	spec := validDatabaseRoleGrantSpec()
-	spec.DatabaseRole = ""
+	spec.DatabaseRole = nil
 	spec.DatabaseRoleRef = nil
 	err := spec.Validate()
 	require.Error(t, err)
@@ -2865,7 +2865,7 @@ func TestDatabaseRoleGrantSpec_Validate_OnNoneSet(t *testing.T) {
 func TestDatabaseRoleGrantSpec_Validate_ValidWithRef(t *testing.T) {
 	t.Parallel()
 	spec := validDatabaseRoleGrantSpec()
-	spec.DatabaseRole = ""
+	spec.DatabaseRole = nil
 	spec.DatabaseRoleRef = &LocalObjectReference{Name: "my-role"}
 	assert.NoError(t, spec.Validate())
 }
@@ -3009,7 +3009,7 @@ func TestPrivilegeObjectCompat_Stage_Invalid(t *testing.T) {
 func TestPrivilegeObjectCompat_Schema_Valid(t *testing.T) {
 	t.Parallel()
 
-	on := &GrantOn{Schema: &GrantOnSchema{SchemaName: `"DB"."SCH"`}}
+	on := &GrantOn{Schema: &GrantOnSchema{SchemaName: ptrStr(`"DB"."SCH"`)}}
 
 	for _, priv := range []string{"USAGE", "MONITOR", "CREATE TABLE", "CREATE VIEW", "MODIFY", "ALL"} {
 		t.Run(priv, func(t *testing.T) {
@@ -3022,7 +3022,7 @@ func TestPrivilegeObjectCompat_Schema_Valid(t *testing.T) {
 func TestPrivilegeObjectCompat_Schema_Invalid(t *testing.T) {
 	t.Parallel()
 
-	on := &GrantOn{Schema: &GrantOnSchema{SchemaName: `"DB"."SCH"`}}
+	on := &GrantOn{Schema: &GrantOnSchema{SchemaName: ptrStr(`"DB"."SCH"`)}}
 	err := validatePrivilegeObjectCompat(on, "SELECT")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not valid for SCHEMA")
@@ -3032,7 +3032,7 @@ func TestPrivilegeObjectCompat_BulkTables_Valid(t *testing.T) {
 	t.Parallel()
 
 	on := &GrantOn{SchemaObject: &GrantOnSchemaObject{
-		All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: "DB"},
+		All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptrStr("DB")},
 	}}
 	assert.NoError(t, validatePrivilegeObjectCompat(on, "SELECT"))
 }
@@ -3041,7 +3041,7 @@ func TestPrivilegeObjectCompat_BulkTables_Invalid(t *testing.T) {
 	t.Parallel()
 
 	on := &GrantOn{SchemaObject: &GrantOnSchemaObject{
-		All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: "DB"},
+		All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptrStr("DB")},
 	}}
 	err := validatePrivilegeObjectCompat(on, "CREATE SCHEMA")
 	require.Error(t, err)
@@ -3081,7 +3081,7 @@ func TestPrivilegeObjectCompat_BulkExternalTables_Valid(t *testing.T) {
 	t.Parallel()
 
 	on := &GrantOn{SchemaObject: &GrantOnSchemaObject{
-		All: &GrantOnBulk{ObjectTypePlural: "EXTERNAL TABLES", InDatabase: "DB"},
+		All: &GrantOnBulk{ObjectTypePlural: "EXTERNAL TABLES", InDatabase: ptrStr("DB")},
 	}}
 	assert.NoError(t, validatePrivilegeObjectCompat(on, "SELECT"))
 }
@@ -3140,7 +3140,7 @@ func TestPrivilegeObjectCompat_FutureTables_Valid(t *testing.T) {
 	t.Parallel()
 
 	on := &GrantOn{SchemaObject: &GrantOnSchemaObject{
-		Future: &GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: `"DB"."SCH"`},
+		Future: &GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: ptrStr(`"DB"."SCH"`)},
 	}}
 	assert.NoError(t, validatePrivilegeObjectCompat(on, "INSERT"))
 }
@@ -3590,7 +3590,7 @@ func validGrantOwnershipSpec() *GrantOwnershipSpec {
 		CommonSpec:  validCommonSpec(),
 		ObjectType:  "TABLE",
 		ObjectName:  `"DB"."SCH"."MY_TABLE"`,
-		AccountRole: "SYSADMIN",
+		AccountRole: ptrStr("SYSADMIN"),
 	}
 }
 
@@ -3620,7 +3620,7 @@ func TestGrantOwnershipSpec_Validate_EmptyObjectName(t *testing.T) {
 func TestGrantOwnershipSpec_Validate_NoRoleSet(t *testing.T) {
 	t.Parallel()
 	s := validGrantOwnershipSpec()
-	s.AccountRole = ""
+	s.AccountRole = nil
 	err := s.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of accountRole, accountRoleRef, databaseRole, or databaseRoleRef must be set")
@@ -3629,7 +3629,7 @@ func TestGrantOwnershipSpec_Validate_NoRoleSet(t *testing.T) {
 func TestGrantOwnershipSpec_Validate_MultipleRolesSet(t *testing.T) {
 	t.Parallel()
 	s := validGrantOwnershipSpec()
-	s.DatabaseRole = "DB_ROLE"
+	s.DatabaseRole = ptrStr("DB_ROLE")
 	err := s.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of accountRole, accountRoleRef, databaseRole, or databaseRoleRef must be set")
@@ -3638,7 +3638,7 @@ func TestGrantOwnershipSpec_Validate_MultipleRolesSet(t *testing.T) {
 func TestGrantOwnershipSpec_Validate_AccountRoleRef(t *testing.T) {
 	t.Parallel()
 	s := validGrantOwnershipSpec()
-	s.AccountRole = ""
+	s.AccountRole = nil
 	s.AccountRoleRef = &LocalObjectReference{Name: "my-role"}
 	assert.NoError(t, s.Validate())
 }
@@ -3646,7 +3646,7 @@ func TestGrantOwnershipSpec_Validate_AccountRoleRef(t *testing.T) {
 func TestGrantOwnershipSpec_Validate_DatabaseRoleRef(t *testing.T) {
 	t.Parallel()
 	s := validGrantOwnershipSpec()
-	s.AccountRole = ""
+	s.AccountRole = nil
 	s.DatabaseRoleRef = &LocalObjectReference{Name: "my-db-role"}
 	assert.NoError(t, s.Validate())
 }
@@ -3804,6 +3804,26 @@ func TestCELAndGoMutualExclusivityInSync(t *testing.T) {
 	t.Run("task_warehouse", func(t *testing.T) {
 		assertCELMutualExclusivity(t, "task_types.go", "warehouse", "userTaskManagedInitialWarehouseSize")
 	})
+
+	// MaskingPolicyApplication policy mutual exclusivity.
+	t.Run("maskingPolicyApplication_policy", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "maskingpolicyapplication_types.go", "policyName", "policyRef")
+	})
+
+	// NetworkPolicyAttachment policy mutual exclusivity.
+	t.Run("networkPolicyAttachment_policy", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "networkpolicyattachment_types.go", "policyName", "policyRef")
+	})
+
+	// PasswordPolicyAttachment policy mutual exclusivity.
+	t.Run("passwordPolicyAttachment_policy", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "passwordpolicyattachment_types.go", "policyName", "policyRef")
+	})
+
+	// TagAssociation tag mutual exclusivity.
+	t.Run("tagAssociation_tag", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "tagassociation_types.go", "tagName", "tagRef")
+	})
 }
 
 // assertCELMutualExclusivity verifies that the given types file contains a CEL
@@ -3848,4 +3868,291 @@ func assertCELMutualExclusivity(t *testing.T, typesFile string, fields ...string
 		"%s: missing CEL XValidation rule for mutual exclusivity of [%s]. "+
 			"Go Validate() has this check — add a matching CEL rule for admission-time rejection.",
 		typesFile, strings.Join(fields, ", "))
+}
+
+// ---------------------------------------------------------------------------
+// MaskingPolicyApplicationSpec validation
+// ---------------------------------------------------------------------------
+
+func validMaskingPolicyApplicationSpec() *MaskingPolicyApplicationSpec {
+	return &MaskingPolicyApplicationSpec{
+		CommonSpec: validCommonSpec(),
+		PolicyName: ptrStr(`"DB"."SCHEMA"."MASK_POLICY"`),
+		TableName:  `"DB"."SCHEMA"."MY_TABLE"`,
+		ColumnName: "EMAIL",
+	}
+}
+
+func TestMaskingPolicyApplicationSpec_Validate_Valid_PolicyName(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validMaskingPolicyApplicationSpec().Validate())
+}
+
+func TestMaskingPolicyApplicationSpec_Validate_Valid_PolicyRef(t *testing.T) {
+	t.Parallel()
+	spec := validMaskingPolicyApplicationSpec()
+	spec.PolicyName = nil
+	spec.PolicyRef = &LocalObjectReference{Name: "my-masking-policy"}
+	assert.NoError(t, spec.Validate())
+}
+
+func TestMaskingPolicyApplicationSpec_Validate_NeitherPolicyNorRef(t *testing.T) {
+	t.Parallel()
+	spec := validMaskingPolicyApplicationSpec()
+	spec.PolicyName = nil
+	spec.PolicyRef = nil
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of policyName or policyRef must be set")
+}
+
+func TestMaskingPolicyApplicationSpec_Validate_BothPolicyAndRef(t *testing.T) {
+	t.Parallel()
+	spec := validMaskingPolicyApplicationSpec()
+	spec.PolicyRef = &LocalObjectReference{Name: "my-masking-policy"}
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of policyName or policyRef must be set")
+}
+
+func TestMaskingPolicyApplicationSpec_Validate_MissingTableName(t *testing.T) {
+	t.Parallel()
+	spec := validMaskingPolicyApplicationSpec()
+	spec.TableName = ""
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.tableName is required")
+}
+
+func TestMaskingPolicyApplicationSpec_Validate_MissingColumnName(t *testing.T) {
+	t.Parallel()
+	spec := validMaskingPolicyApplicationSpec()
+	spec.ColumnName = ""
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.columnName is required")
+}
+
+// ---------------------------------------------------------------------------
+// NetworkPolicyAttachmentSpec validation
+// ---------------------------------------------------------------------------
+
+func validNetworkPolicyAttachmentSpec() *NetworkPolicyAttachmentSpec {
+	return &NetworkPolicyAttachmentSpec{
+		CommonSpec: validCommonSpec(),
+		PolicyName: ptrStr("MY_NETWORK_POLICY"),
+		TargetType: "ACCOUNT",
+	}
+}
+
+func TestNetworkPolicyAttachmentSpec_Validate_Valid_PolicyName(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validNetworkPolicyAttachmentSpec().Validate())
+}
+
+func TestNetworkPolicyAttachmentSpec_Validate_Valid_PolicyRef(t *testing.T) {
+	t.Parallel()
+	spec := validNetworkPolicyAttachmentSpec()
+	spec.PolicyName = nil
+	spec.PolicyRef = &LocalObjectReference{Name: "my-network-policy"}
+	assert.NoError(t, spec.Validate())
+}
+
+func TestNetworkPolicyAttachmentSpec_Validate_Valid_UserTarget(t *testing.T) {
+	t.Parallel()
+	spec := validNetworkPolicyAttachmentSpec()
+	spec.TargetType = "USER"
+	spec.TargetName = "JDOE"
+	assert.NoError(t, spec.Validate())
+}
+
+func TestNetworkPolicyAttachmentSpec_Validate_NeitherPolicyNorRef(t *testing.T) {
+	t.Parallel()
+	spec := validNetworkPolicyAttachmentSpec()
+	spec.PolicyName = nil
+	spec.PolicyRef = nil
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of policyName or policyRef must be set")
+}
+
+func TestNetworkPolicyAttachmentSpec_Validate_BothPolicyAndRef(t *testing.T) {
+	t.Parallel()
+	spec := validNetworkPolicyAttachmentSpec()
+	spec.PolicyRef = &LocalObjectReference{Name: "my-network-policy"}
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of policyName or policyRef must be set")
+}
+
+func TestNetworkPolicyAttachmentSpec_Validate_MissingTargetType(t *testing.T) {
+	t.Parallel()
+	spec := validNetworkPolicyAttachmentSpec()
+	spec.TargetType = ""
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.targetType is required")
+}
+
+func TestNetworkPolicyAttachmentSpec_Validate_UserMissingTargetName(t *testing.T) {
+	t.Parallel()
+	spec := validNetworkPolicyAttachmentSpec()
+	spec.TargetType = "USER"
+	spec.TargetName = ""
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.targetName is required when targetType is USER")
+}
+
+// ---------------------------------------------------------------------------
+// PasswordPolicyAttachmentSpec validation
+// ---------------------------------------------------------------------------
+
+func validPasswordPolicyAttachmentSpec() *PasswordPolicyAttachmentSpec {
+	return &PasswordPolicyAttachmentSpec{
+		CommonSpec: validCommonSpec(),
+		PolicyName: ptrStr(`"DB"."SCHEMA"."MY_PASSWORD_POLICY"`),
+		TargetType: "ACCOUNT",
+	}
+}
+
+func TestPasswordPolicyAttachmentSpec_Validate_Valid_PolicyName(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validPasswordPolicyAttachmentSpec().Validate())
+}
+
+func TestPasswordPolicyAttachmentSpec_Validate_Valid_PolicyRef(t *testing.T) {
+	t.Parallel()
+	spec := validPasswordPolicyAttachmentSpec()
+	spec.PolicyName = nil
+	spec.PolicyRef = &LocalObjectReference{Name: "my-password-policy"}
+	assert.NoError(t, spec.Validate())
+}
+
+func TestPasswordPolicyAttachmentSpec_Validate_Valid_UserTarget(t *testing.T) {
+	t.Parallel()
+	spec := validPasswordPolicyAttachmentSpec()
+	spec.TargetType = "USER"
+	spec.TargetName = "JDOE"
+	assert.NoError(t, spec.Validate())
+}
+
+func TestPasswordPolicyAttachmentSpec_Validate_NeitherPolicyNorRef(t *testing.T) {
+	t.Parallel()
+	spec := validPasswordPolicyAttachmentSpec()
+	spec.PolicyName = nil
+	spec.PolicyRef = nil
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of policyName or policyRef must be set")
+}
+
+func TestPasswordPolicyAttachmentSpec_Validate_BothPolicyAndRef(t *testing.T) {
+	t.Parallel()
+	spec := validPasswordPolicyAttachmentSpec()
+	spec.PolicyRef = &LocalObjectReference{Name: "my-password-policy"}
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of policyName or policyRef must be set")
+}
+
+func TestPasswordPolicyAttachmentSpec_Validate_MissingTargetType(t *testing.T) {
+	t.Parallel()
+	spec := validPasswordPolicyAttachmentSpec()
+	spec.TargetType = ""
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.targetType is required")
+}
+
+func TestPasswordPolicyAttachmentSpec_Validate_UserMissingTargetName(t *testing.T) {
+	t.Parallel()
+	spec := validPasswordPolicyAttachmentSpec()
+	spec.TargetType = "USER"
+	spec.TargetName = ""
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.targetName is required when targetType is USER")
+}
+
+// ---------------------------------------------------------------------------
+// TagAssociationSpec validation
+// ---------------------------------------------------------------------------
+
+func validTagAssociationSpec() *TagAssociationSpec {
+	return &TagAssociationSpec{
+		CommonSpec: validCommonSpec(),
+		TagName:    ptrStr(`"DB"."SCHEMA"."MY_TAG"`),
+		TagValue:   "production",
+		ObjectType: "TABLE",
+		ObjectName: `"DB"."SCHEMA"."MY_TABLE"`,
+	}
+}
+
+func TestTagAssociationSpec_Validate_Valid_TagName(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validTagAssociationSpec().Validate())
+}
+
+func TestTagAssociationSpec_Validate_Valid_TagRef(t *testing.T) {
+	t.Parallel()
+	spec := validTagAssociationSpec()
+	spec.TagName = nil
+	spec.TagRef = &LocalObjectReference{Name: "my-tag"}
+	assert.NoError(t, spec.Validate())
+}
+
+func TestTagAssociationSpec_Validate_NeitherTagNorRef(t *testing.T) {
+	t.Parallel()
+	spec := validTagAssociationSpec()
+	spec.TagName = nil
+	spec.TagRef = nil
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of tagName or tagRef must be set")
+}
+
+func TestTagAssociationSpec_Validate_BothTagAndRef(t *testing.T) {
+	t.Parallel()
+	spec := validTagAssociationSpec()
+	spec.TagRef = &LocalObjectReference{Name: "my-tag"}
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one of tagName or tagRef must be set")
+}
+
+func TestTagAssociationSpec_Validate_MissingTagValue(t *testing.T) {
+	t.Parallel()
+	spec := validTagAssociationSpec()
+	spec.TagValue = ""
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.tagValue is required")
+}
+
+func TestTagAssociationSpec_Validate_TagValueTooLong(t *testing.T) {
+	t.Parallel()
+	spec := validTagAssociationSpec()
+	spec.TagValue = strings.Repeat("x", 257)
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.tagValue must be at most 256 characters")
+}
+
+func TestTagAssociationSpec_Validate_MissingObjectType(t *testing.T) {
+	t.Parallel()
+	spec := validTagAssociationSpec()
+	spec.ObjectType = ""
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.objectType is required")
+}
+
+func TestTagAssociationSpec_Validate_MissingObjectName(t *testing.T) {
+	t.Parallel()
+	spec := validTagAssociationSpec()
+	spec.ObjectName = ""
+	err := spec.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.objectName is required")
 }

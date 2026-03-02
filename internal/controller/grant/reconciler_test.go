@@ -61,6 +61,8 @@ func (m *mockService) Revoke(ctx context.Context, opts snowflake.RevokeGrantOpti
 // Helpers
 // --------------------------------------------------------------------------
 
+func strPtr(s string) *string { return &s }
+
 func newTestAccountRoleGrant(name, namespace string) *snowplanev1alpha1.AccountRoleGrant {
 	return &snowplanev1alpha1.AccountRoleGrant{
 		ObjectMeta: metav1.ObjectMeta{
@@ -80,7 +82,7 @@ func newTestAccountRoleGrant(name, namespace string) *snowplanev1alpha1.AccountR
 					ObjectName: "MY_DB",
 				},
 			},
-			AccountRole: "DATA_READER",
+			AccountRole: strPtr("DATA_READER"),
 		},
 	}
 }
@@ -579,7 +581,7 @@ func TestOnToParams_SchemaName(t *testing.T) {
 	t.Parallel()
 
 	on := &snowplanev1alpha1.GrantOn{
-		Schema: &snowplanev1alpha1.GrantOnSchema{SchemaName: `DB.SCH`},
+		Schema: &snowplanev1alpha1.GrantOnSchema{SchemaName: strPtr(`DB.SCH`)},
 	}
 	p := onToParams(on)
 	assert.Equal(t, "DB.SCH", p.SchemaName)
@@ -628,7 +630,7 @@ func TestPreReconcile_AccountRoleRefResolved(t *testing.T) {
 	grant := newTestAccountRoleGrant("my-grant", "default")
 	grant.Finalizers = []string{accountRoleGrantFinalizer}
 	// Use AccountRoleRef instead of raw AccountRole.
-	grant.Spec.AccountRole = ""
+	grant.Spec.AccountRole = nil
 	grant.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "reader-role"}
 
 	accountRole := newReadyAccountRole("reader-role", "default", "DATA_READER")
@@ -667,7 +669,7 @@ func TestPreReconcile_AccountRoleRefNotFound(t *testing.T) {
 
 	grant := newTestAccountRoleGrant("my-grant", "default")
 	grant.Finalizers = []string{accountRoleGrantFinalizer}
-	grant.Spec.AccountRole = ""
+	grant.Spec.AccountRole = nil
 	grant.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "missing-role"}
 
 	mock := &mockService{}
@@ -691,7 +693,7 @@ func TestPreReconcile_AccountRoleRefNotReady(t *testing.T) {
 
 	grant := newTestAccountRoleGrant("my-grant", "default")
 	grant.Finalizers = []string{accountRoleGrantFinalizer}
-	grant.Spec.AccountRole = ""
+	grant.Spec.AccountRole = nil
 	grant.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "unready-role"}
 
 	// Create an AccountRole that exists but is NOT ready.
@@ -793,11 +795,11 @@ func TestListByIndex_AccountRole_FiltersCorrectly(t *testing.T) {
 	t.Parallel()
 
 	g1 := newTestAccountRoleGrant("grant-a", "default")
-	g1.Spec.AccountRole = ""
+	g1.Spec.AccountRole = nil
 	g1.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "reader-role"}
 
 	g2 := newTestAccountRoleGrant("grant-b", "default")
-	g2.Spec.AccountRole = ""
+	g2.Spec.AccountRole = nil
 	g2.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "writer-role"}
 
 	r := newTestReconcilerWithIndex(&mockService{}, g1, g2)
@@ -815,11 +817,11 @@ func TestListByIndex_AccountRole_MultipleMatches(t *testing.T) {
 	t.Parallel()
 
 	g1 := newTestAccountRoleGrant("grant-a", "default")
-	g1.Spec.AccountRole = ""
+	g1.Spec.AccountRole = nil
 	g1.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "reader-role"}
 
 	g2 := newTestAccountRoleGrant("grant-b", "default")
-	g2.Spec.AccountRole = ""
+	g2.Spec.AccountRole = nil
 	g2.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "reader-role"}
 
 	r := newTestReconcilerWithIndex(&mockService{}, g1, g2)
@@ -838,7 +840,7 @@ func TestListByIndex_AccountRole_NoMatch(t *testing.T) {
 	t.Parallel()
 
 	g1 := newTestAccountRoleGrant("grant-a", "default")
-	g1.Spec.AccountRole = ""
+	g1.Spec.AccountRole = nil
 	g1.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "reader-role"}
 
 	r := newTestReconcilerWithIndex(&mockService{}, g1)

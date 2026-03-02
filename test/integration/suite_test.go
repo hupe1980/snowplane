@@ -889,7 +889,7 @@ func newTestGrant(name, privilege, objectType, objectName, toRole string) *snowp
 					ObjectName: objectName,
 				},
 			},
-			AccountRole: toRole,
+			AccountRole: &toRole,
 		},
 	}
 }

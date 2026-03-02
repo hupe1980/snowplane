@@ -126,6 +126,7 @@ spec:
                 description: |-
                   PolicyName is the Snowflake network policy name.
                   Mutually exclusive with PolicyRef.
+                minLength: 1
                 type: string
               policyRef:
                 description: |-
@@ -204,8 +205,8 @@ spec:
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
                 || self.useRole == oldSelf.useRole)
             - message: exactly one of spec.policyName or spec.policyRef must be set
-              rule: '(has(self.policyName) ? 1 : 0) + (has(self.policyRef) ? 1 : 0)
-                == 1'
+              rule: (has(self.policyName) && !has(self.policyRef)) || (!has(self.policyName)
+                && has(self.policyRef))
             - message: spec.targetName is required when targetType is USER
               rule: self.targetType == 'ACCOUNT' || has(self.targetName)
           status:

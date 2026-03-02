@@ -356,7 +356,7 @@ func validateGrantOn(on *GrantOn) []error {
 		onCount++
 
 		schemaCount := 0
-		if on.Schema.SchemaName != "" {
+		if on.Schema.SchemaName != nil {
 			schemaCount++
 		}
 
@@ -364,7 +364,7 @@ func validateGrantOn(on *GrantOn) []error {
 			schemaCount++
 		}
 
-		if on.Schema.AllInDatabase != "" {
+		if on.Schema.AllInDatabase != nil {
 			schemaCount++
 		}
 
@@ -372,7 +372,7 @@ func validateGrantOn(on *GrantOn) []error {
 			schemaCount++
 		}
 
-		if on.Schema.FutureInDatabase != "" {
+		if on.Schema.FutureInDatabase != nil {
 			schemaCount++
 		}
 
@@ -385,15 +385,15 @@ func validateGrantOn(on *GrantOn) []error {
 		}
 
 		// Mutual exclusivity: ref vs raw string.
-		if on.Schema.SchemaName != "" && on.Schema.SchemaRef != nil {
+		if on.Schema.SchemaName != nil && on.Schema.SchemaRef != nil {
 			errs = append(errs, errors.New("spec.on.schema: schemaName and schemaRef are mutually exclusive"))
 		}
 
-		if on.Schema.AllInDatabase != "" && on.Schema.AllInDatabaseRef != nil {
+		if on.Schema.AllInDatabase != nil && on.Schema.AllInDatabaseRef != nil {
 			errs = append(errs, errors.New("spec.on.schema: allInDatabase and allInDatabaseRef are mutually exclusive"))
 		}
 
-		if on.Schema.FutureInDatabase != "" && on.Schema.FutureInDatabaseRef != nil {
+		if on.Schema.FutureInDatabase != nil && on.Schema.FutureInDatabaseRef != nil {
 			errs = append(errs, errors.New("spec.on.schema: futureInDatabase and futureInDatabaseRef are mutually exclusive"))
 		}
 	}
@@ -451,7 +451,7 @@ func (s *AccountRoleGrantSpec) Validate() error {
 
 	// Exactly one of accountRole or accountRoleRef must be set.
 	roleCount := 0
-	if s.AccountRole != "" {
+	if s.AccountRole != nil {
 		roleCount++
 	}
 
@@ -463,7 +463,7 @@ func (s *AccountRoleGrantSpec) Validate() error {
 		errs = append(errs, errors.New("spec: exactly one of accountRole or accountRoleRef must be set"))
 	}
 
-	if s.AccountRole != "" && s.AccountRoleRef != nil {
+	if s.AccountRole != nil && s.AccountRoleRef != nil {
 		errs = append(errs, errors.New("spec: accountRole and accountRoleRef are mutually exclusive"))
 	}
 
@@ -492,7 +492,7 @@ func (s *DatabaseRoleGrantSpec) Validate() error {
 
 	// Exactly one of databaseRole or databaseRoleRef must be set.
 	roleCount := 0
-	if s.DatabaseRole != "" {
+	if s.DatabaseRole != nil {
 		roleCount++
 	}
 
@@ -504,7 +504,7 @@ func (s *DatabaseRoleGrantSpec) Validate() error {
 		errs = append(errs, errors.New("spec: exactly one of databaseRole or databaseRoleRef must be set"))
 	}
 
-	if s.DatabaseRole != "" && s.DatabaseRoleRef != nil {
+	if s.DatabaseRole != nil && s.DatabaseRoleRef != nil {
 		errs = append(errs, errors.New("spec: databaseRole and databaseRoleRef are mutually exclusive"))
 	}
 
@@ -557,7 +557,7 @@ func validateGrantOnBulk(prefix string, b *GrantOnBulk) []error {
 
 	// Count all scope variants (raw + ref).
 	scopeCount := 0
-	if b.InDatabase != "" {
+	if b.InDatabase != nil {
 		scopeCount++
 	}
 
@@ -565,7 +565,7 @@ func validateGrantOnBulk(prefix string, b *GrantOnBulk) []error {
 		scopeCount++
 	}
 
-	if b.InSchema != "" {
+	if b.InSchema != nil {
 		scopeCount++
 	}
 
@@ -578,11 +578,11 @@ func validateGrantOnBulk(prefix string, b *GrantOnBulk) []error {
 	}
 
 	// Mutual exclusivity: ref vs raw string.
-	if b.InDatabase != "" && b.InDatabaseRef != nil {
+	if b.InDatabase != nil && b.InDatabaseRef != nil {
 		errs = append(errs, fmt.Errorf("%s: inDatabase and inDatabaseRef are mutually exclusive", prefix))
 	}
 
-	if b.InSchema != "" && b.InSchemaRef != nil {
+	if b.InSchema != nil && b.InSchemaRef != nil {
 		errs = append(errs, fmt.Errorf("%s: inSchema and inSchemaRef are mutually exclusive", prefix))
 	}
 
@@ -1743,53 +1743,268 @@ func (s *MaterializedViewSpec) Validate() error {
 	return errors.Join(errs...)
 }
 
+// Validate checks the SecretWithClientCredentialsSpec for configuration errors.
+func (s *SecretWithClientCredentialsSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.APIAuthentication == "" {
+		errs = append(errs, errors.New("spec.apiAuthentication is required"))
+	}
+
+	if len(s.OAuthScopes) == 0 {
+		errs = append(errs, errors.New("spec.oauthScopes must contain at least one scope"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the SecretWithAuthorizationCodeGrantSpec for configuration errors.
+func (s *SecretWithAuthorizationCodeGrantSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.APIAuthentication == "" {
+		errs = append(errs, errors.New("spec.apiAuthentication is required"))
+	}
+
+	if s.OAuthRefreshToken == "" {
+		errs = append(errs, errors.New("spec.oauthRefreshToken is required"))
+	}
+
+	if s.OAuthRefreshTokenExpiryTime == "" {
+		errs = append(errs, errors.New("spec.oauthRefreshTokenExpiryTime is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the SecretWithBasicAuthenticationSpec for configuration errors.
+func (s *SecretWithBasicAuthenticationSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.Username == "" {
+		errs = append(errs, errors.New("spec.username is required"))
+	}
+
+	if s.Password == "" {
+		errs = append(errs, errors.New("spec.password is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the SecretWithGenericStringSpec for configuration errors.
+func (s *SecretWithGenericStringSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.SecretString == "" {
+		errs = append(errs, errors.New("spec.secretString is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the APIAuthenticationIntegrationWithClientCredentialsSpec for configuration errors.
+func (s *APIAuthenticationIntegrationWithClientCredentialsSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if s.OAuthClientID == "" {
+		errs = append(errs, errors.New("spec.oauthClientId is required"))
+	}
+
+	if s.OAuthClientSecret == "" {
+		errs = append(errs, errors.New("spec.oauthClientSecret is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the APIAuthenticationIntegrationWithAuthorizationCodeGrantSpec for configuration errors.
+func (s *APIAuthenticationIntegrationWithAuthorizationCodeGrantSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if s.OAuthClientID == "" {
+		errs = append(errs, errors.New("spec.oauthClientId is required"))
+	}
+
+	if s.OAuthClientSecret == "" {
+		errs = append(errs, errors.New("spec.oauthClientSecret is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the APIAuthenticationIntegrationWithJWTBearerSpec for configuration errors.
+func (s *APIAuthenticationIntegrationWithJWTBearerSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if s.OAuthClientID == "" {
+		errs = append(errs, errors.New("spec.oauthClientId is required"))
+	}
+
+	if s.OAuthClientSecret == "" {
+		errs = append(errs, errors.New("spec.oauthClientSecret is required"))
+	}
+
+	if s.OAuthAssertionIssuer == "" {
+		errs = append(errs, errors.New("spec.oauthAssertionIssuer is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
 // ValidFieldExportSourceKinds enumerates the Snowplane managed resource kinds
 // supported as FieldExport sources.
 //
 //nolint:gochecknoglobals // package-level constant set
 var ValidFieldExportSourceKinds = map[string]struct{}{
-	"Alert":                    {},
-	"Database":                 {},
-	"Schema":                   {},
-	"Warehouse":                {},
-	"User":                     {},
-	"AccountRole":              {},
-	"DatabaseRole":             {},
-	"AccountRoleGrant":         {},
-	"DatabaseRoleGrant":        {},
-	"ShareGrant":               {},
-	"Table":                    {},
-	"View":                     {},
-	"Stage":                    {},
-	"Task":                     {},
-	"StreamOnTable":            {},
-	"StreamOnView":             {},
-	"StreamOnExternalTable":    {},
-	"StreamOnDirectoryTable":   {},
-	"StreamOnDynamicTable":     {},
-	"Tag":                      {},
-	"NetworkPolicy":            {},
-	"ResourceMonitor":          {},
-	"MaskingPolicy":            {},
-	"RowAccessPolicy":          {},
-	"GrantOwnership":           {},
-	"StorageIntegration":       {},
-	"SecurityIntegration":      {},
-	"NotificationIntegration":  {},
-	"FileFormat":               {},
-	"Pipe":                     {},
-	"DynamicTable":             {},
-	"PasswordPolicy":           {},
-	"NetworkRule":              {},
-	"AccountRoleAssignment":    {},
-	"DatabaseRoleAssignment":   {},
-	"TagAssociation":           {},
-	"NetworkPolicyAttachment":  {},
-	"PasswordPolicyAttachment": {},
-	"MaskingPolicyApplication": {},
-	"Sequence":                 {},
-	"ExternalTable":            {},
-	"MaterializedView":         {},
+	"Alert":                            {},
+	"Database":                         {},
+	"Schema":                           {},
+	"Warehouse":                        {},
+	"User":                             {},
+	"AccountRole":                      {},
+	"DatabaseRole":                     {},
+	"AccountRoleGrant":                 {},
+	"DatabaseRoleGrant":                {},
+	"ShareGrant":                       {},
+	"Table":                            {},
+	"View":                             {},
+	"Stage":                            {},
+	"Task":                             {},
+	"StreamOnTable":                    {},
+	"StreamOnView":                     {},
+	"StreamOnExternalTable":            {},
+	"StreamOnDirectoryTable":           {},
+	"StreamOnDynamicTable":             {},
+	"Tag":                              {},
+	"NetworkPolicy":                    {},
+	"ResourceMonitor":                  {},
+	"MaskingPolicy":                    {},
+	"RowAccessPolicy":                  {},
+	"GrantOwnership":                   {},
+	"StorageIntegration":               {},
+	"SecurityIntegration":              {},
+	"NotificationIntegration":          {},
+	"FileFormat":                       {},
+	"Pipe":                             {},
+	"DynamicTable":                     {},
+	"PasswordPolicy":                   {},
+	"NetworkRule":                      {},
+	"AccountRoleAssignment":            {},
+	"DatabaseRoleAssignment":           {},
+	"TagAssociation":                   {},
+	"NetworkPolicyAttachment":          {},
+	"PasswordPolicyAttachment":         {},
+	"MaskingPolicyApplication":         {},
+	"Sequence":                         {},
+	"TableConstraint":                  {},
+	"ExternalTable":                    {},
+	"MaterializedView":                 {},
+	"ProcedureSQL":                     {},
+	"ProcedureJavascript":              {},
+	"ProcedurePython":                  {},
+	"ProcedureJava":                    {},
+	"ProcedureScala":                   {},
+	"FunctionSQL":                      {},
+	"FunctionJavascript":               {},
+	"FunctionPython":                   {},
+	"FunctionJava":                     {},
+	"FunctionScala":                    {},
+	"SecretWithClientCredentials":      {},
+	"SecretWithAuthorizationCodeGrant": {},
+	"SecretWithBasicAuthentication":    {},
+	"SecretWithGenericString":          {},
+	"APIAuthenticationIntegrationWithClientCredentials":      {},
+	"APIAuthenticationIntegrationWithAuthorizationCodeGrant": {},
+	"APIAuthenticationIntegrationWithJWTBearer":              {},
 }
 
 // Validate checks that the FieldExport spec fields are semantically valid.
@@ -1897,7 +2112,10 @@ func ValidateDangerousAccountRoleGrant(spec *AccountRoleGrantSpec) error {
 	}
 
 	// Block grants targeting dangerous system roles.
-	target := strings.ToUpper(strings.TrimSpace(spec.AccountRole))
+	var target string
+	if spec.AccountRole != nil {
+		target = strings.ToUpper(strings.TrimSpace(*spec.AccountRole))
+	}
 	if target != "" && DangerousSystemRoles[target] {
 		errs = append(errs, fmt.Errorf(
 			"granting privileges to system role %s is dangerous and blocked by default; "+
@@ -2001,7 +2219,7 @@ func (s *AccountRoleAssignmentSpec) Validate() error {
 
 	// Exactly one of roleName or roleRef must be set.
 	roleCount := 0
-	if s.RoleName != "" {
+	if s.RoleName != nil {
 		roleCount++
 	}
 
@@ -2015,7 +2233,7 @@ func (s *AccountRoleAssignmentSpec) Validate() error {
 
 	// Exactly one of toRole/toRoleRef or toUser/toUserRef must be set.
 	targetCount := 0
-	if s.ToRole != "" {
+	if s.ToRole != nil {
 		targetCount++
 	}
 
@@ -2023,7 +2241,7 @@ func (s *AccountRoleAssignmentSpec) Validate() error {
 		targetCount++
 	}
 
-	if s.ToUser != "" {
+	if s.ToUser != nil {
 		targetCount++
 	}
 
@@ -2095,7 +2313,7 @@ func (s *DatabaseRoleAssignmentSpec) Validate() error {
 
 	// Exactly one of databaseRoleName or databaseRoleRef must be set.
 	roleCount := 0
-	if s.DatabaseRoleName != "" {
+	if s.DatabaseRoleName != nil {
 		roleCount++
 	}
 
@@ -2109,7 +2327,7 @@ func (s *DatabaseRoleAssignmentSpec) Validate() error {
 
 	// Exactly one of toRole/toRoleRef or toDatabaseRole/toDatabaseRoleRef must be set.
 	targetCount := 0
-	if s.ToRole != "" {
+	if s.ToRole != nil {
 		targetCount++
 	}
 
@@ -2117,7 +2335,7 @@ func (s *DatabaseRoleAssignmentSpec) Validate() error {
 		targetCount++
 	}
 
-	if s.ToDatabaseRole != "" {
+	if s.ToDatabaseRole != nil {
 		targetCount++
 	}
 
@@ -2142,7 +2360,7 @@ func (s *TagAssociationSpec) Validate() error {
 
 	// Exactly one of tagName or tagRef must be set.
 	tagCount := 0
-	if s.TagName != "" {
+	if s.TagName != nil {
 		tagCount++
 	}
 
@@ -2181,7 +2399,7 @@ func (s *NetworkPolicyAttachmentSpec) Validate() error {
 
 	// Exactly one of policyName or policyRef must be set.
 	policyCount := 0
-	if s.PolicyName != "" {
+	if s.PolicyName != nil {
 		policyCount++
 	}
 
@@ -2214,7 +2432,7 @@ func (s *PasswordPolicyAttachmentSpec) Validate() error {
 
 	// Exactly one of policyName or policyRef must be set.
 	policyCount := 0
-	if s.PolicyName != "" {
+	if s.PolicyName != nil {
 		policyCount++
 	}
 
@@ -2247,7 +2465,7 @@ func (s *MaskingPolicyApplicationSpec) Validate() error {
 
 	// Exactly one of policyName or policyRef must be set.
 	policyCount := 0
-	if s.PolicyName != "" {
+	if s.PolicyName != nil {
 		policyCount++
 	}
 
@@ -2265,6 +2483,50 @@ func (s *MaskingPolicyApplicationSpec) Validate() error {
 
 	if s.ColumnName == "" {
 		errs = append(errs, errors.New("spec.columnName is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the TableConstraintSpec for configuration errors.
+func (s *TableConstraintSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if s.TableName == "" {
+		errs = append(errs, errors.New("spec.tableName is required"))
+	}
+
+	if s.Type == "" {
+		errs = append(errs, errors.New("spec.type is required"))
+	}
+
+	if len(s.Columns) == 0 {
+		errs = append(errs, errors.New("spec.columns must have at least one entry"))
+	}
+
+	// Foreign key properties validation.
+	if s.Type == ConstraintTypeForeignKey {
+		if s.ForeignKeyProperties == nil {
+			errs = append(errs, errors.New("spec.foreignKeyProperties is required when type is FOREIGN KEY"))
+		} else {
+			if s.ForeignKeyProperties.ReferencesTableName == "" {
+				errs = append(errs, errors.New("spec.foreignKeyProperties.referencesTableName is required"))
+			}
+
+			if len(s.ForeignKeyProperties.ReferencesColumns) == 0 {
+				errs = append(errs, errors.New("spec.foreignKeyProperties.referencesColumns must have at least one entry"))
+			}
+		}
+	} else if s.ForeignKeyProperties != nil {
+		errs = append(errs, errors.New("spec.foreignKeyProperties must not be set when type is not FOREIGN KEY"))
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {

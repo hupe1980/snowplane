@@ -65,7 +65,7 @@ func (a *databaseRoleGrantAdapter) PreReconcile(ctx context.Context, grant *snow
 			return refresolver.HandleRefError(ctx, grant, a.recorder, "DatabaseRole", ref.Name, err)
 		}
 
-		grant.Spec.DatabaseRole = fqn
+		grant.Spec.DatabaseRole = &fqn
 		grant.Spec.DatabaseRoleRef = nil
 	}
 
@@ -88,7 +88,7 @@ func (a *databaseRoleGrantAdapter) PreReconcile(ctx context.Context, grant *snow
 
 // BuildIdentifier constructs a GrantIdentifier from the DatabaseRoleGrant spec.
 func (a *databaseRoleGrantAdapter) BuildIdentifier(grant *snowplanev1alpha1.DatabaseRoleGrant) (reconciler.Identifier, error) {
-	role := grant.Spec.DatabaseRole
+	role := derefStr(grant.Spec.DatabaseRole)
 	toClause := snowflake.BuildToClause("", role, "")
 
 	return buildGrantIdentifier(&grant.Spec.On, grant.Spec.Privilege, toClause, role, grant.Spec.ResolveKind(), false)
@@ -208,7 +208,7 @@ func (a *databaseRoleGrantAdapter) Create(ctx context.Context, svc Service, obj 
 	opts := snowflake.CreateGrantOptions{
 		Privilege:       obj.Spec.Privilege,
 		OnClause:        onClause,
-		ToClause:        snowflake.BuildToClause("", obj.Spec.DatabaseRole, ""),
+		ToClause:        snowflake.BuildToClause("", derefStr(obj.Spec.DatabaseRole), ""),
 		WithGrantOption: obj.Spec.WithGrantOption,
 	}
 
@@ -260,7 +260,7 @@ func (a *databaseRoleGrantAdapter) ApplyObservation(obj *snowplanev1alpha1.Datab
 
 		onClause, err := snowflake.BuildOnClause(on)
 		if err == nil {
-			toClause := snowflake.BuildToClause("", obj.Spec.DatabaseRole, "")
+			toClause := snowflake.BuildToClause("", derefStr(obj.Spec.DatabaseRole), "")
 			obj.Status.FullyQualifiedName = fmt.Sprintf("GRANT %s %s %s", grantObs.ShowOutput.Privilege, onClause, toClause)
 		}
 

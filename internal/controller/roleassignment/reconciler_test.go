@@ -49,6 +49,8 @@ func (m *mockService) RevokeRole(ctx context.Context, opts snowflake.RevokeRoleO
 	return nil
 }
 
+func strPtr(s string) *string { return &s }
+
 func newTestARA(name, ns string) *snowplanev1alpha1.AccountRoleAssignment {
 	return &snowplanev1alpha1.AccountRoleAssignment{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns, Generation: 1},
@@ -57,8 +59,8 @@ func newTestARA(name, ns string) *snowplanev1alpha1.AccountRoleAssignment {
 				DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete,
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
-			RoleName: "ANALYST",
-			ToRole:   "SYSADMIN",
+			RoleName: strPtr("ANALYST"),
+			ToRole:   strPtr("SYSADMIN"),
 		},
 	}
 }
@@ -71,8 +73,8 @@ func newTestDRA(name, ns string) *snowplanev1alpha1.DatabaseRoleAssignment {
 				DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete,
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
-			DatabaseRoleName: "MY_DB.READER",
-			ToRole:           "SYSADMIN",
+			DatabaseRoleName: strPtr("MY_DB.READER"),
+			ToRole:           strPtr("SYSADMIN"),
 		},
 	}
 }
@@ -207,8 +209,8 @@ func TestARA_Grant_ToUser(t *testing.T) {
 	t.Parallel()
 	obj := newTestARA("my-ara", "default")
 	obj.Finalizers = []string{accountRoleAssignmentFinalizer}
-	obj.Spec.ToRole = ""
-	obj.Spec.ToUser = "john"
+	obj.Spec.ToRole = nil
+	obj.Spec.ToUser = strPtr("john")
 	var captured snowflake.GrantRoleOptions
 	first := true
 	mock := &mockService{
@@ -292,8 +294,8 @@ func TestARA_BuildIdentifier_ToUser(t *testing.T) {
 	t.Parallel()
 	a := &accountRoleAssignmentAdapter{}
 	obj := newTestARA("t", "default")
-	obj.Spec.ToRole = ""
-	obj.Spec.ToUser = "john"
+	obj.Spec.ToRole = nil
+	obj.Spec.ToUser = strPtr("john")
 	id, err := a.BuildIdentifier(obj)
 	require.NoError(t, err)
 	raID := id.(snowflake.RoleAssignmentIdentifier)
@@ -313,8 +315,8 @@ func TestResolveAccountTarget(t *testing.T) {
 	t.Run("ToUser", func(t *testing.T) {
 		t.Parallel()
 		obj := newTestARA("t", "d")
-		obj.Spec.ToRole = ""
-		obj.Spec.ToUser = "john"
+		obj.Spec.ToRole = nil
+		obj.Spec.ToUser = strPtr("john")
 		gt, gn := resolveAccountTarget(obj)
 		assert.Equal(t, "USER", gt)
 		assert.Equal(t, "john", gn)
@@ -322,7 +324,7 @@ func TestResolveAccountTarget(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		t.Parallel()
 		obj := newTestARA("t", "d")
-		obj.Spec.ToRole = ""
+		obj.Spec.ToRole = nil
 		gt, gn := resolveAccountTarget(obj)
 		assert.Empty(t, gt)
 		assert.Empty(t, gn)
@@ -332,7 +334,7 @@ func TestResolveAccountTarget(t *testing.T) {
 func TestARA_PreReconcile_RoleRef(t *testing.T) {
 	t.Parallel()
 	obj := newTestARA("my-ara", "default")
-	obj.Spec.RoleName = ""
+	obj.Spec.RoleName = nil
 	obj.Spec.RoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "my-role-cr"}
 	role := readyAccountRole("my-role-cr", "default", "ANALYST")
 	scheme := testutil.TestScheme()
@@ -342,14 +344,14 @@ func TestARA_PreReconcile_RoleRef(t *testing.T) {
 	a := &accountRoleAssignmentAdapter{client: c, recorder: record.NewFakeRecorder(10)}
 	err := a.PreReconcile(context.Background(), obj)
 	require.NoError(t, err)
-	assert.Equal(t, `"ANALYST"`, obj.Spec.RoleName)
+	assert.Equal(t, `"ANALYST"`, *obj.Spec.RoleName)
 	assert.Nil(t, obj.Spec.RoleRef)
 }
 
 func TestARA_PreReconcile_RoleRef_NotFound(t *testing.T) {
 	t.Parallel()
 	obj := newTestARA("my-ara", "default")
-	obj.Spec.RoleName = ""
+	obj.Spec.RoleName = nil
 	obj.Spec.RoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "nonexistent"}
 	scheme := testutil.TestScheme()
 	c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(obj).WithStatusSubresource(
@@ -426,8 +428,8 @@ func TestResolveDatabaseTarget(t *testing.T) {
 	t.Run("ToDatabaseRole", func(t *testing.T) {
 		t.Parallel()
 		obj := newTestDRA("t", "d")
-		obj.Spec.ToRole = ""
-		obj.Spec.ToDatabaseRole = "MY_DB.WRITER"
+		obj.Spec.ToRole = nil
+		obj.Spec.ToDatabaseRole = strPtr("MY_DB.WRITER")
 		gt, gn := resolveDatabaseTarget(obj)
 		assert.Equal(t, "DATABASE_ROLE", gt)
 		assert.Equal(t, "MY_DB.WRITER", gn)
@@ -435,7 +437,7 @@ func TestResolveDatabaseTarget(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		t.Parallel()
 		obj := newTestDRA("t", "d")
-		obj.Spec.ToRole = ""
+		obj.Spec.ToRole = nil
 		gt, gn := resolveDatabaseTarget(obj)
 		assert.Empty(t, gt)
 		assert.Empty(t, gn)
@@ -534,8 +536,8 @@ func TestARA_BuildIdentifier_EmptyTarget(t *testing.T) {
 	t.Parallel()
 	a := &accountRoleAssignmentAdapter{}
 	obj := newTestARA("t", "default")
-	obj.Spec.ToRole = ""
-	obj.Spec.ToUser = ""
+	obj.Spec.ToRole = nil
+	obj.Spec.ToUser = nil
 	_, err := a.BuildIdentifier(obj)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of toRole")
@@ -545,7 +547,7 @@ func TestDRA_BuildIdentifier_EmptyTarget(t *testing.T) {
 	t.Parallel()
 	a := &databaseRoleAssignmentAdapter{}
 	obj := newTestDRA("t", "default")
-	obj.Spec.ToRole = ""
+	obj.Spec.ToRole = nil
 	_, err := a.BuildIdentifier(obj)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of toRole")

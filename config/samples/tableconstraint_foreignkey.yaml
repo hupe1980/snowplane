@@ -1,0 +1,22 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: TableConstraint
+metadata:
+  name: fk-order-customer
+spec:
+  providerRef:
+    name: default
+  deletionPolicy: Delete
+  name: fk_order_customer
+  type: "FOREIGN KEY"
+  tableName: '"MY_DB"."MY_SCHEMA"."ORDERS"'
+  columns:
+    - CUSTOMER_ID
+  foreignKeyProperties:
+    referencesTableName: '"MY_DB"."MY_SCHEMA"."CUSTOMERS"'
+    referencesColumns:
+      - ID
+    onDelete: CASCADE
+    onUpdate: "NO ACTION"
+  properties:
+    enforced: false
+  comment: "Foreign key linking orders to customers"

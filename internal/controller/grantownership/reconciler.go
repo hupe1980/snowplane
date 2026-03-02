@@ -95,12 +95,12 @@ func applyObservation(g *snowplanev1alpha1.GrantOwnership, obs *snowflake.GrantO
 
 // resolveGranteeName extracts the resolved grantee name from the spec.
 func resolveGranteeName(g *snowplanev1alpha1.GrantOwnership) string {
-	if g.Spec.AccountRole != "" {
-		return g.Spec.AccountRole
+	if g.Spec.AccountRole != nil {
+		return *g.Spec.AccountRole
 	}
 
-	if g.Spec.DatabaseRole != "" {
-		return g.Spec.DatabaseRole
+	if g.Spec.DatabaseRole != nil {
+		return *g.Spec.DatabaseRole
 	}
 
 	return ""
@@ -108,7 +108,17 @@ func resolveGranteeName(g *snowplanev1alpha1.GrantOwnership) string {
 
 // buildToRole constructs the TO clause value (e.g. "ROLE MY_ROLE").
 func buildToRole(g *snowplanev1alpha1.GrantOwnership) string {
-	return snowflake.BuildToClause(g.Spec.AccountRole, g.Spec.DatabaseRole, "")
+	accountRole := ""
+	if g.Spec.AccountRole != nil {
+		accountRole = *g.Spec.AccountRole
+	}
+
+	databaseRole := ""
+	if g.Spec.DatabaseRole != nil {
+		databaseRole = *g.Spec.DatabaseRole
+	}
+
+	return snowflake.BuildToClause(accountRole, databaseRole, "")
 }
 
 func detectDrift(g *snowplanev1alpha1.GrantOwnership, obs *snowflake.GrantOwnershipObservation) *drift.Result {

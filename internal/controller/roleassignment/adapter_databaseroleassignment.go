@@ -68,7 +68,7 @@ func (a *databaseRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *s
 			return refresolver.HandleRefError(ctx, obj, a.recorder, "DatabaseRole", ref.Name, err)
 		}
 
-		obj.Spec.DatabaseRoleName = fqn
+		obj.Spec.DatabaseRoleName = &fqn
 		obj.Spec.DatabaseRoleRef = nil
 	}
 
@@ -81,7 +81,7 @@ func (a *databaseRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *s
 			return refresolver.HandleRefError(ctx, obj, a.recorder, "AccountRole", ref.Name, err)
 		}
 
-		obj.Spec.ToRole = name
+		obj.Spec.ToRole = &name
 		obj.Spec.ToRoleRef = nil
 	}
 
@@ -94,7 +94,7 @@ func (a *databaseRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *s
 			return refresolver.HandleRefError(ctx, obj, a.recorder, "DatabaseRole", ref.Name, err)
 		}
 
-		obj.Spec.ToDatabaseRole = fqn
+		obj.Spec.ToDatabaseRole = &fqn
 		obj.Spec.ToDatabaseRoleRef = nil
 	}
 
@@ -114,7 +114,7 @@ func (a *databaseRoleAssignmentAdapter) BuildIdentifier(obj *snowplanev1alpha1.D
 	}
 
 	return snowflake.RoleAssignmentIdentifier{
-		RoleName:       obj.Spec.DatabaseRoleName,
+		RoleName:       derefStr(obj.Spec.DatabaseRoleName),
 		IsDatabaseRole: true,
 		GrantedTo:      grantedTo,
 		GranteeName:    granteeName,
@@ -244,10 +244,10 @@ func (a *databaseRoleAssignmentAdapter) Observe(ctx context.Context, svc Service
 // Create grants the database role in Snowflake.
 func (a *databaseRoleAssignmentAdapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha1.DatabaseRoleAssignment, _ reconciler.Identifier) error {
 	opts := snowflake.GrantRoleOptions{
-		RoleName:       obj.Spec.DatabaseRoleName,
+		RoleName:       derefStr(obj.Spec.DatabaseRoleName),
 		IsDatabaseRole: true,
-		ToRole:         obj.Spec.ToRole,
-		ToDatabaseRole: obj.Spec.ToDatabaseRole,
+		ToRole:         derefStr(obj.Spec.ToRole),
+		ToDatabaseRole: derefStr(obj.Spec.ToDatabaseRole),
 	}
 
 	return svc.GrantRole(ctx, opts)
@@ -284,7 +284,7 @@ func (a *databaseRoleAssignmentAdapter) ApplyObservation(obj *snowplanev1alpha1.
 	if raObs.ShowOutput != nil {
 		grantedTo, granteeName := resolveDatabaseTarget(obj)
 		id := snowflake.RoleAssignmentIdentifier{
-			RoleName:       obj.Spec.DatabaseRoleName,
+			RoleName:       derefStr(obj.Spec.DatabaseRoleName),
 			IsDatabaseRole: true,
 			GrantedTo:      grantedTo,
 			GranteeName:    granteeName,
@@ -307,12 +307,12 @@ func (a *databaseRoleAssignmentAdapter) DetectDrift(obj *snowplanev1alpha1.Datab
 
 // resolveDatabaseTarget determines the grantedTo category and grantee name from the spec.
 func resolveDatabaseTarget(obj *snowplanev1alpha1.DatabaseRoleAssignment) (grantedTo, granteeName string) {
-	if obj.Spec.ToRole != "" {
-		return "ROLE", obj.Spec.ToRole
+	if obj.Spec.ToRole != nil {
+		return "ROLE", *obj.Spec.ToRole
 	}
 
-	if obj.Spec.ToDatabaseRole != "" {
-		return "DATABASE_ROLE", obj.Spec.ToDatabaseRole
+	if obj.Spec.ToDatabaseRole != nil {
+		return "DATABASE_ROLE", *obj.Spec.ToDatabaseRole
 	}
 
 	return "", ""

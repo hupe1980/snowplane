@@ -23,12 +23,20 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	accountrolectl "github.com/hupe1980/snowplane/internal/controller/accountrole"
 	alertctl "github.com/hupe1980/snowplane/internal/controller/alert"
+	apiauthacgctl "github.com/hupe1980/snowplane/internal/controller/apiauthenticationintegrationwithauthorizationcodegrant"
+	apiauthccctl "github.com/hupe1980/snowplane/internal/controller/apiauthenticationintegrationwithclientcredentials"
+	apiauthjwtctl "github.com/hupe1980/snowplane/internal/controller/apiauthenticationintegrationwithjwtbearer"
 	database "github.com/hupe1980/snowplane/internal/controller/database"
 	databaserolectl "github.com/hupe1980/snowplane/internal/controller/databaserole"
 	dynamictablectl "github.com/hupe1980/snowplane/internal/controller/dynamictable"
 	externaltablectl "github.com/hupe1980/snowplane/internal/controller/externaltable"
 	fieldexportctl "github.com/hupe1980/snowplane/internal/controller/fieldexport"
 	fileformatctl "github.com/hupe1980/snowplane/internal/controller/fileformat"
+	functionjavactl "github.com/hupe1980/snowplane/internal/controller/functionjava"
+	functionjavascriptctl "github.com/hupe1980/snowplane/internal/controller/functionjavascript"
+	functionpythonctl "github.com/hupe1980/snowplane/internal/controller/functionpython"
+	functionscalactl "github.com/hupe1980/snowplane/internal/controller/functionscala"
+	functionsqlctl "github.com/hupe1980/snowplane/internal/controller/functionsql"
 	grantctl "github.com/hupe1980/snowplane/internal/controller/grant"
 	grantownershipctl "github.com/hupe1980/snowplane/internal/controller/grantownership"
 	maskingpolicyctl "github.com/hupe1980/snowplane/internal/controller/maskingpolicy"
@@ -41,12 +49,21 @@ import (
 	passwordpolicyctl "github.com/hupe1980/snowplane/internal/controller/passwordpolicy"
 	passwordpolicyattachmentctl "github.com/hupe1980/snowplane/internal/controller/passwordpolicyattachment"
 	pipectl "github.com/hupe1980/snowplane/internal/controller/pipe"
+	procedurejavactl "github.com/hupe1980/snowplane/internal/controller/procedurejava"
+	procedurejavascriptctl "github.com/hupe1980/snowplane/internal/controller/procedurejavascript"
+	procedurepythonctl "github.com/hupe1980/snowplane/internal/controller/procedurepython"
+	procedurescalactl "github.com/hupe1980/snowplane/internal/controller/procedurescala"
+	proceduresqlctl "github.com/hupe1980/snowplane/internal/controller/proceduresql"
 	providerconfig "github.com/hupe1980/snowplane/internal/controller/providerconfig"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	resourcemonitorctl "github.com/hupe1980/snowplane/internal/controller/resourcemonitor"
 	roleassignmentctl "github.com/hupe1980/snowplane/internal/controller/roleassignment"
 	rowaccesspolicyctl "github.com/hupe1980/snowplane/internal/controller/rowaccesspolicy"
 	schemactl "github.com/hupe1980/snowplane/internal/controller/schema"
+	secretwithauthorizationcodegrantctl "github.com/hupe1980/snowplane/internal/controller/secretwithauthorizationcodegrant"
+	secretwithbasicauthenticationctl "github.com/hupe1980/snowplane/internal/controller/secretwithbasicauthentication"
+	secretwithclientcredentialsctl "github.com/hupe1980/snowplane/internal/controller/secretwithclientcredentials"
+	secretwithgenericstringctl "github.com/hupe1980/snowplane/internal/controller/secretwithgenericstring"
 	securityintegrationctl "github.com/hupe1980/snowplane/internal/controller/securityintegration"
 	sequencectl "github.com/hupe1980/snowplane/internal/controller/sequence"
 	stagectl "github.com/hupe1980/snowplane/internal/controller/stage"
@@ -57,6 +74,7 @@ import (
 	streamontablectl "github.com/hupe1980/snowplane/internal/controller/streamontable"
 	streamonviewctl "github.com/hupe1980/snowplane/internal/controller/streamonview"
 	tablectl "github.com/hupe1980/snowplane/internal/controller/table"
+	tableconstraintctl "github.com/hupe1980/snowplane/internal/controller/tableconstraint"
 	tagctl "github.com/hupe1980/snowplane/internal/controller/tag"
 	tagassociationctl "github.com/hupe1980/snowplane/internal/controller/tagassociation"
 	taskctl "github.com/hupe1980/snowplane/internal/controller/task"
@@ -82,49 +100,67 @@ func init() {
 
 // validControllerNames is the set of controller names accepted by --disable-controllers.
 var validControllerNames = map[string]bool{
-	"alert":                    true,
-	"database":                 true,
-	"schema":                   true,
-	"warehouse":                true,
-	"accountrole":              true,
-	"databaserole":             true,
-	"accountrolegrant":         true,
-	"databaserolegrant":        true,
-	"sharegrant":               true,
-	"user":                     true,
-	"table":                    true,
-	"view":                     true,
-	"stage":                    true,
-	"task":                     true,
-	"streamontable":            true,
-	"streamonview":             true,
-	"streamonexternaltable":    true,
-	"streamondirectorytable":   true,
-	"streamondynamictable":     true,
-	"tag":                      true,
-	"networkpolicy":            true,
-	"resourcemonitor":          true,
-	"maskingpolicy":            true,
-	"rowaccesspolicy":          true,
-	"grantownership":           true,
-	"fieldexport":              true,
-	"storageintegration":       true,
-	"fileformat":               true,
-	"pipe":                     true,
-	"dynamictable":             true,
-	"notificationintegration":  true,
-	"securityintegration":      true,
-	"passwordpolicy":           true,
-	"networkrule":              true,
-	"accountroleassignment":    true,
-	"databaseroleassignment":   true,
-	"tagassociation":           true,
-	"networkpolicyattachment":  true,
-	"passwordpolicyattachment": true,
-	"maskingpolicyapplication": true,
-	"sequence":                 true,
-	"externaltable":            true,
-	"materializedview":         true,
+	"alert":                            true,
+	"database":                         true,
+	"schema":                           true,
+	"warehouse":                        true,
+	"accountrole":                      true,
+	"databaserole":                     true,
+	"accountrolegrant":                 true,
+	"databaserolegrant":                true,
+	"sharegrant":                       true,
+	"user":                             true,
+	"table":                            true,
+	"view":                             true,
+	"stage":                            true,
+	"task":                             true,
+	"streamontable":                    true,
+	"streamonview":                     true,
+	"streamonexternaltable":            true,
+	"streamondirectorytable":           true,
+	"streamondynamictable":             true,
+	"tag":                              true,
+	"networkpolicy":                    true,
+	"resourcemonitor":                  true,
+	"maskingpolicy":                    true,
+	"rowaccesspolicy":                  true,
+	"grantownership":                   true,
+	"fieldexport":                      true,
+	"storageintegration":               true,
+	"fileformat":                       true,
+	"pipe":                             true,
+	"dynamictable":                     true,
+	"notificationintegration":          true,
+	"securityintegration":              true,
+	"passwordpolicy":                   true,
+	"networkrule":                      true,
+	"accountroleassignment":            true,
+	"databaseroleassignment":           true,
+	"tagassociation":                   true,
+	"networkpolicyattachment":          true,
+	"passwordpolicyattachment":         true,
+	"maskingpolicyapplication":         true,
+	"sequence":                         true,
+	"externaltable":                    true,
+	"materializedview":                 true,
+	"proceduresql":                     true,
+	"procedurejavascript":              true,
+	"procedurepython":                  true,
+	"procedurejava":                    true,
+	"procedurescala":                   true,
+	"functionsql":                      true,
+	"functionjavascript":               true,
+	"functionpython":                   true,
+	"functionjava":                     true,
+	"functionscala":                    true,
+	"tableconstraint":                  true,
+	"secretwithclientcredentials":      true,
+	"secretwithauthorizationcodegrant": true,
+	"secretwithbasicauthentication":    true,
+	"secretwithgenericstring":          true,
+	"apiauthenticationintegrationwithclientcredentials":      true,
+	"apiauthenticationintegrationwithauthorizationcodegrant": true,
+	"apiauthenticationintegrationwithjwtbearer":              true,
 }
 
 // parseDisabledControllers parses a comma-separated list of controller names
@@ -388,6 +424,24 @@ func main() {
 		{"sequence", sequencectl.NewReconciler(kc, factory, controllerRec("sequence"), rl)},
 		{"externaltable", externaltablectl.NewReconciler(kc, factory, controllerRec("externaltable"), rl)},
 		{"materializedview", materializedviewctl.NewReconciler(kc, factory, controllerRec("materializedview"), rl)},
+		{"proceduresql", proceduresqlctl.NewReconciler(kc, factory, controllerRec("proceduresql"), rl)},
+		{"procedurejavascript", procedurejavascriptctl.NewReconciler(kc, factory, controllerRec("procedurejavascript"), rl)},
+		{"procedurepython", procedurepythonctl.NewReconciler(kc, factory, controllerRec("procedurepython"), rl)},
+		{"procedurejava", procedurejavactl.NewReconciler(kc, factory, controllerRec("procedurejava"), rl)},
+		{"procedurescala", procedurescalactl.NewReconciler(kc, factory, controllerRec("procedurescala"), rl)},
+		{"functionsql", functionsqlctl.NewReconciler(kc, factory, controllerRec("functionsql"), rl)},
+		{"functionjavascript", functionjavascriptctl.NewReconciler(kc, factory, controllerRec("functionjavascript"), rl)},
+		{"functionpython", functionpythonctl.NewReconciler(kc, factory, controllerRec("functionpython"), rl)},
+		{"functionjava", functionjavactl.NewReconciler(kc, factory, controllerRec("functionjava"), rl)},
+		{"functionscala", functionscalactl.NewReconciler(kc, factory, controllerRec("functionscala"), rl)},
+		{"tableconstraint", tableconstraintctl.NewReconciler(kc, factory, controllerRec("tableconstraint"), rl)},
+		{"secretwithclientcredentials", secretwithclientcredentialsctl.NewReconciler(kc, factory, controllerRec("secretwithclientcredentials"), rl)},
+		{"secretwithauthorizationcodegrant", secretwithauthorizationcodegrantctl.NewReconciler(kc, factory, controllerRec("secretwithauthorizationcodegrant"), rl)},
+		{"secretwithbasicauthentication", secretwithbasicauthenticationctl.NewReconciler(kc, factory, controllerRec("secretwithbasicauthentication"), rl)},
+		{"secretwithgenericstring", secretwithgenericstringctl.NewReconciler(kc, factory, controllerRec("secretwithgenericstring"), rl)},
+		{"apiauthenticationintegrationwithclientcredentials", apiauthccctl.NewReconciler(kc, factory, controllerRec("apiauthenticationintegrationwithclientcredentials"), rl)},
+		{"apiauthenticationintegrationwithauthorizationcodegrant", apiauthacgctl.NewReconciler(kc, factory, controllerRec("apiauthenticationintegrationwithauthorizationcodegrant"), rl)},
+		{"apiauthenticationintegrationwithjwtbearer", apiauthjwtctl.NewReconciler(kc, factory, controllerRec("apiauthenticationintegrationwithjwtbearer"), rl)},
 	}
 
 	for _, entry := range controllers {

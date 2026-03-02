@@ -209,16 +209,16 @@ func TestDeepCopy_GrantOn_NestedPointerIsolation(t *testing.T) {
 			ObjectName: "DB1",
 		},
 		Schema: &GrantOnSchema{
-			SchemaName: "DB1.PUBLIC",
+			SchemaName: strPtr("DB1.PUBLIC"),
 		},
 		SchemaObject: &GrantOnSchemaObject{
 			ObjectType: "TABLE",
 			ObjectName: "DB1.PUBLIC.T1",
 			All: &GrantOnBulk{
-				InDatabase: "DB1",
+				InDatabase: strPtr("DB1"),
 			},
 			Future: &GrantOnBulk{
-				InSchema: "DB1.PUBLIC",
+				InSchema: strPtr("DB1.PUBLIC"),
 			},
 		},
 	}
@@ -228,21 +228,21 @@ func TestDeepCopy_GrantOn_NestedPointerIsolation(t *testing.T) {
 
 	// Mutate level 1 struct pointers.
 	copied.AccountObject.ObjectName = "MUTATED"
-	copied.Schema.SchemaName = "MUTATED"
+	copied.Schema.SchemaName = strPtr("MUTATED")
 	copied.SchemaObject.ObjectName = "MUTATED"
 
 	// Mutate level 2 nested pointers (GrantOnBulk).
-	copied.SchemaObject.All.InDatabase = "MUTATED"
-	copied.SchemaObject.Future.InSchema = "MUTATED"
+	copied.SchemaObject.All.InDatabase = strPtr("MUTATED")
+	copied.SchemaObject.Future.InSchema = strPtr("MUTATED")
 
 	// Original level 1 unchanged.
 	assert.Equal(t, "DB1", orig.AccountObject.ObjectName)
-	assert.Equal(t, "DB1.PUBLIC", orig.Schema.SchemaName)
+	assert.Equal(t, "DB1.PUBLIC", *orig.Schema.SchemaName)
 	assert.Equal(t, "DB1.PUBLIC.T1", orig.SchemaObject.ObjectName)
 
 	// Original level 2 unchanged.
-	assert.Equal(t, "DB1", orig.SchemaObject.All.InDatabase)
-	assert.Equal(t, "DB1.PUBLIC", orig.SchemaObject.Future.InSchema)
+	assert.Equal(t, "DB1", *orig.SchemaObject.All.InDatabase)
+	assert.Equal(t, "DB1.PUBLIC", *orig.SchemaObject.Future.InSchema)
 }
 
 // TestDeepCopy_AccountRoleGrantSpec_FullIsolation tests the complete AccountRoleGrantSpec with all
@@ -257,22 +257,22 @@ func TestDeepCopy_AccountRoleGrantSpec_FullIsolation(t *testing.T) {
 				ObjectType: "TABLE",
 				ObjectName: "DB.SCH.T",
 				All: &GrantOnBulk{
-					InSchema: "DB.SCH",
+					InSchema: strPtr("DB.SCH"),
 				},
 			},
 		},
-		AccountRole:     "ANALYST",
+		AccountRole:     strPtr("ANALYST"),
 		WithGrantOption: true,
 	}
 
 	copied := orig.DeepCopy()
 	copied.On.SchemaObject.ObjectName = "MUTATED"
-	copied.On.SchemaObject.All.InSchema = "MUTATED"
-	copied.AccountRole = "MUTATED"
+	copied.On.SchemaObject.All.InSchema = strPtr("MUTATED")
+	copied.AccountRole = strPtr("MUTATED")
 
 	assert.Equal(t, "DB.SCH.T", orig.On.SchemaObject.ObjectName)
-	assert.Equal(t, "DB.SCH", orig.On.SchemaObject.All.InSchema)
-	assert.Equal(t, "ANALYST", orig.AccountRole)
+	assert.Equal(t, "DB.SCH", *orig.On.SchemaObject.All.InSchema)
+	assert.Equal(t, "ANALYST", *orig.AccountRole)
 }
 
 // TestDeepCopy_TableSpec_ColumnPointerIsolation tests that column pointer

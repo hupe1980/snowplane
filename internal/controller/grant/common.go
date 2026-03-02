@@ -37,12 +37,12 @@ func onToParams(on *snowplanev1alpha1.GrantOn) snowflake.OnClauseParams {
 	}
 
 	if s := on.Schema; s != nil {
-		if s.SchemaName != "" {
-			p.SchemaName = s.SchemaName
-		} else if s.AllInDatabase != "" {
-			p.AllSchemasInDB = s.AllInDatabase
-		} else if s.FutureInDatabase != "" {
-			p.FutureSchemasInDB = s.FutureInDatabase
+		if s.SchemaName != nil {
+			p.SchemaName = *s.SchemaName
+		} else if s.AllInDatabase != nil {
+			p.AllSchemasInDB = *s.AllInDatabase
+		} else if s.FutureInDatabase != nil {
+			p.FutureSchemasInDB = *s.FutureInDatabase
 		}
 
 		return p
@@ -54,12 +54,12 @@ func onToParams(on *snowplanev1alpha1.GrantOn) snowflake.OnClauseParams {
 			p.SchemaObjectName = so.ObjectName
 		} else if so.All != nil {
 			p.AllObjectsTypePlural = so.All.ObjectTypePlural
-			p.AllObjectsInDB = so.All.InDatabase
-			p.AllObjectsInSchema = so.All.InSchema
+			p.AllObjectsInDB = derefStr(so.All.InDatabase)
+			p.AllObjectsInSchema = derefStr(so.All.InSchema)
 		} else if so.Future != nil {
 			p.FutureObjectsTypePlural = so.Future.ObjectTypePlural
-			p.FutureObjectsInDB = so.Future.InDatabase
-			p.FutureObjectsInSchema = so.Future.InSchema
+			p.FutureObjectsInDB = derefStr(so.Future.InDatabase)
+			p.FutureObjectsInSchema = derefStr(so.Future.InSchema)
 		}
 
 		return p
@@ -77,7 +77,7 @@ func resolveOnRefs(ctx context.Context, client sigs.Client, ns string, on *snowp
 				return handleErr("Schema", ref.Name, err)
 			}
 
-			on.Schema.SchemaName = fqn
+			on.Schema.SchemaName = &fqn
 			on.Schema.SchemaRef = nil
 		}
 
@@ -87,7 +87,7 @@ func resolveOnRefs(ctx context.Context, client sigs.Client, ns string, on *snowp
 				return handleErr("Database", ref.Name, err)
 			}
 
-			on.Schema.AllInDatabase = fqn
+			on.Schema.AllInDatabase = &fqn
 			on.Schema.AllInDatabaseRef = nil
 		}
 
@@ -97,7 +97,7 @@ func resolveOnRefs(ctx context.Context, client sigs.Client, ns string, on *snowp
 				return handleErr("Database", ref.Name, err)
 			}
 
-			on.Schema.FutureInDatabase = fqn
+			on.Schema.FutureInDatabase = &fqn
 			on.Schema.FutureInDatabaseRef = nil
 		}
 	}
@@ -110,7 +110,7 @@ func resolveOnRefs(ctx context.Context, client sigs.Client, ns string, on *snowp
 					return handleErr("Database", ref.Name, err)
 				}
 
-				bulk.InDatabase = fqn
+				bulk.InDatabase = &fqn
 				bulk.InDatabaseRef = nil
 			}
 
@@ -120,7 +120,7 @@ func resolveOnRefs(ctx context.Context, client sigs.Client, ns string, on *snowp
 					return handleErr("Schema", ref.Name, err)
 				}
 
-				bulk.InSchema = fqn
+				bulk.InSchema = &fqn
 				bulk.InSchemaRef = nil
 			}
 		}
@@ -132,7 +132,7 @@ func resolveOnRefs(ctx context.Context, client sigs.Client, ns string, on *snowp
 					return handleErr("Database", ref.Name, err)
 				}
 
-				bulk.InDatabase = fqn
+				bulk.InDatabase = &fqn
 				bulk.InDatabaseRef = nil
 			}
 
@@ -142,13 +142,22 @@ func resolveOnRefs(ctx context.Context, client sigs.Client, ns string, on *snowp
 					return handleErr("Schema", ref.Name, err)
 				}
 
-				bulk.InSchema = fqn
+				bulk.InSchema = &fqn
 				bulk.InSchemaRef = nil
 			}
 		}
 	}
 
 	return nil
+}
+
+// derefStr safely dereferences a *string, returning "" if nil.
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+
+	return *s
 }
 
 // buildGrantIdentifier builds a GrantIdentifier from components.

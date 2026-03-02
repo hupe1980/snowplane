@@ -59,6 +59,8 @@ func (m *mockService) Drop(ctx context.Context, id snowflake.GrantOwnershipIdent
 // Helpers
 // --------------------------------------------------------------------------
 
+func strPtr(s string) *string { return &s }
+
 func newTestGrantOwnership(name, namespace string) *snowplanev1alpha1.GrantOwnership {
 	return &snowplanev1alpha1.GrantOwnership{
 		ObjectMeta: metav1.ObjectMeta{
@@ -73,7 +75,7 @@ func newTestGrantOwnership(name, namespace string) *snowplanev1alpha1.GrantOwner
 			},
 			ObjectType:  "DATABASE",
 			ObjectName:  "MY_DB",
-			AccountRole: "DATA_ADMIN",
+			AccountRole: strPtr("DATA_ADMIN"),
 		},
 	}
 }
@@ -418,7 +420,7 @@ func TestReconcile_ImmutableGrantee(t *testing.T) {
 
 	g := newTestGrantOwnership("mygo", "default")
 	g.Finalizers = []string{finalizerName}
-	g.Spec.AccountRole = "NEW_ROLE"
+	g.Spec.AccountRole = strPtr("NEW_ROLE")
 	g.Status.ObservedGeneration = 1
 	g.Status.ShowOutput = &snowplanev1alpha1.GrantOwnershipShowOutput{
 		GranteeName: "OLD_ROLE",
@@ -458,7 +460,7 @@ func TestResolveGranteeName_AccountRole(t *testing.T) {
 
 	g := &snowplanev1alpha1.GrantOwnership{
 		Spec: snowplanev1alpha1.GrantOwnershipSpec{
-			AccountRole: "ADMIN",
+			AccountRole: strPtr("ADMIN"),
 		},
 	}
 	assert.Equal(t, "ADMIN", resolveGranteeName(g))
@@ -469,7 +471,7 @@ func TestResolveGranteeName_DatabaseRole(t *testing.T) {
 
 	g := &snowplanev1alpha1.GrantOwnership{
 		Spec: snowplanev1alpha1.GrantOwnershipSpec{
-			DatabaseRole: "DB_READER",
+			DatabaseRole: strPtr("DB_READER"),
 		},
 	}
 	assert.Equal(t, "DB_READER", resolveGranteeName(g))
@@ -489,7 +491,7 @@ func TestBuildToRole(t *testing.T) {
 
 	g := &snowplanev1alpha1.GrantOwnership{
 		Spec: snowplanev1alpha1.GrantOwnershipSpec{
-			AccountRole: "ADMIN",
+			AccountRole: strPtr("ADMIN"),
 		},
 	}
 	result := buildToRole(g)
@@ -519,7 +521,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 
 	g := &snowplanev1alpha1.GrantOwnership{
 		Spec: snowplanev1alpha1.GrantOwnershipSpec{
-			AccountRole: "DATA_ADMIN",
+			AccountRole: strPtr("DATA_ADMIN"),
 		},
 	}
 
@@ -538,7 +540,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 
 	g := &snowplanev1alpha1.GrantOwnership{
 		Spec: snowplanev1alpha1.GrantOwnershipSpec{
-			AccountRole: "ADMIN",
+			AccountRole: strPtr("ADMIN"),
 		},
 	}
 

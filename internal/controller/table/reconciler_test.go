@@ -565,7 +565,7 @@ func TestBuildCreateOptions_WithConstraints(t *testing.T) {
 	t.Parallel()
 
 	table := newTestTable("mytable", "default")
-	table.Spec.Constraints = []snowplanev1alpha1.TableConstraint{
+	table.Spec.Constraints = []snowplanev1alpha1.InlineTableConstraint{
 		{
 			Name:    "pk_id",
 			Type:    snowplanev1alpha1.TableConstraintPrimaryKey,

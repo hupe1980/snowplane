@@ -51,7 +51,7 @@ func (a *adapter) PreReconcile(ctx context.Context, g *snowplanev1alpha1.GrantOw
 			return err
 		}
 
-		g.Spec.AccountRole = name
+		g.Spec.AccountRole = &name
 		g.Spec.AccountRoleRef = nil
 	}
 
@@ -64,7 +64,7 @@ func (a *adapter) PreReconcile(ctx context.Context, g *snowplanev1alpha1.GrantOw
 			return err
 		}
 
-		g.Spec.DatabaseRole = name
+		g.Spec.DatabaseRole = &name
 		g.Spec.DatabaseRoleRef = nil
 	}
 

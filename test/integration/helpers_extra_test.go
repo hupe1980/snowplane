@@ -288,7 +288,7 @@ func newTestGrantOwnership(name, objectType, objectName, accountRole string) *sn
 			},
 			ObjectType:  objectType,
 			ObjectName:  objectName,
-			AccountRole: accountRole,
+			AccountRole: &accountRole,
 		},
 	}
 }
@@ -303,8 +303,8 @@ func newTestAccountRoleAssignment(name, roleName, toRole string) *snowplanev1alp
 			CommonSpec: snowplanev1alpha1.CommonSpec{
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
-			RoleName: roleName,
-			ToRole:   toRole,
+			RoleName: &roleName,
+			ToRole:   &toRole,
 		},
 	}
 }
@@ -319,8 +319,8 @@ func newTestDatabaseRoleAssignment(name, databaseRoleName, toRole string) *snowp
 			CommonSpec: snowplanev1alpha1.CommonSpec{
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
-			DatabaseRoleName: databaseRoleName,
-			ToRole:           toRole,
+			DatabaseRoleName: &databaseRoleName,
+			ToRole:           &toRole,
 		},
 	}
 }

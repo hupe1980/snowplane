@@ -23,7 +23,7 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.usingColumns) == has(self.usingColumns) && (!has(self.usingColumns) || self.usingColumns == oldSelf.usingColumns)",message="spec.usingColumns is immutable (delete and recreate the resource to change)"
 //
 // Mutual exclusivity rules:
-// +kubebuilder:validation:XValidation:rule="(has(self.policyName) ? 1 : 0) + (has(self.policyRef) ? 1 : 0) == 1",message="exactly one of spec.policyName or spec.policyRef must be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.policyName) && !has(self.policyRef)) || (!has(self.policyName) && has(self.policyRef))",message="exactly one of spec.policyName or spec.policyRef must be set"
 type MaskingPolicyApplicationSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -31,7 +31,8 @@ type MaskingPolicyApplicationSpec struct {
 	// (e.g. "MY_DB"."MY_SCHEMA"."MY_MASKING_POLICY").
 	// Mutually exclusive with PolicyRef.
 	// +optional
-	PolicyName string `json:"policyName,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	PolicyName *string `json:"policyName,omitempty"`
 
 	// PolicyRef references a MaskingPolicy CR in the same namespace.
 	// When set, the policy name is resolved from the CR's fullyQualifiedName.
@@ -100,8 +101,10 @@ type MaskingPolicyApplicationList struct {
 
 // GetSpecName returns a human-readable composite name for the application.
 func (r *MaskingPolicyApplication) GetSpecName() string {
-	policy := r.Spec.PolicyName
-	if policy == "" && r.Spec.PolicyRef != nil {
+	var policy string
+	if r.Spec.PolicyName != nil {
+		policy = *r.Spec.PolicyName
+	} else if r.Spec.PolicyRef != nil {
 		policy = fmt.Sprintf("ref:%s", r.Spec.PolicyRef.Name)
 	}
 

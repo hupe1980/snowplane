@@ -68,7 +68,7 @@ func (a *accountRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *sn
 			return refresolver.HandleRefError(ctx, obj, a.recorder, "AccountRole", ref.Name, err)
 		}
 
-		obj.Spec.RoleName = name
+		obj.Spec.RoleName = &name
 		obj.Spec.RoleRef = nil
 	}
 
@@ -81,7 +81,7 @@ func (a *accountRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *sn
 			return refresolver.HandleRefError(ctx, obj, a.recorder, "AccountRole", ref.Name, err)
 		}
 
-		obj.Spec.ToRole = name
+		obj.Spec.ToRole = &name
 		obj.Spec.ToRoleRef = nil
 	}
 
@@ -94,7 +94,7 @@ func (a *accountRoleAssignmentAdapter) PreReconcile(ctx context.Context, obj *sn
 			return refresolver.HandleRefError(ctx, obj, a.recorder, "User", ref.Name, err)
 		}
 
-		obj.Spec.ToUser = name
+		obj.Spec.ToUser = &name
 		obj.Spec.ToUserRef = nil
 	}
 
@@ -114,7 +114,7 @@ func (a *accountRoleAssignmentAdapter) BuildIdentifier(obj *snowplanev1alpha1.Ac
 	}
 
 	return snowflake.RoleAssignmentIdentifier{
-		RoleName:       obj.Spec.RoleName,
+		RoleName:       derefStr(obj.Spec.RoleName),
 		IsDatabaseRole: false,
 		GrantedTo:      grantedTo,
 		GranteeName:    granteeName,
@@ -244,10 +244,10 @@ func (a *accountRoleAssignmentAdapter) Observe(ctx context.Context, svc Service,
 // Create grants the role in Snowflake.
 func (a *accountRoleAssignmentAdapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha1.AccountRoleAssignment, _ reconciler.Identifier) error {
 	opts := snowflake.GrantRoleOptions{
-		RoleName:       obj.Spec.RoleName,
+		RoleName:       derefStr(obj.Spec.RoleName),
 		IsDatabaseRole: false,
-		ToRole:         obj.Spec.ToRole,
-		ToUser:         obj.Spec.ToUser,
+		ToRole:         derefStr(obj.Spec.ToRole),
+		ToUser:         derefStr(obj.Spec.ToUser),
 	}
 
 	return svc.GrantRole(ctx, opts)
@@ -285,7 +285,7 @@ func (a *accountRoleAssignmentAdapter) ApplyObservation(obj *snowplanev1alpha1.A
 	if raObs.ShowOutput != nil {
 		grantedTo, granteeName := resolveAccountTarget(obj)
 		id := snowflake.RoleAssignmentIdentifier{
-			RoleName:       obj.Spec.RoleName,
+			RoleName:       derefStr(obj.Spec.RoleName),
 			IsDatabaseRole: false,
 			GrantedTo:      grantedTo,
 			GranteeName:    granteeName,
@@ -308,12 +308,12 @@ func (a *accountRoleAssignmentAdapter) DetectDrift(obj *snowplanev1alpha1.Accoun
 
 // resolveAccountTarget determines the grantedTo category and grantee name from the spec.
 func resolveAccountTarget(obj *snowplanev1alpha1.AccountRoleAssignment) (grantedTo, granteeName string) {
-	if obj.Spec.ToRole != "" {
-		return "ROLE", obj.Spec.ToRole
+	if obj.Spec.ToRole != nil {
+		return "ROLE", *obj.Spec.ToRole
 	}
 
-	if obj.Spec.ToUser != "" {
-		return "USER", obj.Spec.ToUser
+	if obj.Spec.ToUser != nil {
+		return "USER", *obj.Spec.ToUser
 	}
 
 	return "", ""

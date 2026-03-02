@@ -72,12 +72,12 @@ ci: lint vet security test build
 # Generate deepcopy methods, CRD manifests, and accessor boilerplate
 generate:
     go run hack/gen-accessors/main.go
-    controller-gen object paths="./api/v1alpha1"
-    controller-gen crd paths="./api/..." output:crd:artifacts:config=config/crd/bases
+    go tool controller-gen object paths="./api/v1alpha1"
+    go tool controller-gen crd paths="./api/..." output:crd:artifacts:config=config/crd/bases
 
 # Generate CRD manifests only
 manifests:
-    controller-gen crd paths="./api/..." output:crd:artifacts:config=config/crd/bases
+    go tool controller-gen crd paths="./api/..." output:crd:artifacts:config=config/crd/bases
 
 # Sync generated CRDs into the Helm chart
 sync-crds: manifests

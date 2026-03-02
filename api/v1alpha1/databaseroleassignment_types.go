@@ -24,7 +24,7 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 //
 // Mutual exclusivity rules:
-// +kubebuilder:validation:XValidation:rule="(has(self.databaseRoleName) ? 1 : 0) + (has(self.databaseRoleRef) ? 1 : 0) == 1",message="exactly one of spec.databaseRoleName or spec.databaseRoleRef must be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.databaseRoleName) && !has(self.databaseRoleRef)) || (!has(self.databaseRoleName) && has(self.databaseRoleRef))",message="exactly one of spec.databaseRoleName or spec.databaseRoleRef must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.toRole) ? 1 : 0) + (has(self.toRoleRef) ? 1 : 0) + (has(self.toDatabaseRole) ? 1 : 0) + (has(self.toDatabaseRoleRef) ? 1 : 0) == 1",message="exactly one of spec.toRole, spec.toRoleRef, spec.toDatabaseRole, or spec.toDatabaseRoleRef must be set"
 type DatabaseRoleAssignmentSpec struct {
 	CommonSpec `json:",inline"`
@@ -32,7 +32,8 @@ type DatabaseRoleAssignmentSpec struct {
 	// DatabaseRoleName is the fully qualified name of the database role to assign (e.g. MY_DB.MY_ROLE).
 	// Mutually exclusive with DatabaseRoleRef.
 	// +optional
-	DatabaseRoleName string `json:"databaseRoleName,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	DatabaseRoleName *string `json:"databaseRoleName,omitempty"`
 
 	// DatabaseRoleRef references a DatabaseRole CR in the same namespace.
 	// When set, the database role name is resolved from the CR's fullyQualifiedName.
@@ -43,7 +44,8 @@ type DatabaseRoleAssignmentSpec struct {
 	// ToRole is the name of the account role to assign the database role to.
 	// Mutually exclusive with ToRoleRef, ToDatabaseRole, ToDatabaseRoleRef.
 	// +optional
-	ToRole string `json:"toRole,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	ToRole *string `json:"toRole,omitempty"`
 
 	// ToRoleRef references an AccountRole CR in the same namespace.
 	// When set, the target role name is resolved from the CR's spec.name.
@@ -54,7 +56,8 @@ type DatabaseRoleAssignmentSpec struct {
 	// ToDatabaseRole is the fully qualified name of the database role to assign to (e.g. MY_DB.MY_ROLE).
 	// Mutually exclusive with ToDatabaseRoleRef, ToRole, ToRoleRef.
 	// +optional
-	ToDatabaseRole string `json:"toDatabaseRole,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	ToDatabaseRole *string `json:"toDatabaseRole,omitempty"`
 
 	// ToDatabaseRoleRef references a DatabaseRole CR in the same namespace.
 	// When set, the target database role name is resolved from the CR's fullyQualifiedName.
@@ -101,7 +104,11 @@ type DatabaseRoleAssignmentList struct {
 
 // GetSpecName returns a human-readable composite name for the role assignment.
 func (r *DatabaseRoleAssignment) GetSpecName() string {
-	role := r.Spec.DatabaseRoleName
+	var role string
+	if r.Spec.DatabaseRoleName != nil {
+		role = *r.Spec.DatabaseRoleName
+	}
+
 	if role == "" && r.Spec.DatabaseRoleRef != nil {
 		role = "(ref: " + r.Spec.DatabaseRoleRef.Name + ")"
 	}
@@ -113,16 +120,16 @@ func (r *DatabaseRoleAssignment) GetSpecName() string {
 
 // resolvedTarget returns a string describing who the database role is assigned to.
 func (r *DatabaseRoleAssignment) resolvedTarget() string {
-	if r.Spec.ToRole != "" {
-		return "ROLE " + r.Spec.ToRole
+	if r.Spec.ToRole != nil {
+		return "ROLE " + *r.Spec.ToRole
 	}
 
 	if r.Spec.ToRoleRef != nil {
 		return "ROLE (ref: " + r.Spec.ToRoleRef.Name + ")"
 	}
 
-	if r.Spec.ToDatabaseRole != "" {
-		return "DATABASE ROLE " + r.Spec.ToDatabaseRole
+	if r.Spec.ToDatabaseRole != nil {
+		return "DATABASE ROLE " + *r.Spec.ToDatabaseRole
 	}
 
 	if r.Spec.ToDatabaseRoleRef != nil {

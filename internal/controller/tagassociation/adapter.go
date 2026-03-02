@@ -63,12 +63,12 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.TagAs
 			return refresolver.HandleRefError(ctx, obj, a.recorder, "Tag", ref.Name, err)
 		}
 
-		obj.Spec.TagName = fqn
+		obj.Spec.TagName = &fqn
 		obj.Status.TagName = fqn
 
 		logger.V(1).Info("tagassociation tagRef resolved", "tagName", fqn)
-	} else if obj.Spec.TagName != "" {
-		obj.Status.TagName = obj.Spec.TagName
+	} else if obj.Spec.TagName != nil {
+		obj.Status.TagName = *obj.Spec.TagName
 	}
 
 	return nil
@@ -76,12 +76,12 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.TagAs
 
 // BuildIdentifier constructs a TagAssociationIdentifier from the spec.
 func (a *adapter) BuildIdentifier(obj *snowplanev1alpha1.TagAssociation) (reconciler.Identifier, error) {
-	if obj.Spec.TagName == "" {
+	if obj.Spec.TagName == nil || *obj.Spec.TagName == "" {
 		return nil, fmt.Errorf("tagName must be set (either directly or via tagRef)")
 	}
 
 	return snowflake.TagAssociationIdentifier{
-		TagName:    obj.Spec.TagName,
+		TagName:    *obj.Spec.TagName,
 		ObjectType: obj.Spec.ObjectType,
 		ObjectName: obj.Spec.ObjectName,
 	}, nil
@@ -139,7 +139,7 @@ func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identi
 // Create sets the tag on the object in Snowflake.
 func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha1.TagAssociation, _ reconciler.Identifier) error {
 	return svc.SetTag(ctx, snowflake.SetTagOptions{
-		TagName:    obj.Spec.TagName,
+		TagName:    *obj.Spec.TagName,
 		TagValue:   obj.Spec.TagValue,
 		ObjectType: obj.Spec.ObjectType,
 		ObjectName: obj.Spec.ObjectName,
@@ -199,7 +199,7 @@ func (a *adapter) BuildAlterOptions(_ context.Context, obj *snowplanev1alpha1.Ta
 
 	return &tagAssociationAlterOptions{
 		setOpts: snowflake.SetTagOptions{
-			TagName:    obj.Spec.TagName,
+			TagName:    *obj.Spec.TagName,
 			TagValue:   obj.Spec.TagValue,
 			ObjectType: obj.Spec.ObjectType,
 			ObjectName: obj.Spec.ObjectName,
@@ -212,7 +212,7 @@ func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.TagAssociation, obs *r
 	detail := obs.Detail
 	if detail != nil && detail.Exists {
 		obj.Status.FullyQualifiedName = snowflake.TagAssociationIdentifier{
-			TagName:    obj.Spec.TagName,
+			TagName:    *obj.Spec.TagName,
 			ObjectType: obj.Spec.ObjectType,
 			ObjectName: obj.Spec.ObjectName,
 		}.FullyQualifiedName()
@@ -238,7 +238,7 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.TagAssociation, obs *reconc
 
 		// Immutable fields — comparing against the identifier.
 		if obj.Status.TagName != "" {
-			d.CompareStringValueFold("TAG_NAME", obj.Spec.TagName, obj.Status.TagName, true)
+			d.CompareStringValueFold("TAG_NAME", *obj.Spec.TagName, obj.Status.TagName, true)
 		}
 
 		d.CompareStringValueFold("OBJECT_TYPE", obj.Spec.ObjectType, obj.Spec.ObjectType, true)

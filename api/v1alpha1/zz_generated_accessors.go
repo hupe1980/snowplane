@@ -2806,6 +2806,1493 @@ func (mv *MaterializedView) SetTrackedParametersList(val []string) {
 }
 
 // ---------------------------------------------------------------------------
+// ProcedureSQL
+// ---------------------------------------------------------------------------
+
+func (p *ProcedureSQL) GetConditions() []metav1.Condition {
+	return p.Status.Conditions
+}
+
+func (p *ProcedureSQL) SetConditions(conditions []metav1.Condition) {
+	p.Status.Conditions = conditions
+}
+
+func (p *ProcedureSQL) GetDeletionPolicy() DeletionPolicy {
+	if p.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return p.Spec.DeletionPolicy
+}
+
+func (p *ProcedureSQL) GetFullyQualifiedName() string {
+	return p.Status.FullyQualifiedName
+}
+
+func (p *ProcedureSQL) GetProviderRef() ProviderReference {
+	return p.Spec.ProviderRef
+}
+
+func (p *ProcedureSQL) GetSpecName() string {
+	return p.Spec.Name
+}
+
+func (p *ProcedureSQL) GetUseRole() *string {
+	return p.Spec.UseRole
+}
+
+func (p *ProcedureSQL) GetPaused() bool {
+	return p.Spec.Paused
+}
+
+func (p *ProcedureSQL) GetManagementPolicies() ManagementPolicies {
+	return p.Spec.ManagementPolicies
+}
+
+func (p *ProcedureSQL) SetCreateOrAlter(val *bool) {
+	p.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (p *ProcedureSQL) GetObservedGeneration() int64 {
+	return p.Status.ObservedGeneration
+}
+
+func (p *ProcedureSQL) SetObservedGeneration(val int64) {
+	p.Status.ObservedGeneration = val
+}
+
+func (p *ProcedureSQL) GetLastAppliedSpecHash() string {
+	return p.Status.LastAppliedSpecHash
+}
+
+func (p *ProcedureSQL) SetLastAppliedSpecHash(val string) {
+	p.Status.LastAppliedSpecHash = val
+}
+
+func (p *ProcedureSQL) ValidateSpec() error {
+	return p.Spec.Validate()
+}
+
+func (p *ProcedureSQL) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(p.Spec)
+}
+
+func (p *ProcedureSQL) GetOwner() string {
+	if p.Status.ShowOutput != nil {
+		return p.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (p *ProcedureSQL) GetTrackedParametersList() []string {
+	return p.Status.TrackedParameters
+}
+
+func (p *ProcedureSQL) SetTrackedParametersList(val []string) {
+	p.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// ProcedureJavascript
+// ---------------------------------------------------------------------------
+
+func (p *ProcedureJavascript) GetConditions() []metav1.Condition {
+	return p.Status.Conditions
+}
+
+func (p *ProcedureJavascript) SetConditions(conditions []metav1.Condition) {
+	p.Status.Conditions = conditions
+}
+
+func (p *ProcedureJavascript) GetDeletionPolicy() DeletionPolicy {
+	if p.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return p.Spec.DeletionPolicy
+}
+
+func (p *ProcedureJavascript) GetFullyQualifiedName() string {
+	return p.Status.FullyQualifiedName
+}
+
+func (p *ProcedureJavascript) GetProviderRef() ProviderReference {
+	return p.Spec.ProviderRef
+}
+
+func (p *ProcedureJavascript) GetSpecName() string {
+	return p.Spec.Name
+}
+
+func (p *ProcedureJavascript) GetUseRole() *string {
+	return p.Spec.UseRole
+}
+
+func (p *ProcedureJavascript) GetPaused() bool {
+	return p.Spec.Paused
+}
+
+func (p *ProcedureJavascript) GetManagementPolicies() ManagementPolicies {
+	return p.Spec.ManagementPolicies
+}
+
+func (p *ProcedureJavascript) SetCreateOrAlter(val *bool) {
+	p.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (p *ProcedureJavascript) GetObservedGeneration() int64 {
+	return p.Status.ObservedGeneration
+}
+
+func (p *ProcedureJavascript) SetObservedGeneration(val int64) {
+	p.Status.ObservedGeneration = val
+}
+
+func (p *ProcedureJavascript) GetLastAppliedSpecHash() string {
+	return p.Status.LastAppliedSpecHash
+}
+
+func (p *ProcedureJavascript) SetLastAppliedSpecHash(val string) {
+	p.Status.LastAppliedSpecHash = val
+}
+
+func (p *ProcedureJavascript) ValidateSpec() error {
+	return p.Spec.Validate()
+}
+
+func (p *ProcedureJavascript) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(p.Spec)
+}
+
+func (p *ProcedureJavascript) GetOwner() string {
+	if p.Status.ShowOutput != nil {
+		return p.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (p *ProcedureJavascript) GetTrackedParametersList() []string {
+	return p.Status.TrackedParameters
+}
+
+func (p *ProcedureJavascript) SetTrackedParametersList(val []string) {
+	p.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// ProcedurePython
+// ---------------------------------------------------------------------------
+
+func (p *ProcedurePython) GetConditions() []metav1.Condition {
+	return p.Status.Conditions
+}
+
+func (p *ProcedurePython) SetConditions(conditions []metav1.Condition) {
+	p.Status.Conditions = conditions
+}
+
+func (p *ProcedurePython) GetDeletionPolicy() DeletionPolicy {
+	if p.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return p.Spec.DeletionPolicy
+}
+
+func (p *ProcedurePython) GetFullyQualifiedName() string {
+	return p.Status.FullyQualifiedName
+}
+
+func (p *ProcedurePython) GetProviderRef() ProviderReference {
+	return p.Spec.ProviderRef
+}
+
+func (p *ProcedurePython) GetSpecName() string {
+	return p.Spec.Name
+}
+
+func (p *ProcedurePython) GetUseRole() *string {
+	return p.Spec.UseRole
+}
+
+func (p *ProcedurePython) GetPaused() bool {
+	return p.Spec.Paused
+}
+
+func (p *ProcedurePython) GetManagementPolicies() ManagementPolicies {
+	return p.Spec.ManagementPolicies
+}
+
+func (p *ProcedurePython) SetCreateOrAlter(val *bool) {
+	p.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (p *ProcedurePython) GetObservedGeneration() int64 {
+	return p.Status.ObservedGeneration
+}
+
+func (p *ProcedurePython) SetObservedGeneration(val int64) {
+	p.Status.ObservedGeneration = val
+}
+
+func (p *ProcedurePython) GetLastAppliedSpecHash() string {
+	return p.Status.LastAppliedSpecHash
+}
+
+func (p *ProcedurePython) SetLastAppliedSpecHash(val string) {
+	p.Status.LastAppliedSpecHash = val
+}
+
+func (p *ProcedurePython) ValidateSpec() error {
+	return p.Spec.Validate()
+}
+
+func (p *ProcedurePython) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(p.Spec)
+}
+
+func (p *ProcedurePython) GetOwner() string {
+	if p.Status.ShowOutput != nil {
+		return p.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (p *ProcedurePython) GetTrackedParametersList() []string {
+	return p.Status.TrackedParameters
+}
+
+func (p *ProcedurePython) SetTrackedParametersList(val []string) {
+	p.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// ProcedureJava
+// ---------------------------------------------------------------------------
+
+func (p *ProcedureJava) GetConditions() []metav1.Condition {
+	return p.Status.Conditions
+}
+
+func (p *ProcedureJava) SetConditions(conditions []metav1.Condition) {
+	p.Status.Conditions = conditions
+}
+
+func (p *ProcedureJava) GetDeletionPolicy() DeletionPolicy {
+	if p.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return p.Spec.DeletionPolicy
+}
+
+func (p *ProcedureJava) GetFullyQualifiedName() string {
+	return p.Status.FullyQualifiedName
+}
+
+func (p *ProcedureJava) GetProviderRef() ProviderReference {
+	return p.Spec.ProviderRef
+}
+
+func (p *ProcedureJava) GetSpecName() string {
+	return p.Spec.Name
+}
+
+func (p *ProcedureJava) GetUseRole() *string {
+	return p.Spec.UseRole
+}
+
+func (p *ProcedureJava) GetPaused() bool {
+	return p.Spec.Paused
+}
+
+func (p *ProcedureJava) GetManagementPolicies() ManagementPolicies {
+	return p.Spec.ManagementPolicies
+}
+
+func (p *ProcedureJava) SetCreateOrAlter(val *bool) {
+	p.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (p *ProcedureJava) GetObservedGeneration() int64 {
+	return p.Status.ObservedGeneration
+}
+
+func (p *ProcedureJava) SetObservedGeneration(val int64) {
+	p.Status.ObservedGeneration = val
+}
+
+func (p *ProcedureJava) GetLastAppliedSpecHash() string {
+	return p.Status.LastAppliedSpecHash
+}
+
+func (p *ProcedureJava) SetLastAppliedSpecHash(val string) {
+	p.Status.LastAppliedSpecHash = val
+}
+
+func (p *ProcedureJava) ValidateSpec() error {
+	return p.Spec.Validate()
+}
+
+func (p *ProcedureJava) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(p.Spec)
+}
+
+func (p *ProcedureJava) GetOwner() string {
+	if p.Status.ShowOutput != nil {
+		return p.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (p *ProcedureJava) GetTrackedParametersList() []string {
+	return p.Status.TrackedParameters
+}
+
+func (p *ProcedureJava) SetTrackedParametersList(val []string) {
+	p.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// ProcedureScala
+// ---------------------------------------------------------------------------
+
+func (p *ProcedureScala) GetConditions() []metav1.Condition {
+	return p.Status.Conditions
+}
+
+func (p *ProcedureScala) SetConditions(conditions []metav1.Condition) {
+	p.Status.Conditions = conditions
+}
+
+func (p *ProcedureScala) GetDeletionPolicy() DeletionPolicy {
+	if p.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return p.Spec.DeletionPolicy
+}
+
+func (p *ProcedureScala) GetFullyQualifiedName() string {
+	return p.Status.FullyQualifiedName
+}
+
+func (p *ProcedureScala) GetProviderRef() ProviderReference {
+	return p.Spec.ProviderRef
+}
+
+func (p *ProcedureScala) GetSpecName() string {
+	return p.Spec.Name
+}
+
+func (p *ProcedureScala) GetUseRole() *string {
+	return p.Spec.UseRole
+}
+
+func (p *ProcedureScala) GetPaused() bool {
+	return p.Spec.Paused
+}
+
+func (p *ProcedureScala) GetManagementPolicies() ManagementPolicies {
+	return p.Spec.ManagementPolicies
+}
+
+func (p *ProcedureScala) SetCreateOrAlter(val *bool) {
+	p.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (p *ProcedureScala) GetObservedGeneration() int64 {
+	return p.Status.ObservedGeneration
+}
+
+func (p *ProcedureScala) SetObservedGeneration(val int64) {
+	p.Status.ObservedGeneration = val
+}
+
+func (p *ProcedureScala) GetLastAppliedSpecHash() string {
+	return p.Status.LastAppliedSpecHash
+}
+
+func (p *ProcedureScala) SetLastAppliedSpecHash(val string) {
+	p.Status.LastAppliedSpecHash = val
+}
+
+func (p *ProcedureScala) ValidateSpec() error {
+	return p.Spec.Validate()
+}
+
+func (p *ProcedureScala) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(p.Spec)
+}
+
+func (p *ProcedureScala) GetOwner() string {
+	if p.Status.ShowOutput != nil {
+		return p.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (p *ProcedureScala) GetTrackedParametersList() []string {
+	return p.Status.TrackedParameters
+}
+
+func (p *ProcedureScala) SetTrackedParametersList(val []string) {
+	p.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// FunctionSQL
+// ---------------------------------------------------------------------------
+
+func (f *FunctionSQL) GetConditions() []metav1.Condition {
+	return f.Status.Conditions
+}
+
+func (f *FunctionSQL) SetConditions(conditions []metav1.Condition) {
+	f.Status.Conditions = conditions
+}
+
+func (f *FunctionSQL) GetDeletionPolicy() DeletionPolicy {
+	if f.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return f.Spec.DeletionPolicy
+}
+
+func (f *FunctionSQL) GetFullyQualifiedName() string {
+	return f.Status.FullyQualifiedName
+}
+
+func (f *FunctionSQL) GetProviderRef() ProviderReference {
+	return f.Spec.ProviderRef
+}
+
+func (f *FunctionSQL) GetSpecName() string {
+	return f.Spec.Name
+}
+
+func (f *FunctionSQL) GetUseRole() *string {
+	return f.Spec.UseRole
+}
+
+func (f *FunctionSQL) GetPaused() bool {
+	return f.Spec.Paused
+}
+
+func (f *FunctionSQL) GetManagementPolicies() ManagementPolicies {
+	return f.Spec.ManagementPolicies
+}
+
+func (f *FunctionSQL) SetCreateOrAlter(val *bool) {
+	f.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (f *FunctionSQL) GetObservedGeneration() int64 {
+	return f.Status.ObservedGeneration
+}
+
+func (f *FunctionSQL) SetObservedGeneration(val int64) {
+	f.Status.ObservedGeneration = val
+}
+
+func (f *FunctionSQL) GetLastAppliedSpecHash() string {
+	return f.Status.LastAppliedSpecHash
+}
+
+func (f *FunctionSQL) SetLastAppliedSpecHash(val string) {
+	f.Status.LastAppliedSpecHash = val
+}
+
+func (f *FunctionSQL) ValidateSpec() error {
+	return f.Spec.Validate()
+}
+
+func (f *FunctionSQL) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(f.Spec)
+}
+
+func (f *FunctionSQL) GetOwner() string {
+	if f.Status.ShowOutput != nil {
+		return f.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (f *FunctionSQL) GetTrackedParametersList() []string {
+	return f.Status.TrackedParameters
+}
+
+func (f *FunctionSQL) SetTrackedParametersList(val []string) {
+	f.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// FunctionJavascript
+// ---------------------------------------------------------------------------
+
+func (f *FunctionJavascript) GetConditions() []metav1.Condition {
+	return f.Status.Conditions
+}
+
+func (f *FunctionJavascript) SetConditions(conditions []metav1.Condition) {
+	f.Status.Conditions = conditions
+}
+
+func (f *FunctionJavascript) GetDeletionPolicy() DeletionPolicy {
+	if f.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return f.Spec.DeletionPolicy
+}
+
+func (f *FunctionJavascript) GetFullyQualifiedName() string {
+	return f.Status.FullyQualifiedName
+}
+
+func (f *FunctionJavascript) GetProviderRef() ProviderReference {
+	return f.Spec.ProviderRef
+}
+
+func (f *FunctionJavascript) GetSpecName() string {
+	return f.Spec.Name
+}
+
+func (f *FunctionJavascript) GetUseRole() *string {
+	return f.Spec.UseRole
+}
+
+func (f *FunctionJavascript) GetPaused() bool {
+	return f.Spec.Paused
+}
+
+func (f *FunctionJavascript) GetManagementPolicies() ManagementPolicies {
+	return f.Spec.ManagementPolicies
+}
+
+func (f *FunctionJavascript) SetCreateOrAlter(val *bool) {
+	f.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (f *FunctionJavascript) GetObservedGeneration() int64 {
+	return f.Status.ObservedGeneration
+}
+
+func (f *FunctionJavascript) SetObservedGeneration(val int64) {
+	f.Status.ObservedGeneration = val
+}
+
+func (f *FunctionJavascript) GetLastAppliedSpecHash() string {
+	return f.Status.LastAppliedSpecHash
+}
+
+func (f *FunctionJavascript) SetLastAppliedSpecHash(val string) {
+	f.Status.LastAppliedSpecHash = val
+}
+
+func (f *FunctionJavascript) ValidateSpec() error {
+	return f.Spec.Validate()
+}
+
+func (f *FunctionJavascript) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(f.Spec)
+}
+
+func (f *FunctionJavascript) GetOwner() string {
+	if f.Status.ShowOutput != nil {
+		return f.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (f *FunctionJavascript) GetTrackedParametersList() []string {
+	return f.Status.TrackedParameters
+}
+
+func (f *FunctionJavascript) SetTrackedParametersList(val []string) {
+	f.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// FunctionPython
+// ---------------------------------------------------------------------------
+
+func (f *FunctionPython) GetConditions() []metav1.Condition {
+	return f.Status.Conditions
+}
+
+func (f *FunctionPython) SetConditions(conditions []metav1.Condition) {
+	f.Status.Conditions = conditions
+}
+
+func (f *FunctionPython) GetDeletionPolicy() DeletionPolicy {
+	if f.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return f.Spec.DeletionPolicy
+}
+
+func (f *FunctionPython) GetFullyQualifiedName() string {
+	return f.Status.FullyQualifiedName
+}
+
+func (f *FunctionPython) GetProviderRef() ProviderReference {
+	return f.Spec.ProviderRef
+}
+
+func (f *FunctionPython) GetSpecName() string {
+	return f.Spec.Name
+}
+
+func (f *FunctionPython) GetUseRole() *string {
+	return f.Spec.UseRole
+}
+
+func (f *FunctionPython) GetPaused() bool {
+	return f.Spec.Paused
+}
+
+func (f *FunctionPython) GetManagementPolicies() ManagementPolicies {
+	return f.Spec.ManagementPolicies
+}
+
+func (f *FunctionPython) SetCreateOrAlter(val *bool) {
+	f.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (f *FunctionPython) GetObservedGeneration() int64 {
+	return f.Status.ObservedGeneration
+}
+
+func (f *FunctionPython) SetObservedGeneration(val int64) {
+	f.Status.ObservedGeneration = val
+}
+
+func (f *FunctionPython) GetLastAppliedSpecHash() string {
+	return f.Status.LastAppliedSpecHash
+}
+
+func (f *FunctionPython) SetLastAppliedSpecHash(val string) {
+	f.Status.LastAppliedSpecHash = val
+}
+
+func (f *FunctionPython) ValidateSpec() error {
+	return f.Spec.Validate()
+}
+
+func (f *FunctionPython) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(f.Spec)
+}
+
+func (f *FunctionPython) GetOwner() string {
+	if f.Status.ShowOutput != nil {
+		return f.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (f *FunctionPython) GetTrackedParametersList() []string {
+	return f.Status.TrackedParameters
+}
+
+func (f *FunctionPython) SetTrackedParametersList(val []string) {
+	f.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// FunctionJava
+// ---------------------------------------------------------------------------
+
+func (f *FunctionJava) GetConditions() []metav1.Condition {
+	return f.Status.Conditions
+}
+
+func (f *FunctionJava) SetConditions(conditions []metav1.Condition) {
+	f.Status.Conditions = conditions
+}
+
+func (f *FunctionJava) GetDeletionPolicy() DeletionPolicy {
+	if f.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return f.Spec.DeletionPolicy
+}
+
+func (f *FunctionJava) GetFullyQualifiedName() string {
+	return f.Status.FullyQualifiedName
+}
+
+func (f *FunctionJava) GetProviderRef() ProviderReference {
+	return f.Spec.ProviderRef
+}
+
+func (f *FunctionJava) GetSpecName() string {
+	return f.Spec.Name
+}
+
+func (f *FunctionJava) GetUseRole() *string {
+	return f.Spec.UseRole
+}
+
+func (f *FunctionJava) GetPaused() bool {
+	return f.Spec.Paused
+}
+
+func (f *FunctionJava) GetManagementPolicies() ManagementPolicies {
+	return f.Spec.ManagementPolicies
+}
+
+func (f *FunctionJava) SetCreateOrAlter(val *bool) {
+	f.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (f *FunctionJava) GetObservedGeneration() int64 {
+	return f.Status.ObservedGeneration
+}
+
+func (f *FunctionJava) SetObservedGeneration(val int64) {
+	f.Status.ObservedGeneration = val
+}
+
+func (f *FunctionJava) GetLastAppliedSpecHash() string {
+	return f.Status.LastAppliedSpecHash
+}
+
+func (f *FunctionJava) SetLastAppliedSpecHash(val string) {
+	f.Status.LastAppliedSpecHash = val
+}
+
+func (f *FunctionJava) ValidateSpec() error {
+	return f.Spec.Validate()
+}
+
+func (f *FunctionJava) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(f.Spec)
+}
+
+func (f *FunctionJava) GetOwner() string {
+	if f.Status.ShowOutput != nil {
+		return f.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (f *FunctionJava) GetTrackedParametersList() []string {
+	return f.Status.TrackedParameters
+}
+
+func (f *FunctionJava) SetTrackedParametersList(val []string) {
+	f.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// FunctionScala
+// ---------------------------------------------------------------------------
+
+func (f *FunctionScala) GetConditions() []metav1.Condition {
+	return f.Status.Conditions
+}
+
+func (f *FunctionScala) SetConditions(conditions []metav1.Condition) {
+	f.Status.Conditions = conditions
+}
+
+func (f *FunctionScala) GetDeletionPolicy() DeletionPolicy {
+	if f.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return f.Spec.DeletionPolicy
+}
+
+func (f *FunctionScala) GetFullyQualifiedName() string {
+	return f.Status.FullyQualifiedName
+}
+
+func (f *FunctionScala) GetProviderRef() ProviderReference {
+	return f.Spec.ProviderRef
+}
+
+func (f *FunctionScala) GetSpecName() string {
+	return f.Spec.Name
+}
+
+func (f *FunctionScala) GetUseRole() *string {
+	return f.Spec.UseRole
+}
+
+func (f *FunctionScala) GetPaused() bool {
+	return f.Spec.Paused
+}
+
+func (f *FunctionScala) GetManagementPolicies() ManagementPolicies {
+	return f.Spec.ManagementPolicies
+}
+
+func (f *FunctionScala) SetCreateOrAlter(val *bool) {
+	f.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (f *FunctionScala) GetObservedGeneration() int64 {
+	return f.Status.ObservedGeneration
+}
+
+func (f *FunctionScala) SetObservedGeneration(val int64) {
+	f.Status.ObservedGeneration = val
+}
+
+func (f *FunctionScala) GetLastAppliedSpecHash() string {
+	return f.Status.LastAppliedSpecHash
+}
+
+func (f *FunctionScala) SetLastAppliedSpecHash(val string) {
+	f.Status.LastAppliedSpecHash = val
+}
+
+func (f *FunctionScala) ValidateSpec() error {
+	return f.Spec.Validate()
+}
+
+func (f *FunctionScala) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(f.Spec)
+}
+
+func (f *FunctionScala) GetOwner() string {
+	if f.Status.ShowOutput != nil {
+		return f.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (f *FunctionScala) GetTrackedParametersList() []string {
+	return f.Status.TrackedParameters
+}
+
+func (f *FunctionScala) SetTrackedParametersList(val []string) {
+	f.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// SecretWithClientCredentials
+// ---------------------------------------------------------------------------
+
+func (s *SecretWithClientCredentials) GetConditions() []metav1.Condition {
+	return s.Status.Conditions
+}
+
+func (s *SecretWithClientCredentials) SetConditions(conditions []metav1.Condition) {
+	s.Status.Conditions = conditions
+}
+
+func (s *SecretWithClientCredentials) GetDeletionPolicy() DeletionPolicy {
+	if s.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return s.Spec.DeletionPolicy
+}
+
+func (s *SecretWithClientCredentials) GetFullyQualifiedName() string {
+	return s.Status.FullyQualifiedName
+}
+
+func (s *SecretWithClientCredentials) GetProviderRef() ProviderReference {
+	return s.Spec.ProviderRef
+}
+
+func (s *SecretWithClientCredentials) GetSpecName() string {
+	return s.Spec.Name
+}
+
+func (s *SecretWithClientCredentials) GetUseRole() *string {
+	return s.Spec.UseRole
+}
+
+func (s *SecretWithClientCredentials) GetPaused() bool {
+	return s.Spec.Paused
+}
+
+func (s *SecretWithClientCredentials) GetManagementPolicies() ManagementPolicies {
+	return s.Spec.ManagementPolicies
+}
+
+func (s *SecretWithClientCredentials) SetCreateOrAlter(val *bool) {
+	s.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (s *SecretWithClientCredentials) GetObservedGeneration() int64 {
+	return s.Status.ObservedGeneration
+}
+
+func (s *SecretWithClientCredentials) SetObservedGeneration(val int64) {
+	s.Status.ObservedGeneration = val
+}
+
+func (s *SecretWithClientCredentials) GetLastAppliedSpecHash() string {
+	return s.Status.LastAppliedSpecHash
+}
+
+func (s *SecretWithClientCredentials) SetLastAppliedSpecHash(val string) {
+	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *SecretWithClientCredentials) ValidateSpec() error {
+	return s.Spec.Validate()
+}
+
+func (s *SecretWithClientCredentials) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(s.Spec)
+}
+
+func (s *SecretWithClientCredentials) GetOwner() string {
+	if s.Status.ShowOutput != nil && s.Status.ShowOutput.Owner != nil {
+		return *s.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (s *SecretWithClientCredentials) GetTrackedParametersList() []string {
+	return s.Status.TrackedParameters
+}
+
+func (s *SecretWithClientCredentials) SetTrackedParametersList(val []string) {
+	s.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// SecretWithAuthorizationCodeGrant
+// ---------------------------------------------------------------------------
+
+func (s *SecretWithAuthorizationCodeGrant) GetConditions() []metav1.Condition {
+	return s.Status.Conditions
+}
+
+func (s *SecretWithAuthorizationCodeGrant) SetConditions(conditions []metav1.Condition) {
+	s.Status.Conditions = conditions
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetDeletionPolicy() DeletionPolicy {
+	if s.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return s.Spec.DeletionPolicy
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetFullyQualifiedName() string {
+	return s.Status.FullyQualifiedName
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetProviderRef() ProviderReference {
+	return s.Spec.ProviderRef
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetSpecName() string {
+	return s.Spec.Name
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetUseRole() *string {
+	return s.Spec.UseRole
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetPaused() bool {
+	return s.Spec.Paused
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetManagementPolicies() ManagementPolicies {
+	return s.Spec.ManagementPolicies
+}
+
+func (s *SecretWithAuthorizationCodeGrant) SetCreateOrAlter(val *bool) {
+	s.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetObservedGeneration() int64 {
+	return s.Status.ObservedGeneration
+}
+
+func (s *SecretWithAuthorizationCodeGrant) SetObservedGeneration(val int64) {
+	s.Status.ObservedGeneration = val
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetLastAppliedSpecHash() string {
+	return s.Status.LastAppliedSpecHash
+}
+
+func (s *SecretWithAuthorizationCodeGrant) SetLastAppliedSpecHash(val string) {
+	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *SecretWithAuthorizationCodeGrant) ValidateSpec() error {
+	return s.Spec.Validate()
+}
+
+func (s *SecretWithAuthorizationCodeGrant) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(s.Spec)
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetOwner() string {
+	if s.Status.ShowOutput != nil && s.Status.ShowOutput.Owner != nil {
+		return *s.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetTrackedParametersList() []string {
+	return s.Status.TrackedParameters
+}
+
+func (s *SecretWithAuthorizationCodeGrant) SetTrackedParametersList(val []string) {
+	s.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// SecretWithBasicAuthentication
+// ---------------------------------------------------------------------------
+
+func (s *SecretWithBasicAuthentication) GetConditions() []metav1.Condition {
+	return s.Status.Conditions
+}
+
+func (s *SecretWithBasicAuthentication) SetConditions(conditions []metav1.Condition) {
+	s.Status.Conditions = conditions
+}
+
+func (s *SecretWithBasicAuthentication) GetDeletionPolicy() DeletionPolicy {
+	if s.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return s.Spec.DeletionPolicy
+}
+
+func (s *SecretWithBasicAuthentication) GetFullyQualifiedName() string {
+	return s.Status.FullyQualifiedName
+}
+
+func (s *SecretWithBasicAuthentication) GetProviderRef() ProviderReference {
+	return s.Spec.ProviderRef
+}
+
+func (s *SecretWithBasicAuthentication) GetSpecName() string {
+	return s.Spec.Name
+}
+
+func (s *SecretWithBasicAuthentication) GetUseRole() *string {
+	return s.Spec.UseRole
+}
+
+func (s *SecretWithBasicAuthentication) GetPaused() bool {
+	return s.Spec.Paused
+}
+
+func (s *SecretWithBasicAuthentication) GetManagementPolicies() ManagementPolicies {
+	return s.Spec.ManagementPolicies
+}
+
+func (s *SecretWithBasicAuthentication) SetCreateOrAlter(val *bool) {
+	s.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (s *SecretWithBasicAuthentication) GetObservedGeneration() int64 {
+	return s.Status.ObservedGeneration
+}
+
+func (s *SecretWithBasicAuthentication) SetObservedGeneration(val int64) {
+	s.Status.ObservedGeneration = val
+}
+
+func (s *SecretWithBasicAuthentication) GetLastAppliedSpecHash() string {
+	return s.Status.LastAppliedSpecHash
+}
+
+func (s *SecretWithBasicAuthentication) SetLastAppliedSpecHash(val string) {
+	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *SecretWithBasicAuthentication) ValidateSpec() error {
+	return s.Spec.Validate()
+}
+
+func (s *SecretWithBasicAuthentication) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(s.Spec)
+}
+
+func (s *SecretWithBasicAuthentication) GetOwner() string {
+	if s.Status.ShowOutput != nil && s.Status.ShowOutput.Owner != nil {
+		return *s.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (s *SecretWithBasicAuthentication) GetTrackedParametersList() []string {
+	return s.Status.TrackedParameters
+}
+
+func (s *SecretWithBasicAuthentication) SetTrackedParametersList(val []string) {
+	s.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// SecretWithGenericString
+// ---------------------------------------------------------------------------
+
+func (s *SecretWithGenericString) GetConditions() []metav1.Condition {
+	return s.Status.Conditions
+}
+
+func (s *SecretWithGenericString) SetConditions(conditions []metav1.Condition) {
+	s.Status.Conditions = conditions
+}
+
+func (s *SecretWithGenericString) GetDeletionPolicy() DeletionPolicy {
+	if s.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return s.Spec.DeletionPolicy
+}
+
+func (s *SecretWithGenericString) GetFullyQualifiedName() string {
+	return s.Status.FullyQualifiedName
+}
+
+func (s *SecretWithGenericString) GetProviderRef() ProviderReference {
+	return s.Spec.ProviderRef
+}
+
+func (s *SecretWithGenericString) GetSpecName() string {
+	return s.Spec.Name
+}
+
+func (s *SecretWithGenericString) GetUseRole() *string {
+	return s.Spec.UseRole
+}
+
+func (s *SecretWithGenericString) GetPaused() bool {
+	return s.Spec.Paused
+}
+
+func (s *SecretWithGenericString) GetManagementPolicies() ManagementPolicies {
+	return s.Spec.ManagementPolicies
+}
+
+func (s *SecretWithGenericString) SetCreateOrAlter(val *bool) {
+	s.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (s *SecretWithGenericString) GetObservedGeneration() int64 {
+	return s.Status.ObservedGeneration
+}
+
+func (s *SecretWithGenericString) SetObservedGeneration(val int64) {
+	s.Status.ObservedGeneration = val
+}
+
+func (s *SecretWithGenericString) GetLastAppliedSpecHash() string {
+	return s.Status.LastAppliedSpecHash
+}
+
+func (s *SecretWithGenericString) SetLastAppliedSpecHash(val string) {
+	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *SecretWithGenericString) ValidateSpec() error {
+	return s.Spec.Validate()
+}
+
+func (s *SecretWithGenericString) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(s.Spec)
+}
+
+func (s *SecretWithGenericString) GetOwner() string {
+	if s.Status.ShowOutput != nil && s.Status.ShowOutput.Owner != nil {
+		return *s.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (s *SecretWithGenericString) GetTrackedParametersList() []string {
+	return s.Status.TrackedParameters
+}
+
+func (s *SecretWithGenericString) SetTrackedParametersList(val []string) {
+	s.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// APIAuthenticationIntegrationWithClientCredentials
+// ---------------------------------------------------------------------------
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) GetConditions() []metav1.Condition {
+	return a.Status.Conditions
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) SetConditions(conditions []metav1.Condition) {
+	a.Status.Conditions = conditions
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) GetDeletionPolicy() DeletionPolicy {
+	if a.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return a.Spec.DeletionPolicy
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) GetFullyQualifiedName() string {
+	return a.Status.FullyQualifiedName
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) GetProviderRef() ProviderReference {
+	return a.Spec.ProviderRef
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) GetSpecName() string {
+	return a.Spec.Name
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) GetUseRole() *string {
+	return a.Spec.UseRole
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) GetPaused() bool {
+	return a.Spec.Paused
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) GetManagementPolicies() ManagementPolicies {
+	return a.Spec.ManagementPolicies
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) SetCreateOrAlter(val *bool) {
+	a.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) GetObservedGeneration() int64 {
+	return a.Status.ObservedGeneration
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) SetObservedGeneration(val int64) {
+	a.Status.ObservedGeneration = val
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) GetLastAppliedSpecHash() string {
+	return a.Status.LastAppliedSpecHash
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) SetLastAppliedSpecHash(val string) {
+	a.Status.LastAppliedSpecHash = val
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) ValidateSpec() error {
+	return a.Spec.Validate()
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(a.Spec)
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) GetOwner() string {
+	// SHOW SECURITY INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) GetTrackedParametersList() []string {
+	return a.Status.TrackedParameters
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) SetTrackedParametersList(val []string) {
+	a.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// APIAuthenticationIntegrationWithAuthorizationCodeGrant
+// ---------------------------------------------------------------------------
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetConditions() []metav1.Condition {
+	return a.Status.Conditions
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) SetConditions(conditions []metav1.Condition) {
+	a.Status.Conditions = conditions
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetDeletionPolicy() DeletionPolicy {
+	if a.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return a.Spec.DeletionPolicy
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetFullyQualifiedName() string {
+	return a.Status.FullyQualifiedName
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetProviderRef() ProviderReference {
+	return a.Spec.ProviderRef
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetSpecName() string {
+	return a.Spec.Name
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetUseRole() *string {
+	return a.Spec.UseRole
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetPaused() bool {
+	return a.Spec.Paused
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetManagementPolicies() ManagementPolicies {
+	return a.Spec.ManagementPolicies
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) SetCreateOrAlter(val *bool) {
+	a.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetObservedGeneration() int64 {
+	return a.Status.ObservedGeneration
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) SetObservedGeneration(val int64) {
+	a.Status.ObservedGeneration = val
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetLastAppliedSpecHash() string {
+	return a.Status.LastAppliedSpecHash
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) SetLastAppliedSpecHash(val string) {
+	a.Status.LastAppliedSpecHash = val
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) ValidateSpec() error {
+	return a.Spec.Validate()
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(a.Spec)
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetOwner() string {
+	// SHOW SECURITY INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetTrackedParametersList() []string {
+	return a.Status.TrackedParameters
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) SetTrackedParametersList(val []string) {
+	a.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// APIAuthenticationIntegrationWithJWTBearer
+// ---------------------------------------------------------------------------
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) GetConditions() []metav1.Condition {
+	return a.Status.Conditions
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) SetConditions(conditions []metav1.Condition) {
+	a.Status.Conditions = conditions
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) GetDeletionPolicy() DeletionPolicy {
+	if a.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return a.Spec.DeletionPolicy
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) GetFullyQualifiedName() string {
+	return a.Status.FullyQualifiedName
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) GetProviderRef() ProviderReference {
+	return a.Spec.ProviderRef
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) GetSpecName() string {
+	return a.Spec.Name
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) GetUseRole() *string {
+	return a.Spec.UseRole
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) GetPaused() bool {
+	return a.Spec.Paused
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) GetManagementPolicies() ManagementPolicies {
+	return a.Spec.ManagementPolicies
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) SetCreateOrAlter(val *bool) {
+	a.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) GetObservedGeneration() int64 {
+	return a.Status.ObservedGeneration
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) SetObservedGeneration(val int64) {
+	a.Status.ObservedGeneration = val
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) GetLastAppliedSpecHash() string {
+	return a.Status.LastAppliedSpecHash
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) SetLastAppliedSpecHash(val string) {
+	a.Status.LastAppliedSpecHash = val
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) ValidateSpec() error {
+	return a.Spec.Validate()
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(a.Spec)
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) GetOwner() string {
+	// SHOW SECURITY INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) GetTrackedParametersList() []string {
+	return a.Status.TrackedParameters
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) SetTrackedParametersList(val []string) {
+	a.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
 // AccountRoleGrant
 // ---------------------------------------------------------------------------
 
@@ -3588,3 +5075,80 @@ func (mpa *MaskingPolicyApplication) GetOwner() string {
 func (mpa *MaskingPolicyApplication) GetTrackedParametersList() []string { return nil }
 
 func (mpa *MaskingPolicyApplication) SetTrackedParametersList(_ []string) {}
+
+// ---------------------------------------------------------------------------
+// TableConstraint
+// ---------------------------------------------------------------------------
+
+func (tc *TableConstraint) GetConditions() []metav1.Condition {
+	return tc.Status.Conditions
+}
+
+func (tc *TableConstraint) SetConditions(conditions []metav1.Condition) {
+	tc.Status.Conditions = conditions
+}
+
+func (tc *TableConstraint) GetDeletionPolicy() DeletionPolicy {
+	if tc.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return tc.Spec.DeletionPolicy
+}
+
+func (tc *TableConstraint) GetFullyQualifiedName() string {
+	return tc.Status.FullyQualifiedName
+}
+
+func (tc *TableConstraint) GetProviderRef() ProviderReference {
+	return tc.Spec.ProviderRef
+}
+
+func (tc *TableConstraint) GetUseRole() *string {
+	return tc.Spec.UseRole
+}
+
+func (tc *TableConstraint) GetPaused() bool {
+	return tc.Spec.Paused
+}
+
+func (tc *TableConstraint) GetManagementPolicies() ManagementPolicies {
+	return tc.Spec.ManagementPolicies
+}
+
+func (tc *TableConstraint) SetCreateOrAlter(val *bool) {
+	tc.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (tc *TableConstraint) GetObservedGeneration() int64 {
+	return tc.Status.ObservedGeneration
+}
+
+func (tc *TableConstraint) SetObservedGeneration(val int64) {
+	tc.Status.ObservedGeneration = val
+}
+
+func (tc *TableConstraint) GetLastAppliedSpecHash() string {
+	return tc.Status.LastAppliedSpecHash
+}
+
+func (tc *TableConstraint) SetLastAppliedSpecHash(val string) {
+	tc.Status.LastAppliedSpecHash = val
+}
+
+func (tc *TableConstraint) ValidateSpec() error {
+	return tc.Spec.Validate()
+}
+
+func (tc *TableConstraint) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(tc.Spec)
+}
+
+func (tc *TableConstraint) GetOwner() string {
+	// Table constraints do not have an owner.
+	return ""
+}
+
+func (tc *TableConstraint) GetTrackedParametersList() []string { return nil }
+
+func (tc *TableConstraint) SetTrackedParametersList(_ []string) {}

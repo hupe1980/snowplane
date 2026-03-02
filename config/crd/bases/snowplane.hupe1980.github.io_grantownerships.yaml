@@ -72,6 +72,7 @@ spec:
                 description: |-
                   AccountRole is the name of the account role to transfer ownership to.
                   Mutually exclusive with AccountRoleRef, DatabaseRole, and DatabaseRoleRef.
+                minLength: 1
                 type: string
               accountRoleRef:
                 description: |-
@@ -100,6 +101,7 @@ spec:
                 description: |-
                   DatabaseRole is the fully qualified database role name (e.g. "MY_DB"."MY_ROLE").
                   Mutually exclusive with AccountRole, AccountRoleRef, and DatabaseRoleRef.
+                minLength: 1
                 type: string
               databaseRoleRef:
                 description: |-

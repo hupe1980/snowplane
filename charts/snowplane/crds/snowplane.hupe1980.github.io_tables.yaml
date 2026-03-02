@@ -112,8 +112,9 @@ spec:
                   Constraints defines table-level constraints (PRIMARY KEY, UNIQUE, FOREIGN KEY).
                   Constraints are applied at creation time and treated as immutable.
                 items:
-                  description: TableConstraint defines a table-level constraint (PRIMARY
-                    KEY, UNIQUE, FOREIGN KEY).
+                  description: |-
+                    InlineTableConstraint defines a table-level constraint (PRIMARY KEY, UNIQUE, FOREIGN KEY)
+                    embedded in a Table spec at creation time.
                   properties:
                     columns:
                       description: Columns lists the column names that participate

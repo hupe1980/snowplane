@@ -22,14 +22,15 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 //
 // Mutual exclusivity rules:
-// +kubebuilder:validation:XValidation:rule="(has(self.tagName) ? 1 : 0) + (has(self.tagRef) ? 1 : 0) == 1",message="exactly one of spec.tagName or spec.tagRef must be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.tagName) && !has(self.tagRef)) || (!has(self.tagName) && has(self.tagRef))",message="exactly one of spec.tagName or spec.tagRef must be set"
 type TagAssociationSpec struct {
 	CommonSpec `json:",inline"`
 
 	// TagName is the fully qualified tag name (e.g. "MY_DB"."MY_SCHEMA"."MY_TAG").
 	// Mutually exclusive with TagRef.
 	// +optional
-	TagName string `json:"tagName,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	TagName *string `json:"tagName,omitempty"`
 
 	// TagRef references a Tag CR in the same namespace.
 	// When set, the tag name is resolved from the CR's fullyQualifiedName.
@@ -106,8 +107,12 @@ type TagAssociationList struct {
 
 // GetSpecName returns a human-readable composite name for the tag association.
 func (r *TagAssociation) GetSpecName() string {
-	tag := r.Spec.TagName
-	if tag == "" && r.Spec.TagRef != nil {
+	var tag string
+
+	switch {
+	case r.Spec.TagName != nil:
+		tag = *r.Spec.TagName
+	case r.Spec.TagRef != nil:
 		tag = "(ref: " + r.Spec.TagRef.Name + ")"
 	}
 

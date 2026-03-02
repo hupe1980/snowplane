@@ -24,6 +24,7 @@
 | 📊 **Data Objects** | Table, View, MaterializedView, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, ExternalTable, FileFormat, Pipe, Sequence |
 | 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
 | ⏰ **Orchestration** | Task (DAG scheduling, serverless or warehouse-backed), Alert (condition-based monitoring & notification) |
+| 🔧 **Programmability** | ProcedureSQL, ProcedureJavascript, ProcedurePython, ProcedureJava, ProcedureScala, FunctionSQL, FunctionJavascript, FunctionPython, FunctionJava, FunctionScala |
 | 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
 | 🛡️ **Security & Governance** | NetworkPolicy, NetworkPolicyAttachment, NetworkRule, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
 | 📤 **Utilities** | FieldExport (copy status fields into ConfigMaps/Secrets) |
@@ -327,7 +328,8 @@ Complete field-level documentation for all Snowplane CRDs is available in the **
 | ⏰ **Orchestration** | Task, Alert |
 | 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
 | 🛡️ **Security & Governance** | NetworkPolicy, NetworkPolicyAttachment, NetworkRule, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
-| 📤 **Utilities** | FieldExport |
+| 🔧 **Programmability** | ProcedureSQL, ProcedureJavascript, ProcedurePython, ProcedureJava, ProcedureScala, FunctionSQL, FunctionJavascript, FunctionPython, FunctionJava, FunctionScala |
+| �📤 **Utilities** | FieldExport |
 
 ## 🔍 Drift Detection
 
@@ -405,6 +407,16 @@ kubectl apply -f manifests.yaml
 | `snowflake_view` | View |
 | `snowflake_materialized_view` | MaterializedView |
 | `snowflake_stage` | Stage |
+| `snowflake_procedure_java` | ProcedureJava |
+| `snowflake_procedure_javascript` | ProcedureJavascript |
+| `snowflake_procedure_python` | ProcedurePython |
+| `snowflake_procedure_scala` | ProcedureScala |
+| `snowflake_procedure_sql` | ProcedureSQL |
+| `snowflake_function_java` | FunctionJava |
+| `snowflake_function_javascript` | FunctionJavascript |
+| `snowflake_function_python` | FunctionPython |
+| `snowflake_function_scala` | FunctionScala |
+| `snowflake_function_sql` | FunctionSQL |
 
 Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped and must be configured manually.
 

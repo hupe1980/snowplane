@@ -62,12 +62,12 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.Passw
 			return refresolver.HandleRefError(ctx, obj, a.recorder, "PasswordPolicy", ref.Name, err)
 		}
 
-		obj.Spec.PolicyName = fqn
+		obj.Spec.PolicyName = &fqn
 		obj.Status.PolicyName = fqn
 
 		logger.V(1).Info("passwordpolicyattachment policyRef resolved", "policyName", fqn)
-	} else if obj.Spec.PolicyName != "" {
-		obj.Status.PolicyName = obj.Spec.PolicyName
+	} else if obj.Spec.PolicyName != nil {
+		obj.Status.PolicyName = *obj.Spec.PolicyName
 	}
 
 	return nil
@@ -75,12 +75,12 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.Passw
 
 // BuildIdentifier constructs a PasswordPolicyAttachmentIdentifier from the spec.
 func (a *adapter) BuildIdentifier(obj *snowplanev1alpha1.PasswordPolicyAttachment) (reconciler.Identifier, error) {
-	if obj.Spec.PolicyName == "" {
+	if obj.Spec.PolicyName == nil || *obj.Spec.PolicyName == "" {
 		return nil, fmt.Errorf("policyName must be set (either directly or via policyRef)")
 	}
 
 	return snowflake.PasswordPolicyAttachmentIdentifier{
-		PolicyName: obj.Spec.PolicyName,
+		PolicyName: *obj.Spec.PolicyName,
 		TargetType: obj.Spec.TargetType,
 		TargetName: obj.Spec.TargetName,
 	}, nil
@@ -138,7 +138,7 @@ func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identi
 // Create attaches the password policy to the target.
 func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha1.PasswordPolicyAttachment, _ reconciler.Identifier) error {
 	return svc.SetPasswordPolicy(ctx, snowflake.SetPasswordPolicyOptions{
-		PolicyName: obj.Spec.PolicyName,
+		PolicyName: *obj.Spec.PolicyName,
 		TargetType: obj.Spec.TargetType,
 		TargetName: obj.Spec.TargetName,
 	})
@@ -187,7 +187,7 @@ func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.PasswordPolicyAttachme
 	detail := obs.Detail
 	if detail != nil && detail.Exists {
 		obj.Status.FullyQualifiedName = snowflake.PasswordPolicyAttachmentIdentifier{
-			PolicyName: obj.Spec.PolicyName,
+			PolicyName: *obj.Spec.PolicyName,
 			TargetType: obj.Spec.TargetType,
 			TargetName: obj.Spec.TargetName,
 		}.FullyQualifiedName()
@@ -209,7 +209,7 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.PasswordPolicyAttachment, o
 	if detail != nil && detail.Exists {
 		// Immutable fields — comparing against the identifier.
 		if obj.Status.PolicyName != "" {
-			d.CompareStringValueFold("POLICY_NAME", obj.Spec.PolicyName, obj.Status.PolicyName, true)
+			d.CompareStringValueFold("POLICY_NAME", *obj.Spec.PolicyName, obj.Status.PolicyName, true)
 		}
 	}
 

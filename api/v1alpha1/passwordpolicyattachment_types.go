@@ -23,7 +23,7 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 //
 // Mutual exclusivity rules:
-// +kubebuilder:validation:XValidation:rule="(has(self.policyName) ? 1 : 0) + (has(self.policyRef) ? 1 : 0) == 1",message="exactly one of spec.policyName or spec.policyRef must be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.policyName) && !has(self.policyRef)) || (!has(self.policyName) && has(self.policyRef))",message="exactly one of spec.policyName or spec.policyRef must be set"
 // +kubebuilder:validation:XValidation:rule="self.targetType == 'ACCOUNT' || has(self.targetName)",message="spec.targetName is required when targetType is USER"
 type PasswordPolicyAttachmentSpec struct {
 	CommonSpec `json:",inline"`
@@ -32,7 +32,8 @@ type PasswordPolicyAttachmentSpec struct {
 	// (e.g. "MY_DB"."MY_SCHEMA"."MY_PASSWORD_POLICY").
 	// Mutually exclusive with PolicyRef.
 	// +optional
-	PolicyName string `json:"policyName,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	PolicyName *string `json:"policyName,omitempty"`
 
 	// PolicyRef references a PasswordPolicy CR in the same namespace.
 	// When set, the policy name is resolved from the CR's fullyQualifiedName.
@@ -94,8 +95,10 @@ type PasswordPolicyAttachmentList struct {
 
 // GetSpecName returns a human-readable composite name for the attachment.
 func (r *PasswordPolicyAttachment) GetSpecName() string {
-	policy := r.Spec.PolicyName
-	if policy == "" && r.Spec.PolicyRef != nil {
+	var policy string
+	if r.Spec.PolicyName != nil {
+		policy = *r.Spec.PolicyName
+	} else if r.Spec.PolicyRef != nil {
 		policy = fmt.Sprintf("ref:%s", r.Spec.PolicyRef.Name)
 	}
 

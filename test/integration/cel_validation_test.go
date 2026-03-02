@@ -342,7 +342,7 @@ func TestCEL_AccountRoleGrant_ImmutablePrivilege(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.AccountRoleGrantSpec{
 			Privilege:   "SELECT",
-			AccountRole: "MY_ROLE",
+			AccountRole: strPtr("MY_ROLE"),
 			On: snowplanev1alpha1.GrantOn{
 				AccountObject: &snowplanev1alpha1.GrantOnAccountObject{
 					ObjectType: "DATABASE",
@@ -478,7 +478,7 @@ func TestCEL_GrantOwnership_ImmutableFields(t *testing.T) {
 		Spec: snowplanev1alpha1.GrantOwnershipSpec{
 			ObjectType:  "TABLE",
 			ObjectName:  "MY_DB.PUBLIC.MY_TABLE",
-			AccountRole: "MY_ROLE",
+			AccountRole: strPtr("MY_ROLE"),
 		},
 	}
 

@@ -62,12 +62,12 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.Maski
 			return refresolver.HandleRefError(ctx, obj, a.recorder, "MaskingPolicy", ref.Name, err)
 		}
 
-		obj.Spec.PolicyName = fqn
+		obj.Spec.PolicyName = &fqn
 		obj.Status.PolicyName = fqn
 
 		logger.V(1).Info("maskingpolicyapplication policyRef resolved", "policyName", fqn)
-	} else if obj.Spec.PolicyName != "" {
-		obj.Status.PolicyName = obj.Spec.PolicyName
+	} else if obj.Spec.PolicyName != nil {
+		obj.Status.PolicyName = *obj.Spec.PolicyName
 	}
 
 	return nil
@@ -75,12 +75,12 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.Maski
 
 // BuildIdentifier constructs a MaskingPolicyApplicationIdentifier from the spec.
 func (a *adapter) BuildIdentifier(obj *snowplanev1alpha1.MaskingPolicyApplication) (reconciler.Identifier, error) {
-	if obj.Spec.PolicyName == "" {
+	if obj.Spec.PolicyName == nil || *obj.Spec.PolicyName == "" {
 		return nil, fmt.Errorf("policyName must be set (either directly or via policyRef)")
 	}
 
 	return snowflake.MaskingPolicyApplicationIdentifier{
-		PolicyName: obj.Spec.PolicyName,
+		PolicyName: *obj.Spec.PolicyName,
 		TableName:  obj.Spec.TableName,
 		ColumnName: obj.Spec.ColumnName,
 	}, nil
@@ -138,7 +138,7 @@ func (a *adapter) Observe(ctx context.Context, svc Service, id reconciler.Identi
 // Create applies the masking policy to the table column.
 func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha1.MaskingPolicyApplication, _ reconciler.Identifier) error {
 	return svc.SetMaskingPolicy(ctx, snowflake.SetMaskingPolicyOptions{
-		PolicyName:   obj.Spec.PolicyName,
+		PolicyName:   *obj.Spec.PolicyName,
 		TableName:    obj.Spec.TableName,
 		ColumnName:   obj.Spec.ColumnName,
 		UsingColumns: obj.Spec.UsingColumns,
@@ -188,7 +188,7 @@ func (a *adapter) ApplyObservation(obj *snowplanev1alpha1.MaskingPolicyApplicati
 	detail := obs.Detail
 	if detail != nil && detail.Exists {
 		obj.Status.FullyQualifiedName = snowflake.MaskingPolicyApplicationIdentifier{
-			PolicyName: obj.Spec.PolicyName,
+			PolicyName: *obj.Spec.PolicyName,
 			TableName:  obj.Spec.TableName,
 			ColumnName: obj.Spec.ColumnName,
 		}.FullyQualifiedName()
@@ -210,7 +210,7 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.MaskingPolicyApplication, o
 	if detail != nil && detail.Exists {
 		// Immutable fields — comparing against the identifier.
 		if obj.Status.PolicyName != "" {
-			d.CompareStringValueFold("POLICY_NAME", obj.Spec.PolicyName, obj.Status.PolicyName, true)
+			d.CompareStringValueFold("POLICY_NAME", *obj.Spec.PolicyName, obj.Status.PolicyName, true)
 		}
 	}
 

@@ -60,7 +60,8 @@ type GrantOnSchema struct {
 	// The controller uses this verbatim in ON SCHEMA <schema_name>.
 	// For: ON SCHEMA <schema_name>
 	// +optional
-	SchemaName string `json:"schemaName,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	SchemaName *string `json:"schemaName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
 	// When set, the schema FQN is resolved from the CR's fullyQualifiedName.
@@ -71,7 +72,8 @@ type GrantOnSchema struct {
 	// AllInDatabase grants on all existing schemas in the specified database.
 	// For: ON ALL SCHEMAS IN DATABASE <db_name>
 	// +optional
-	AllInDatabase string `json:"allInDatabase,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	AllInDatabase *string `json:"allInDatabase,omitempty"`
 
 	// AllInDatabaseRef references a Database CR for the ALL SCHEMAS IN DATABASE grant.
 	// Mutually exclusive with AllInDatabase.
@@ -81,7 +83,8 @@ type GrantOnSchema struct {
 	// FutureInDatabase grants on future schemas in the specified database.
 	// For: ON FUTURE SCHEMAS IN DATABASE <db_name>
 	// +optional
-	FutureInDatabase string `json:"futureInDatabase,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	FutureInDatabase *string `json:"futureInDatabase,omitempty"`
 
 	// FutureInDatabaseRef references a Database CR for the FUTURE SCHEMAS IN DATABASE grant.
 	// Mutually exclusive with FutureInDatabase.
@@ -128,7 +131,8 @@ type GrantOnBulk struct {
 
 	// InDatabase scopes the grant to all objects of the type in the specified database.
 	// +optional
-	InDatabase string `json:"inDatabase,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	InDatabase *string `json:"inDatabase,omitempty"`
 
 	// InDatabaseRef references a Database CR.
 	// Mutually exclusive with InDatabase.
@@ -137,7 +141,8 @@ type GrantOnBulk struct {
 
 	// InSchema scopes the grant to all objects of the type in the specified schema.
 	// +optional
-	InSchema string `json:"inSchema,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	InSchema *string `json:"inSchema,omitempty"`
 
 	// InSchemaRef references a Schema CR.
 	// Mutually exclusive with InSchema.
@@ -174,7 +179,7 @@ type GrantShowOutput struct {
 
 // resolveGrantKind determines the GrantKind from the On structure.
 func resolveGrantKind(on *GrantOn) GrantKind {
-	if on.Schema != nil && (on.Schema.FutureInDatabase != "" || on.Schema.FutureInDatabaseRef != nil) {
+	if on.Schema != nil && (on.Schema.FutureInDatabase != nil || on.Schema.FutureInDatabaseRef != nil) {
 		return GrantKindFuture
 	}
 
@@ -182,7 +187,7 @@ func resolveGrantKind(on *GrantOn) GrantKind {
 		return GrantKindFuture
 	}
 
-	if on.Schema != nil && (on.Schema.AllInDatabase != "" || on.Schema.AllInDatabaseRef != nil) {
+	if on.Schema != nil && (on.Schema.AllInDatabase != nil || on.Schema.AllInDatabaseRef != nil) {
 		return GrantKindAll
 	}
 
@@ -204,24 +209,24 @@ func (o *GrantOn) Description() string {
 	}
 
 	if o.Schema != nil {
-		if o.Schema.SchemaName != "" {
-			return "ON SCHEMA " + o.Schema.SchemaName
+		if o.Schema.SchemaName != nil {
+			return "ON SCHEMA " + *o.Schema.SchemaName
 		}
 
 		if o.Schema.SchemaRef != nil {
 			return "ON SCHEMA (ref: " + o.Schema.SchemaRef.Name + ")"
 		}
 
-		if o.Schema.AllInDatabase != "" {
-			return "ON ALL SCHEMAS IN DATABASE " + o.Schema.AllInDatabase
+		if o.Schema.AllInDatabase != nil {
+			return "ON ALL SCHEMAS IN DATABASE " + *o.Schema.AllInDatabase
 		}
 
 		if o.Schema.AllInDatabaseRef != nil {
 			return "ON ALL SCHEMAS IN DATABASE (ref: " + o.Schema.AllInDatabaseRef.Name + ")"
 		}
 
-		if o.Schema.FutureInDatabase != "" {
-			return "ON FUTURE SCHEMAS IN DATABASE " + o.Schema.FutureInDatabase
+		if o.Schema.FutureInDatabase != nil {
+			return "ON FUTURE SCHEMAS IN DATABASE " + *o.Schema.FutureInDatabase
 		}
 
 		if o.Schema.FutureInDatabaseRef != nil {
@@ -248,16 +253,16 @@ func (o *GrantOn) Description() string {
 
 // description builds a descriptive ON clause for bulk grants.
 func (b *GrantOnBulk) description(keyword string) string {
-	if b.InSchema != "" {
-		return fmt.Sprintf("ON %s %s IN SCHEMA %s", keyword, b.ObjectTypePlural, b.InSchema)
+	if b.InSchema != nil {
+		return fmt.Sprintf("ON %s %s IN SCHEMA %s", keyword, b.ObjectTypePlural, *b.InSchema)
 	}
 
 	if b.InSchemaRef != nil {
 		return fmt.Sprintf("ON %s %s IN SCHEMA (ref: %s)", keyword, b.ObjectTypePlural, b.InSchemaRef.Name)
 	}
 
-	if b.InDatabase != "" {
-		return fmt.Sprintf("ON %s %s IN DATABASE %s", keyword, b.ObjectTypePlural, b.InDatabase)
+	if b.InDatabase != nil {
+		return fmt.Sprintf("ON %s %s IN DATABASE %s", keyword, b.ObjectTypePlural, *b.InDatabase)
 	}
 
 	if b.InDatabaseRef != nil {

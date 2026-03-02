@@ -24,7 +24,7 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 //
 // Mutual exclusivity rules:
-// +kubebuilder:validation:XValidation:rule="(has(self.roleName) ? 1 : 0) + (has(self.roleRef) ? 1 : 0) == 1",message="exactly one of spec.roleName or spec.roleRef must be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.roleName) && !has(self.roleRef)) || (!has(self.roleName) && has(self.roleRef))",message="exactly one of spec.roleName or spec.roleRef must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.toRole) ? 1 : 0) + (has(self.toRoleRef) ? 1 : 0) + (has(self.toUser) ? 1 : 0) + (has(self.toUserRef) ? 1 : 0) == 1",message="exactly one of spec.toRole, spec.toRoleRef, spec.toUser, or spec.toUserRef must be set"
 type AccountRoleAssignmentSpec struct {
 	CommonSpec `json:",inline"`
@@ -32,7 +32,8 @@ type AccountRoleAssignmentSpec struct {
 	// RoleName is the name of the account role to assign.
 	// Mutually exclusive with RoleRef.
 	// +optional
-	RoleName string `json:"roleName,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	RoleName *string `json:"roleName,omitempty"`
 
 	// RoleRef references an AccountRole CR in the same namespace.
 	// When set, the role name is resolved from the CR's spec.name.
@@ -43,7 +44,8 @@ type AccountRoleAssignmentSpec struct {
 	// ToRole is the name of the parent account role to assign the role to.
 	// Mutually exclusive with ToRoleRef, ToUser, ToUserRef.
 	// +optional
-	ToRole string `json:"toRole,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	ToRole *string `json:"toRole,omitempty"`
 
 	// ToRoleRef references an AccountRole CR in the same namespace.
 	// When set, the target role name is resolved from the CR's spec.name.
@@ -54,7 +56,8 @@ type AccountRoleAssignmentSpec struct {
 	// ToUser is the name of the user to assign the role to.
 	// Mutually exclusive with ToUserRef, ToRole, ToRoleRef.
 	// +optional
-	ToUser string `json:"toUser,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	ToUser *string `json:"toUser,omitempty"`
 
 	// ToUserRef references a User CR in the same namespace.
 	// When set, the user name is resolved from the CR's spec.name.
@@ -101,7 +104,11 @@ type AccountRoleAssignmentList struct {
 
 // GetSpecName returns a human-readable composite name for the role assignment.
 func (r *AccountRoleAssignment) GetSpecName() string {
-	role := r.Spec.RoleName
+	var role string
+	if r.Spec.RoleName != nil {
+		role = *r.Spec.RoleName
+	}
+
 	if role == "" && r.Spec.RoleRef != nil {
 		role = "(ref: " + r.Spec.RoleRef.Name + ")"
 	}
@@ -113,16 +120,16 @@ func (r *AccountRoleAssignment) GetSpecName() string {
 
 // resolvedTarget returns a string describing who the role is assigned to.
 func (r *AccountRoleAssignment) resolvedTarget() string {
-	if r.Spec.ToRole != "" {
-		return "ROLE " + r.Spec.ToRole
+	if r.Spec.ToRole != nil {
+		return "ROLE " + *r.Spec.ToRole
 	}
 
 	if r.Spec.ToRoleRef != nil {
 		return "ROLE (ref: " + r.Spec.ToRoleRef.Name + ")"
 	}
 
-	if r.Spec.ToUser != "" {
-		return "USER " + r.Spec.ToUser
+	if r.Spec.ToUser != nil {
+		return "USER " + *r.Spec.ToUser
 	}
 
 	if r.Spec.ToUserRef != nil {

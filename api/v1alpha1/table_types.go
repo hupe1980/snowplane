@@ -59,8 +59,9 @@ type ForeignKeyReference struct {
 	Columns []string `json:"columns"`
 }
 
-// TableConstraint defines a table-level constraint (PRIMARY KEY, UNIQUE, FOREIGN KEY).
-type TableConstraint struct {
+// InlineTableConstraint defines a table-level constraint (PRIMARY KEY, UNIQUE, FOREIGN KEY)
+// embedded in a Table spec at creation time.
+type InlineTableConstraint struct {
 	// Name is the constraint name. If omitted, Snowflake generates one.
 	// +optional
 	Name string `json:"name,omitempty"`
@@ -131,7 +132,7 @@ type TableSpec struct {
 	// Constraints defines table-level constraints (PRIMARY KEY, UNIQUE, FOREIGN KEY).
 	// Constraints are applied at creation time and treated as immutable.
 	// +optional
-	Constraints []TableConstraint `json:"constraints,omitempty"`
+	Constraints []InlineTableConstraint `json:"constraints,omitempty"`
 
 	// Comment is an optional description for the table.
 	// +optional

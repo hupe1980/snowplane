@@ -77,6 +77,7 @@ spec:
                 description: |-
                   DatabaseRoleName is the fully qualified name of the database role to assign (e.g. MY_DB.MY_ROLE).
                   Mutually exclusive with DatabaseRoleRef.
+                minLength: 1
                 type: string
               databaseRoleRef:
                 description: |-
@@ -159,6 +160,7 @@ spec:
                 description: |-
                   ToDatabaseRole is the fully qualified name of the database role to assign to (e.g. MY_DB.MY_ROLE).
                   Mutually exclusive with ToDatabaseRoleRef, ToRole, ToRoleRef.
+                minLength: 1
                 type: string
               toDatabaseRoleRef:
                 description: |-
@@ -177,6 +179,7 @@ spec:
                 description: |-
                   ToRole is the name of the account role to assign the database role to.
                   Mutually exclusive with ToRoleRef, ToDatabaseRole, ToDatabaseRoleRef.
+                minLength: 1
                 type: string
               toRoleRef:
                 description: |-
@@ -234,8 +237,8 @@ spec:
                 || self.useRole == oldSelf.useRole)
             - message: exactly one of spec.databaseRoleName or spec.databaseRoleRef
                 must be set
-              rule: '(has(self.databaseRoleName) ? 1 : 0) + (has(self.databaseRoleRef)
-                ? 1 : 0) == 1'
+              rule: (has(self.databaseRoleName) && !has(self.databaseRoleRef)) ||
+                (!has(self.databaseRoleName) && has(self.databaseRoleRef))
             - message: exactly one of spec.toRole, spec.toRoleRef, spec.toDatabaseRole,
                 or spec.toDatabaseRoleRef must be set
               rule: '(has(self.toRole) ? 1 : 0) + (has(self.toRoleRef) ? 1 : 0) +

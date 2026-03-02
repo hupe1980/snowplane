@@ -12,12 +12,11 @@ import (
 //
 // +kubebuilder:validation:XValidation:rule="self.privilege == oldSelf.privilege",message="spec.privilege is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.on == oldSelf.on",message="spec.on is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="self.accountRole == oldSelf.accountRole",message="spec.accountRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.accountRole) == has(self.accountRole) && (!has(self.accountRole) || self.accountRole == oldSelf.accountRole)",message="spec.accountRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.accountRoleRef) == has(self.accountRoleRef) && (!has(self.accountRoleRef) || self.accountRoleRef == oldSelf.accountRoleRef)",message="spec.accountRoleRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.withGrantOption == oldSelf.withGrantOption",message="spec.withGrantOption is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="has(self.accountRole) || has(self.accountRoleRef)",message="one of spec.accountRole or spec.accountRoleRef must be set"
-// +kubebuilder:validation:XValidation:rule="!(has(self.accountRole) && has(self.accountRoleRef))",message="spec.accountRole and spec.accountRoleRef are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="(has(self.accountRole) && !has(self.accountRoleRef)) || (!has(self.accountRole) && has(self.accountRoleRef))",message="exactly one of spec.accountRole or spec.accountRoleRef must be set"
 type AccountRoleGrantSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -32,7 +31,8 @@ type AccountRoleGrantSpec struct {
 	// AccountRole is the name of the account role to grant the privilege to.
 	// Mutually exclusive with AccountRoleRef.
 	// +optional
-	AccountRole string `json:"accountRole,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	AccountRole *string `json:"accountRole,omitempty"`
 
 	// AccountRoleRef references an AccountRole CR in the same namespace.
 	// When set, the role name is resolved from the CR's spec.name.
@@ -91,7 +91,11 @@ type AccountRoleGrantList struct {
 
 // GetSpecName returns a human-readable composite name for the grant.
 func (r *AccountRoleGrant) GetSpecName() string {
-	role := r.Spec.AccountRole
+	var role string
+	if r.Spec.AccountRole != nil {
+		role = *r.Spec.AccountRole
+	}
+
 	if role == "" && r.Spec.AccountRoleRef != nil {
 		role = "(ref: " + r.Spec.AccountRoleRef.Name + ")"
 	}
@@ -100,7 +104,13 @@ func (r *AccountRoleGrant) GetSpecName() string {
 }
 
 // ResolvedAccountRole returns the resolved account role name (either direct or from ref).
-func (r *AccountRoleGrant) ResolvedAccountRole() string { return r.Spec.AccountRole }
+func (r *AccountRoleGrant) ResolvedAccountRole() string {
+	if r.Spec.AccountRole != nil {
+		return *r.Spec.AccountRole
+	}
+
+	return ""
+}
 
 // ResolveKind determines the GrantKind from the spec.
 func (s *AccountRoleGrantSpec) ResolveKind() GrantKind {

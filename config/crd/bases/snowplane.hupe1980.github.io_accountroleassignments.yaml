@@ -140,6 +140,7 @@ spec:
                 description: |-
                   RoleName is the name of the account role to assign.
                   Mutually exclusive with RoleRef.
+                minLength: 1
                 type: string
               roleRef:
                 description: |-
@@ -158,6 +159,7 @@ spec:
                 description: |-
                   ToRole is the name of the parent account role to assign the role to.
                   Mutually exclusive with ToRoleRef, ToUser, ToUserRef.
+                minLength: 1
                 type: string
               toRoleRef:
                 description: |-
@@ -176,6 +178,7 @@ spec:
                 description: |-
                   ToUser is the name of the user to assign the role to.
                   Mutually exclusive with ToUserRef, ToRole, ToRoleRef.
+                minLength: 1
                 type: string
               toUserRef:
                 description: |-
@@ -232,8 +235,8 @@ spec:
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
                 || self.useRole == oldSelf.useRole)
             - message: exactly one of spec.roleName or spec.roleRef must be set
-              rule: '(has(self.roleName) ? 1 : 0) + (has(self.roleRef) ? 1 : 0) ==
-                1'
+              rule: (has(self.roleName) && !has(self.roleRef)) || (!has(self.roleName)
+                && has(self.roleRef))
             - message: exactly one of spec.toRole, spec.toRoleRef, spec.toUser, or
                 spec.toUserRef must be set
               rule: '(has(self.toRole) ? 1 : 0) + (has(self.toRoleRef) ? 1 : 0) +

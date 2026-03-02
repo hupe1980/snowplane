@@ -165,3 +165,40 @@ func (s SchemaObjectIdentifier) String() string { return s.FullyQualifiedName() 
 func (s SchemaObjectIdentifier) Equal(other SchemaObjectIdentifier) bool {
 	return strings.EqualFold(s.databaseName, other.databaseName) && strings.EqualFold(s.schemaName, other.schemaName) && strings.EqualFold(s.name, other.name)
 }
+
+// --- CallableIdentifier ---
+
+// CallableIdentifier identifies a callable schema-level object (procedure or
+// function) that supports overloading. Snowflake identifies these objects by
+// name + argument types, so DROP and ALTER commands must include the argument
+// type signature.
+type CallableIdentifier struct {
+	SchemaObjectIdentifier
+	argTypes []string
+}
+
+// NewCallableIdentifier creates a new CallableIdentifier.
+func NewCallableIdentifier(databaseName, schemaName, name string, argTypes []string) CallableIdentifier {
+	return CallableIdentifier{
+		SchemaObjectIdentifier: NewSchemaObjectIdentifier(databaseName, schemaName, name),
+		argTypes:               argTypes,
+	}
+}
+
+// ArgTypes returns the argument types for the callable.
+func (c CallableIdentifier) ArgTypes() []string { return c.argTypes }
+
+// FullyQualifiedName returns the quoted identifier without args (for SHOW queries).
+func (c CallableIdentifier) FullyQualifiedName() string {
+	return c.SchemaObjectIdentifier.FullyQualifiedName()
+}
+
+// FullyQualifiedNameWithArgs returns the identifier with the argument type
+// signature appended (e.g. "DB"."SCHEMA"."PROC"(VARCHAR, NUMBER)).
+// This form is required for DROP and ALTER statements.
+func (c CallableIdentifier) FullyQualifiedNameWithArgs() string {
+	return c.SchemaObjectIdentifier.FullyQualifiedName() + "(" + strings.Join(c.argTypes, ", ") + ")"
+}
+
+// String returns the fully qualified name with args.
+func (c CallableIdentifier) String() string { return c.FullyQualifiedNameWithArgs() }

@@ -194,9 +194,31 @@ func managedResourceTypes() []managedResourceEntry {
 		{proto: &snowplanev1alpha1.NetworkPolicyAttachment{}, newList: func() client.ObjectList { return &snowplanev1alpha1.NetworkPolicyAttachmentList{} }},
 		{proto: &snowplanev1alpha1.PasswordPolicyAttachment{}, newList: func() client.ObjectList { return &snowplanev1alpha1.PasswordPolicyAttachmentList{} }},
 		{proto: &snowplanev1alpha1.MaskingPolicyApplication{}, newList: func() client.ObjectList { return &snowplanev1alpha1.MaskingPolicyApplicationList{} }},
+		{proto: &snowplanev1alpha1.TableConstraint{}, newList: func() client.ObjectList { return &snowplanev1alpha1.TableConstraintList{} }},
 		{proto: &snowplanev1alpha1.Sequence{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SequenceList{} }},
 		{proto: &snowplanev1alpha1.ExternalTable{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ExternalTableList{} }},
 		{proto: &snowplanev1alpha1.MaterializedView{}, newList: func() client.ObjectList { return &snowplanev1alpha1.MaterializedViewList{} }},
+		{proto: &snowplanev1alpha1.ProcedureSQL{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ProcedureSQLList{} }},
+		{proto: &snowplanev1alpha1.ProcedureJavascript{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ProcedureJavascriptList{} }},
+		{proto: &snowplanev1alpha1.ProcedurePython{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ProcedurePythonList{} }},
+		{proto: &snowplanev1alpha1.ProcedureJava{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ProcedureJavaList{} }},
+		{proto: &snowplanev1alpha1.ProcedureScala{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ProcedureScalaList{} }},
+		{proto: &snowplanev1alpha1.FunctionSQL{}, newList: func() client.ObjectList { return &snowplanev1alpha1.FunctionSQLList{} }},
+		{proto: &snowplanev1alpha1.FunctionJavascript{}, newList: func() client.ObjectList { return &snowplanev1alpha1.FunctionJavascriptList{} }},
+		{proto: &snowplanev1alpha1.FunctionPython{}, newList: func() client.ObjectList { return &snowplanev1alpha1.FunctionPythonList{} }},
+		{proto: &snowplanev1alpha1.FunctionJava{}, newList: func() client.ObjectList { return &snowplanev1alpha1.FunctionJavaList{} }},
+		{proto: &snowplanev1alpha1.FunctionScala{}, newList: func() client.ObjectList { return &snowplanev1alpha1.FunctionScalaList{} }},
+		{proto: &snowplanev1alpha1.SecretWithClientCredentials{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SecretWithClientCredentialsList{} }},
+		{proto: &snowplanev1alpha1.SecretWithAuthorizationCodeGrant{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SecretWithAuthorizationCodeGrantList{} }},
+		{proto: &snowplanev1alpha1.SecretWithBasicAuthentication{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SecretWithBasicAuthenticationList{} }},
+		{proto: &snowplanev1alpha1.SecretWithGenericString{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SecretWithGenericStringList{} }},
+		{proto: &snowplanev1alpha1.APIAuthenticationIntegrationWithClientCredentials{}, newList: func() client.ObjectList {
+			return &snowplanev1alpha1.APIAuthenticationIntegrationWithClientCredentialsList{}
+		}},
+		{proto: &snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant{}, newList: func() client.ObjectList {
+			return &snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrantList{}
+		}},
+		{proto: &snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBearer{}, newList: func() client.ObjectList { return &snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBearerList{} }},
 	}
 }
 

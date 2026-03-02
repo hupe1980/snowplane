@@ -1,0 +1,18 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: TableConstraint
+metadata:
+  name: pk-orders
+spec:
+  providerRef:
+    name: default
+  deletionPolicy: Delete
+  name: pk_orders
+  type: "PRIMARY KEY"
+  tableName: '"MY_DB"."MY_SCHEMA"."ORDERS"'
+  columns:
+    - ORDER_ID
+  properties:
+    enforced: false
+    rely: true
+    validate: false
+  comment: "Primary key on orders table"

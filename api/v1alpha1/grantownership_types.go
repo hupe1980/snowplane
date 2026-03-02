@@ -49,7 +49,8 @@ type GrantOwnershipSpec struct {
 	// AccountRole is the name of the account role to transfer ownership to.
 	// Mutually exclusive with AccountRoleRef, DatabaseRole, and DatabaseRoleRef.
 	// +optional
-	AccountRole string `json:"accountRole,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	AccountRole *string `json:"accountRole,omitempty"`
 
 	// AccountRoleRef references an AccountRole CR in the same namespace.
 	// Mutually exclusive with AccountRole, DatabaseRole, and DatabaseRoleRef.
@@ -59,7 +60,8 @@ type GrantOwnershipSpec struct {
 	// DatabaseRole is the fully qualified database role name (e.g. "MY_DB"."MY_ROLE").
 	// Mutually exclusive with AccountRole, AccountRoleRef, and DatabaseRoleRef.
 	// +optional
-	DatabaseRole string `json:"databaseRole,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	DatabaseRole *string `json:"databaseRole,omitempty"`
 
 	// DatabaseRoleRef references a DatabaseRole CR in the same namespace.
 	// Mutually exclusive with AccountRole, AccountRoleRef, and DatabaseRole.
@@ -109,7 +111,7 @@ func (s *GrantOwnershipSpec) Validate() error {
 
 	// Exactly one of accountRole/accountRoleRef/databaseRole/databaseRoleRef must be set.
 	count := 0
-	if s.AccountRole != "" {
+	if s.AccountRole != nil {
 		count++
 	}
 
@@ -117,7 +119,7 @@ func (s *GrantOwnershipSpec) Validate() error {
 		count++
 	}
 
-	if s.DatabaseRole != "" {
+	if s.DatabaseRole != nil {
 		count++
 	}
 
@@ -208,13 +210,17 @@ type GrantOwnershipList struct {
 
 // GetSpecName returns a human-readable composite name for the ownership transfer.
 func (g *GrantOwnership) GetSpecName() string {
-	role := g.Spec.AccountRole
+	var role string
+	if g.Spec.AccountRole != nil {
+		role = *g.Spec.AccountRole
+	}
+
 	if role == "" && g.Spec.AccountRoleRef != nil {
 		role = "(ref: " + g.Spec.AccountRoleRef.Name + ")"
 	}
 
-	if role == "" {
-		role = g.Spec.DatabaseRole
+	if role == "" && g.Spec.DatabaseRole != nil {
+		role = *g.Spec.DatabaseRole
 	}
 
 	if role == "" && g.Spec.DatabaseRoleRef != nil {

@@ -32,6 +32,19 @@ type SecretKeyReference struct {
 	Key string `json:"key"`
 }
 
+// SecretBinding binds a Snowflake secret to a variable name for use in procedure/function handler code.
+// Secrets must be allowed by an external access integration specified in the same resource.
+type SecretBinding struct {
+	// SecretName is the fully qualified name of the Snowflake secret
+	// (e.g. "MY_DB"."MY_SCHEMA"."MY_SECRET").
+	// +kubebuilder:validation:MinLength=1
+	SecretName string `json:"secretName"`
+
+	// VariableName is the variable name used to reference the secret in handler code.
+	// +kubebuilder:validation:MinLength=1
+	VariableName string `json:"variableName"`
+}
+
 // ProviderReference selects a ProviderConfig by name and optionally by namespace.
 type ProviderReference struct {
 	// Name of the ProviderConfig to use.

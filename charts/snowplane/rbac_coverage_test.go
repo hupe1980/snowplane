@@ -75,6 +75,8 @@ func registeredCRDPlurals(t *testing.T) map[string]bool {
 		case strings.HasSuffix(lower, "ss") || strings.HasSuffix(lower, "x") ||
 			strings.HasSuffix(lower, "ch") || strings.HasSuffix(lower, "sh"):
 			plural = lower + "es"
+		case strings.HasSuffix(lower, "s"):
+			plural = lower // already ends in s; kubebuilder treats as plural
 		default:
 			plural = lower + "s"
 		}

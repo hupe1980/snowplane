@@ -12,12 +12,11 @@ import (
 //
 // +kubebuilder:validation:XValidation:rule="self.privilege == oldSelf.privilege",message="spec.privilege is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.on == oldSelf.on",message="spec.on is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="self.databaseRole == oldSelf.databaseRole",message="spec.databaseRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRole) == has(self.databaseRole) && (!has(self.databaseRole) || self.databaseRole == oldSelf.databaseRole)",message="spec.databaseRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRoleRef) == has(self.databaseRoleRef) && (!has(self.databaseRoleRef) || self.databaseRoleRef == oldSelf.databaseRoleRef)",message="spec.databaseRoleRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.withGrantOption == oldSelf.withGrantOption",message="spec.withGrantOption is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="has(self.databaseRole) || has(self.databaseRoleRef)",message="one of spec.databaseRole or spec.databaseRoleRef must be set"
-// +kubebuilder:validation:XValidation:rule="!(has(self.databaseRole) && has(self.databaseRoleRef))",message="spec.databaseRole and spec.databaseRoleRef are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="(has(self.databaseRole) && !has(self.databaseRoleRef)) || (!has(self.databaseRole) && has(self.databaseRoleRef))",message="exactly one of spec.databaseRole or spec.databaseRoleRef must be set"
 type DatabaseRoleGrantSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -32,7 +31,8 @@ type DatabaseRoleGrantSpec struct {
 	// DatabaseRole is the fully qualified database role name (e.g. MY_DB.MY_ROLE).
 	// Mutually exclusive with DatabaseRoleRef.
 	// +optional
-	DatabaseRole string `json:"databaseRole,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	DatabaseRole *string `json:"databaseRole,omitempty"`
 
 	// DatabaseRoleRef references a DatabaseRole CR in the same namespace.
 	// When set, the database role name is resolved from the CR's fullyQualifiedName.
@@ -87,7 +87,11 @@ type DatabaseRoleGrantList struct {
 
 // GetSpecName returns a human-readable composite name for the grant.
 func (r *DatabaseRoleGrant) GetSpecName() string {
-	role := r.Spec.DatabaseRole
+	var role string
+	if r.Spec.DatabaseRole != nil {
+		role = *r.Spec.DatabaseRole
+	}
+
 	if role == "" && r.Spec.DatabaseRoleRef != nil {
 		role = "(ref: " + r.Spec.DatabaseRoleRef.Name + ")"
 	}
@@ -96,7 +100,13 @@ func (r *DatabaseRoleGrant) GetSpecName() string {
 }
 
 // ResolvedDatabaseRole returns the resolved database role name (either direct or from ref).
-func (r *DatabaseRoleGrant) ResolvedDatabaseRole() string { return r.Spec.DatabaseRole }
+func (r *DatabaseRoleGrant) ResolvedDatabaseRole() string {
+	if r.Spec.DatabaseRole != nil {
+		return *r.Spec.DatabaseRole
+	}
+
+	return ""
+}
 
 // ResolveKind determines the GrantKind from the spec.
 func (s *DatabaseRoleGrantSpec) ResolveKind() GrantKind {

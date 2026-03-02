@@ -70,6 +70,7 @@ rules:
   - networkpolicyattachments
   - passwordpolicyattachments
   - maskingpolicyapplications
+  - tableconstraints
   - networkpolicies
   - resourcemonitors
   - maskingpolicies
@@ -82,6 +83,13 @@ rules:
   - pipes
   - storageintegrations
   - securityintegrations
+  - secretwithclientcredentials
+  - secretwithauthorizationcodegrants
+  - secretwithbasicauthentications
+  - secretwithgenericstrings
+  - apiauthenticationintegrationwithclientcredentials
+  - apiauthenticationintegrationwithauthorizationcodegrants
+  - apiauthenticationintegrationwithjwtbearers
   - passwordpolicies
   - networkrules
   - alerts
@@ -95,6 +103,16 @@ rules:
   - streamondynamictables
   - fieldexports
   - providerconfigs
+  - proceduresqls
+  - procedurejavascripts
+  - procedurepythons
+  - procedurejavas
+  - procedurescalas
+  - functionsqls
+  - functionjavascripts
+  - functionpythons
+  - functionjavas
+  - functionscalas
   verbs:
   - get
   - list
@@ -125,6 +143,7 @@ rules:
   - networkpolicyattachments/status
   - passwordpolicyattachments/status
   - maskingpolicyapplications/status
+  - tableconstraints/status
   - networkpolicies/status
   - resourcemonitors/status
   - maskingpolicies/status
@@ -137,6 +156,13 @@ rules:
   - pipes/status
   - storageintegrations/status
   - securityintegrations/status
+  - secretwithclientcredentials/status
+  - secretwithauthorizationcodegrants/status
+  - secretwithbasicauthentications/status
+  - secretwithgenericstrings/status
+  - apiauthenticationintegrationwithclientcredentials/status
+  - apiauthenticationintegrationwithauthorizationcodegrants/status
+  - apiauthenticationintegrationwithjwtbearers/status
   - passwordpolicies/status
   - networkrules/status
   - alerts/status
@@ -150,6 +176,16 @@ rules:
   - streamondynamictables/status
   - fieldexports/status
   - providerconfigs/status
+  - proceduresqls/status
+  - procedurejavascripts/status
+  - procedurepythons/status
+  - procedurejavas/status
+  - procedurescalas/status
+  - functionsqls/status
+  - functionjavascripts/status
+  - functionpythons/status
+  - functionjavas/status
+  - functionscalas/status
   verbs:
   - get
   - patch
@@ -176,6 +212,7 @@ rules:
   - networkpolicyattachments/finalizers
   - passwordpolicyattachments/finalizers
   - maskingpolicyapplications/finalizers
+  - tableconstraints/finalizers
   - networkpolicies/finalizers
   - resourcemonitors/finalizers
   - maskingpolicies/finalizers
@@ -188,6 +225,13 @@ rules:
   - pipes/finalizers
   - storageintegrations/finalizers
   - securityintegrations/finalizers
+  - secretwithclientcredentials/finalizers
+  - secretwithauthorizationcodegrants/finalizers
+  - secretwithbasicauthentications/finalizers
+  - secretwithgenericstrings/finalizers
+  - apiauthenticationintegrationwithclientcredentials/finalizers
+  - apiauthenticationintegrationwithauthorizationcodegrants/finalizers
+  - apiauthenticationintegrationwithjwtbearers/finalizers
   - passwordpolicies/finalizers
   - networkrules/finalizers
   - alerts/finalizers
@@ -201,5 +245,15 @@ rules:
   - streamondynamictables/finalizers
   - fieldexports/finalizers
   - providerconfigs/finalizers
+  - proceduresqls/finalizers
+  - procedurejavascripts/finalizers
+  - procedurepythons/finalizers
+  - procedurejavas/finalizers
+  - procedurescalas/finalizers
+  - functionsqls/finalizers
+  - functionjavascripts/finalizers
+  - functionpythons/finalizers
+  - functionjavas/finalizers
+  - functionscalas/finalizers
   verbs:
   - update

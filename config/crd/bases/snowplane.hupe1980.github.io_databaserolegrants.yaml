@@ -73,6 +73,7 @@ spec:
                 description: |-
                   DatabaseRole is the fully qualified database role name (e.g. MY_DB.MY_ROLE).
                   Mutually exclusive with DatabaseRoleRef.
+                minLength: 1
                 type: string
               databaseRoleRef:
                 description: |-
@@ -172,6 +173,7 @@ spec:
                         description: |-
                           AllInDatabase grants on all existing schemas in the specified database.
                           For: ON ALL SCHEMAS IN DATABASE <db_name>
+                        minLength: 1
                         type: string
                       allInDatabaseRef:
                         description: |-
@@ -189,6 +191,7 @@ spec:
                         description: |-
                           FutureInDatabase grants on future schemas in the specified database.
                           For: ON FUTURE SCHEMAS IN DATABASE <db_name>
+                        minLength: 1
                         type: string
                       futureInDatabaseRef:
                         description: |-
@@ -207,6 +210,7 @@ spec:
                           SchemaName is the fully qualified schema name (e.g. "MY_DB"."PUBLIC").
                           The controller uses this verbatim in ON SCHEMA <schema_name>.
                           For: ON SCHEMA <schema_name>
+                        minLength: 1
                         type: string
                       schemaRef:
                         description: |-
@@ -243,6 +247,7 @@ spec:
                           inDatabase:
                             description: InDatabase scopes the grant to all objects
                               of the type in the specified database.
+                            minLength: 1
                             type: string
                           inDatabaseRef:
                             description: |-
@@ -259,6 +264,7 @@ spec:
                           inSchema:
                             description: InSchema scopes the grant to all objects
                               of the type in the specified schema.
+                            minLength: 1
                             type: string
                           inSchemaRef:
                             description: |-
@@ -320,6 +326,7 @@ spec:
                           inDatabase:
                             description: InDatabase scopes the grant to all objects
                               of the type in the specified database.
+                            minLength: 1
                             type: string
                           inDatabaseRef:
                             description: |-
@@ -336,6 +343,7 @@ spec:
                           inSchema:
                             description: InSchema scopes the grant to all objects
                               of the type in the specified schema.
+                            minLength: 1
                             type: string
                           inSchemaRef:
                             description: |-
@@ -490,7 +498,8 @@ spec:
               rule: self.on == oldSelf.on
             - message: spec.databaseRole is immutable (delete and recreate the resource
                 to change)
-              rule: self.databaseRole == oldSelf.databaseRole
+              rule: has(oldSelf.databaseRole) == has(self.databaseRole) && (!has(self.databaseRole)
+                || self.databaseRole == oldSelf.databaseRole)
             - message: spec.databaseRoleRef is immutable (delete and recreate the
                 resource to change)
               rule: has(oldSelf.databaseRoleRef) == has(self.databaseRoleRef) && (!has(self.databaseRoleRef)
@@ -502,10 +511,10 @@ spec:
                 to change)
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
                 || self.useRole == oldSelf.useRole)
-            - message: one of spec.databaseRole or spec.databaseRoleRef must be set
-              rule: has(self.databaseRole) || has(self.databaseRoleRef)
-            - message: spec.databaseRole and spec.databaseRoleRef are mutually exclusive
-              rule: '!(has(self.databaseRole) && has(self.databaseRoleRef))'
+            - message: exactly one of spec.databaseRole or spec.databaseRoleRef must
+                be set
+              rule: (has(self.databaseRole) && !has(self.databaseRoleRef)) || (!has(self.databaseRole)
+                && has(self.databaseRoleRef))
           status:
             description: DatabaseRoleGrantStatus defines the observed state of a DatabaseRoleGrant.
             properties:
