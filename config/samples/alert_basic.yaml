@@ -12,7 +12,8 @@ spec:
     name: my-database
   schemaRef:
     name: my-schema
-  warehouse: COMPUTE_WH
+  warehouseRef:
+    name: my-warehouse
   schedule: "5 MINUTE"
   condition: "SELECT COUNT(*) FROM my_table WHERE status = 'ERROR' AND created_at > DATEADD('hour', -1, CURRENT_TIMESTAMP())"
   action: "CALL alert_handler()"

@@ -1,0 +1,26 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ExternalTable
+metadata:
+  name: my-external-table
+spec:
+  name: MY_EXTERNAL_TABLE
+  providerRef:
+    name: default
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  location: "@MY_DATABASE.MY_SCHEMA.MY_STAGE/data/"
+  fileFormat: "TYPE = PARQUET"
+  columns:
+    - name: id
+      type: NUMBER
+      as: "value:id::number"
+    - name: name
+      type: VARCHAR
+      as: "value:name::varchar"
+    - name: created_at
+      type: TIMESTAMP_NTZ
+      as: "value:created_at::timestamp_ntz"
+  autoRefresh: true
+  comment: "External table managed by Snowplane"

@@ -105,7 +105,7 @@ func buildCreateOptions(obj *snowplanev1alpha1.StreamOnExternalTable, id snowfla
 	return snowflake.CreateStreamOptions{
 		Name:       id,
 		SourceType: snowflake.StreamSourceExternalTable,
-		SourceName: obj.Spec.ExternalTable,
+		SourceName: obj.Status.ExternalTableName,
 		InsertOnly: obj.Spec.InsertOnly,
 		Comment:    obj.Spec.Comment,
 	}
@@ -131,7 +131,7 @@ func detectDrift(obj *snowplanev1alpha1.StreamOnExternalTable, obs *snowflake.St
 		d.CompareStringValueFold("NAME", obj.Spec.Name, obs.ShowOutput.Name, true)
 		d.CompareStringValueFold("DATABASE", snowflake.ParseDatabaseNameFromFQN(obj.Status.DatabaseName), obs.ShowOutput.DatabaseName, true)
 		d.CompareStringValueFold("SCHEMA", snowflake.ParseSchemaNameFromFQN(obj.Status.SchemaName), obs.ShowOutput.SchemaName, true)
-		d.CompareStringValueFold("SOURCE", obj.Spec.ExternalTable, obs.ShowOutput.TableName, true)
+		d.CompareStringValueFold("SOURCE", obj.Status.ExternalTableName, obs.ShowOutput.TableName, true)
 
 		expectedMode := "DEFAULT"
 		if obj.Spec.InsertOnly != nil && *obj.Spec.InsertOnly {

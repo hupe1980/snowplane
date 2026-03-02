@@ -1,0 +1,320 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: maskingpolicyapplications.snowplane.hupe1980.github.io
+spec:
+  group: snowplane.hupe1980.github.io
+  names:
+    categories:
+    - snowplane
+    kind: MaskingPolicyApplication
+    listKind: MaskingPolicyApplicationList
+    plural: maskingpolicyapplications
+    shortNames:
+    - mpa
+    singular: maskingpolicyapplication
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: SYNCED
+      type: string
+    - jsonPath: .status.policyName
+      name: POLICY
+      type: string
+    - jsonPath: .spec.tableName
+      name: TABLE
+      type: string
+    - jsonPath: .spec.columnName
+      name: COLUMN
+      type: string
+    - jsonPath: .spec.providerRef.name
+      name: PROVIDER
+      priority: 1
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          MaskingPolicyApplication is the Schema for the maskingpolicyapplications API.
+          It applies a Snowflake masking policy to a table column.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: "MaskingPolicyApplicationSpec defines the desired state of
+              a MaskingPolicyApplication.\nApplies a Snowflake masking policy to a
+              table column:\n\n\tALTER TABLE <table_name> ALTER COLUMN <column_name>
+              SET MASKING POLICY <policy_name>\n\nIdentity fields (policyName/policyRef,
+              tableName, columnName) are\nimmutable after creation — changing any
+              of them requires deleting and\nrecreating the resource.\n\nMutual exclusivity
+              rules:"
+            properties:
+              columnName:
+                description: |-
+                  ColumnName is the column in the table to apply the masking policy to.
+                  Immutable after creation.
+                minLength: 1
+                type: string
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy specifies what happens to the Snowflake resource when the CR is deleted.
+                  Defaults to "Delete".
+                enum:
+                - Delete
+                - Orphan
+                type: string
+              managementPolicies:
+                description: ManagementPolicies specifies lifecycle policies for this
+                  resource.
+                properties:
+                  adoptionPolicy:
+                    default: fail-if-exists
+                    description: |-
+                      AdoptionPolicy controls how the reconciler handles a pre-existing
+                      Snowflake resource on first reconciliation.
+                      Defaults to "fail-if-exists".
+                    enum:
+                    - adopt
+                    - fail-if-exists
+                    type: string
+                  createOrAlter:
+                    default: true
+                    description: |-
+                      CreateOrAlter controls whether CREATE OR ALTER is used instead of
+                      the legacy CREATE + ALTER two-step flow for supported resource types.
+                      Defaults to true.
+                    type: boolean
+                  driftPolicy:
+                    default: correct
+                    description: |-
+                      DriftPolicy controls whether detected drift is corrected or only
+                      reported via conditions and events.
+                      Defaults to "correct".
+                    enum:
+                    - correct
+                    - detect-only
+                    type: string
+                type: object
+              paused:
+                description: |-
+                  Paused suspends reconciliation of this resource. When true, the
+                  controller skips all Snowflake operations and sets Synced=False
+                  with reason ReconcilePaused. The Snowflake resource is not modified
+                  or deleted while paused.
+                type: boolean
+              policyName:
+                description: |-
+                  PolicyName is the fully qualified Snowflake masking policy name
+                  (e.g. "MY_DB"."MY_SCHEMA"."MY_MASKING_POLICY").
+                  Mutually exclusive with PolicyRef.
+                type: string
+              policyRef:
+                description: |-
+                  PolicyRef references a MaskingPolicy CR in the same namespace.
+                  When set, the policy name is resolved from the CR's fullyQualifiedName.
+                  Mutually exclusive with PolicyName.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              providerRef:
+                description: ProviderRef references the ProviderConfig to use for
+                  Snowflake connectivity.
+                properties:
+                  name:
+                    default: default
+                    description: Name of the ProviderConfig to use.
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the ProviderConfig. Defaults to the namespace of the
+                      referring resource. Set this to reference a ProviderConfig in a
+                      different namespace (e.g. a shared system namespace).
+                    type: string
+                type: object
+              tableName:
+                description: |-
+                  TableName is the fully qualified Snowflake table name
+                  (e.g. "MY_DB"."MY_SCHEMA"."MY_TABLE").
+                  Immutable after creation.
+                minLength: 1
+                type: string
+              useRole:
+                description: |-
+                  UseRole specifies the Snowflake role to activate via USE ROLE before
+                  CREATE/ALTER/DROP operations. In Snowflake's DAC model the role active
+                  at CREATE time becomes the object owner, so this field indirectly
+                  controls initial ownership.
+                  This field is immutable after the resource has been created in Snowflake.
+                minLength: 1
+                type: string
+              usingColumns:
+                description: |-
+                  UsingColumns is an optional list of column names for a conditional masking policy.
+                  The first column specifies the column for the policy conditions.
+                  Additional columns evaluate to determine masking in each row.
+                  Immutable after creation.
+                items:
+                  type: string
+                type: array
+            required:
+            - columnName
+            - providerRef
+            - tableName
+            type: object
+            x-kubernetes-validations:
+            - message: spec.policyName is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.policyName) == has(self.policyName) && (!has(self.policyName)
+                || self.policyName == oldSelf.policyName)
+            - message: spec.policyRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.policyRef) == has(self.policyRef) && (!has(self.policyRef)
+                || self.policyRef == oldSelf.policyRef)
+            - message: spec.tableName is immutable (delete and recreate the resource
+                to change)
+              rule: self.tableName == oldSelf.tableName
+            - message: spec.columnName is immutable (delete and recreate the resource
+                to change)
+              rule: self.columnName == oldSelf.columnName
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
+            - message: spec.usingColumns is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.usingColumns) == has(self.usingColumns) && (!has(self.usingColumns)
+                || self.usingColumns == oldSelf.usingColumns)
+            - message: exactly one of spec.policyName or spec.policyRef must be set
+              rule: '(has(self.policyName) ? 1 : 0) + (has(self.policyRef) ? 1 : 0)
+                == 1'
+          status:
+            description: MaskingPolicyApplicationStatus defines the observed state
+              of a MaskingPolicyApplication.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the resource's state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              fullyQualifiedName:
+                description: FullyQualifiedName is the Snowflake fully qualified identifier
+                  for this resource.
+                type: string
+              lastAppliedSpecHash:
+                description: |-
+                  LastAppliedSpecHash is the SHA-256 hash of the spec as of the last
+                  successful reconciliation. The reconciler uses this to distinguish
+                  spec changes (user edited the CR) from external drift (Snowflake
+                  state diverged without a spec change). This is more reliable than
+                  comparing ObservedGeneration vs Generation because metadata-only
+                  changes (labels, annotations) increment Generation without changing
+                  the spec.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              observedPolicyName:
+                description: |-
+                  ObservedPolicyName is the masking policy currently applied in Snowflake,
+                  as read from POLICY_REFERENCES.
+                type: string
+              policyName:
+                description: PolicyName is the resolved fully qualified masking policy
+                  name.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

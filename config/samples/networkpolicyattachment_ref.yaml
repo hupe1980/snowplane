@@ -1,0 +1,12 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: NetworkPolicyAttachment
+metadata:
+  name: user-network-policy
+spec:
+  providerRef:
+    name: default
+  # Use a PolicyRef to reference an existing NetworkPolicy CR instead of a raw name.
+  policyRef:
+    name: my-network-policy
+  targetType: USER
+  targetName: MY_USER

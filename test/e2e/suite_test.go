@@ -1307,12 +1307,12 @@ func newTaskCR(name, sfName, dbRefName, schemaRefName, warehouseName, sqlStateme
 				"namespace": testNamespace,
 			},
 			"spec": map[string]interface{}{
-				"name":         sfName,
-				"sqlStatement": sqlStatement,
-				"comment":      "e2e test task",
-				"schedule":     "60 MINUTE",
-				"warehouse":    warehouseName,
-				"suspend":      true,
+				"name":          sfName,
+				"sqlStatement":  sqlStatement,
+				"comment":       "e2e test task",
+				"schedule":      "60 MINUTE",
+				"warehouseName": warehouseName,
+				"suspend":       true,
 				"databaseRef": map[string]interface{}{
 					"name": dbRefName,
 				},
@@ -1337,9 +1337,9 @@ func newStreamOnTableCR(name, sfName, dbRefName, schemaRefName, table string) *u
 				"namespace": testNamespace,
 			},
 			"spec": map[string]interface{}{
-				"name":    sfName,
-				"table":   table,
-				"comment": "e2e test stream on table",
+				"name":      sfName,
+				"tableName": table,
+				"comment":   "e2e test stream on table",
 				"databaseRef": map[string]interface{}{
 					"name": dbRefName,
 				},

@@ -14,9 +14,18 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
-// +kubebuilder:validation:XValidation:rule="!(has(self.warehouse) && has(self.userTaskManagedInitialWarehouseSize))",message="spec.warehouse and spec.userTaskManagedInitialWarehouseSize are mutually exclusive"
-// +kubebuilder:validation:XValidation:rule="!has(self.finalize) || !has(self.schedule)",message="spec.finalize and spec.schedule are mutually exclusive"
-// +kubebuilder:validation:XValidation:rule="!has(self.finalize) || !has(self.after) || size(self.after) == 0",message="spec.finalize and spec.after are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!(has(self.warehouseRef) && has(self.userTaskManagedInitialWarehouseSize)) && !(has(self.warehouseName) && has(self.userTaskManagedInitialWarehouseSize))",message="spec.warehouseRef/warehouseName and spec.userTaskManagedInitialWarehouseSize are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!(has(self.warehouseRef) && has(self.warehouseName))",message="spec.warehouseRef and spec.warehouseName are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.warehouseName) || !self.warehouseName.contains('.')",message="spec.warehouseName must be a simple identifier, not a fully-qualified name"
+// +kubebuilder:validation:XValidation:rule="!(has(self.errorIntegrationRef) && has(self.errorIntegrationName))",message="spec.errorIntegrationRef and spec.errorIntegrationName are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!(has(self.successIntegrationRef) && has(self.successIntegrationName))",message="spec.successIntegrationRef and spec.successIntegrationName are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!(has(self.finalizeRef) && has(self.finalizeName))",message="spec.finalizeRef and spec.finalizeName are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.finalizeName) || !has(self.schedule)",message="spec.finalizeName and spec.schedule are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.finalizeRef) || !has(self.schedule)",message="spec.finalizeRef and spec.schedule are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.finalizeName) || !has(self.after) || size(self.after) == 0",message="spec.finalizeName and spec.after are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.finalizeRef) || !has(self.after) || size(self.after) == 0",message="spec.finalizeRef and spec.after are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.after) || self.after.all(p, (has(p.ref) && !has(p.name)) || (!has(p.ref) && has(p.name)))",message="each entry in spec.after must set exactly one of ref or name"
+// +kubebuilder:validation:XValidation:rule="!has(self.after) || self.after.all(p, !has(p.name) || !p.name.contains('.'))",message="spec.after[].name must be a simple identifier, not a fully-qualified name"
 // +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
 // +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
 type TaskSpec struct {
@@ -24,6 +33,7 @@ type TaskSpec struct {
 
 	// Name is the Snowflake task name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -35,6 +45,7 @@ type TaskSpec struct {
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -46,15 +57,23 @@ type TaskSpec struct {
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
-	// Warehouse specifies the virtual warehouse for task runs.
-	// Mutually exclusive with UserTaskManagedInitialWarehouseSize.
+	// WarehouseRef references a Warehouse CR in the same namespace.
+	// Mutually exclusive with WarehouseName and UserTaskManagedInitialWarehouseSize.
 	// +optional
-	Warehouse *string `json:"warehouse,omitempty"`
+	WarehouseRef *LocalObjectReference `json:"warehouseRef,omitempty"`
+
+	// WarehouseName is the Snowflake warehouse identifier (e.g. "COMPUTE_WH").
+	// Mutually exclusive with WarehouseRef and UserTaskManagedInitialWarehouseSize.
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
+	WarehouseName *string `json:"warehouseName,omitempty"`
 
 	// UserTaskManagedInitialWarehouseSize sets the initial size for serverless tasks.
-	// Mutually exclusive with Warehouse.
+	// Mutually exclusive with WarehouseRef and WarehouseName.
 	// +optional
 	// +kubebuilder:validation:Enum=XSMALL;SMALL;MEDIUM;LARGE;XLARGE;XXLARGE
 	UserTaskManagedInitialWarehouseSize *string `json:"userTaskManagedInitialWarehouseSize,omitempty" snowflake:"USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE"`
@@ -68,9 +87,11 @@ type TaskSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	SQLStatement string `json:"sqlStatement"`
 
-	// After specifies predecessor task names for DAG scheduling.
+	// After specifies predecessor tasks for DAG scheduling.
+	// Each entry references either a Task CR or a raw Snowflake task name.
 	// +optional
-	After []string `json:"after,omitempty"`
+	// +kubebuilder:validation:MaxItems=100
+	After []TaskPredecessor `json:"after,omitempty"`
 
 	// When specifies a boolean SQL expression that determines whether the task runs.
 	// +optional
@@ -96,13 +117,27 @@ type TaskSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	SuspendTaskAfterNumFailures *int32 `json:"suspendTaskAfterNumFailures,omitempty" snowflake:"SUSPEND_TASK_AFTER_NUM_FAILURES"`
 
-	// ErrorIntegration is the notification integration for error notifications.
+	// ErrorIntegrationRef references a NotificationIntegration CR for error notifications.
+	// Mutually exclusive with ErrorIntegrationName.
 	// +optional
-	ErrorIntegration *string `json:"errorIntegration,omitempty" snowflake:"ERROR_INTEGRATION"`
+	ErrorIntegrationRef *LocalObjectReference `json:"errorIntegrationRef,omitempty"`
 
-	// SuccessIntegration is the notification integration for success notifications.
+	// ErrorIntegrationName is the Snowflake notification integration identifier for error notifications.
+	// Mutually exclusive with ErrorIntegrationRef.
 	// +optional
-	SuccessIntegration *string `json:"successIntegration,omitempty" snowflake:"SUCCESS_INTEGRATION"`
+	// +kubebuilder:validation:MinLength=1
+	ErrorIntegrationName *string `json:"errorIntegrationName,omitempty" snowflake:"ERROR_INTEGRATION"`
+
+	// SuccessIntegrationRef references a NotificationIntegration CR for success notifications.
+	// Mutually exclusive with SuccessIntegrationName.
+	// +optional
+	SuccessIntegrationRef *LocalObjectReference `json:"successIntegrationRef,omitempty"`
+
+	// SuccessIntegrationName is the Snowflake notification integration identifier for success notifications.
+	// Mutually exclusive with SuccessIntegrationRef.
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	SuccessIntegrationName *string `json:"successIntegrationName,omitempty" snowflake:"SUCCESS_INTEGRATION"`
 
 	// TaskAutoRetryAttempts specifies the number of automatic retry attempts (0-30).
 	// +optional
@@ -121,11 +156,17 @@ type TaskSpec struct {
 	// +optional
 	Config *string `json:"config,omitempty" snowflake:"CONFIG"`
 
-	// Finalize specifies the name of a root task that this finalizer task is
-	// associated with. Finalizer tasks run after all other tasks in the task
-	// graph complete. Mutually exclusive with Schedule and After.
+	// FinalizeRef references a Task CR that this finalizer task is associated with.
+	// Finalizer tasks run after all other tasks in the task graph complete.
+	// Mutually exclusive with FinalizeName, Schedule, and After.
 	// +optional
-	Finalize *string `json:"finalize,omitempty" snowflake:"FINALIZE,nounset"`
+	FinalizeRef *LocalObjectReference `json:"finalizeRef,omitempty"`
+
+	// FinalizeName is the name of a root task that this finalizer task is
+	// associated with. Finalizer tasks run after all other tasks in the task
+	// graph complete. Mutually exclusive with FinalizeRef, Schedule, and After.
+	// +optional
+	FinalizeName *string `json:"finalizeName,omitempty" snowflake:"FINALIZE,nounset"`
 
 	// LogLevel specifies the severity level of events for the task.
 	// +optional
@@ -156,6 +197,20 @@ type TaskSpec struct {
 	// +optional
 	// +kubebuilder:validation:Enum=XSMALL;SMALL;MEDIUM;LARGE;XLARGE;XXLARGE
 	ServerlessTaskMaxStatementSize *string `json:"serverlessTaskMaxStatementSize,omitempty" snowflake:"SERVERLESS_TASK_MAX_STATEMENT_SIZE"`
+}
+
+// TaskPredecessor specifies a predecessor task for DAG scheduling.
+// Exactly one of Ref or Name must be set.
+type TaskPredecessor struct {
+	// Ref references a Task CR in the same namespace.
+	// +optional
+	Ref *LocalObjectReference `json:"ref,omitempty"`
+
+	// Name is the Snowflake task identifier.
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
+	Name *string `json:"name,omitempty"`
 }
 
 // TaskShowOutput mirrors the SHOW TASKS output stored in status.
@@ -239,6 +294,21 @@ type TaskStatus struct {
 
 	// SchemaName is the parent Snowflake schema name.
 	SchemaName string `json:"schemaName,omitempty"`
+
+	// WarehouseName is the resolved warehouse name.
+	WarehouseName string `json:"warehouseName,omitempty"`
+
+	// ErrorIntegrationName is the resolved error integration name.
+	ErrorIntegrationName string `json:"errorIntegrationName,omitempty"`
+
+	// SuccessIntegrationName is the resolved success integration name.
+	SuccessIntegrationName string `json:"successIntegrationName,omitempty"`
+
+	// FinalizeName is the resolved finalize task name.
+	FinalizeName string `json:"finalizeName,omitempty"`
+
+	// AfterNames is the resolved list of predecessor task names.
+	AfterNames []string `json:"afterNames,omitempty"`
 
 	// ShowOutput contains the raw SHOW TASKS output for this task.
 	ShowOutput *TaskShowOutput `json:"showOutput,omitempty"`

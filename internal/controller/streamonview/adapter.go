@@ -53,7 +53,24 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.Strea
 
 	obj.Status.SchemaName = schemaFQN
 
-	refresolver.SetDatabaseAndSchemaResolvedCondition(obj, obj.Spec.DatabaseRef, obj.Spec.DatabaseName, obj.Spec.SchemaRef, obj.Spec.SchemaName)
+	viewName, err := refresolver.PreReconcileSourceRef(ctx, a.client, a.recorder, obj,
+		obj.Namespace, obj.Spec.ViewRef, obj.Spec.ViewName, obj.Status.ViewName,
+		"View",
+		func() *snowplanev1alpha1.View { return &snowplanev1alpha1.View{} },
+		snowplanev1alpha1.GroupVersion.WithKind("View"),
+		func(v *snowplanev1alpha1.View) string { return v.Spec.Name },
+	)
+	if err != nil {
+		return err
+	}
+
+	obj.Status.ViewName = viewName
+
+	refresolver.SetAllReferencesResolvedCondition(obj,
+		refresolver.RefDescriptor{KindLabel: "Database", Ref: obj.Spec.DatabaseRef, RawName: obj.Spec.DatabaseName},
+		refresolver.RefDescriptor{KindLabel: "Schema", Ref: obj.Spec.SchemaRef, RawName: obj.Spec.SchemaName},
+		refresolver.RefDescriptor{KindLabel: "View", Ref: obj.Spec.ViewRef, RawName: obj.Spec.ViewName},
+	)
 
 	return nil
 }
@@ -107,6 +124,27 @@ func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
 		bldr.Watches(
 			&snowplanev1alpha1.Schema{},
 			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.StreamOnViewList{} }, ".spec.schemaRef.name", "listing stream-on-view for schema watch")),
+		)
+
+		if err := mgr.GetFieldIndexer().IndexField(
+			ctx,
+			&snowplanev1alpha1.StreamOnView{},
+			".spec.viewRef.name",
+			func(o sigs.Object) []string {
+				s, ok := o.(*snowplanev1alpha1.StreamOnView)
+				if !ok || s.Spec.ViewRef == nil {
+					return nil
+				}
+
+				return []string{s.Spec.ViewRef.Name}
+			},
+		); err != nil {
+			return fmt.Errorf("creating field indexer for .spec.viewRef.name: %w", err)
+		}
+
+		bldr.Watches(
+			&snowplanev1alpha1.View{},
+			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.StreamOnViewList{} }, ".spec.viewRef.name", "listing stream-on-view for view watch")),
 		)
 
 		return nil

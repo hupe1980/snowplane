@@ -189,16 +189,27 @@ spec:
                   This field is immutable after the resource has been created in Snowflake.
                 minLength: 1
                 type: string
-              view:
+              viewName:
                 description: |-
-                  View is the fully qualified name of the source view
-                  (e.g. "MY_DB"."MY_SCHEMA"."MY_VIEW"). Immutable after creation.
+                  ViewName is the Snowflake view identifier (e.g. "MY_VIEW").
+                  Mutually exclusive with ViewRef. Immutable after creation.
                 minLength: 1
                 type: string
+              viewRef:
+                description: |-
+                  ViewRef references a View CR in the same namespace.
+                  Mutually exclusive with ViewName. Immutable after creation.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
             required:
             - name
             - providerRef
-            - view
             type: object
             x-kubernetes-validations:
             - message: spec.name is immutable (delete and recreate the resource to
@@ -220,9 +231,14 @@ spec:
                 to change)
               rule: has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName)
                 || self.schemaName == oldSelf.schemaName)
-            - message: spec.view is immutable (delete and recreate the resource to
-                change)
-              rule: self.view == oldSelf.view
+            - message: spec.viewRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.viewRef) == has(self.viewRef) && (!has(self.viewRef)
+                || self.viewRef == oldSelf.viewRef)
+            - message: spec.viewName is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.viewName) == has(self.viewName) && (!has(self.viewName)
+                || self.viewName == oldSelf.viewName)
             - message: spec.useRole is immutable (delete and recreate the resource
                 to change)
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
@@ -234,12 +250,18 @@ spec:
             - message: exactly one of spec.schemaRef or spec.schemaName must be set
               rule: (has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef)
                 && has(self.schemaName))
+            - message: exactly one of spec.viewRef or spec.viewName must be set
+              rule: (has(self.viewRef) && !has(self.viewName)) || (!has(self.viewRef)
+                && has(self.viewName))
             - message: spec.databaseName must be a simple identifier, not a fully-qualified
                 name
               rule: '!has(self.databaseName) || !self.databaseName.contains(''.'')'
             - message: spec.schemaName must be a simple identifier, not a fully-qualified
                 name; use spec.databaseName for the database part
               rule: '!has(self.schemaName) || !self.schemaName.contains(''.'')'
+            - message: spec.viewName must be a simple identifier, not a fully-qualified
+                name
+              rule: '!has(self.viewName) || !self.viewName.contains(''.'')'
           status:
             description: StreamOnViewStatus defines the observed state of a StreamOnView.
             properties:
@@ -375,6 +397,9 @@ spec:
                 items:
                   type: string
                 type: array
+              viewName:
+                description: ViewName is the resolved Snowflake view name.
+                type: string
             type: object
         type: object
     served: true

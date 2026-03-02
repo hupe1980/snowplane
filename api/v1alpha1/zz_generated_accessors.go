@@ -2542,6 +2542,270 @@ func (nr *NetworkRule) SetTrackedParametersList(val []string) {
 }
 
 // ---------------------------------------------------------------------------
+// Sequence
+// ---------------------------------------------------------------------------
+
+func (seq *Sequence) GetConditions() []metav1.Condition {
+	return seq.Status.Conditions
+}
+
+func (seq *Sequence) SetConditions(conditions []metav1.Condition) {
+	seq.Status.Conditions = conditions
+}
+
+func (seq *Sequence) GetDeletionPolicy() DeletionPolicy {
+	if seq.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return seq.Spec.DeletionPolicy
+}
+
+func (seq *Sequence) GetFullyQualifiedName() string {
+	return seq.Status.FullyQualifiedName
+}
+
+func (seq *Sequence) GetProviderRef() ProviderReference {
+	return seq.Spec.ProviderRef
+}
+
+func (seq *Sequence) GetSpecName() string {
+	return seq.Spec.Name
+}
+
+func (seq *Sequence) GetUseRole() *string {
+	return seq.Spec.UseRole
+}
+
+func (seq *Sequence) GetPaused() bool {
+	return seq.Spec.Paused
+}
+
+func (seq *Sequence) GetManagementPolicies() ManagementPolicies {
+	return seq.Spec.ManagementPolicies
+}
+
+func (seq *Sequence) SetCreateOrAlter(val *bool) {
+	seq.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (seq *Sequence) GetObservedGeneration() int64 {
+	return seq.Status.ObservedGeneration
+}
+
+func (seq *Sequence) SetObservedGeneration(val int64) {
+	seq.Status.ObservedGeneration = val
+}
+
+func (seq *Sequence) GetLastAppliedSpecHash() string {
+	return seq.Status.LastAppliedSpecHash
+}
+
+func (seq *Sequence) SetLastAppliedSpecHash(val string) {
+	seq.Status.LastAppliedSpecHash = val
+}
+
+func (seq *Sequence) ValidateSpec() error {
+	return seq.Spec.Validate()
+}
+
+func (seq *Sequence) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(seq.Spec)
+}
+
+func (seq *Sequence) GetOwner() string {
+	if seq.Status.ShowOutput != nil {
+		return seq.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (seq *Sequence) GetTrackedParametersList() []string {
+	return seq.Status.TrackedParameters
+}
+
+func (seq *Sequence) SetTrackedParametersList(val []string) {
+	seq.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// ExternalTable
+// ---------------------------------------------------------------------------
+
+func (et *ExternalTable) GetConditions() []metav1.Condition {
+	return et.Status.Conditions
+}
+
+func (et *ExternalTable) SetConditions(conditions []metav1.Condition) {
+	et.Status.Conditions = conditions
+}
+
+func (et *ExternalTable) GetDeletionPolicy() DeletionPolicy {
+	if et.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return et.Spec.DeletionPolicy
+}
+
+func (et *ExternalTable) GetFullyQualifiedName() string {
+	return et.Status.FullyQualifiedName
+}
+
+func (et *ExternalTable) GetProviderRef() ProviderReference {
+	return et.Spec.ProviderRef
+}
+
+func (et *ExternalTable) GetSpecName() string {
+	return et.Spec.Name
+}
+
+func (et *ExternalTable) GetUseRole() *string {
+	return et.Spec.UseRole
+}
+
+func (et *ExternalTable) GetPaused() bool {
+	return et.Spec.Paused
+}
+
+func (et *ExternalTable) GetManagementPolicies() ManagementPolicies {
+	return et.Spec.ManagementPolicies
+}
+
+func (et *ExternalTable) SetCreateOrAlter(val *bool) {
+	et.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (et *ExternalTable) GetObservedGeneration() int64 {
+	return et.Status.ObservedGeneration
+}
+
+func (et *ExternalTable) SetObservedGeneration(val int64) {
+	et.Status.ObservedGeneration = val
+}
+
+func (et *ExternalTable) GetLastAppliedSpecHash() string {
+	return et.Status.LastAppliedSpecHash
+}
+
+func (et *ExternalTable) SetLastAppliedSpecHash(val string) {
+	et.Status.LastAppliedSpecHash = val
+}
+
+func (et *ExternalTable) ValidateSpec() error {
+	return et.Spec.Validate()
+}
+
+func (et *ExternalTable) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(et.Spec)
+}
+
+func (et *ExternalTable) GetOwner() string {
+	if et.Status.ShowOutput != nil {
+		return et.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (et *ExternalTable) GetTrackedParametersList() []string {
+	return et.Status.TrackedParameters
+}
+
+func (et *ExternalTable) SetTrackedParametersList(val []string) {
+	et.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// MaterializedView
+// ---------------------------------------------------------------------------
+
+func (mv *MaterializedView) GetConditions() []metav1.Condition {
+	return mv.Status.Conditions
+}
+
+func (mv *MaterializedView) SetConditions(conditions []metav1.Condition) {
+	mv.Status.Conditions = conditions
+}
+
+func (mv *MaterializedView) GetDeletionPolicy() DeletionPolicy {
+	if mv.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return mv.Spec.DeletionPolicy
+}
+
+func (mv *MaterializedView) GetFullyQualifiedName() string {
+	return mv.Status.FullyQualifiedName
+}
+
+func (mv *MaterializedView) GetProviderRef() ProviderReference {
+	return mv.Spec.ProviderRef
+}
+
+func (mv *MaterializedView) GetSpecName() string {
+	return mv.Spec.Name
+}
+
+func (mv *MaterializedView) GetUseRole() *string {
+	return mv.Spec.UseRole
+}
+
+func (mv *MaterializedView) GetPaused() bool {
+	return mv.Spec.Paused
+}
+
+func (mv *MaterializedView) GetManagementPolicies() ManagementPolicies {
+	return mv.Spec.ManagementPolicies
+}
+
+func (mv *MaterializedView) SetCreateOrAlter(val *bool) {
+	mv.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (mv *MaterializedView) GetObservedGeneration() int64 {
+	return mv.Status.ObservedGeneration
+}
+
+func (mv *MaterializedView) SetObservedGeneration(val int64) {
+	mv.Status.ObservedGeneration = val
+}
+
+func (mv *MaterializedView) GetLastAppliedSpecHash() string {
+	return mv.Status.LastAppliedSpecHash
+}
+
+func (mv *MaterializedView) SetLastAppliedSpecHash(val string) {
+	mv.Status.LastAppliedSpecHash = val
+}
+
+func (mv *MaterializedView) ValidateSpec() error {
+	return mv.Spec.Validate()
+}
+
+func (mv *MaterializedView) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(mv.Spec)
+}
+
+func (mv *MaterializedView) GetOwner() string {
+	if mv.Status.ShowOutput != nil {
+		return mv.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (mv *MaterializedView) GetTrackedParametersList() []string {
+	return mv.Status.TrackedParameters
+}
+
+func (mv *MaterializedView) SetTrackedParametersList(val []string) {
+	mv.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
 // AccountRoleGrant
 // ---------------------------------------------------------------------------
 
@@ -3093,3 +3357,234 @@ func (ta *TagAssociation) GetOwner() string {
 func (ta *TagAssociation) GetTrackedParametersList() []string { return nil }
 
 func (ta *TagAssociation) SetTrackedParametersList(_ []string) {}
+
+// ---------------------------------------------------------------------------
+// NetworkPolicyAttachment
+// ---------------------------------------------------------------------------
+
+func (npa *NetworkPolicyAttachment) GetConditions() []metav1.Condition {
+	return npa.Status.Conditions
+}
+
+func (npa *NetworkPolicyAttachment) SetConditions(conditions []metav1.Condition) {
+	npa.Status.Conditions = conditions
+}
+
+func (npa *NetworkPolicyAttachment) GetDeletionPolicy() DeletionPolicy {
+	if npa.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return npa.Spec.DeletionPolicy
+}
+
+func (npa *NetworkPolicyAttachment) GetFullyQualifiedName() string {
+	return npa.Status.FullyQualifiedName
+}
+
+func (npa *NetworkPolicyAttachment) GetProviderRef() ProviderReference {
+	return npa.Spec.ProviderRef
+}
+
+func (npa *NetworkPolicyAttachment) GetUseRole() *string {
+	return npa.Spec.UseRole
+}
+
+func (npa *NetworkPolicyAttachment) GetPaused() bool {
+	return npa.Spec.Paused
+}
+
+func (npa *NetworkPolicyAttachment) GetManagementPolicies() ManagementPolicies {
+	return npa.Spec.ManagementPolicies
+}
+
+func (npa *NetworkPolicyAttachment) SetCreateOrAlter(val *bool) {
+	npa.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (npa *NetworkPolicyAttachment) GetObservedGeneration() int64 {
+	return npa.Status.ObservedGeneration
+}
+
+func (npa *NetworkPolicyAttachment) SetObservedGeneration(val int64) {
+	npa.Status.ObservedGeneration = val
+}
+
+func (npa *NetworkPolicyAttachment) GetLastAppliedSpecHash() string {
+	return npa.Status.LastAppliedSpecHash
+}
+
+func (npa *NetworkPolicyAttachment) SetLastAppliedSpecHash(val string) {
+	npa.Status.LastAppliedSpecHash = val
+}
+
+func (npa *NetworkPolicyAttachment) ValidateSpec() error {
+	return npa.Spec.Validate()
+}
+
+func (npa *NetworkPolicyAttachment) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(npa.Spec)
+}
+
+func (npa *NetworkPolicyAttachment) GetOwner() string {
+	// Network policy attachments do not have an owner.
+	return ""
+}
+
+func (npa *NetworkPolicyAttachment) GetTrackedParametersList() []string { return nil }
+
+func (npa *NetworkPolicyAttachment) SetTrackedParametersList(_ []string) {}
+
+// ---------------------------------------------------------------------------
+// PasswordPolicyAttachment
+// ---------------------------------------------------------------------------
+
+func (ppa *PasswordPolicyAttachment) GetConditions() []metav1.Condition {
+	return ppa.Status.Conditions
+}
+
+func (ppa *PasswordPolicyAttachment) SetConditions(conditions []metav1.Condition) {
+	ppa.Status.Conditions = conditions
+}
+
+func (ppa *PasswordPolicyAttachment) GetDeletionPolicy() DeletionPolicy {
+	if ppa.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return ppa.Spec.DeletionPolicy
+}
+
+func (ppa *PasswordPolicyAttachment) GetFullyQualifiedName() string {
+	return ppa.Status.FullyQualifiedName
+}
+
+func (ppa *PasswordPolicyAttachment) GetProviderRef() ProviderReference {
+	return ppa.Spec.ProviderRef
+}
+
+func (ppa *PasswordPolicyAttachment) GetUseRole() *string {
+	return ppa.Spec.UseRole
+}
+
+func (ppa *PasswordPolicyAttachment) GetPaused() bool {
+	return ppa.Spec.Paused
+}
+
+func (ppa *PasswordPolicyAttachment) GetManagementPolicies() ManagementPolicies {
+	return ppa.Spec.ManagementPolicies
+}
+
+func (ppa *PasswordPolicyAttachment) SetCreateOrAlter(val *bool) {
+	ppa.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (ppa *PasswordPolicyAttachment) GetObservedGeneration() int64 {
+	return ppa.Status.ObservedGeneration
+}
+
+func (ppa *PasswordPolicyAttachment) SetObservedGeneration(val int64) {
+	ppa.Status.ObservedGeneration = val
+}
+
+func (ppa *PasswordPolicyAttachment) GetLastAppliedSpecHash() string {
+	return ppa.Status.LastAppliedSpecHash
+}
+
+func (ppa *PasswordPolicyAttachment) SetLastAppliedSpecHash(val string) {
+	ppa.Status.LastAppliedSpecHash = val
+}
+
+func (ppa *PasswordPolicyAttachment) ValidateSpec() error {
+	return ppa.Spec.Validate()
+}
+
+func (ppa *PasswordPolicyAttachment) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(ppa.Spec)
+}
+
+func (ppa *PasswordPolicyAttachment) GetOwner() string {
+	// Password policy attachments do not have an owner.
+	return ""
+}
+
+func (ppa *PasswordPolicyAttachment) GetTrackedParametersList() []string { return nil }
+
+func (ppa *PasswordPolicyAttachment) SetTrackedParametersList(_ []string) {}
+
+// ---------------------------------------------------------------------------
+// MaskingPolicyApplication
+// ---------------------------------------------------------------------------
+
+func (mpa *MaskingPolicyApplication) GetConditions() []metav1.Condition {
+	return mpa.Status.Conditions
+}
+
+func (mpa *MaskingPolicyApplication) SetConditions(conditions []metav1.Condition) {
+	mpa.Status.Conditions = conditions
+}
+
+func (mpa *MaskingPolicyApplication) GetDeletionPolicy() DeletionPolicy {
+	if mpa.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return mpa.Spec.DeletionPolicy
+}
+
+func (mpa *MaskingPolicyApplication) GetFullyQualifiedName() string {
+	return mpa.Status.FullyQualifiedName
+}
+
+func (mpa *MaskingPolicyApplication) GetProviderRef() ProviderReference {
+	return mpa.Spec.ProviderRef
+}
+
+func (mpa *MaskingPolicyApplication) GetUseRole() *string {
+	return mpa.Spec.UseRole
+}
+
+func (mpa *MaskingPolicyApplication) GetPaused() bool {
+	return mpa.Spec.Paused
+}
+
+func (mpa *MaskingPolicyApplication) GetManagementPolicies() ManagementPolicies {
+	return mpa.Spec.ManagementPolicies
+}
+
+func (mpa *MaskingPolicyApplication) SetCreateOrAlter(val *bool) {
+	mpa.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (mpa *MaskingPolicyApplication) GetObservedGeneration() int64 {
+	return mpa.Status.ObservedGeneration
+}
+
+func (mpa *MaskingPolicyApplication) SetObservedGeneration(val int64) {
+	mpa.Status.ObservedGeneration = val
+}
+
+func (mpa *MaskingPolicyApplication) GetLastAppliedSpecHash() string {
+	return mpa.Status.LastAppliedSpecHash
+}
+
+func (mpa *MaskingPolicyApplication) SetLastAppliedSpecHash(val string) {
+	mpa.Status.LastAppliedSpecHash = val
+}
+
+func (mpa *MaskingPolicyApplication) ValidateSpec() error {
+	return mpa.Spec.Validate()
+}
+
+func (mpa *MaskingPolicyApplication) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(mpa.Spec)
+}
+
+func (mpa *MaskingPolicyApplication) GetOwner() string {
+	// Masking policy applications do not have an owner.
+	return ""
+}
+
+func (mpa *MaskingPolicyApplication) GetTrackedParametersList() []string { return nil }
+
+func (mpa *MaskingPolicyApplication) SetTrackedParametersList(_ []string) {}

@@ -83,12 +83,12 @@ func newTestDynamicTable(name, namespace string) *snowplanev1alpha1.DynamicTable
 				DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete,
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
-			Name:         "MY_DT",
-			DatabaseName: testutil.PtrString("MY_DB"),
-			SchemaName:   testutil.PtrString("MY_SCHEMA"),
-			Query:        "SELECT * FROM src",
-			TargetLag:    "1 minute",
-			Warehouse:    "MY_WH",
+			Name:          "MY_DT",
+			DatabaseName:  testutil.PtrString("MY_DB"),
+			SchemaName:    testutil.PtrString("MY_SCHEMA"),
+			Query:         "SELECT * FROM src",
+			TargetLag:     "1 minute",
+			WarehouseName: testutil.PtrString("MY_WH"),
 		},
 	}
 }
@@ -172,6 +172,7 @@ func TestReconcile_CreateTerminalError(t *testing.T) {
 	dt.Finalizers = []string{finalizerName}
 	dt.Status.DatabaseName = "MY_DB"
 	dt.Status.SchemaName = "MY_SCHEMA"
+	dt.Status.WarehouseName = "MY_WH"
 
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.SchemaObjectIdentifier) (*snowflake.DynamicTableObservation, error) {
@@ -200,6 +201,7 @@ func TestReconcile_UpdateNoChanges(t *testing.T) {
 	dt.Status.ObservedGeneration = 1
 	dt.Status.DatabaseName = "MY_DB"
 	dt.Status.SchemaName = "MY_SCHEMA"
+	dt.Status.WarehouseName = "MY_WH"
 
 	obs := successfulObservation()
 
@@ -230,6 +232,7 @@ func TestReconcile_UpdateComment(t *testing.T) {
 	dt.Spec.Comment = testutil.PtrString("new comment")
 	dt.Status.DatabaseName = "MY_DB"
 	dt.Status.SchemaName = "MY_SCHEMA"
+	dt.Status.WarehouseName = "MY_WH"
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old comment"
@@ -266,6 +269,7 @@ func TestReconcile_Delete(t *testing.T) {
 	dt.Finalizers = []string{finalizerName}
 	dt.Status.DatabaseName = "MY_DB"
 	dt.Status.SchemaName = "MY_SCHEMA"
+	dt.Status.WarehouseName = "MY_WH"
 	now := metav1.Now()
 	dt.DeletionTimestamp = &now
 
@@ -298,6 +302,7 @@ func TestReconcile_DeleteOrphanPolicy(t *testing.T) {
 	dt.Finalizers = []string{finalizerName}
 	dt.Status.DatabaseName = "MY_DB"
 	dt.Status.SchemaName = "MY_SCHEMA"
+	dt.Status.WarehouseName = "MY_WH"
 	dt.Spec.DeletionPolicy = snowplanev1alpha1.DeletionPolicyOrphan
 	now := metav1.Now()
 	dt.DeletionTimestamp = &now
@@ -352,6 +357,7 @@ func TestReconcile_EventEmission_Create(t *testing.T) {
 	dt.Finalizers = []string{finalizerName}
 	dt.Status.DatabaseName = "MY_DB"
 	dt.Status.SchemaName = "MY_SCHEMA"
+	dt.Status.WarehouseName = "MY_WH"
 
 	obs := successfulObservation()
 

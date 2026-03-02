@@ -1,0 +1,9 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: NetworkPolicyAttachment
+metadata:
+  name: account-network-policy
+spec:
+  providerRef:
+    name: default
+  policyName: MY_NETWORK_POLICY
+  targetType: ACCOUNT

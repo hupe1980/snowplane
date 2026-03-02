@@ -10,6 +10,7 @@ spec:
     name: my-database
   schemaRef:
     name: my-schema
-  table: MY_SOURCE_TABLE
+  tableRef:
+    name: my-table
   appendOnly: true
   comment: "Stream on table managed by Snowplane"

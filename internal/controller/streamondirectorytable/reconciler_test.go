@@ -75,7 +75,7 @@ func newTestStreamOnDirectoryTable(name, namespace string) *snowplanev1alpha1.St
 			Name:         "MY_STREAM",
 			DatabaseName: testutil.PtrString("MY_DB"),
 			SchemaName:   testutil.PtrString("MY_SCHEMA"),
-			Stage:        "MY_STAGE",
+			StageName:    testutil.PtrString("MY_STAGE"),
 		},
 	}
 }
@@ -230,6 +230,7 @@ func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 	s := newTestStreamOnDirectoryTable("mys", "default")
 	s.Spec.Comment = testutil.PtrString("test")
+	s.Status.StageName = "MY_STAGE"
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_STREAM")
 	opts := buildCreateOptions(s, id)
 	assert.Equal(t, "MY_STREAM", opts.Name.Name())
@@ -267,8 +268,8 @@ func TestApplyObservation(t *testing.T) {
 func TestDetectDrift_NoDrift(t *testing.T) {
 	t.Parallel()
 	s := &snowplanev1alpha1.StreamOnDirectoryTable{
-		Spec:   snowplanev1alpha1.StreamOnDirectoryTableSpec{Name: "MY_STREAM", Stage: "MY_STAGE"},
-		Status: snowplanev1alpha1.StreamOnDirectoryTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA"},
+		Spec:   snowplanev1alpha1.StreamOnDirectoryTableSpec{Name: "MY_STREAM", StageName: testutil.PtrString("MY_STAGE")},
+		Status: snowplanev1alpha1.StreamOnDirectoryTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", StageName: "MY_STAGE"},
 	}
 	obs := &snowflake.StreamObservation{
 		ShowOutput: &snowflake.StreamShowOutput{
@@ -283,8 +284,8 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 func TestDetectDrift_WithDrift(t *testing.T) {
 	t.Parallel()
 	s := &snowplanev1alpha1.StreamOnDirectoryTable{
-		Spec:   snowplanev1alpha1.StreamOnDirectoryTableSpec{Name: "MY_STREAM", Stage: "MY_STAGE", Comment: testutil.PtrString("desired")},
-		Status: snowplanev1alpha1.StreamOnDirectoryTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA"},
+		Spec:   snowplanev1alpha1.StreamOnDirectoryTableSpec{Name: "MY_STREAM", StageName: testutil.PtrString("MY_STAGE"), Comment: testutil.PtrString("desired")},
+		Status: snowplanev1alpha1.StreamOnDirectoryTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", StageName: "MY_STAGE"},
 	}
 	obs := &snowflake.StreamObservation{
 		ShowOutput: &snowflake.StreamShowOutput{

@@ -1,0 +1,426 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: materializedviews.snowplane.hupe1980.github.io
+spec:
+  group: snowplane.hupe1980.github.io
+  names:
+    categories:
+    - snowplane
+    kind: MaterializedView
+    listKind: MaterializedViewList
+    plural: materializedviews
+    shortNames:
+    - matview
+    - matviews
+    singular: materializedview
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: SYNCED
+      type: string
+    - jsonPath: .spec.name
+      name: SNOWFLAKE-NAME
+      type: string
+    - jsonPath: .status.databaseName
+      name: DATABASE
+      type: string
+    - jsonPath: .status.schemaName
+      name: SCHEMA
+      type: string
+    - jsonPath: .spec.providerRef.name
+      name: PROVIDER
+      priority: 1
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: MaterializedView is the Schema for the materializedviews API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: MaterializedViewSpec defines the desired state of a Snowflake
+              materialized view.
+            properties:
+              clusterBy:
+                description: ClusterBy specifies clustering expressions for the materialized
+                  view. Immutable after creation.
+                items:
+                  type: string
+                type: array
+              comment:
+                description: Comment is the materialized view description.
+                type: string
+              databaseName:
+                description: DatabaseName is the Snowflake database identifier (e.g.
+                  ANALYTICS). Mutually exclusive with databaseRef.
+                minLength: 1
+                type: string
+              databaseRef:
+                description: DatabaseRef is a reference to a Database CR. Mutually
+                  exclusive with databaseName.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy specifies what happens to the Snowflake resource when the CR is deleted.
+                  Defaults to "Delete".
+                enum:
+                - Delete
+                - Orphan
+                type: string
+              managementPolicies:
+                description: ManagementPolicies specifies lifecycle policies for this
+                  resource.
+                properties:
+                  adoptionPolicy:
+                    default: fail-if-exists
+                    description: |-
+                      AdoptionPolicy controls how the reconciler handles a pre-existing
+                      Snowflake resource on first reconciliation.
+                      Defaults to "fail-if-exists".
+                    enum:
+                    - adopt
+                    - fail-if-exists
+                    type: string
+                  createOrAlter:
+                    default: true
+                    description: |-
+                      CreateOrAlter controls whether CREATE OR ALTER is used instead of
+                      the legacy CREATE + ALTER two-step flow for supported resource types.
+                      Defaults to true.
+                    type: boolean
+                  driftPolicy:
+                    default: correct
+                    description: |-
+                      DriftPolicy controls whether detected drift is corrected or only
+                      reported via conditions and events.
+                      Defaults to "correct".
+                    enum:
+                    - correct
+                    - detect-only
+                    type: string
+                type: object
+              name:
+                description: Name is the Snowflake materialized view name. Immutable
+                  after creation.
+                minLength: 1
+                type: string
+              paused:
+                description: |-
+                  Paused suspends reconciliation of this resource. When true, the
+                  controller skips all Snowflake operations and sets Synced=False
+                  with reason ReconcilePaused. The Snowflake resource is not modified
+                  or deleted while paused.
+                type: boolean
+              providerRef:
+                description: ProviderRef references the ProviderConfig to use for
+                  Snowflake connectivity.
+                properties:
+                  name:
+                    default: default
+                    description: Name of the ProviderConfig to use.
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the ProviderConfig. Defaults to the namespace of the
+                      referring resource. Set this to reference a ProviderConfig in a
+                      different namespace (e.g. a shared system namespace).
+                    type: string
+                type: object
+              schemaName:
+                description: SchemaName is the Snowflake schema identifier (e.g. PUBLIC).
+                  Mutually exclusive with schemaRef.
+                minLength: 1
+                type: string
+              schemaRef:
+                description: SchemaRef is a reference to a Schema CR. Mutually exclusive
+                  with schemaName.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              secure:
+                description: Secure specifies whether the materialized view is a secure
+                  view.
+                type: boolean
+              statement:
+                description: Statement is the SELECT query that defines the materialized
+                  view. Immutable after creation.
+                minLength: 1
+                type: string
+              useRole:
+                description: |-
+                  UseRole specifies the Snowflake role to activate via USE ROLE before
+                  CREATE/ALTER/DROP operations. In Snowflake's DAC model the role active
+                  at CREATE time becomes the object owner, so this field indirectly
+                  controls initial ownership.
+                  This field is immutable after the resource has been created in Snowflake.
+                minLength: 1
+                type: string
+            required:
+            - name
+            - providerRef
+            - statement
+            type: object
+            x-kubernetes-validations:
+            - message: spec.name is immutable (delete and recreate the resource to
+                change)
+              rule: self.name == oldSelf.name
+            - message: spec.databaseRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.databaseRef) == has(self.databaseRef) && (!has(self.databaseRef)
+                || self.databaseRef == oldSelf.databaseRef)
+            - message: spec.databaseName is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName)
+                || self.databaseName == oldSelf.databaseName)
+            - message: spec.schemaRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef)
+                || self.schemaRef == oldSelf.schemaRef)
+            - message: spec.schemaName is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName)
+                || self.schemaName == oldSelf.schemaName)
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
+            - message: exactly one of spec.databaseRef or spec.databaseName must be
+                set
+              rule: (has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef)
+                && has(self.databaseName))
+            - message: exactly one of spec.schemaRef or spec.schemaName must be set
+              rule: (has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef)
+                && has(self.schemaName))
+            - message: spec.databaseName must be a simple identifier, not a fully-qualified
+                name
+              rule: '!has(self.databaseName) || !self.databaseName.contains(''.'')'
+            - message: spec.schemaName must be a simple identifier, not a fully-qualified
+                name; use spec.databaseName for the database part
+              rule: '!has(self.schemaName) || !self.schemaName.contains(''.'')'
+            - message: spec.statement is immutable (delete and recreate the resource
+                to change)
+              rule: self.statement == oldSelf.statement
+            - message: spec.clusterBy is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.clusterBy) == has(self.clusterBy) && (!has(self.clusterBy)
+                || self.clusterBy == oldSelf.clusterBy)
+          status:
+            description: MaterializedViewStatus defines the observed state of MaterializedView.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the resource's state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              databaseName:
+                description: DatabaseName is the resolved Snowflake database name.
+                type: string
+              fullyQualifiedName:
+                description: FullyQualifiedName is the Snowflake fully qualified identifier
+                  for this resource.
+                type: string
+              lastAppliedSpecHash:
+                description: |-
+                  LastAppliedSpecHash is the SHA-256 hash of the spec as of the last
+                  successful reconciliation. The reconciler uses this to distinguish
+                  spec changes (user edited the CR) from external drift (Snowflake
+                  state diverged without a spec change). This is more reliable than
+                  comparing ObservedGeneration vs Generation because metadata-only
+                  changes (labels, annotations) increment Generation without changing
+                  the spec.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              schemaName:
+                description: SchemaName is the resolved Snowflake schema name.
+                type: string
+              showOutput:
+                description: ShowOutput contains the output of SHOW MATERIALIZED VIEWS
+                  for this resource.
+                properties:
+                  automaticClustering:
+                    description: AutomaticClustering indicates whether automatic clustering
+                      is active.
+                    type: string
+                  behindBy:
+                    description: BehindBy shows how far the materialized view is behind
+                      the base table.
+                    type: string
+                  bytes:
+                    description: Bytes is the byte size of the materialized view data.
+                    type: string
+                  clusterBy:
+                    description: ClusterBy contains clustering column information.
+                    type: string
+                  comment:
+                    description: Comment is the materialized view description.
+                    type: string
+                  compactedOn:
+                    description: CompactedOn is the timestamp of the last compaction
+                      operation.
+                    type: string
+                  createdOn:
+                    description: CreatedOn is the timestamp when the materialized
+                      view was created.
+                    type: string
+                  databaseName:
+                    description: DatabaseName is the database containing the materialized
+                      view.
+                    type: string
+                  invalid:
+                    description: Invalid indicates whether the materialized view is
+                      currently invalid.
+                    type: string
+                  invalidReason:
+                    description: InvalidReason provides the reason when the materialized
+                      view is invalid.
+                    type: string
+                  isSecure:
+                    description: IsSecure indicates whether the materialized view
+                      is a secure view.
+                    type: string
+                  name:
+                    description: Name is the materialized view name.
+                    type: string
+                  owner:
+                    description: Owner is the role that owns the materialized view.
+                    type: string
+                  ownerRoleType:
+                    description: OwnerRoleType is the type of role that owns the object.
+                    type: string
+                  refreshedOn:
+                    description: RefreshedOn is the timestamp of the last refresh
+                      operation.
+                    type: string
+                  rows:
+                    description: Rows is the number of rows in the materialized view.
+                    type: string
+                  schemaName:
+                    description: SchemaName is the schema containing the materialized
+                      view.
+                    type: string
+                  sourceDatabaseName:
+                    description: SourceDatabaseName is the database of the base table.
+                    type: string
+                  sourceSchemaName:
+                    description: SourceSchemaName is the schema of the base table.
+                    type: string
+                  sourceTableName:
+                    description: SourceTableName is the base table name.
+                    type: string
+                  text:
+                    description: Text is the SQL definition of the materialized view.
+                    type: string
+                type: object
+              trackedParameters:
+                description: TrackedParameters lists spec fields currently tracked
+                  for UNSET detection.
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -75,7 +75,7 @@ func newTestStreamOnView(name, namespace string) *snowplanev1alpha1.StreamOnView
 			Name:         "MY_STREAM",
 			DatabaseName: testutil.PtrString("MY_DB"),
 			SchemaName:   testutil.PtrString("MY_SCHEMA"),
-			View:         "MY_VIEW",
+			ViewName:     testutil.PtrString("MY_VIEW"),
 		},
 	}
 }
@@ -231,6 +231,7 @@ func TestBuildCreateOptions(t *testing.T) {
 	s := newTestStreamOnView("mys", "default")
 	s.Spec.AppendOnly = testutil.PtrBool(true)
 	s.Spec.Comment = testutil.PtrString("test")
+	s.Status.ViewName = "MY_VIEW"
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_STREAM")
 	opts := buildCreateOptions(s, id)
 	assert.Equal(t, "MY_STREAM", opts.Name.Name())
@@ -269,8 +270,8 @@ func TestApplyObservation(t *testing.T) {
 func TestDetectDrift_NoDrift(t *testing.T) {
 	t.Parallel()
 	s := &snowplanev1alpha1.StreamOnView{
-		Spec:   snowplanev1alpha1.StreamOnViewSpec{Name: "MY_STREAM", View: "MY_VIEW"},
-		Status: snowplanev1alpha1.StreamOnViewStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA"},
+		Spec:   snowplanev1alpha1.StreamOnViewSpec{Name: "MY_STREAM", ViewName: testutil.PtrString("MY_VIEW")},
+		Status: snowplanev1alpha1.StreamOnViewStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", ViewName: "MY_VIEW"},
 	}
 	obs := &snowflake.StreamObservation{
 		ShowOutput: &snowflake.StreamShowOutput{
@@ -285,8 +286,8 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 func TestDetectDrift_WithDrift(t *testing.T) {
 	t.Parallel()
 	s := &snowplanev1alpha1.StreamOnView{
-		Spec:   snowplanev1alpha1.StreamOnViewSpec{Name: "MY_STREAM", View: "MY_VIEW", Comment: testutil.PtrString("desired")},
-		Status: snowplanev1alpha1.StreamOnViewStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA"},
+		Spec:   snowplanev1alpha1.StreamOnViewSpec{Name: "MY_STREAM", ViewName: testutil.PtrString("MY_VIEW"), Comment: testutil.PtrString("desired")},
+		Status: snowplanev1alpha1.StreamOnViewStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", ViewName: "MY_VIEW"},
 	}
 	obs := &snowflake.StreamObservation{
 		ShowOutput: &snowflake.StreamShowOutput{

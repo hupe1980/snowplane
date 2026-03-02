@@ -10,6 +10,7 @@ spec:
     name: my-database
   schemaRef:
     name: my-schema
-  view: MY_SOURCE_VIEW
+  viewRef:
+    name: my-view
   appendOnly: true
   comment: "Stream on view managed by Snowplane"

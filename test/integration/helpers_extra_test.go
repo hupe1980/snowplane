@@ -62,12 +62,12 @@ func newTestDynamicTable(name, sfName, dbRefName, schemaRefName string) *snowpla
 			CommonSpec: snowplanev1alpha1.CommonSpec{
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
-			Name:        sfName,
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
-			Query:       "SELECT 1 AS id",
-			TargetLag:   "1 minute",
-			Warehouse:   "MY_WH",
+			Name:          sfName,
+			DatabaseRef:   &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
+			SchemaRef:     &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			Query:         "SELECT 1 AS id",
+			TargetLag:     "1 minute",
+			WarehouseName: strPtr("MY_WH"),
 		},
 	}
 }

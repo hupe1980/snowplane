@@ -1048,6 +1048,10 @@ func (s *AlertSpec) Validate() error {
 		errs = append(errs, errors.New("spec.action is required"))
 	}
 
+	if err := validateOptionalSourceRef("warehouse", s.WarehouseRef, s.WarehouseName); err != nil {
+		errs = append(errs, err)
+	}
+
 	if err := s.CommonSpec.Validate(); err != nil {
 		errs = append(errs, err)
 	}
@@ -1078,8 +1082,31 @@ func (s *TaskSpec) Validate() error {
 	}
 
 	// Warehouse and UserTaskManagedInitialWarehouseSize are mutually exclusive.
-	if s.Warehouse != nil && s.UserTaskManagedInitialWarehouseSize != nil {
-		errs = append(errs, errors.New("spec.warehouse and spec.userTaskManagedInitialWarehouseSize are mutually exclusive"))
+	if err := validateOptionalSourceRef("warehouse", s.WarehouseRef, s.WarehouseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if (s.WarehouseRef != nil || s.WarehouseName != nil) && s.UserTaskManagedInitialWarehouseSize != nil {
+		errs = append(errs, errors.New("spec.warehouseRef/warehouseName and spec.userTaskManagedInitialWarehouseSize are mutually exclusive"))
+	}
+
+	if err := validateOptionalSourceRef("errorIntegration", s.ErrorIntegrationRef, s.ErrorIntegrationName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateOptionalSourceRef("successIntegration", s.SuccessIntegrationRef, s.SuccessIntegrationName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateOptionalSourceRef("finalize", s.FinalizeRef, s.FinalizeName); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Validate After entries: each must have exactly one of ref or name.
+	for i, p := range s.After {
+		if (p.Ref == nil) == (p.Name == nil) {
+			errs = append(errs, fmt.Errorf("spec.after[%d]: exactly one of ref or name must be set", i))
+		}
 	}
 
 	if s.UserTaskTimeoutMs != nil {
@@ -1119,8 +1146,8 @@ func (s *StreamOnTableSpec) Validate() error {
 		errs = append(errs, err)
 	}
 
-	if s.Table == "" {
-		errs = append(errs, errors.New("spec.table is required"))
+	if err := validateSourceRef("table", s.TableRef, s.TableName); err != nil {
+		errs = append(errs, err)
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -1146,8 +1173,8 @@ func (s *StreamOnViewSpec) Validate() error {
 		errs = append(errs, err)
 	}
 
-	if s.View == "" {
-		errs = append(errs, errors.New("spec.view is required"))
+	if err := validateSourceRef("view", s.ViewRef, s.ViewName); err != nil {
+		errs = append(errs, err)
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -1173,8 +1200,8 @@ func (s *StreamOnExternalTableSpec) Validate() error {
 		errs = append(errs, err)
 	}
 
-	if s.ExternalTable == "" {
-		errs = append(errs, errors.New("spec.externalTable is required"))
+	if err := validateExternalTableSource(s.ExternalTableRef, s.ExternalTableName); err != nil {
+		errs = append(errs, err)
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -1200,8 +1227,8 @@ func (s *StreamOnDirectoryTableSpec) Validate() error {
 		errs = append(errs, err)
 	}
 
-	if s.Stage == "" {
-		errs = append(errs, errors.New("spec.stage is required"))
+	if err := validateSourceRef("stage", s.StageRef, s.StageName); err != nil {
+		errs = append(errs, err)
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -1227,8 +1254,8 @@ func (s *StreamOnDynamicTableSpec) Validate() error {
 		errs = append(errs, err)
 	}
 
-	if s.DynamicTable == "" {
-		errs = append(errs, errors.New("spec.dynamicTable is required"))
+	if err := validateSourceRef("dynamicTable", s.DynamicTableRef, s.DynamicTableName); err != nil {
+		errs = append(errs, err)
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -1439,8 +1466,16 @@ func (s *PipeSpec) Validate() error {
 		errs = append(errs, errors.New("spec.copyStatement is required"))
 	}
 
-	if s.AutoIngest != nil && *s.AutoIngest && (s.Integration == nil || *s.Integration == "") {
-		errs = append(errs, errors.New("spec.integration is required when spec.autoIngest is true"))
+	if err := validateOptionalSourceRef("integration", s.IntegrationRef, s.IntegrationName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if s.AutoIngest != nil && *s.AutoIngest && s.IntegrationRef == nil && s.IntegrationName == nil {
+		errs = append(errs, errors.New("one of spec.integrationRef or spec.integrationName is required when spec.autoIngest is true"))
+	}
+
+	if err := validateOptionalSourceRef("errorIntegration", s.ErrorIntegrationRef, s.ErrorIntegrationName); err != nil {
+		errs = append(errs, err)
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -1474,8 +1509,8 @@ func (s *DynamicTableSpec) Validate() error {
 		errs = append(errs, errors.New("spec.targetLag is required"))
 	}
 
-	if s.Warehouse == "" {
-		errs = append(errs, errors.New("spec.warehouse is required"))
+	if err := validateSourceRef("warehouse", s.WarehouseRef, s.WarehouseName); err != nil {
+		errs = append(errs, err)
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -1627,47 +1662,134 @@ func (s *NetworkRuleSpec) Validate() error {
 	return errors.Join(errs...)
 }
 
+// Validate checks the SequenceSpec for configuration errors.
+func (s *SequenceSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the ExternalTableSpec for configuration errors.
+func (s *ExternalTableSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if s.Location == "" {
+		errs = append(errs, errors.New("spec.location is required"))
+	}
+
+	if s.FileFormat == "" {
+		errs = append(errs, errors.New("spec.fileFormat is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the MaterializedViewSpec for configuration errors.
+func (s *MaterializedViewSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if s.Statement == "" {
+		errs = append(errs, errors.New("spec.statement is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
 // ValidFieldExportSourceKinds enumerates the Snowplane managed resource kinds
 // supported as FieldExport sources.
 //
 //nolint:gochecknoglobals // package-level constant set
 var ValidFieldExportSourceKinds = map[string]struct{}{
-	"Alert":                   {},
-	"Database":                {},
-	"Schema":                  {},
-	"Warehouse":               {},
-	"User":                    {},
-	"AccountRole":             {},
-	"DatabaseRole":            {},
-	"AccountRoleGrant":        {},
-	"DatabaseRoleGrant":       {},
-	"ShareGrant":              {},
-	"Table":                   {},
-	"View":                    {},
-	"Stage":                   {},
-	"Task":                    {},
-	"StreamOnTable":           {},
-	"StreamOnView":            {},
-	"StreamOnExternalTable":   {},
-	"StreamOnDirectoryTable":  {},
-	"StreamOnDynamicTable":    {},
-	"Tag":                     {},
-	"NetworkPolicy":           {},
-	"ResourceMonitor":         {},
-	"MaskingPolicy":           {},
-	"RowAccessPolicy":         {},
-	"GrantOwnership":          {},
-	"StorageIntegration":      {},
-	"SecurityIntegration":     {},
-	"NotificationIntegration": {},
-	"FileFormat":              {},
-	"Pipe":                    {},
-	"DynamicTable":            {},
-	"PasswordPolicy":          {},
-	"NetworkRule":             {},
-	"AccountRoleAssignment":   {},
-	"DatabaseRoleAssignment":  {},
-	"TagAssociation":          {},
+	"Alert":                    {},
+	"Database":                 {},
+	"Schema":                   {},
+	"Warehouse":                {},
+	"User":                     {},
+	"AccountRole":              {},
+	"DatabaseRole":             {},
+	"AccountRoleGrant":         {},
+	"DatabaseRoleGrant":        {},
+	"ShareGrant":               {},
+	"Table":                    {},
+	"View":                     {},
+	"Stage":                    {},
+	"Task":                     {},
+	"StreamOnTable":            {},
+	"StreamOnView":             {},
+	"StreamOnExternalTable":    {},
+	"StreamOnDirectoryTable":   {},
+	"StreamOnDynamicTable":     {},
+	"Tag":                      {},
+	"NetworkPolicy":            {},
+	"ResourceMonitor":          {},
+	"MaskingPolicy":            {},
+	"RowAccessPolicy":          {},
+	"GrantOwnership":           {},
+	"StorageIntegration":       {},
+	"SecurityIntegration":      {},
+	"NotificationIntegration":  {},
+	"FileFormat":               {},
+	"Pipe":                     {},
+	"DynamicTable":             {},
+	"PasswordPolicy":           {},
+	"NetworkRule":              {},
+	"AccountRoleAssignment":    {},
+	"DatabaseRoleAssignment":   {},
+	"TagAssociation":           {},
+	"NetworkPolicyAttachment":  {},
+	"PasswordPolicyAttachment": {},
+	"MaskingPolicyApplication": {},
+	"Sequence":                 {},
+	"ExternalTable":            {},
+	"MaterializedView":         {},
 }
 
 // Validate checks that the FieldExport spec fields are semantically valid.
@@ -1824,6 +1946,50 @@ func validateSchemaSource(ref *LocalObjectReference, name *string) error {
 
 	if ref != nil && ref.Name == "" {
 		return errors.New("spec.schemaRef.name must not be empty when schemaRef is set")
+	}
+
+	return nil
+}
+
+// validateExternalTableSource enforces exactly-one-of semantics for
+// externalTableRef / externalTableName.
+func validateExternalTableSource(ref *LocalObjectReference, name *string) error {
+	return validateSourceRef("externalTable", ref, name)
+}
+
+// validateSourceRef enforces exactly-one-of semantics for a
+// <kindLabel>Ref / <kindLabel>Name pair.
+func validateSourceRef(kindLabel string, ref *LocalObjectReference, name *string) error {
+	hasRef := ref != nil && ref.Name != ""
+	hasName := name != nil && *name != ""
+
+	if hasRef && hasName {
+		return fmt.Errorf("spec.%sRef and spec.%sName are mutually exclusive", kindLabel, kindLabel)
+	}
+
+	if !hasRef && !hasName {
+		return fmt.Errorf("exactly one of spec.%sRef or spec.%sName must be set", kindLabel, kindLabel)
+	}
+
+	if ref != nil && ref.Name == "" {
+		return fmt.Errorf("spec.%sRef.name must not be empty when %sRef is set", kindLabel, kindLabel)
+	}
+
+	return nil
+}
+
+// validateOptionalSourceRef validates an optional ref/name pair.
+// Both may be nil (field omitted), but if one is set, the other must be nil.
+func validateOptionalSourceRef(kindLabel string, ref *LocalObjectReference, name *string) error {
+	hasRef := ref != nil && ref.Name != ""
+	hasName := name != nil && *name != ""
+
+	if hasRef && hasName {
+		return fmt.Errorf("spec.%sRef and spec.%sName are mutually exclusive", kindLabel, kindLabel)
+	}
+
+	if ref != nil && ref.Name == "" {
+		return fmt.Errorf("spec.%sRef.name must not be empty when %sRef is set", kindLabel, kindLabel)
 	}
 
 	return nil
@@ -2000,6 +2166,105 @@ func (s *TagAssociationSpec) Validate() error {
 
 	if s.ObjectName == "" {
 		errs = append(errs, errors.New("spec.objectName is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the NetworkPolicyAttachmentSpec for configuration errors.
+func (s *NetworkPolicyAttachmentSpec) Validate() error {
+	var errs []error
+
+	// Exactly one of policyName or policyRef must be set.
+	policyCount := 0
+	if s.PolicyName != "" {
+		policyCount++
+	}
+
+	if s.PolicyRef != nil {
+		policyCount++
+	}
+
+	if policyCount != 1 {
+		errs = append(errs, errors.New("spec: exactly one of policyName or policyRef must be set"))
+	}
+
+	if s.TargetType == "" {
+		errs = append(errs, errors.New("spec.targetType is required"))
+	}
+
+	if s.TargetType == "USER" && s.TargetName == "" {
+		errs = append(errs, errors.New("spec.targetName is required when targetType is USER"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the PasswordPolicyAttachmentSpec for configuration errors.
+func (s *PasswordPolicyAttachmentSpec) Validate() error {
+	var errs []error
+
+	// Exactly one of policyName or policyRef must be set.
+	policyCount := 0
+	if s.PolicyName != "" {
+		policyCount++
+	}
+
+	if s.PolicyRef != nil {
+		policyCount++
+	}
+
+	if policyCount != 1 {
+		errs = append(errs, errors.New("spec: exactly one of policyName or policyRef must be set"))
+	}
+
+	if s.TargetType == "" {
+		errs = append(errs, errors.New("spec.targetType is required"))
+	}
+
+	if s.TargetType == "USER" && s.TargetName == "" {
+		errs = append(errs, errors.New("spec.targetName is required when targetType is USER"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the MaskingPolicyApplicationSpec for configuration errors.
+func (s *MaskingPolicyApplicationSpec) Validate() error {
+	var errs []error
+
+	// Exactly one of policyName or policyRef must be set.
+	policyCount := 0
+	if s.PolicyName != "" {
+		policyCount++
+	}
+
+	if s.PolicyRef != nil {
+		policyCount++
+	}
+
+	if policyCount != 1 {
+		errs = append(errs, errors.New("spec: exactly one of policyName or policyRef must be set"))
+	}
+
+	if s.TableName == "" {
+		errs = append(errs, errors.New("spec.tableName is required"))
+	}
+
+	if s.ColumnName == "" {
+		errs = append(errs, errors.New("spec.columnName is required"))
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {

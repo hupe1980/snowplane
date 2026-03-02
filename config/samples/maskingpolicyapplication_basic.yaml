@@ -1,0 +1,10 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: MaskingPolicyApplication
+metadata:
+  name: table-column-masking
+spec:
+  providerRef:
+    name: default
+  policyName: '"MY_DB"."MY_SCHEMA"."MY_MASKING_POLICY"'
+  tableName: '"MY_DB"."MY_SCHEMA"."MY_TABLE"'
+  columnName: EMAIL

@@ -44,6 +44,7 @@ All resource types support drift detection:
 | DatabaseRoleAssignment | `grantedTo`, `granteeName` (all fields immutable) |
 | Table | `name`, `database`, `schema`, `transient` |
 | View | `name`, `database`, `schema` |
+| MaterializedView | `name`, `database`, `schema`, `statement` |
 | Stage | `name`, `database`, `schema`, `stageType` |
 | Task | `name`, `database`, `schema` |
 | Alert | `name`, `database`, `schema` |

@@ -65,9 +65,31 @@ spec:
             description: TaskSpec defines the desired state of a Snowflake Task.
             properties:
               after:
-                description: After specifies predecessor task names for DAG scheduling.
+                description: |-
+                  After specifies predecessor tasks for DAG scheduling.
+                  Each entry references either a Task CR or a raw Snowflake task name.
                 items:
-                  type: string
+                  description: |-
+                    TaskPredecessor specifies a predecessor task for DAG scheduling.
+                    Exactly one of Ref or Name must be set.
+                  properties:
+                    name:
+                      description: Name is the Snowflake task identifier.
+                      maxLength: 255
+                      minLength: 1
+                      type: string
+                    ref:
+                      description: Ref references a Task CR in the same namespace.
+                      properties:
+                        name:
+                          description: Name of the referent.
+                          minLength: 1
+                          type: string
+                      required:
+                      - name
+                      type: object
+                  type: object
+                maxItems: 100
                 type: array
               allowOverlappingExecution:
                 description: AllowOverlappingExecution allows multiple instances of
@@ -85,6 +107,7 @@ spec:
                 description: |-
                   DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
                   Mutually exclusive with DatabaseRef. Immutable after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               databaseRef:
@@ -108,16 +131,43 @@ spec:
                 - Delete
                 - Orphan
                 type: string
-              errorIntegration:
-                description: ErrorIntegration is the notification integration for
-                  error notifications.
-                type: string
-              finalize:
+              errorIntegrationName:
                 description: |-
-                  Finalize specifies the name of a root task that this finalizer task is
-                  associated with. Finalizer tasks run after all other tasks in the task
-                  graph complete. Mutually exclusive with Schedule and After.
+                  ErrorIntegrationName is the Snowflake notification integration identifier for error notifications.
+                  Mutually exclusive with ErrorIntegrationRef.
+                minLength: 1
                 type: string
+              errorIntegrationRef:
+                description: |-
+                  ErrorIntegrationRef references a NotificationIntegration CR for error notifications.
+                  Mutually exclusive with ErrorIntegrationName.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              finalizeName:
+                description: |-
+                  FinalizeName is the name of a root task that this finalizer task is
+                  associated with. Finalizer tasks run after all other tasks in the task
+                  graph complete. Mutually exclusive with FinalizeRef, Schedule, and After.
+                type: string
+              finalizeRef:
+                description: |-
+                  FinalizeRef references a Task CR that this finalizer task is associated with.
+                  Finalizer tasks run after all other tasks in the task graph complete.
+                  Mutually exclusive with FinalizeName, Schedule, and After.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
               logLevel:
                 description: LogLevel specifies the severity level of events for the
                   task.
@@ -164,6 +214,7 @@ spec:
                 type: object
               name:
                 description: Name is the Snowflake task name. Immutable after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               paused:
@@ -198,6 +249,7 @@ spec:
                 description: |-
                   SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
                   Mutually exclusive with SchemaRef. Immutable after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               schemaRef:
@@ -240,10 +292,24 @@ spec:
                 description: SQLStatement is the SQL code executed when the task runs.
                 minLength: 1
                 type: string
-              successIntegration:
-                description: SuccessIntegration is the notification integration for
-                  success notifications.
+              successIntegrationName:
+                description: |-
+                  SuccessIntegrationName is the Snowflake notification integration identifier for success notifications.
+                  Mutually exclusive with SuccessIntegrationRef.
+                minLength: 1
                 type: string
+              successIntegrationRef:
+                description: |-
+                  SuccessIntegrationRef references a NotificationIntegration CR for success notifications.
+                  Mutually exclusive with SuccessIntegrationName.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
               suspend:
                 default: true
                 description: |-
@@ -282,7 +348,7 @@ spec:
               userTaskManagedInitialWarehouseSize:
                 description: |-
                   UserTaskManagedInitialWarehouseSize sets the initial size for serverless tasks.
-                  Mutually exclusive with Warehouse.
+                  Mutually exclusive with WarehouseRef and WarehouseName.
                 enum:
                 - XSMALL
                 - SMALL
@@ -306,11 +372,25 @@ spec:
                 maximum: 604800000
                 minimum: 0
                 type: integer
-              warehouse:
+              warehouseName:
                 description: |-
-                  Warehouse specifies the virtual warehouse for task runs.
-                  Mutually exclusive with UserTaskManagedInitialWarehouseSize.
+                  WarehouseName is the Snowflake warehouse identifier (e.g. "COMPUTE_WH").
+                  Mutually exclusive with WarehouseRef and UserTaskManagedInitialWarehouseSize.
+                maxLength: 255
+                minLength: 1
                 type: string
+              warehouseRef:
+                description: |-
+                  WarehouseRef references a Warehouse CR in the same namespace.
+                  Mutually exclusive with WarehouseName and UserTaskManagedInitialWarehouseSize.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
               when:
                 description: When specifies a boolean SQL expression that determines
                   whether the task runs.
@@ -351,14 +431,39 @@ spec:
             - message: exactly one of spec.schemaRef or spec.schemaName must be set
               rule: (has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef)
                 && has(self.schemaName))
-            - message: spec.warehouse and spec.userTaskManagedInitialWarehouseSize
+            - message: spec.warehouseRef/warehouseName and spec.userTaskManagedInitialWarehouseSize
                 are mutually exclusive
-              rule: '!(has(self.warehouse) && has(self.userTaskManagedInitialWarehouseSize))'
-            - message: spec.finalize and spec.schedule are mutually exclusive
-              rule: '!has(self.finalize) || !has(self.schedule)'
-            - message: spec.finalize and spec.after are mutually exclusive
-              rule: '!has(self.finalize) || !has(self.after) || size(self.after) ==
-                0'
+              rule: '!(has(self.warehouseRef) && has(self.userTaskManagedInitialWarehouseSize))
+                && !(has(self.warehouseName) && has(self.userTaskManagedInitialWarehouseSize))'
+            - message: spec.warehouseRef and spec.warehouseName are mutually exclusive
+              rule: '!(has(self.warehouseRef) && has(self.warehouseName))'
+            - message: spec.warehouseName must be a simple identifier, not a fully-qualified
+                name
+              rule: '!has(self.warehouseName) || !self.warehouseName.contains(''.'')'
+            - message: spec.errorIntegrationRef and spec.errorIntegrationName are
+                mutually exclusive
+              rule: '!(has(self.errorIntegrationRef) && has(self.errorIntegrationName))'
+            - message: spec.successIntegrationRef and spec.successIntegrationName
+                are mutually exclusive
+              rule: '!(has(self.successIntegrationRef) && has(self.successIntegrationName))'
+            - message: spec.finalizeRef and spec.finalizeName are mutually exclusive
+              rule: '!(has(self.finalizeRef) && has(self.finalizeName))'
+            - message: spec.finalizeName and spec.schedule are mutually exclusive
+              rule: '!has(self.finalizeName) || !has(self.schedule)'
+            - message: spec.finalizeRef and spec.schedule are mutually exclusive
+              rule: '!has(self.finalizeRef) || !has(self.schedule)'
+            - message: spec.finalizeName and spec.after are mutually exclusive
+              rule: '!has(self.finalizeName) || !has(self.after) || size(self.after)
+                == 0'
+            - message: spec.finalizeRef and spec.after are mutually exclusive
+              rule: '!has(self.finalizeRef) || !has(self.after) || size(self.after)
+                == 0'
+            - message: each entry in spec.after must set exactly one of ref or name
+              rule: '!has(self.after) || self.after.all(p, (has(p.ref) && !has(p.name))
+                || (!has(p.ref) && has(p.name)))'
+            - message: spec.after[].name must be a simple identifier, not a fully-qualified
+                name
+              rule: '!has(self.after) || self.after.all(p, !has(p.name) || !p.name.contains(''.''))'
             - message: spec.databaseName must be a simple identifier, not a fully-qualified
                 name
               rule: '!has(self.databaseName) || !self.databaseName.contains(''.'')'
@@ -368,6 +473,11 @@ spec:
           status:
             description: TaskStatus defines the observed state of a Task.
             properties:
+              afterNames:
+                description: AfterNames is the resolved list of predecessor task names.
+                items:
+                  type: string
+                type: array
               conditions:
                 description: Conditions represent the latest available observations
                   of the resource's state.
@@ -431,6 +541,13 @@ spec:
                 x-kubernetes-list-type: map
               databaseName:
                 description: DatabaseName is the parent Snowflake database name.
+                type: string
+              errorIntegrationName:
+                description: ErrorIntegrationName is the resolved error integration
+                  name.
+                type: string
+              finalizeName:
+                description: FinalizeName is the resolved finalize task name.
                 type: string
               fullyQualifiedName:
                 description: FullyQualifiedName is the Snowflake fully qualified identifier
@@ -542,6 +659,10 @@ spec:
                     description: Warehouse is the warehouse used by the task.
                     type: string
                 type: object
+              successIntegrationName:
+                description: SuccessIntegrationName is the resolved success integration
+                  name.
+                type: string
               trackedParameters:
                 description: |-
                   TrackedParameters tracks which optional spec fields have been actively SET
@@ -549,6 +670,9 @@ spec:
                 items:
                   type: string
                 type: array
+              warehouseName:
+                description: WarehouseName is the resolved warehouse name.
+                type: string
             type: object
         type: object
     served: true

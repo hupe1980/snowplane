@@ -72,10 +72,10 @@ func newTestStreamOnExternalTable(name, namespace string) *snowplanev1alpha1.Str
 				DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete,
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
-			Name:          "MY_STREAM",
-			DatabaseName:  testutil.PtrString("MY_DB"),
-			SchemaName:    testutil.PtrString("MY_SCHEMA"),
-			ExternalTable: "MY_EXT_TABLE",
+			Name:              "MY_STREAM",
+			DatabaseName:      testutil.PtrString("MY_DB"),
+			SchemaName:        testutil.PtrString("MY_SCHEMA"),
+			ExternalTableName: testutil.PtrString("MY_EXT_TABLE"),
 		},
 	}
 }
@@ -150,6 +150,7 @@ func TestReconcile_Create(t *testing.T) {
 	s.Finalizers = []string{finalizerName}
 	s.Status.DatabaseName = "MY_DB"
 	s.Status.SchemaName = "MY_SCHEMA"
+	s.Status.ExternalTableName = "MY_EXT_TABLE"
 	var capturedOpts snowflake.CreateStreamOptions
 	obs := successfulObservation()
 	mock := &mockService{
@@ -186,6 +187,7 @@ func TestReconcile_CreateFails(t *testing.T) {
 	s.Finalizers = []string{finalizerName}
 	s.Status.DatabaseName = "MY_DB"
 	s.Status.SchemaName = "MY_SCHEMA"
+	s.Status.ExternalTableName = "MY_EXT_TABLE"
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.SchemaObjectIdentifier) (*snowflake.StreamObservation, error) {
 			return &snowflake.StreamObservation{Exists: false}, nil
@@ -206,6 +208,7 @@ func TestReconcile_Delete(t *testing.T) {
 	s.Finalizers = []string{finalizerName}
 	s.Status.DatabaseName = "MY_DB"
 	s.Status.SchemaName = "MY_SCHEMA"
+	s.Status.ExternalTableName = "MY_EXT_TABLE"
 	now := metav1.Now()
 	s.DeletionTimestamp = &now
 	var dropCalled bool
@@ -231,6 +234,7 @@ func TestBuildCreateOptions(t *testing.T) {
 	s := newTestStreamOnExternalTable("mys", "default")
 	s.Spec.InsertOnly = testutil.PtrBool(true)
 	s.Spec.Comment = testutil.PtrString("test")
+	s.Status.ExternalTableName = "MY_EXT_TABLE"
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_STREAM")
 	opts := buildCreateOptions(s, id)
 	assert.Equal(t, "MY_STREAM", opts.Name.Name())
@@ -269,8 +273,8 @@ func TestApplyObservation(t *testing.T) {
 func TestDetectDrift_NoDrift(t *testing.T) {
 	t.Parallel()
 	s := &snowplanev1alpha1.StreamOnExternalTable{
-		Spec:   snowplanev1alpha1.StreamOnExternalTableSpec{Name: "MY_STREAM", ExternalTable: "MY_EXT_TABLE"},
-		Status: snowplanev1alpha1.StreamOnExternalTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA"},
+		Spec:   snowplanev1alpha1.StreamOnExternalTableSpec{Name: "MY_STREAM"},
+		Status: snowplanev1alpha1.StreamOnExternalTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", ExternalTableName: "MY_EXT_TABLE"},
 	}
 	obs := &snowflake.StreamObservation{
 		ShowOutput: &snowflake.StreamShowOutput{
@@ -285,8 +289,8 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 func TestDetectDrift_WithDrift(t *testing.T) {
 	t.Parallel()
 	s := &snowplanev1alpha1.StreamOnExternalTable{
-		Spec:   snowplanev1alpha1.StreamOnExternalTableSpec{Name: "MY_STREAM", ExternalTable: "MY_EXT_TABLE", Comment: testutil.PtrString("desired")},
-		Status: snowplanev1alpha1.StreamOnExternalTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA"},
+		Spec:   snowplanev1alpha1.StreamOnExternalTableSpec{Name: "MY_STREAM", Comment: testutil.PtrString("desired")},
+		Status: snowplanev1alpha1.StreamOnExternalTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", ExternalTableName: "MY_EXT_TABLE"},
 	}
 	obs := &snowflake.StreamObservation{
 		ShowOutput: &snowflake.StreamShowOutput{

@@ -262,3 +262,47 @@ func SourceName(ref *snowplanev1alpha1.LocalObjectReference, name *string) strin
 
 	return "<unset>"
 }
+
+// ResolveSourceRef resolves a reference to any named Snowflake object.
+// When ref is set, it fetches the CR by name, checks it is Ready, and returns
+// the value from extractName (typically spec.name). When rawName is set, it is
+// returned as-is. Exactly one of ref or rawName must be non-nil.
+func ResolveSourceRef[T interface {
+	client.Object
+	conditions.ConditionedObject
+}](
+	ctx context.Context,
+	c client.Client,
+	namespace string,
+	ref *snowplanev1alpha1.LocalObjectReference,
+	rawName *string,
+	newObj func() T,
+	gvk schema.GroupVersionKind,
+	extractName func(T) string,
+) (string, error) {
+	if ref != nil {
+		obj := newObj()
+		obj.GetObjectKind().SetGroupVersionKind(gvk)
+
+		key := types.NamespacedName{Namespace: namespace, Name: ref.Name}
+		if err := c.Get(ctx, key, obj); err != nil {
+			if apierrors.IsNotFound(err) {
+				return "", fmt.Errorf("%w: %s %q in namespace %q", ErrReferenceNotFound, gvk.Kind, ref.Name, namespace)
+			}
+
+			return "", fmt.Errorf("fetching %s reference %q: %w", gvk.Kind, ref.Name, err)
+		}
+
+		if !conditions.IsTrue(obj, snowplanev1alpha1.TypeReady) {
+			return "", fmt.Errorf("%w: %s %q in namespace %q", ErrReferenceNotReady, gvk.Kind, ref.Name, namespace)
+		}
+
+		return extractName(obj), nil
+	}
+
+	if rawName != nil && *rawName != "" {
+		return *rawName, nil
+	}
+
+	return "", ErrNeitherRefNorNameSet
+}

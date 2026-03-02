@@ -3463,12 +3463,12 @@ func TestTaskSpec_Validate_NoSchemaSource(t *testing.T) {
 func TestTaskSpec_Validate_WarehouseMutualExclusion(t *testing.T) {
 	t.Parallel()
 	s := validTaskSpec()
-	s.Warehouse = ptrStr("WH")
+	s.WarehouseName = ptrStr("WH")
 	size := "SMALL"
 	s.UserTaskManagedInitialWarehouseSize = &size
 	err := s.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.warehouse and spec.userTaskManagedInitialWarehouseSize are mutually exclusive")
+	assert.Contains(t, err.Error(), "spec.warehouseRef/warehouseName and spec.userTaskManagedInitialWarehouseSize are mutually exclusive")
 }
 
 func TestTaskSpec_Validate_TimeoutTooLarge(t *testing.T) {

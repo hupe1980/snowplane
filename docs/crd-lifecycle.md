@@ -44,6 +44,7 @@ Every Snowplane CRD carries a maturity label (`snowplane.hupe1980.github.io/matu
 | GrantOwnership | alpha | Ownership transfer, no-op on delete |
 | Table | alpha | Column management, schema-level |
 | View | alpha | AS query management, secure views |
+| MaterializedView | alpha | Materialized query results, secure, cluster by |
 | Stage | alpha | Internal/external stages, file format |
 | Task | alpha | Scheduled SQL, DAG, serverless |
 | Alert | alpha | Condition-based monitoring & notification |

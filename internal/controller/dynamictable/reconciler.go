@@ -109,7 +109,7 @@ func buildCreateOptions(dt *snowplanev1alpha1.DynamicTable, id snowflake.SchemaO
 		Name:                       id,
 		Query:                      dt.Spec.Query,
 		TargetLag:                  dt.Spec.TargetLag,
-		Warehouse:                  dt.Spec.Warehouse,
+		Warehouse:                  dt.Status.WarehouseName,
 		Comment:                    dt.Spec.Comment,
 		Transient:                  dt.Spec.Transient,
 		ClusterBy:                  dt.Spec.ClusterBy,
@@ -141,8 +141,8 @@ func buildAlterOptions(dt *snowplanev1alpha1.DynamicTable, id snowflake.SchemaOb
 	}
 
 	// Warehouse — always send if it differs.
-	if obs.ShowOutput != nil && !strings.EqualFold(dt.Spec.Warehouse, obs.ShowOutput.Warehouse) {
-		wh := dt.Spec.Warehouse
+	if obs.ShowOutput != nil && !strings.EqualFold(dt.Status.WarehouseName, obs.ShowOutput.Warehouse) {
+		wh := dt.Status.WarehouseName
 		opts.Warehouse = &wh
 	}
 
@@ -197,7 +197,7 @@ func detectDrift(dt *snowplanev1alpha1.DynamicTable, obs *snowflake.DynamicTable
 
 		// Mutable fields.
 		d.CompareStringValueFold("TARGET_LAG", dt.Spec.TargetLag, obs.ShowOutput.TargetLag, false)
-		d.CompareStringValueFold("WAREHOUSE", dt.Spec.Warehouse, obs.ShowOutput.Warehouse, false)
+		d.CompareStringValueFold("WAREHOUSE", dt.Status.WarehouseName, obs.ShowOutput.Warehouse, false)
 		d.CompareString("COMMENT", dt.Spec.Comment, obs.ShowOutput.Comment, false)
 		d.CompareStringValue("CLUSTER_BY", strings.Join(dt.Spec.ClusterBy, ", "), obs.ShowOutput.ClusterBy, false)
 	}

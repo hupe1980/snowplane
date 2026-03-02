@@ -26,7 +26,7 @@ Full lifecycle management for every resource — create, alter, drop, drift dete
 | Category | Resources |
 |:---------|:----------|
 | **Core Infrastructure** | Database, Schema, Warehouse |
-| **Data Objects** | Table, View, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe |
+| **Data Objects** | Table, View, MaterializedView, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe, Sequence, ExternalTable |
 | **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
 | **Orchestration** | Task, Alert |
 | **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
@@ -46,7 +46,7 @@ Full lifecycle management for every resource — create, alter, drop, drift dete
 : Field-level drift detection with structured reporting. Use `detect-only` policy for monitoring without correction.
 
 **Cross-Resource References**
-: Schemas reference Databases; Tables, Views, and Stages reference Schemas. Dependency resolution and backoff are automatic.
+: Schemas reference Databases; Tables, Views, MaterializedViews, and Stages reference Schemas. Dependency resolution and backoff are automatic.
 
 **Resource Adoption**
 : Adopt pre-existing Snowflake objects via a single annotation — no data migration needed.

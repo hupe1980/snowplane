@@ -53,7 +53,24 @@ func (a *adapter) PreReconcile(ctx context.Context, dt *snowplanev1alpha1.Dynami
 
 	dt.Status.SchemaName = schemaFQN
 
-	refresolver.SetDatabaseAndSchemaResolvedCondition(dt, dt.Spec.DatabaseRef, dt.Spec.DatabaseName, dt.Spec.SchemaRef, dt.Spec.SchemaName)
+	warehouseName, err := refresolver.PreReconcileSourceRef(ctx, a.client, a.recorder, dt,
+		dt.Namespace, dt.Spec.WarehouseRef, dt.Spec.WarehouseName, dt.Status.WarehouseName,
+		"Warehouse",
+		func() *snowplanev1alpha1.Warehouse { return &snowplanev1alpha1.Warehouse{} },
+		snowplanev1alpha1.GroupVersion.WithKind("Warehouse"),
+		func(w *snowplanev1alpha1.Warehouse) string { return w.Spec.Name },
+	)
+	if err != nil {
+		return err
+	}
+
+	dt.Status.WarehouseName = warehouseName
+
+	refresolver.SetAllReferencesResolvedCondition(dt,
+		refresolver.RefDescriptor{KindLabel: "Database", Ref: dt.Spec.DatabaseRef, RawName: dt.Spec.DatabaseName},
+		refresolver.RefDescriptor{KindLabel: "Schema", Ref: dt.Spec.SchemaRef, RawName: dt.Spec.SchemaName},
+		refresolver.RefDescriptor{KindLabel: "Warehouse", Ref: dt.Spec.WarehouseRef, RawName: dt.Spec.WarehouseName},
+	)
 
 	return nil
 }
@@ -107,6 +124,27 @@ func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
 		bldr.Watches(
 			&snowplanev1alpha1.Schema{},
 			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.DynamicTableList{} }, ".spec.schemaRef.name", "listing dynamic tables for schema watch")),
+		)
+
+		if err := mgr.GetFieldIndexer().IndexField(
+			ctx,
+			&snowplanev1alpha1.DynamicTable{},
+			".spec.warehouseRef.name",
+			func(o sigs.Object) []string {
+				dt, ok := o.(*snowplanev1alpha1.DynamicTable)
+				if !ok || dt.Spec.WarehouseRef == nil {
+					return nil
+				}
+
+				return []string{dt.Spec.WarehouseRef.Name}
+			},
+		); err != nil {
+			return fmt.Errorf("creating field indexer for .spec.warehouseRef.name: %w", err)
+		}
+
+		bldr.Watches(
+			&snowplanev1alpha1.Warehouse{},
+			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.DynamicTableList{} }, ".spec.warehouseRef.name", "listing dynamic tables for warehouse watch")),
 		)
 
 		return nil

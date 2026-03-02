@@ -53,7 +53,55 @@ func (a *adapter) PreReconcile(ctx context.Context, pipe *snowplanev1alpha1.Pipe
 
 	pipe.Status.SchemaName = schemaFQN
 
-	refresolver.SetDatabaseAndSchemaResolvedCondition(pipe, pipe.Spec.DatabaseRef, pipe.Spec.DatabaseName, pipe.Spec.SchemaRef, pipe.Spec.SchemaName)
+	// Resolve optional Integration ref (immutable, references NotificationIntegration).
+	if pipe.Spec.IntegrationRef != nil || pipe.Spec.IntegrationName != nil {
+		integrationName, intErr := refresolver.PreReconcileSourceRef(ctx, a.client, a.recorder, pipe,
+			pipe.Namespace, pipe.Spec.IntegrationRef, pipe.Spec.IntegrationName, pipe.Status.IntegrationName,
+			"Integration",
+			func() *snowplanev1alpha1.NotificationIntegration {
+				return &snowplanev1alpha1.NotificationIntegration{}
+			},
+			snowplanev1alpha1.GroupVersion.WithKind("NotificationIntegration"),
+			func(ni *snowplanev1alpha1.NotificationIntegration) string { return ni.Spec.Name },
+		)
+		if intErr != nil {
+			return intErr
+		}
+
+		pipe.Status.IntegrationName = integrationName
+	}
+
+	// Resolve optional ErrorIntegration ref (mutable, references NotificationIntegration).
+	if pipe.Spec.ErrorIntegrationRef != nil || pipe.Spec.ErrorIntegrationName != nil {
+		errorIntName, eiErr := refresolver.PreReconcileSourceRef(ctx, a.client, a.recorder, pipe,
+			pipe.Namespace, pipe.Spec.ErrorIntegrationRef, pipe.Spec.ErrorIntegrationName, pipe.Status.ErrorIntegrationName,
+			"ErrorIntegration",
+			func() *snowplanev1alpha1.NotificationIntegration {
+				return &snowplanev1alpha1.NotificationIntegration{}
+			},
+			snowplanev1alpha1.GroupVersion.WithKind("NotificationIntegration"),
+			func(ni *snowplanev1alpha1.NotificationIntegration) string { return ni.Spec.Name },
+		)
+		if eiErr != nil {
+			return eiErr
+		}
+
+		pipe.Status.ErrorIntegrationName = errorIntName
+	}
+
+	// Build dynamic refs list for condition.
+	refs := []refresolver.RefDescriptor{
+		{KindLabel: "database", Ref: pipe.Spec.DatabaseRef, RawName: pipe.Spec.DatabaseName},
+		{KindLabel: "schema", Ref: pipe.Spec.SchemaRef, RawName: pipe.Spec.SchemaName},
+	}
+	if pipe.Spec.IntegrationRef != nil || pipe.Spec.IntegrationName != nil {
+		refs = append(refs, refresolver.RefDescriptor{KindLabel: "integration", Ref: pipe.Spec.IntegrationRef, RawName: pipe.Spec.IntegrationName})
+	}
+	if pipe.Spec.ErrorIntegrationRef != nil || pipe.Spec.ErrorIntegrationName != nil {
+		refs = append(refs, refresolver.RefDescriptor{KindLabel: "errorIntegration", Ref: pipe.Spec.ErrorIntegrationRef, RawName: pipe.Spec.ErrorIntegrationName})
+	}
+
+	refresolver.SetAllReferencesResolvedCondition(pipe, refs...)
 
 	return nil
 }
@@ -107,6 +155,45 @@ func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
 		bldr.Watches(
 			&snowplanev1alpha1.Schema{},
 			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.PipeList{} }, ".spec.schemaRef.name", "listing pipes for schema watch")),
+		)
+
+		// IntegrationRef index.
+		if err := mgr.GetFieldIndexer().IndexField(
+			ctx,
+			&snowplanev1alpha1.Pipe{},
+			".spec.integrationRef.name",
+			func(o sigs.Object) []string {
+				p, ok := o.(*snowplanev1alpha1.Pipe)
+				if !ok || p.Spec.IntegrationRef == nil {
+					return nil
+				}
+
+				return []string{p.Spec.IntegrationRef.Name}
+			},
+		); err != nil {
+			return fmt.Errorf("creating field indexer for .spec.integrationRef.name: %w", err)
+		}
+
+		// ErrorIntegrationRef index.
+		if err := mgr.GetFieldIndexer().IndexField(
+			ctx,
+			&snowplanev1alpha1.Pipe{},
+			".spec.errorIntegrationRef.name",
+			func(o sigs.Object) []string {
+				p, ok := o.(*snowplanev1alpha1.Pipe)
+				if !ok || p.Spec.ErrorIntegrationRef == nil {
+					return nil
+				}
+
+				return []string{p.Spec.ErrorIntegrationRef.Name}
+			},
+		); err != nil {
+			return fmt.Errorf("creating field indexer for .spec.errorIntegrationRef.name: %w", err)
+		}
+
+		bldr.Watches(
+			&snowplanev1alpha1.NotificationIntegration{},
+			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.PipeList{} }, ".spec.integrationRef.name", "listing pipes for notification integration watch")),
 		)
 
 		return nil

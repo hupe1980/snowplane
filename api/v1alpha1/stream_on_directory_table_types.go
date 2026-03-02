@@ -12,12 +12,15 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName) || self.databaseName == oldSelf.databaseName)",message="spec.databaseName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef) || self.schemaRef == oldSelf.schemaRef)",message="spec.schemaRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName) || self.schemaName == oldSelf.schemaName)",message="spec.schemaName is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="self.stage == oldSelf.stage",message="spec.stage is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.stageRef) == has(self.stageRef) && (!has(self.stageRef) || self.stageRef == oldSelf.stageRef)",message="spec.stageRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.stageName) == has(self.stageName) && (!has(self.stageName) || self.stageName == oldSelf.stageName)",message="spec.stageName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.stageRef) && !has(self.stageName)) || (!has(self.stageRef) && has(self.stageName))",message="exactly one of spec.stageRef or spec.stageName must be set"
 // +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
 // +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
+// +kubebuilder:validation:XValidation:rule="!has(self.stageName) || !self.stageName.contains('.')",message="spec.stageName must be a simple identifier, not a fully-qualified name"
 type StreamOnDirectoryTableSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -47,10 +50,16 @@ type StreamOnDirectoryTableSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	SchemaName *string `json:"schemaName,omitempty"`
 
-	// Stage is the fully qualified name of the source stage whose directory
-	// table the stream monitors. Immutable after creation.
+	// StageRef references a Stage CR in the same namespace.
+	// Mutually exclusive with StageName. Immutable after creation.
+	// +optional
+	StageRef *LocalObjectReference `json:"stageRef,omitempty"`
+
+	// StageName is the Snowflake stage identifier (e.g. "MY_STAGE").
+	// Mutually exclusive with StageRef. Immutable after creation.
+	// +optional
 	// +kubebuilder:validation:MinLength=1
-	Stage string `json:"stage"`
+	StageName *string `json:"stageName,omitempty"`
 
 	// Comment is an optional description for the stream.
 	// +optional
@@ -66,6 +75,9 @@ type StreamOnDirectoryTableStatus struct {
 
 	// SchemaName is the parent Snowflake schema name.
 	SchemaName string `json:"schemaName,omitempty"`
+
+	// StageName is the resolved Snowflake stage name.
+	StageName string `json:"stageName,omitempty"`
 
 	// ShowOutput contains the raw SHOW STREAMS output for this stream.
 	ShowOutput *StreamShowOutput `json:"showOutput,omitempty"`

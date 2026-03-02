@@ -39,8 +39,10 @@ const (
 // +kubebuilder:validation:XValidation:rule="self.transient == oldSelf.transient",message="spec.transient is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.warehouseRef) && !has(self.warehouseName)) || (!has(self.warehouseRef) && has(self.warehouseName))",message="exactly one of spec.warehouseRef or spec.warehouseName must be set"
 // +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
 // +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
+// +kubebuilder:validation:XValidation:rule="!has(self.warehouseName) || !self.warehouseName.contains('.')",message="spec.warehouseName must be a simple identifier, not a fully-qualified name"
 type DynamicTableSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -80,9 +82,16 @@ type DynamicTableSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	TargetLag string `json:"targetLag"`
 
-	// Warehouse is the warehouse used for refreshing the dynamic table.
+	// WarehouseRef references a Warehouse CR in the same namespace.
+	// Mutually exclusive with WarehouseName.
+	// +optional
+	WarehouseRef *LocalObjectReference `json:"warehouseRef,omitempty"`
+
+	// WarehouseName is the Snowflake warehouse identifier (e.g. "COMPUTE_WH").
+	// Mutually exclusive with WarehouseRef.
+	// +optional
 	// +kubebuilder:validation:MinLength=1
-	Warehouse string `json:"warehouse"`
+	WarehouseName *string `json:"warehouseName,omitempty"`
 
 	// RefreshMode specifies the refresh strategy (AUTO, FULL, INCREMENTAL).
 	// Immutable after creation.
@@ -169,6 +178,9 @@ type DynamicTableStatus struct {
 
 	// SchemaName is the parent Snowflake schema name.
 	SchemaName string `json:"schemaName,omitempty"`
+
+	// WarehouseName is the resolved Snowflake warehouse name.
+	WarehouseName string `json:"warehouseName,omitempty"`
 
 	// ShowOutput contains the raw SHOW DYNAMIC TABLES output for this dynamic table.
 	ShowOutput *DynamicTableShowOutput `json:"showOutput,omitempty"`

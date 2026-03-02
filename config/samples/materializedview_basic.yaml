@@ -1,0 +1,16 @@
+# MaterializedView with minimal configuration using references.
+# Note: Materialized views require Snowflake Enterprise Edition or higher.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: MaterializedView
+metadata:
+  name: my-materialized-view
+  namespace: snowplane-system
+spec:
+  name: DAILY_SALES_SUMMARY
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  statement: "SELECT sale_date, SUM(amount) AS total_amount FROM sales GROUP BY sale_date"
+  providerRef:
+    name: default

@@ -83,7 +83,7 @@ func newTestStreamOnTable(name, namespace string) *snowplanev1alpha1.StreamOnTab
 			Name:         "MY_STREAM",
 			DatabaseName: testutil.PtrString("MY_DB"),
 			SchemaName:   testutil.PtrString("MY_SCHEMA"),
-			Table:        "MY_TABLE",
+			TableName:    testutil.PtrString("MY_TABLE"),
 		},
 	}
 }
@@ -389,6 +389,7 @@ func TestBuildCreateOptions(t *testing.T) {
 	s := newTestStreamOnTable("mys", "default")
 	s.Spec.AppendOnly = testutil.PtrBool(true)
 	s.Spec.Comment = testutil.PtrString("test")
+	s.Status.TableName = "MY_TABLE"
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_STREAM")
 
 	opts := buildCreateOptions(s, id)
@@ -467,13 +468,14 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 
 	s := &snowplanev1alpha1.StreamOnTable{
 		Spec: snowplanev1alpha1.StreamOnTableSpec{
-			Name:    "MY_STREAM",
-			Table:   "MY_TABLE",
-			Comment: testutil.PtrString("test"),
+			Name:      "MY_STREAM",
+			TableName: testutil.PtrString("MY_TABLE"),
+			Comment:   testutil.PtrString("test"),
 		},
 		Status: snowplanev1alpha1.StreamOnTableStatus{
 			DatabaseName: "MY_DB",
 			SchemaName:   "MY_SCHEMA",
+			TableName:    "MY_TABLE",
 		},
 	}
 
@@ -497,13 +499,14 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 
 	s := &snowplanev1alpha1.StreamOnTable{
 		Spec: snowplanev1alpha1.StreamOnTableSpec{
-			Name:    "MY_STREAM",
-			Table:   "MY_TABLE",
-			Comment: testutil.PtrString("desired"),
+			Name:      "MY_STREAM",
+			TableName: testutil.PtrString("MY_TABLE"),
+			Comment:   testutil.PtrString("desired"),
 		},
 		Status: snowplanev1alpha1.StreamOnTableStatus{
 			DatabaseName: "MY_DB",
 			SchemaName:   "MY_SCHEMA",
+			TableName:    "MY_TABLE",
 		},
 	}
 
@@ -529,12 +532,13 @@ func TestDetectDrift_AppendOnlyMode(t *testing.T) {
 	s := &snowplanev1alpha1.StreamOnTable{
 		Spec: snowplanev1alpha1.StreamOnTableSpec{
 			Name:       "MY_STREAM",
-			Table:      "MY_TABLE",
+			TableName:  testutil.PtrString("MY_TABLE"),
 			AppendOnly: testutil.PtrBool(true),
 		},
 		Status: snowplanev1alpha1.StreamOnTableStatus{
 			DatabaseName: "MY_DB",
 			SchemaName:   "MY_SCHEMA",
+			TableName:    "MY_TABLE",
 		},
 	}
 

@@ -12,7 +12,8 @@ spec:
     name: my-database
   schemaRef:
     name: my-schema
-  warehouse: COMPUTE_WH
+  warehouseRef:
+    name: my-warehouse
   schedule: "60 MINUTES"
   sqlStatement: "INSERT INTO TARGET_TABLE SELECT * FROM SOURCE_TABLE"
   providerRef:

@@ -1,0 +1,19 @@
+# MaterializedView with all options: secure, comment, cluster by and inline names.
+# Note: Materialized views require Snowflake Enterprise Edition or higher.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: MaterializedView
+metadata:
+  name: my-secure-materialized-view
+  namespace: snowplane-system
+spec:
+  name: SECURE_DAILY_SALES
+  databaseName: ANALYTICS
+  schemaName: PUBLIC
+  statement: "SELECT sale_date, region, SUM(amount) AS total_amount FROM sales GROUP BY sale_date, region"
+  secure: true
+  comment: "Secure materialized view for daily sales aggregation"
+  clusterBy:
+    - sale_date
+    - region
+  providerRef:
+    name: default

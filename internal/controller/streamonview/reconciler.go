@@ -105,7 +105,7 @@ func buildCreateOptions(obj *snowplanev1alpha1.StreamOnView, id snowflake.Schema
 	return snowflake.CreateStreamOptions{
 		Name:            id,
 		SourceType:      snowflake.StreamSourceView,
-		SourceName:      obj.Spec.View,
+		SourceName:      obj.Status.ViewName,
 		AppendOnly:      obj.Spec.AppendOnly,
 		ShowInitialRows: obj.Spec.ShowInitialRows,
 		Comment:         obj.Spec.Comment,
@@ -132,7 +132,7 @@ func detectDrift(obj *snowplanev1alpha1.StreamOnView, obs *snowflake.StreamObser
 		d.CompareStringValueFold("NAME", obj.Spec.Name, obs.ShowOutput.Name, true)
 		d.CompareStringValueFold("DATABASE", snowflake.ParseDatabaseNameFromFQN(obj.Status.DatabaseName), obs.ShowOutput.DatabaseName, true)
 		d.CompareStringValueFold("SCHEMA", snowflake.ParseSchemaNameFromFQN(obj.Status.SchemaName), obs.ShowOutput.SchemaName, true)
-		d.CompareStringValueFold("SOURCE", obj.Spec.View, obs.ShowOutput.TableName, true)
+		d.CompareStringValueFold("SOURCE", obj.Status.ViewName, obs.ShowOutput.TableName, true)
 
 		expectedMode := "DEFAULT"
 		if obj.Spec.AppendOnly != nil && *obj.Spec.AppendOnly {

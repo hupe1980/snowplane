@@ -103,15 +103,25 @@ func applyObservation(pipe *snowplanev1alpha1.Pipe, obs *snowflake.PipeObservati
 }
 
 func buildCreateOptions(pipe *snowplanev1alpha1.Pipe, id snowflake.SchemaObjectIdentifier) snowflake.CreatePipeOptions {
-	return snowflake.CreatePipeOptions{
-		Name:             id,
-		CopyStatement:    pipe.Spec.CopyStatement,
-		AutoIngest:       pipe.Spec.AutoIngest,
-		Integration:      pipe.Spec.Integration,
-		AwsSnsTopic:      pipe.Spec.AwsSnsTopic,
-		ErrorIntegration: pipe.Spec.ErrorIntegration,
-		Comment:          pipe.Spec.Comment,
+	opts := snowflake.CreatePipeOptions{
+		Name:          id,
+		CopyStatement: pipe.Spec.CopyStatement,
+		AutoIngest:    pipe.Spec.AutoIngest,
+		AwsSnsTopic:   pipe.Spec.AwsSnsTopic,
+		Comment:       pipe.Spec.Comment,
 	}
+
+	if pipe.Status.IntegrationName != "" {
+		v := pipe.Status.IntegrationName
+		opts.Integration = &v
+	}
+
+	if pipe.Status.ErrorIntegrationName != "" {
+		v := pipe.Status.ErrorIntegrationName
+		opts.ErrorIntegration = &v
+	}
+
+	return opts
 }
 
 func buildAlterOptions(pipe *snowplanev1alpha1.Pipe, id snowflake.SchemaObjectIdentifier, obs *snowflake.PipeObservation) snowflake.AlterPipeOptions {
@@ -126,9 +136,10 @@ func buildAlterOptions(pipe *snowplanev1alpha1.Pipe, id snowflake.SchemaObjectId
 	}
 
 	// ErrorIntegration: set if changed.
-	if pipe.Spec.ErrorIntegration != nil {
-		if obs.ShowOutput == nil || *pipe.Spec.ErrorIntegration != obs.ShowOutput.ErrorIntegration {
-			opts.ErrorIntegration = pipe.Spec.ErrorIntegration
+	if pipe.Status.ErrorIntegrationName != "" {
+		if obs.ShowOutput == nil || pipe.Status.ErrorIntegrationName != obs.ShowOutput.ErrorIntegration {
+			v := pipe.Status.ErrorIntegrationName
+			opts.ErrorIntegration = &v
 		}
 	}
 
@@ -144,12 +155,18 @@ func detectDrift(pipe *snowplanev1alpha1.Pipe, obs *snowflake.PipeObservation) *
 		d.CompareStringValueFold("DATABASE", snowflake.ParseDatabaseNameFromFQN(pipe.Status.DatabaseName), obs.ShowOutput.DatabaseName, true)
 		d.CompareStringValueFold("SCHEMA", snowflake.ParseSchemaNameFromFQN(pipe.Status.SchemaName), obs.ShowOutput.SchemaName, true)
 		d.CompareStringValue("DEFINITION", pipe.Spec.CopyStatement, obs.ShowOutput.Definition, true)
-		d.CompareString("INTEGRATION", pipe.Spec.Integration, obs.ShowOutput.Integration, true)
+		if pipe.Status.IntegrationName != "" {
+			v := pipe.Status.IntegrationName
+			d.CompareString("INTEGRATION", &v, obs.ShowOutput.Integration, true)
+		}
 		d.CompareString("AWS_SNS_TOPIC", pipe.Spec.AwsSnsTopic, obs.ShowOutput.AwsSnsTopic, true)
 
 		// Mutable fields.
 		d.CompareString("COMMENT", pipe.Spec.Comment, obs.ShowOutput.Comment, false)
-		d.CompareString("ERROR_INTEGRATION", pipe.Spec.ErrorIntegration, obs.ShowOutput.ErrorIntegration, false)
+		if pipe.Status.ErrorIntegrationName != "" {
+			v := pipe.Status.ErrorIntegrationName
+			d.CompareString("ERROR_INTEGRATION", &v, obs.ShowOutput.ErrorIntegration, false)
+		}
 	}
 
 	return d.Result()

@@ -78,6 +78,9 @@ rules:
   - streamondynamictables
   - tags
   - tagassociations
+  - networkpolicyattachments
+  - passwordpolicyattachments
+  - maskingpolicyapplications
   - networkpolicies
   - resourcemonitors
   - maskingpolicies
@@ -85,6 +88,9 @@ rules:
   - grantownerships
   - dynamictables
   - fileformats
+  - sequences
+  - externaltables
+  - materializedviews
   - pipes
   - storageintegrations
   - securityintegrations
@@ -127,6 +133,9 @@ rules:
   - streamondynamictables/status
   - tags/status
   - tagassociations/status
+  - networkpolicyattachments/status
+  - passwordpolicyattachments/status
+  - maskingpolicyapplications/status
   - networkpolicies/status
   - resourcemonitors/status
   - maskingpolicies/status
@@ -134,7 +143,10 @@ rules:
   - grantownerships/status
   - dynamictables/status
   - fileformats/status
+  - sequences/status
+  - externaltables/status
   - pipes/status
+  - materializedviews/status
   - storageintegrations/status
   - securityintegrations/status
   - notificationintegrations/status
@@ -172,6 +184,9 @@ rules:
   - streamondynamictables/finalizers
   - tags/finalizers
   - tagassociations/finalizers
+  - networkpolicyattachments/finalizers
+  - passwordpolicyattachments/finalizers
+  - maskingpolicyapplications/finalizers
   - networkpolicies/finalizers
   - resourcemonitors/finalizers
   - maskingpolicies/finalizers
@@ -179,8 +194,11 @@ rules:
   - grantownerships/finalizers
   - dynamictables/finalizers
   - fileformats/finalizers
+  - sequences/finalizers
+  - externaltables/finalizers
   - pipes/finalizers
   - storageintegrations/finalizers
+  - materializedviews/finalizers
   - securityintegrations/finalizers
   - notificationintegrations/finalizers
   - passwordpolicies/finalizers
@@ -274,6 +292,9 @@ rules:
   - streamondynamictables
   - tags
   - tagassociations
+  - networkpolicyattachments
+  - passwordpolicyattachments
+  - maskingpolicyapplications
   - networkpolicies
   - resourcemonitors
   - maskingpolicies
@@ -281,9 +302,12 @@ rules:
   - grantownerships
   - dynamictables
   - fileformats
+  - sequences
+  - externaltables
   - pipes
   - storageintegrations
   - securityintegrations
+  - materializedviews
   - notificationintegrations
   - passwordpolicies
   - networkrules
@@ -319,6 +343,9 @@ rules:
   - streamondynamictables/status
   - tags/status
   - tagassociations/status
+  - networkpolicyattachments/status
+  - passwordpolicyattachments/status
+  - maskingpolicyapplications/status
   - networkpolicies/status
   - resourcemonitors/status
   - maskingpolicies/status
@@ -326,10 +353,13 @@ rules:
   - grantownerships/status
   - dynamictables/status
   - fileformats/status
+  - sequences/status
+  - externaltables/status
   - pipes/status
   - storageintegrations/status
   - securityintegrations/status
   - notificationintegrations/status
+  - materializedviews/status
   - passwordpolicies/status
   - networkrules/status
   - fieldexports/status
@@ -372,6 +402,9 @@ rules:
   - streamondynamictables
   - tags
   - tagassociations
+  - networkpolicyattachments
+  - passwordpolicyattachments
+  - maskingpolicyapplications
   - networkpolicies
   - resourcemonitors
   - maskingpolicies
@@ -379,11 +412,14 @@ rules:
   - grantownerships
   - dynamictables
   - fileformats
+  - sequences
+  - externaltables
   - pipes
   - storageintegrations
   - securityintegrations
   - notificationintegrations
   - passwordpolicies
+  - materializedviews
   - networkrules
   - fieldexports
   - providerconfigs
@@ -421,6 +457,9 @@ rules:
   - streamondynamictables/status
   - tags/status
   - tagassociations/status
+  - networkpolicyattachments/status
+  - passwordpolicyattachments/status
+  - maskingpolicyapplications/status
   - networkpolicies/status
   - resourcemonitors/status
   - maskingpolicies/status
@@ -428,12 +467,15 @@ rules:
   - grantownerships/status
   - dynamictables/status
   - fileformats/status
+  - sequences/status
+  - externaltables/status
   - pipes/status
   - storageintegrations/status
   - securityintegrations/status
   - notificationintegrations/status
   - passwordpolicies/status
   - networkrules/status
+  - materializedviews/status
   - fieldexports/status
   - providerconfigs/status
   verbs:

@@ -53,7 +53,24 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.Strea
 
 	obj.Status.SchemaName = schemaFQN
 
-	refresolver.SetDatabaseAndSchemaResolvedCondition(obj, obj.Spec.DatabaseRef, obj.Spec.DatabaseName, obj.Spec.SchemaRef, obj.Spec.SchemaName)
+	stageName, err := refresolver.PreReconcileSourceRef(ctx, a.client, a.recorder, obj,
+		obj.Namespace, obj.Spec.StageRef, obj.Spec.StageName, obj.Status.StageName,
+		"Stage",
+		func() *snowplanev1alpha1.Stage { return &snowplanev1alpha1.Stage{} },
+		snowplanev1alpha1.GroupVersion.WithKind("Stage"),
+		func(st *snowplanev1alpha1.Stage) string { return st.Spec.Name },
+	)
+	if err != nil {
+		return err
+	}
+
+	obj.Status.StageName = stageName
+
+	refresolver.SetAllReferencesResolvedCondition(obj,
+		refresolver.RefDescriptor{KindLabel: "Database", Ref: obj.Spec.DatabaseRef, RawName: obj.Spec.DatabaseName},
+		refresolver.RefDescriptor{KindLabel: "Schema", Ref: obj.Spec.SchemaRef, RawName: obj.Spec.SchemaName},
+		refresolver.RefDescriptor{KindLabel: "Stage", Ref: obj.Spec.StageRef, RawName: obj.Spec.StageName},
+	)
 
 	return nil
 }
@@ -107,6 +124,27 @@ func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
 		bldr.Watches(
 			&snowplanev1alpha1.Schema{},
 			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.StreamOnDirectoryTableList{} }, ".spec.schemaRef.name", "listing stream-on-directory-table for schema watch")),
+		)
+
+		if err := mgr.GetFieldIndexer().IndexField(
+			ctx,
+			&snowplanev1alpha1.StreamOnDirectoryTable{},
+			".spec.stageRef.name",
+			func(o sigs.Object) []string {
+				s, ok := o.(*snowplanev1alpha1.StreamOnDirectoryTable)
+				if !ok || s.Spec.StageRef == nil {
+					return nil
+				}
+
+				return []string{s.Spec.StageRef.Name}
+			},
+		); err != nil {
+			return fmt.Errorf("creating field indexer for .spec.stageRef.name: %w", err)
+		}
+
+		bldr.Watches(
+			&snowplanev1alpha1.Stage{},
+			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.StreamOnDirectoryTableList{} }, ".spec.stageRef.name", "listing stream-on-directory-table for stage watch")),
 		)
 
 		return nil

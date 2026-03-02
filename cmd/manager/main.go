@@ -26,15 +26,20 @@ import (
 	database "github.com/hupe1980/snowplane/internal/controller/database"
 	databaserolectl "github.com/hupe1980/snowplane/internal/controller/databaserole"
 	dynamictablectl "github.com/hupe1980/snowplane/internal/controller/dynamictable"
+	externaltablectl "github.com/hupe1980/snowplane/internal/controller/externaltable"
 	fieldexportctl "github.com/hupe1980/snowplane/internal/controller/fieldexport"
 	fileformatctl "github.com/hupe1980/snowplane/internal/controller/fileformat"
 	grantctl "github.com/hupe1980/snowplane/internal/controller/grant"
 	grantownershipctl "github.com/hupe1980/snowplane/internal/controller/grantownership"
 	maskingpolicyctl "github.com/hupe1980/snowplane/internal/controller/maskingpolicy"
+	maskingpolicyapplicationctl "github.com/hupe1980/snowplane/internal/controller/maskingpolicyapplication"
+	materializedviewctl "github.com/hupe1980/snowplane/internal/controller/materializedview"
 	networkpolicyctl "github.com/hupe1980/snowplane/internal/controller/networkpolicy"
+	networkpolicyattachmentctl "github.com/hupe1980/snowplane/internal/controller/networkpolicyattachment"
 	networkrulectl "github.com/hupe1980/snowplane/internal/controller/networkrule"
 	notificationintegrationctl "github.com/hupe1980/snowplane/internal/controller/notificationintegration"
 	passwordpolicyctl "github.com/hupe1980/snowplane/internal/controller/passwordpolicy"
+	passwordpolicyattachmentctl "github.com/hupe1980/snowplane/internal/controller/passwordpolicyattachment"
 	pipectl "github.com/hupe1980/snowplane/internal/controller/pipe"
 	providerconfig "github.com/hupe1980/snowplane/internal/controller/providerconfig"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
@@ -43,6 +48,7 @@ import (
 	rowaccesspolicyctl "github.com/hupe1980/snowplane/internal/controller/rowaccesspolicy"
 	schemactl "github.com/hupe1980/snowplane/internal/controller/schema"
 	securityintegrationctl "github.com/hupe1980/snowplane/internal/controller/securityintegration"
+	sequencectl "github.com/hupe1980/snowplane/internal/controller/sequence"
 	stagectl "github.com/hupe1980/snowplane/internal/controller/stage"
 	storageintegrationctl "github.com/hupe1980/snowplane/internal/controller/storageintegration"
 	streamondirectorytablectl "github.com/hupe1980/snowplane/internal/controller/streamondirectorytable"
@@ -76,43 +82,49 @@ func init() {
 
 // validControllerNames is the set of controller names accepted by --disable-controllers.
 var validControllerNames = map[string]bool{
-	"alert":                   true,
-	"database":                true,
-	"schema":                  true,
-	"warehouse":               true,
-	"accountrole":             true,
-	"databaserole":            true,
-	"accountrolegrant":        true,
-	"databaserolegrant":       true,
-	"sharegrant":              true,
-	"user":                    true,
-	"table":                   true,
-	"view":                    true,
-	"stage":                   true,
-	"task":                    true,
-	"streamontable":           true,
-	"streamonview":            true,
-	"streamonexternaltable":   true,
-	"streamondirectorytable":  true,
-	"streamondynamictable":    true,
-	"tag":                     true,
-	"networkpolicy":           true,
-	"resourcemonitor":         true,
-	"maskingpolicy":           true,
-	"rowaccesspolicy":         true,
-	"grantownership":          true,
-	"fieldexport":             true,
-	"storageintegration":      true,
-	"fileformat":              true,
-	"pipe":                    true,
-	"dynamictable":            true,
-	"notificationintegration": true,
-	"securityintegration":     true,
-	"passwordpolicy":          true,
-	"networkrule":             true,
-	"accountroleassignment":   true,
-	"databaseroleassignment":  true,
-	"tagassociation":          true,
+	"alert":                    true,
+	"database":                 true,
+	"schema":                   true,
+	"warehouse":                true,
+	"accountrole":              true,
+	"databaserole":             true,
+	"accountrolegrant":         true,
+	"databaserolegrant":        true,
+	"sharegrant":               true,
+	"user":                     true,
+	"table":                    true,
+	"view":                     true,
+	"stage":                    true,
+	"task":                     true,
+	"streamontable":            true,
+	"streamonview":             true,
+	"streamonexternaltable":    true,
+	"streamondirectorytable":   true,
+	"streamondynamictable":     true,
+	"tag":                      true,
+	"networkpolicy":            true,
+	"resourcemonitor":          true,
+	"maskingpolicy":            true,
+	"rowaccesspolicy":          true,
+	"grantownership":           true,
+	"fieldexport":              true,
+	"storageintegration":       true,
+	"fileformat":               true,
+	"pipe":                     true,
+	"dynamictable":             true,
+	"notificationintegration":  true,
+	"securityintegration":      true,
+	"passwordpolicy":           true,
+	"networkrule":              true,
+	"accountroleassignment":    true,
+	"databaseroleassignment":   true,
+	"tagassociation":           true,
+	"networkpolicyattachment":  true,
+	"passwordpolicyattachment": true,
+	"maskingpolicyapplication": true,
+	"sequence":                 true,
+	"externaltable":            true,
+	"materializedview":         true,
 }
 
 // parseDisabledControllers parses a comma-separated list of controller names
@@ -370,6 +382,12 @@ func main() {
 		{"accountroleassignment", roleassignmentctl.NewAccountRoleAssignmentReconciler(kc, factory, controllerRec("accountroleassignment"), rl)},
 		{"databaseroleassignment", roleassignmentctl.NewDatabaseRoleAssignmentReconciler(kc, factory, controllerRec("databaseroleassignment"), rl)},
 		{"tagassociation", tagassociationctl.NewReconciler(kc, factory, controllerRec("tagassociation"), rl)},
+		{"networkpolicyattachment", networkpolicyattachmentctl.NewReconciler(kc, factory, controllerRec("networkpolicyattachment"), rl)},
+		{"passwordpolicyattachment", passwordpolicyattachmentctl.NewReconciler(kc, factory, controllerRec("passwordpolicyattachment"), rl)},
+		{"maskingpolicyapplication", maskingpolicyapplicationctl.NewReconciler(kc, factory, controllerRec("maskingpolicyapplication"), rl)},
+		{"sequence", sequencectl.NewReconciler(kc, factory, controllerRec("sequence"), rl)},
+		{"externaltable", externaltablectl.NewReconciler(kc, factory, controllerRec("externaltable"), rl)},
+		{"materializedview", materializedviewctl.NewReconciler(kc, factory, controllerRec("materializedview"), rl)},
 	}
 
 	for _, entry := range controllers {

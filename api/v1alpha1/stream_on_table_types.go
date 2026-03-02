@@ -11,12 +11,15 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName) || self.databaseName == oldSelf.databaseName)",message="spec.databaseName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef) || self.schemaRef == oldSelf.schemaRef)",message="spec.schemaRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName) || self.schemaName == oldSelf.schemaName)",message="spec.schemaName is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="self.table == oldSelf.table",message="spec.table is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.tableRef) == has(self.tableRef) && (!has(self.tableRef) || self.tableRef == oldSelf.tableRef)",message="spec.tableRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.tableName) == has(self.tableName) && (!has(self.tableName) || self.tableName == oldSelf.tableName)",message="spec.tableName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.tableRef) && !has(self.tableName)) || (!has(self.tableRef) && has(self.tableName))",message="exactly one of spec.tableRef or spec.tableName must be set"
 // +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
 // +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
+// +kubebuilder:validation:XValidation:rule="!has(self.tableName) || !self.tableName.contains('.')",message="spec.tableName must be a simple identifier, not a fully-qualified name"
 type StreamOnTableSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -46,10 +49,16 @@ type StreamOnTableSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	SchemaName *string `json:"schemaName,omitempty"`
 
-	// Table is the fully qualified name of the source table
-	// (e.g. "MY_DB"."MY_SCHEMA"."MY_TABLE"). Immutable after creation.
+	// TableRef references a Table CR in the same namespace.
+	// Mutually exclusive with TableName. Immutable after creation.
+	// +optional
+	TableRef *LocalObjectReference `json:"tableRef,omitempty"`
+
+	// TableName is the Snowflake table identifier (e.g. "MY_TABLE").
+	// Mutually exclusive with TableRef. Immutable after creation.
+	// +optional
 	// +kubebuilder:validation:MinLength=1
-	Table string `json:"table"`
+	TableName *string `json:"tableName,omitempty"`
 
 	// AppendOnly when true creates an append-only stream that tracks row inserts only.
 	// +optional
@@ -73,6 +82,9 @@ type StreamOnTableStatus struct {
 
 	// SchemaName is the parent Snowflake schema name.
 	SchemaName string `json:"schemaName,omitempty"`
+
+	// TableName is the resolved Snowflake table name.
+	TableName string `json:"tableName,omitempty"`
 
 	// ShowOutput contains the raw SHOW STREAMS output for this stream.
 	ShowOutput *StreamShowOutput `json:"showOutput,omitempty"`

@@ -10,5 +10,6 @@ spec:
     name: my-database
   schemaRef:
     name: my-schema
-  stage: MY_STAGE
+  stageRef:
+    name: my-stage
   comment: "Stream on directory table managed by Snowplane"

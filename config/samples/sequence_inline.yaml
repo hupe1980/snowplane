@@ -1,0 +1,13 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Sequence
+metadata:
+  name: my-sequence-inline
+spec:
+  name: ORDER_SEQ
+  providerRef:
+    name: default
+  databaseName: MY_DATABASE
+  schemaName: MY_SCHEMA
+  start: 1000
+  increment: 10
+  ordering: NOORDER

@@ -53,7 +53,24 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.Strea
 
 	obj.Status.SchemaName = schemaFQN
 
-	refresolver.SetDatabaseAndSchemaResolvedCondition(obj, obj.Spec.DatabaseRef, obj.Spec.DatabaseName, obj.Spec.SchemaRef, obj.Spec.SchemaName)
+	extTableName, err := refresolver.PreReconcileSourceRef(ctx, a.client, a.recorder, obj,
+		obj.Namespace, obj.Spec.ExternalTableRef, obj.Spec.ExternalTableName, obj.Status.ExternalTableName,
+		"ExternalTable",
+		func() *snowplanev1alpha1.ExternalTable { return &snowplanev1alpha1.ExternalTable{} },
+		snowplanev1alpha1.GroupVersion.WithKind("ExternalTable"),
+		func(et *snowplanev1alpha1.ExternalTable) string { return et.Spec.Name },
+	)
+	if err != nil {
+		return err
+	}
+
+	obj.Status.ExternalTableName = extTableName
+
+	refresolver.SetAllReferencesResolvedCondition(obj,
+		refresolver.RefDescriptor{KindLabel: "Database", Ref: obj.Spec.DatabaseRef, RawName: obj.Spec.DatabaseName},
+		refresolver.RefDescriptor{KindLabel: "Schema", Ref: obj.Spec.SchemaRef, RawName: obj.Spec.SchemaName},
+		refresolver.RefDescriptor{KindLabel: "ExternalTable", Ref: obj.Spec.ExternalTableRef, RawName: obj.Spec.ExternalTableName},
+	)
 
 	return nil
 }
@@ -99,6 +116,22 @@ func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
 			return fmt.Errorf("creating field indexer for .spec.schemaRef.name: %w", err)
 		}
 
+		if err := mgr.GetFieldIndexer().IndexField(
+			ctx,
+			&snowplanev1alpha1.StreamOnExternalTable{},
+			".spec.externalTableRef.name",
+			func(o sigs.Object) []string {
+				s, ok := o.(*snowplanev1alpha1.StreamOnExternalTable)
+				if !ok || s.Spec.ExternalTableRef == nil {
+					return nil
+				}
+
+				return []string{s.Spec.ExternalTableRef.Name}
+			},
+		); err != nil {
+			return fmt.Errorf("creating field indexer for .spec.externalTableRef.name: %w", err)
+		}
+
 		bldr.Watches(
 			&snowplanev1alpha1.Database{},
 			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.StreamOnExternalTableList{} }, ".spec.databaseRef.name", "listing stream-on-external-table for database watch")),
@@ -107,6 +140,11 @@ func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
 		bldr.Watches(
 			&snowplanev1alpha1.Schema{},
 			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.StreamOnExternalTableList{} }, ".spec.schemaRef.name", "listing stream-on-external-table for schema watch")),
+		)
+
+		bldr.Watches(
+			&snowplanev1alpha1.ExternalTable{},
+			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.StreamOnExternalTableList{} }, ".spec.externalTableRef.name", "listing stream-on-external-table for external-table watch")),
 		)
 
 		return nil

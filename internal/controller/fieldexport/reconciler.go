@@ -639,6 +639,12 @@ func sourceResourceTypes() []client.Object {
 		&snowplanev1alpha1.SecurityIntegration{},
 		&snowplanev1alpha1.NotificationIntegration{},
 		&snowplanev1alpha1.TagAssociation{},
+		&snowplanev1alpha1.NetworkPolicyAttachment{},
+		&snowplanev1alpha1.PasswordPolicyAttachment{},
+		&snowplanev1alpha1.MaskingPolicyApplication{},
+		&snowplanev1alpha1.Sequence{},
+		&snowplanev1alpha1.ExternalTable{},
+		&snowplanev1alpha1.MaterializedView{},
 	}
 }
 

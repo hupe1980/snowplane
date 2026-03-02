@@ -101,12 +101,24 @@ spec:
                 - Delete
                 - Orphan
                 type: string
-              dynamicTable:
+              dynamicTableName:
                 description: |-
-                  DynamicTable is the fully qualified name of the source dynamic table
-                  (e.g. "MY_DB"."MY_SCHEMA"."MY_DYN_TABLE"). Immutable after creation.
+                  DynamicTableName is the Snowflake dynamic table identifier (e.g. "MY_DYN_TABLE").
+                  Mutually exclusive with DynamicTableRef. Immutable after creation.
                 minLength: 1
                 type: string
+              dynamicTableRef:
+                description: |-
+                  DynamicTableRef references a DynamicTable CR in the same namespace.
+                  Mutually exclusive with DynamicTableName. Immutable after creation.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
               managementPolicies:
                 description: ManagementPolicies specifies lifecycle policies for this
                   resource.
@@ -198,7 +210,6 @@ spec:
                 minLength: 1
                 type: string
             required:
-            - dynamicTable
             - name
             - providerRef
             type: object
@@ -222,9 +233,14 @@ spec:
                 to change)
               rule: has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName)
                 || self.schemaName == oldSelf.schemaName)
-            - message: spec.dynamicTable is immutable (delete and recreate the resource
-                to change)
-              rule: self.dynamicTable == oldSelf.dynamicTable
+            - message: spec.dynamicTableRef is immutable (delete and recreate the
+                resource to change)
+              rule: has(oldSelf.dynamicTableRef) == has(self.dynamicTableRef) && (!has(self.dynamicTableRef)
+                || self.dynamicTableRef == oldSelf.dynamicTableRef)
+            - message: spec.dynamicTableName is immutable (delete and recreate the
+                resource to change)
+              rule: has(oldSelf.dynamicTableName) == has(self.dynamicTableName) &&
+                (!has(self.dynamicTableName) || self.dynamicTableName == oldSelf.dynamicTableName)
             - message: spec.useRole is immutable (delete and recreate the resource
                 to change)
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
@@ -236,12 +252,19 @@ spec:
             - message: exactly one of spec.schemaRef or spec.schemaName must be set
               rule: (has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef)
                 && has(self.schemaName))
+            - message: exactly one of spec.dynamicTableRef or spec.dynamicTableName
+                must be set
+              rule: (has(self.dynamicTableRef) && !has(self.dynamicTableName)) ||
+                (!has(self.dynamicTableRef) && has(self.dynamicTableName))
             - message: spec.databaseName must be a simple identifier, not a fully-qualified
                 name
               rule: '!has(self.databaseName) || !self.databaseName.contains(''.'')'
             - message: spec.schemaName must be a simple identifier, not a fully-qualified
                 name; use spec.databaseName for the database part
               rule: '!has(self.schemaName) || !self.schemaName.contains(''.'')'
+            - message: spec.dynamicTableName must be a simple identifier, not a fully-qualified
+                name
+              rule: '!has(self.dynamicTableName) || !self.dynamicTableName.contains(''.'')'
           status:
             description: StreamOnDynamicTableStatus defines the observed state of
               a StreamOnDynamicTable.
@@ -309,6 +332,10 @@ spec:
                 x-kubernetes-list-type: map
               databaseName:
                 description: DatabaseName is the parent Snowflake database name.
+                type: string
+              dynamicTableName:
+                description: DynamicTableName is the resolved Snowflake dynamic table
+                  name.
                 type: string
               fullyQualifiedName:
                 description: FullyQualifiedName is the Snowflake fully qualified identifier

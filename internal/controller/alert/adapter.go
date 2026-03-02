@@ -53,7 +53,31 @@ func (a *adapter) PreReconcile(ctx context.Context, alert *snowplanev1alpha1.Ale
 
 	alert.Status.SchemaName = schemaFQN
 
-	refresolver.SetDatabaseAndSchemaResolvedCondition(alert, alert.Spec.DatabaseRef, alert.Spec.DatabaseName, alert.Spec.SchemaRef, alert.Spec.SchemaName)
+	// Resolve optional warehouse ref.
+	if alert.Spec.WarehouseRef != nil || alert.Spec.WarehouseName != nil {
+		whName, err := refresolver.PreReconcileSourceRef(ctx, a.client, a.recorder, alert,
+			alert.Namespace, alert.Spec.WarehouseRef, alert.Spec.WarehouseName, alert.Status.WarehouseName,
+			"Warehouse",
+			func() *snowplanev1alpha1.Warehouse { return &snowplanev1alpha1.Warehouse{} },
+			snowplanev1alpha1.GroupVersion.WithKind("Warehouse"),
+			func(w *snowplanev1alpha1.Warehouse) string { return w.Spec.Name },
+		)
+		if err != nil {
+			return err
+		}
+
+		alert.Status.WarehouseName = whName
+	}
+
+	refs := []refresolver.RefDescriptor{
+		{KindLabel: "Database", Ref: alert.Spec.DatabaseRef, RawName: alert.Spec.DatabaseName},
+		{KindLabel: "Schema", Ref: alert.Spec.SchemaRef, RawName: alert.Spec.SchemaName},
+	}
+	if alert.Spec.WarehouseRef != nil || alert.Spec.WarehouseName != nil {
+		refs = append(refs, refresolver.RefDescriptor{KindLabel: "Warehouse", Ref: alert.Spec.WarehouseRef, RawName: alert.Spec.WarehouseName})
+	}
+
+	refresolver.SetAllReferencesResolvedCondition(alert, refs...)
 
 	return nil
 }
@@ -107,6 +131,27 @@ func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
 		bldr.Watches(
 			&snowplanev1alpha1.Schema{},
 			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.AlertList{} }, ".spec.schemaRef.name", "listing alerts for schema watch")),
+		)
+
+		if err := mgr.GetFieldIndexer().IndexField(
+			ctx,
+			&snowplanev1alpha1.Alert{},
+			".spec.warehouseRef.name",
+			func(o sigs.Object) []string {
+				al, ok := o.(*snowplanev1alpha1.Alert)
+				if !ok || al.Spec.WarehouseRef == nil {
+					return nil
+				}
+
+				return []string{al.Spec.WarehouseRef.Name}
+			},
+		); err != nil {
+			return fmt.Errorf("creating field indexer for .spec.warehouseRef.name: %w", err)
+		}
+
+		bldr.Watches(
+			&snowplanev1alpha1.Warehouse{},
+			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.AlertList{} }, ".spec.warehouseRef.name", "listing alerts for warehouse watch")),
 		)
 
 		return nil

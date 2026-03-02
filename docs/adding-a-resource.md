@@ -89,6 +89,69 @@ type ThingSpec struct {
 }
 ```
 
+### Optional Cross-Resource Ref/Name (e.g. Warehouse, Integration)
+
+For **optional** references (e.g. warehouse, notification integration), use an at-most-one-of CEL rule.
+Both fields may be nil (omitted), but setting both is rejected at admission:
+
+```go
+// +kubebuilder:validation:XValidation:rule="!(has(self.warehouseRef) && has(self.warehouseName))",message="at most one of spec.warehouseRef or spec.warehouseName may be set"
+// +kubebuilder:validation:XValidation:rule="!has(self.warehouseName) || !self.warehouseName.contains('.')",message="spec.warehouseName must not contain dots"
+type ThingSpec struct {
+    // ...
+
+    // +optional
+    WarehouseRef *LocalObjectReference `json:"warehouseRef,omitempty"`
+
+    // +optional
+    // +kubebuilder:validation:MinLength=1
+    WarehouseName *string `json:"warehouseName,omitempty"`
+}
+```
+
+Resolve in the adapter's `PreReconcile` with `PreReconcileSourceRef`:
+
+```go
+if thing.Spec.WarehouseRef != nil || thing.Spec.WarehouseName != nil {
+    name, err := refresolver.PreReconcileSourceRef[*v1alpha1.Warehouse](ctx, a.client, a.recorder, thing,
+        thing.Namespace, thing.Spec.WarehouseRef, thing.Spec.WarehouseName, thing.Status.WarehouseName,
+        "Warehouse", func() *v1alpha1.Warehouse { return &v1alpha1.Warehouse{} },
+        v1alpha1.GroupVersion.WithKind("Warehouse"),
+        func(w *v1alpha1.Warehouse) string { return w.Spec.Name })
+    if err != nil {
+        return err
+    }
+    thing.Status.WarehouseName = name
+}
+```
+
+Validate in `Validate()` with the optional helper:
+
+```go
+if err := validateOptionalSourceRef("warehouse", s.WarehouseRef, s.WarehouseName); err != nil {
+    errs = append(errs, err)
+}
+```
+
+### List-Based Predecessor Refs (e.g. Task DAG)
+
+For **list** fields where each entry can be a ref or a name, use a struct with per-entry XOR:
+
+```go
+type TaskPredecessor struct {
+    // +optional
+    Ref *LocalObjectReference `json:"ref,omitempty"`
+    // +optional
+    // +kubebuilder:validation:MinLength=1
+    Name *string `json:"name,omitempty"`
+}
+
+// CEL per-entry XOR:
+// +kubebuilder:validation:XValidation:rule="self.after.all(p, (has(p.ref) && !has(p.name)) || (!has(p.ref) && has(p.name)))",message="each after entry must set exactly one of ref or name"
+```
+
+Resolve all entries in a loop during `PreReconcile`, accumulating resolved names into a status slice.
+
 ### Status Type
 
 ```go
@@ -548,7 +611,9 @@ Update these docs to include the new resource:
 
 - [ ] Types with spec, status, show output, kubebuilder markers
 - [ ] `SchemeBuilder.Register(&Thing{}, &ThingList{})` in `init()`
-- [ ] Dual ref/name with CEL XOR rule (database/schema-level)
+- [ ] Dual ref/name with CEL XOR rule (database/schema-level, plus any optional refs like warehouse/integration)
+- [ ] Optional refs: at-most-one-of CEL, `validateOptionalSourceRef`, `PreReconcileSourceRef` with guard
+- [ ] List refs (if any): per-entry XOR CEL, loop-based resolution in PreReconcile
 - [ ] `Validate()` method using shared helpers
 - [ ] Type registered in `hack/gen-accessors/main.go`, `just generate` run
 - [ ] CRD manifest with maturity label (`just sync-crds` — copies to Helm chart)

@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -177,6 +179,72 @@ func PreReconcileSchemaRef(
 	}
 
 	return schemaFQN, nil
+}
+
+// PreReconcileSourceRef resolves any named-object source reference with
+// conditions and deletion-timestamp fallback. It is the generic equivalent
+// of PreReconcileDatabaseRef / PreReconcileSchemaRef for source-object refs
+// (Table, View, ExternalTable, DynamicTable, Stage, Warehouse, etc.).
+func PreReconcileSourceRef[T interface {
+	client.Object
+	conditions.ConditionedObject
+}](
+	ctx context.Context,
+	c client.Client,
+	recorder record.EventRecorder,
+	obj ConditionedClientObject,
+	namespace string,
+	ref *snowplanev1alpha1.LocalObjectReference,
+	rawName *string,
+	cachedName string,
+	kindLabel string,
+	newSourceObj func() T,
+	gvk schema.GroupVersionKind,
+	extractName func(T) string,
+) (string, error) {
+	logger := log.FromContext(ctx)
+
+	name, err := ResolveSourceRef(ctx, c, namespace, ref, rawName, newSourceObj, gvk, extractName)
+	if err != nil {
+		refName := SourceName(ref, rawName)
+		wrappedErr := HandleRefError(ctx, obj, recorder, kindLabel, refName, err)
+
+		if !obj.GetDeletionTimestamp().IsZero() && cachedName != "" {
+			conditions.SetReferencesResolved(obj,
+				fmt.Sprintf("Using cached %s name %q for deletion", kindLabel, cachedName))
+			logger.Info(fmt.Sprintf("%s reference not resolved during deletion, using cached value", kindLabel),
+				"cachedName", cachedName, "error", err)
+
+			return cachedName, nil
+		}
+
+		if errors.Is(err, ErrReferenceNotFound) || errors.Is(err, ErrReferenceNotReady) {
+			logger.Info(fmt.Sprintf("%s reference not resolved, requeuing", kindLabel), "error", err)
+		}
+
+		return "", wrappedErr
+	}
+
+	return name, nil
+}
+
+// RefDescriptor describes a single resolved reference for condition messages.
+type RefDescriptor struct {
+	KindLabel string
+	Ref       *snowplanev1alpha1.LocalObjectReference
+	RawName   *string
+}
+
+// SetAllReferencesResolvedCondition sets a ReferencesResolved condition with a
+// message listing all resolved references. Use this instead of the fixed-arity
+// helpers (SetDatabaseAndSchemaResolvedCondition, etc.) when references vary.
+func SetAllReferencesResolvedCondition(obj conditions.ConditionedObject, refs ...RefDescriptor) {
+	parts := make([]string, 0, len(refs))
+	for _, r := range refs {
+		parts = append(parts, fmt.Sprintf("%s %s", r.KindLabel, SourceName(r.Ref, r.RawName)))
+	}
+
+	conditions.SetReferencesResolved(obj, fmt.Sprintf("%s resolved", strings.Join(parts, ", ")))
 }
 
 // MapByFieldIndex returns a handler.MapFunc that maps changes on a watched

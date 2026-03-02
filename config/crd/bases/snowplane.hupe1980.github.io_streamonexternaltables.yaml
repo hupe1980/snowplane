@@ -96,12 +96,24 @@ spec:
                 - Delete
                 - Orphan
                 type: string
-              externalTable:
+              externalTableName:
                 description: |-
-                  ExternalTable is the fully qualified name of the source external table
-                  (e.g. "MY_DB"."MY_SCHEMA"."MY_EXT_TABLE"). Immutable after creation.
+                  ExternalTableName is the Snowflake external table identifier (e.g. "MY_EXT_TABLE").
+                  Mutually exclusive with ExternalTableRef. Immutable after creation.
                 minLength: 1
                 type: string
+              externalTableRef:
+                description: |-
+                  ExternalTableRef references an ExternalTable CR in the same namespace.
+                  Mutually exclusive with ExternalTableName. Immutable after creation.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
               insertOnly:
                 description: InsertOnly when true creates an insert-only stream (the
                   only mode for external tables).
@@ -193,7 +205,6 @@ spec:
                 minLength: 1
                 type: string
             required:
-            - externalTable
             - name
             - providerRef
             type: object
@@ -217,9 +228,14 @@ spec:
                 to change)
               rule: has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName)
                 || self.schemaName == oldSelf.schemaName)
-            - message: spec.externalTable is immutable (delete and recreate the resource
-                to change)
-              rule: self.externalTable == oldSelf.externalTable
+            - message: spec.externalTableRef is immutable (delete and recreate the
+                resource to change)
+              rule: has(oldSelf.externalTableRef) == has(self.externalTableRef) &&
+                (!has(self.externalTableRef) || self.externalTableRef == oldSelf.externalTableRef)
+            - message: spec.externalTableName is immutable (delete and recreate the
+                resource to change)
+              rule: has(oldSelf.externalTableName) == has(self.externalTableName)
+                && (!has(self.externalTableName) || self.externalTableName == oldSelf.externalTableName)
             - message: spec.useRole is immutable (delete and recreate the resource
                 to change)
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
@@ -231,12 +247,19 @@ spec:
             - message: exactly one of spec.schemaRef or spec.schemaName must be set
               rule: (has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef)
                 && has(self.schemaName))
+            - message: exactly one of spec.externalTableRef or spec.externalTableName
+                must be set
+              rule: (has(self.externalTableRef) && !has(self.externalTableName)) ||
+                (!has(self.externalTableRef) && has(self.externalTableName))
             - message: spec.databaseName must be a simple identifier, not a fully-qualified
                 name
               rule: '!has(self.databaseName) || !self.databaseName.contains(''.'')'
             - message: spec.schemaName must be a simple identifier, not a fully-qualified
                 name; use spec.databaseName for the database part
               rule: '!has(self.schemaName) || !self.schemaName.contains(''.'')'
+            - message: spec.externalTableName must be a simple identifier, not a fully-qualified
+                name
+              rule: '!has(self.externalTableName) || !self.externalTableName.contains(''.'')'
           status:
             description: StreamOnExternalTableStatus defines the observed state of
               a StreamOnExternalTable.
@@ -304,6 +327,10 @@ spec:
                 x-kubernetes-list-type: map
               databaseName:
                 description: DatabaseName is the parent Snowflake database name.
+                type: string
+              externalTableName:
+                description: ExternalTableName is the resolved Snowflake external
+                  table name.
                 type: string
               fullyQualifiedName:
                 description: FullyQualifiedName is the Snowflake fully qualified identifier

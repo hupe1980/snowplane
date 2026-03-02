@@ -16,6 +16,8 @@
 #   spec:
 #     roleName: ANALYTICS_READER
 #     comment: "Read-only access to analytics database"
+#     providerRef:
+#       name: default
 #     grants:
 #       - privilege: USAGE
 #         on:
@@ -53,8 +55,8 @@ spec:
       # Optional: assign this role to a parent role (e.g. SYSADMIN).
       # Leave empty to skip role assignment.
       assignToRole: string | default=""
-      # ProviderConfig to use for Snowflake connectivity.
-      providerRef: string | default="default"
+      # ProviderConfig to use for Snowflake connectivity ({name: <cr-name>}).
+      providerRef: object
     status:
       roleReady: ${role.status.conditions[?(@.type=="Ready")].status}
 
@@ -67,8 +69,7 @@ spec:
         metadata:
           name: ${schema.metadata.name}
         spec:
-          providerRef:
-            name: ${schema.spec.providerRef}
+          providerRef: ${schema.spec.providerRef}
           name: ${schema.spec.roleName}
           comment: ${schema.spec.comment}
 
@@ -87,8 +88,7 @@ spec:
         metadata:
           name: ${schema.metadata.name + '-grant-' + string(i)}
         spec:
-          providerRef:
-            name: ${schema.spec.providerRef}
+          providerRef: ${schema.spec.providerRef}
           privilege: ${grant.privilege}
           accountRoleRef:
             name: ${role.metadata.name}
@@ -104,7 +104,6 @@ spec:
         metadata:
           name: ${schema.metadata.name}-assignment
         spec:
-          providerRef:
-            name: ${schema.spec.providerRef}
+          providerRef: ${schema.spec.providerRef}
           roleName: ${role.spec.name}
           toRole: ${schema.spec.assignToRole}

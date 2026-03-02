@@ -83,8 +83,7 @@ func TestCrossResource_FullStack(t *testing.T) {
 	// 4. Stream on the table
 	streamSFName := uniqueName("XREF_FULL_STR")
 	streamName := k8sName(streamSFName)
-	fqTable := dbSFName + "." + schemaSFName + "." + tableSFName
-	streamCleanup := createCR(t, gvrStreamOnTable, newStreamOnTableCR(streamName, streamSFName, dbName, schemaName, fqTable))
+	streamCleanup := createCR(t, gvrStreamOnTable, newStreamOnTableCR(streamName, streamSFName, dbName, schemaName, tableSFName))
 	defer streamCleanup()
 	waitForReady(t, gvrStreamOnTable, streamName)
 

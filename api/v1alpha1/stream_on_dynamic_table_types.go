@@ -12,12 +12,15 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName) || self.databaseName == oldSelf.databaseName)",message="spec.databaseName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef) || self.schemaRef == oldSelf.schemaRef)",message="spec.schemaRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName) || self.schemaName == oldSelf.schemaName)",message="spec.schemaName is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="self.dynamicTable == oldSelf.dynamicTable",message="spec.dynamicTable is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.dynamicTableRef) == has(self.dynamicTableRef) && (!has(self.dynamicTableRef) || self.dynamicTableRef == oldSelf.dynamicTableRef)",message="spec.dynamicTableRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.dynamicTableName) == has(self.dynamicTableName) && (!has(self.dynamicTableName) || self.dynamicTableName == oldSelf.dynamicTableName)",message="spec.dynamicTableName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.dynamicTableRef) && !has(self.dynamicTableName)) || (!has(self.dynamicTableRef) && has(self.dynamicTableName))",message="exactly one of spec.dynamicTableRef or spec.dynamicTableName must be set"
 // +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
 // +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
+// +kubebuilder:validation:XValidation:rule="!has(self.dynamicTableName) || !self.dynamicTableName.contains('.')",message="spec.dynamicTableName must be a simple identifier, not a fully-qualified name"
 type StreamOnDynamicTableSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -47,10 +50,16 @@ type StreamOnDynamicTableSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	SchemaName *string `json:"schemaName,omitempty"`
 
-	// DynamicTable is the fully qualified name of the source dynamic table
-	// (e.g. "MY_DB"."MY_SCHEMA"."MY_DYN_TABLE"). Immutable after creation.
+	// DynamicTableRef references a DynamicTable CR in the same namespace.
+	// Mutually exclusive with DynamicTableName. Immutable after creation.
+	// +optional
+	DynamicTableRef *LocalObjectReference `json:"dynamicTableRef,omitempty"`
+
+	// DynamicTableName is the Snowflake dynamic table identifier (e.g. "MY_DYN_TABLE").
+	// Mutually exclusive with DynamicTableRef. Immutable after creation.
+	// +optional
 	// +kubebuilder:validation:MinLength=1
-	DynamicTable string `json:"dynamicTable"`
+	DynamicTableName *string `json:"dynamicTableName,omitempty"`
 
 	// AppendOnly when true creates an append-only stream that tracks row inserts only.
 	// +optional
@@ -74,6 +83,9 @@ type StreamOnDynamicTableStatus struct {
 
 	// SchemaName is the parent Snowflake schema name.
 	SchemaName string `json:"schemaName,omitempty"`
+
+	// DynamicTableName is the resolved Snowflake dynamic table name.
+	DynamicTableName string `json:"dynamicTableName,omitempty"`
 
 	// ShowOutput contains the raw SHOW STREAMS output for this stream.
 	ShowOutput *StreamShowOutput `json:"showOutput,omitempty"`

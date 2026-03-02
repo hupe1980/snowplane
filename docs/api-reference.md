@@ -272,7 +272,28 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 </details>
 
 <details>
-<summary>📦 <strong>Stage</strong></summary>
+<summary>� <strong>MaterializedView</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Materialized view name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.statement` | `string` | SQL SELECT statement *(immutable)* |
+| `spec.secure` | `bool` | Enable SECURE MATERIALIZED VIEW |
+| `spec.comment` | `*string` | Comment for the materialized view |
+| `spec.clusterBy` | `[]string` | Cluster-by expressions *(immutable)* |
+
+> ⚠️ **Enterprise Edition:** Materialized views require Snowflake Enterprise Edition or higher.
+>
+> ⚠️ **No CREATE OR ALTER:** Materialized views do not support CREATE OR ALTER. Immutable field changes require delete/recreate (use `force-new` annotation).
+
+</details>
+
+<details>
+<summary>�📦 <strong>Stage</strong></summary>
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -315,19 +336,25 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
 | `spec.sqlStatement` | `string` | SQL code executed when the task runs |
 | `spec.schedule` | `*string` | Cron or interval schedule (e.g. `5 MINUTES`) |
-| `spec.warehouse` | `*string` | Warehouse for task execution *(mutually exclusive with serverless size)* |
+| `spec.warehouseRef.name` | `*string` | Warehouse CR reference *(mutually exclusive with warehouseName and serverless size)* |
+| `spec.warehouseName` | `*string` | Warehouse Snowflake name *(mutually exclusive with warehouseRef and serverless size)* |
 | `spec.userTaskManagedInitialWarehouseSize` | `*enum` | Serverless warehouse size: `XSMALL`…`XXLARGE` |
-| `spec.after` | `[]string` | Predecessor task names for DAG scheduling |
+| `spec.after` | `[]TaskPredecessor` | Predecessor tasks for DAG scheduling — each entry has `ref.name` or `name` (XOR) |
 | `spec.when` | `*string` | Boolean SQL condition for conditional execution |
 | `spec.suspend` | `*bool` | Whether the task is suspended (default: `true`) |
 | `spec.comment` | `*string` | Optional description |
 | `spec.allowOverlappingExecution` | `*bool` | Allow concurrent graph executions |
 | `spec.userTaskTimeoutMs` | `*int32` | Single-run timeout in milliseconds (0–604800000) |
 | `spec.suspendTaskAfterNumFailures` | `*int32` | Auto-suspend after N consecutive failures |
-| `spec.errorIntegration` | `*string` | Notification integration for errors |
+| `spec.errorIntegrationRef.name` | `*string` | NotificationIntegration CR reference for errors *(XOR with errorIntegrationName)* |
+| `spec.errorIntegrationName` | `*string` | NotificationIntegration Snowflake name for errors *(XOR with errorIntegrationRef)* |
+| `spec.successIntegrationRef.name` | `*string` | NotificationIntegration CR reference for success *(XOR with successIntegrationName)* |
+| `spec.successIntegrationName` | `*string` | NotificationIntegration Snowflake name for success *(XOR with successIntegrationRef)* |
+| `spec.finalizeRef.name` | `*string` | Finalizer Task CR reference *(XOR with finalizeName)* |
+| `spec.finalizeName` | `*string` | Finalizer Task Snowflake name *(XOR with finalizeRef)* |
 | `spec.taskAutoRetryAttempts` | `*int32` | Automatic retry attempts (0–30) |
 
-> ⏰ **DAG Scheduling:** Use `after` to chain tasks into directed acyclic graphs. Root tasks require a `schedule`; child tasks inherit it from the root.
+> ⏰ **DAG Scheduling:** Use `after` to chain tasks into directed acyclic graphs. Each predecessor entry accepts either a `ref.name` (CR reference) or a `name` (Snowflake name) — exactly one must be set. Root tasks require a `schedule`; child tasks inherit it from the root.
 
 > ⚠️ **Security:** The `sqlStatement`, `when`, and `config` fields are embedded into SQL statements. Ensure RBAC restricts Task CR access to trusted principals.
 
@@ -344,7 +371,8 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.condition` | `string` | SQL condition query (evaluated inside `IF(EXISTS(...))`) |
 | `spec.action` | `string` | SQL statement executed when condition is true |
 | `spec.schedule` | `*string` | Cron or interval schedule (e.g. `10 MINUTE`) — omit for streaming alerts |
-| `spec.warehouse` | `*string` | Warehouse for alert execution — omit for serverless |
+| `spec.warehouseRef.name` | `*string` | Warehouse CR reference *(XOR with warehouseName)* — omit for serverless |
+| `spec.warehouseName` | `*string` | Warehouse Snowflake name *(XOR with warehouseRef)* — omit for serverless |
 | `spec.suspend` | `*bool` | Whether the alert is suspended (default: `true`) |
 | `spec.comment` | `*string` | Optional description |
 
@@ -362,7 +390,8 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.name` | `string` | Stream name *(immutable)* |
 | `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
-| `spec.table` | `string` | Fully qualified source table name *(immutable)* |
+| `spec.tableRef.name` | `string` | Source Table CR reference *(XOR with tableName, immutable)* |
+| `spec.tableName` | `string` | Source table Snowflake name *(XOR with tableRef, immutable)* |
 | `spec.appendOnly` | `*bool` | Track row inserts only |
 | `spec.showInitialRows` | `*bool` | Include existing rows on first consume |
 | `spec.comment` | `*string` | Optional description |
@@ -379,7 +408,8 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.name` | `string` | Stream name *(immutable)* |
 | `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
-| `spec.view` | `string` | Fully qualified source view name *(immutable)* |
+| `spec.viewRef.name` | `string` | Source View CR reference *(XOR with viewName, immutable)* |
+| `spec.viewName` | `string` | Source view Snowflake name *(XOR with viewRef, immutable)* |
 | `spec.appendOnly` | `*bool` | Track row inserts only |
 | `spec.showInitialRows` | `*bool` | Include existing rows on first consume |
 | `spec.comment` | `*string` | Optional description |
@@ -396,7 +426,8 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.name` | `string` | Stream name *(immutable)* |
 | `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
-| `spec.externalTable` | `string` | Fully qualified source external table name *(immutable)* |
+| `spec.externalTableRef.name` | `string` | Source ExternalTable CR reference *(XOR with externalTableName, immutable)* |
+| `spec.externalTableName` | `string` | Source external table Snowflake name *(XOR with externalTableRef, immutable)* |
 | `spec.insertOnly` | `*bool` | Track inserts only (the only mode for external tables) |
 | `spec.comment` | `*string` | Optional description |
 
@@ -412,7 +443,8 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.name` | `string` | Stream name *(immutable)* |
 | `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
-| `spec.stage` | `string` | Fully qualified source stage name *(immutable)* |
+| `spec.stageRef.name` | `string` | Source Stage CR reference *(XOR with stageName, immutable)* |
+| `spec.stageName` | `string` | Source stage Snowflake name *(XOR with stageRef, immutable)* |
 | `spec.comment` | `*string` | Optional description |
 
 > 🔄 **Change Data Capture:** Tracks file changes on a stage's directory table.
@@ -427,7 +459,8 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.name` | `string` | Stream name *(immutable)* |
 | `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
-| `spec.dynamicTable` | `string` | Fully qualified source dynamic table name *(immutable)* |
+| `spec.dynamicTableRef.name` | `string` | Source DynamicTable CR reference *(XOR with dynamicTableName, immutable)* |
+| `spec.dynamicTableName` | `string` | Source dynamic table Snowflake name *(XOR with dynamicTableRef, immutable)* |
 | `spec.appendOnly` | `*bool` | Track row inserts only |
 | `spec.showInitialRows` | `*bool` | Include existing rows on first consume |
 | `spec.comment` | `*string` | Optional description |
@@ -543,9 +576,11 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
 | `spec.copyStatement` | `string` | COPY INTO statement defining pipe behavior *(immutable)* |
 | `spec.autoIngest` | `*bool` | Enable automatic data loading on new files *(immutable)* |
-| `spec.integration` | `*string` | Notification integration for auto-ingest *(required when autoIngest=true, immutable)* |
+| `spec.integrationRef.name` | `*string` | NotificationIntegration CR reference for auto-ingest *(XOR with integrationName, immutable)* |
+| `spec.integrationName` | `*string` | NotificationIntegration Snowflake name for auto-ingest *(XOR with integrationRef, immutable)* |
 | `spec.awsSnsTopic` | `*string` | Amazon SNS topic ARN for S3 auto-ingest *(immutable)* |
-| `spec.errorIntegration` | `*string` | Notification integration for error notifications |
+| `spec.errorIntegrationRef.name` | `*string` | NotificationIntegration CR reference for errors *(XOR with errorIntegrationName)* |
+| `spec.errorIntegrationName` | `*string` | NotificationIntegration Snowflake name for errors *(XOR with errorIntegrationRef)* |
 | `spec.comment` | `*string` | Optional description |
 | `status.notificationChannel` | `string` | Cloud notification channel (e.g. SQS ARN) — configure cloud event notifications |
 
@@ -563,7 +598,8 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
 | `spec.query` | `string` | SQL query defining the dynamic table content *(immutable)* |
 | `spec.targetLag` | `string` | Maximum acceptable staleness (e.g. `"1 minute"`, `"DOWNSTREAM"`) |
-| `spec.warehouse` | `string` | Warehouse used for refreshing |
+| `spec.warehouseRef.name` | `string` | Warehouse CR reference *(XOR with warehouseName)* |
+| `spec.warehouseName` | `string` | Warehouse Snowflake name *(XOR with warehouseRef)* |
 | `spec.refreshMode` | `*enum` | Refresh strategy: `AUTO` / `FULL` / `INCREMENTAL` *(immutable)* |
 | `spec.initialize` | `*enum` | Initial data population: `ON_CREATE` / `ON_SCHEDULE` *(immutable)* |
 | `spec.transient` | `bool` | Transient dynamic table — no Fail-safe *(immutable, default: false)* |

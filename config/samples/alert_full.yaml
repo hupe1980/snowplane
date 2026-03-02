@@ -11,7 +11,8 @@ spec:
     name: my-database
   schemaRef:
     name: my-schema
-  warehouse: ALERT_WH
+  warehouseRef:
+    name: my-warehouse
   schedule: "USING CRON 0 */6 * * * America/New_York"
   condition: >-
     SELECT COUNT(*)

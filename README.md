@@ -21,18 +21,18 @@
 | Category | Resources |
 |----------|-----------|
 | 🗄️ **Core Infrastructure** | Database, Schema, Warehouse |
-| 📊 **Data Objects** | Table, View, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe |
+| 📊 **Data Objects** | Table, View, MaterializedView, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, ExternalTable, FileFormat, Pipe, Sequence |
 | 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
 | ⏰ **Orchestration** | Task (DAG scheduling, serverless or warehouse-backed), Alert (condition-based monitoring & notification) |
 | 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
-| 🛡️ **Security & Governance** | NetworkPolicy, NetworkRule, PasswordPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
+| 🛡️ **Security & Governance** | NetworkPolicy, NetworkPolicyAttachment, NetworkRule, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
 | 📤 **Utilities** | FieldExport (copy status fields into ConfigMaps/Secrets) |
 
 Every resource supports full lifecycle management (create, alter, drop), drift detection, adoption of pre-existing objects, and deletion policies. See the [API Reference](#-api-reference) below for detailed field documentation.
 
 ### 🔧 Operator Capabilities
 
-- 🔗 **Cross-Resource References** — Schemas → Databases; Tables, Views, Stages, FileFormats, Pipes, DynamicTables, MaskingPolicies, PasswordPolicies, NetworkRules → Databases + Schemas with automatic dependency resolution and backoff
+- 🔗 **Cross-Resource References** — Ref/Name XOR pattern: every cross-resource field supports either a Kubernetes object reference (`fooRef`) or a plain Snowflake identifier (`fooName`), mutually exclusive via CEL. Covers database, schema, warehouse, policy, tag, and integration references with automatic dependency resolution and backoff
 - 🔄 **Observe-Diff-Apply Reconciliation** — Only altered fields are pushed to Snowflake, minimizing API calls
 - 🔍 **Drift Detection & Correction** — Field-level drift detection with structured reporting, detect-only policy option
 - 🏷️ **Resource Adoption** — Adopt pre-existing Snowflake resources via `spec.managementPolicies.adoptionPolicy: adopt`
@@ -50,7 +50,7 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 - 🔑 **Username/Password** — Password auth via Kubernetes Secrets
 - 🌐 **Workload Identity Federation** — EKS IRSA, GKE WI, AKS WI via projected ServiceAccount tokens
 - 🔒 **Sensitive Field Redaction** — Passwords, PEM keys, tokens `[REDACTED]` in all logs and events
-- 🛡️ **CEL Validation Rules** — Immutable field enforcement, enum/range validation, dangerous-grant blocking at the CRD level
+- 🛡️ **CEL Validation Rules** — Immutable field enforcement, ref/name XOR mutual exclusion, enum/range validation, dangerous-grant blocking at the CRD level
 - 🔧 **CRD Schema Defaults** — Auto-defaults for `deletionPolicy`, `providerRef`, User `type` via CRD schema
 
 ### 📈 Observability & Operations
@@ -78,8 +78,8 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 │  │          Snowplane Controller Manager         ││
 │  │                                               ││
 │  │  ┌──────────────────────────────────────────┐ ││
-│  │  │  🔗 Reference Resolver                   │ ││
-│  │  │  Resolves databaseRef/schemaRef → FQN    │  ││
+│  │  │  🔗 Reference Resolver (generic)          │ ││
+│  │  │  Resolves fooRef/fooName → FQN (XOR)     │  ││
 │  │  │  Waits for dependency readiness          │  ││
 │  │  └──────────────────────────────────────────┘  ││
 │  │                                                ││
@@ -322,11 +322,11 @@ Complete field-level documentation for all Snowplane CRDs is available in the **
 |----------|-----------|
 | 🔌 **Provider** | ProviderConfig |
 | 🗄️ **Core Infrastructure** | Database, Schema, Warehouse |
-| 📊 **Data Objects** | Table, View, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe |
+| 📊 **Data Objects** | Table, View, MaterializedView, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe, Sequence, ExternalTable |
 | 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
 | ⏰ **Orchestration** | Task, Alert |
 | 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
-| 🛡️ **Security & Governance** | NetworkPolicy, NetworkRule, PasswordPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
+| 🛡️ **Security & Governance** | NetworkPolicy, NetworkPolicyAttachment, NetworkRule, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
 | 📤 **Utilities** | FieldExport |
 
 ## 🔍 Drift Detection
@@ -403,6 +403,7 @@ kubectl apply -f manifests.yaml
 | `snowflake_grant_privileges_to_share` | ShareGrant |
 | `snowflake_table` | Table |
 | `snowflake_view` | View |
+| `snowflake_materialized_view` | MaterializedView |
 | `snowflake_stage` | Stage |
 
 Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped and must be configured manually.
@@ -424,12 +425,14 @@ Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped a
 ├── charts/snowplane/       # Helm chart
 ├── docs/                   # Documentation
 ├── hack/                   # Dev & codegen scripts
+├── kro/                    # KRO ResourceGraphDefinitions (composite resources)
 ├── internal/
 │   ├── circuitbreaker/     # Per-provider 3-state failure isolation
 │   ├── clients/
 │   │   ├── clientfactory/  # Client cache with hash-based rotation
 │   │   └── snowflake/      # Snowflake SDK wrapper & SQL builder
 │   ├── controller/         # All reconcilers (managed resources + FieldExport + ProviderConfig)
+│   │   └── refresolver/    # Generic ref/name resolver (ResolveSourceRef[T])
 │   ├── drift/              # Field-level drift detection engine
 │   ├── metrics/            # Custom Prometheus metrics
 │   ├── provider/           # Provider config builder & client resolution
@@ -462,6 +465,10 @@ Generated manifests use `deletionPolicy: Orphan`. Sensitive fields are skipped a
 | 🚀 [GitOps with Argo CD](docs/gitops-argocd.md) | Health checks, sync waves, ArgoCD setup |
 | 🚀 [GitOps with Flux](docs/gitops-flux.md) | Kustomization dependencies, health checks, Flux setup |
 | 🧩 [Adding a Resource](docs/adding-a-resource.md) | Guide for adding new Snowflake resource types |
+| 🏷️ [Annotations](docs/annotations.md) | Annotations reference |
+| 💡 [Concepts](docs/concepts.md) | Core concepts overview |
+| 📝 [Contributing](docs/contributing.md) | Contributing guide |
+| 🧩 [KRO Integration](docs/kro.md) | Kube Resource Orchestrator composite resources |
 
 ## 🤝 Contributing
 

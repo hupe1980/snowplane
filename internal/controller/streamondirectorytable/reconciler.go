@@ -105,7 +105,7 @@ func buildCreateOptions(obj *snowplanev1alpha1.StreamOnDirectoryTable, id snowfl
 	return snowflake.CreateStreamOptions{
 		Name:       id,
 		SourceType: snowflake.StreamSourceStage,
-		SourceName: obj.Spec.Stage,
+		SourceName: obj.Status.StageName,
 		Comment:    obj.Spec.Comment,
 	}
 }
@@ -130,7 +130,7 @@ func detectDrift(obj *snowplanev1alpha1.StreamOnDirectoryTable, obs *snowflake.S
 		d.CompareStringValueFold("NAME", obj.Spec.Name, obs.ShowOutput.Name, true)
 		d.CompareStringValueFold("DATABASE", snowflake.ParseDatabaseNameFromFQN(obj.Status.DatabaseName), obs.ShowOutput.DatabaseName, true)
 		d.CompareStringValueFold("SCHEMA", snowflake.ParseSchemaNameFromFQN(obj.Status.SchemaName), obs.ShowOutput.SchemaName, true)
-		d.CompareStringValueFold("SOURCE", obj.Spec.Stage, obs.ShowOutput.TableName, true)
+		d.CompareStringValueFold("SOURCE", obj.Status.StageName, obs.ShowOutput.TableName, true)
 		d.CompareStringValueFold("MODE", "DEFAULT", obs.ShowOutput.Mode, true)
 		d.CompareString("COMMENT", obj.Spec.Comment, obs.ShowOutput.Comment, false)
 	}

@@ -562,6 +562,6 @@ See [Annotations Reference]({% link annotations.md %}) for the full list of anno
 
 ## What's Next
 
-Snowplane manages many Snowflake resource types including Task, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, Tag, NetworkPolicy, NetworkRule, PasswordPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, StorageIntegration, SecurityIntegration, NotificationIntegration, FileFormat, Pipe, DynamicTable, AccountRoleAssignment, and DatabaseRoleAssignment.
+Snowplane manages many Snowflake resource types including Task, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, Tag, NetworkPolicy, NetworkRule, PasswordPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, StorageIntegration, SecurityIntegration, NotificationIntegration, FileFormat, Pipe, DynamicTable, MaterializedView, Sequence, ExternalTable, AccountRoleAssignment, and DatabaseRoleAssignment.
 
 See `config/samples/` for example CRs of every resource type.

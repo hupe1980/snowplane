@@ -102,14 +102,20 @@ func applyObservation(alert *snowplanev1alpha1.Alert, obs *snowflake.AlertObserv
 }
 
 func buildCreateOptions(alert *snowplanev1alpha1.Alert, id snowflake.SchemaObjectIdentifier) snowflake.CreateAlertOptions {
-	return snowflake.CreateAlertOptions{
+	opts := snowflake.CreateAlertOptions{
 		Name:      id,
-		Warehouse: alert.Spec.Warehouse,
 		Schedule:  alert.Spec.Schedule,
 		Comment:   alert.Spec.Comment,
 		Condition: alert.Spec.Condition,
 		Action:    alert.Spec.Action,
 	}
+
+	if alert.Status.WarehouseName != "" {
+		wh := alert.Status.WarehouseName
+		opts.Warehouse = &wh
+	}
+
+	return opts
 }
 
 func buildAlterOptions(alert *snowplanev1alpha1.Alert, id snowflake.SchemaObjectIdentifier, obs *snowflake.AlertObservation) snowflake.AlterAlertOptions {
@@ -133,8 +139,9 @@ func buildAlterOptions(alert *snowplanev1alpha1.Alert, id snowflake.SchemaObject
 		}
 
 		// Warehouse changes.
-		if alert.Spec.Warehouse != nil && *alert.Spec.Warehouse != obs.ShowOutput.Warehouse {
-			opts.Warehouse = alert.Spec.Warehouse
+		if alert.Status.WarehouseName != "" && alert.Status.WarehouseName != obs.ShowOutput.Warehouse {
+			wh := alert.Status.WarehouseName
+			opts.Warehouse = &wh
 		}
 
 		// Condition changes.
@@ -173,7 +180,14 @@ func detectDrift(alert *snowplanev1alpha1.Alert, obs *snowflake.AlertObservation
 		// Mutable fields from SHOW output.
 		d.CompareString("COMMENT", alert.Spec.Comment, obs.ShowOutput.Comment, false)
 		d.CompareString("SCHEDULE", alert.Spec.Schedule, obs.ShowOutput.Schedule, false)
-		d.CompareString("WAREHOUSE", alert.Spec.Warehouse, obs.ShowOutput.Warehouse, false)
+
+		var warehousePtr *string
+		if alert.Status.WarehouseName != "" {
+			wh := alert.Status.WarehouseName
+			warehousePtr = &wh
+		}
+
+		d.CompareString("WAREHOUSE", warehousePtr, obs.ShowOutput.Warehouse, false)
 		d.CompareStringValue("CONDITION", alert.Spec.Condition, obs.ShowOutput.Condition, false)
 		d.CompareStringValue("ACTION", alert.Spec.Action, obs.ShowOutput.Action, false)
 	}

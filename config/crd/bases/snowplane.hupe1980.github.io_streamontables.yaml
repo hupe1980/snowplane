@@ -180,12 +180,24 @@ spec:
                 description: ShowInitialRows when true returns existing rows as inserts
                   on first consume.
                 type: boolean
-              table:
+              tableName:
                 description: |-
-                  Table is the fully qualified name of the source table
-                  (e.g. "MY_DB"."MY_SCHEMA"."MY_TABLE"). Immutable after creation.
+                  TableName is the Snowflake table identifier (e.g. "MY_TABLE").
+                  Mutually exclusive with TableRef. Immutable after creation.
                 minLength: 1
                 type: string
+              tableRef:
+                description: |-
+                  TableRef references a Table CR in the same namespace.
+                  Mutually exclusive with TableName. Immutable after creation.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
               useRole:
                 description: |-
                   UseRole specifies the Snowflake role to activate via USE ROLE before
@@ -198,7 +210,6 @@ spec:
             required:
             - name
             - providerRef
-            - table
             type: object
             x-kubernetes-validations:
             - message: spec.name is immutable (delete and recreate the resource to
@@ -220,9 +231,14 @@ spec:
                 to change)
               rule: has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName)
                 || self.schemaName == oldSelf.schemaName)
-            - message: spec.table is immutable (delete and recreate the resource to
-                change)
-              rule: self.table == oldSelf.table
+            - message: spec.tableRef is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.tableRef) == has(self.tableRef) && (!has(self.tableRef)
+                || self.tableRef == oldSelf.tableRef)
+            - message: spec.tableName is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.tableName) == has(self.tableName) && (!has(self.tableName)
+                || self.tableName == oldSelf.tableName)
             - message: spec.useRole is immutable (delete and recreate the resource
                 to change)
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
@@ -234,12 +250,18 @@ spec:
             - message: exactly one of spec.schemaRef or spec.schemaName must be set
               rule: (has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef)
                 && has(self.schemaName))
+            - message: exactly one of spec.tableRef or spec.tableName must be set
+              rule: (has(self.tableRef) && !has(self.tableName)) || (!has(self.tableRef)
+                && has(self.tableName))
             - message: spec.databaseName must be a simple identifier, not a fully-qualified
                 name
               rule: '!has(self.databaseName) || !self.databaseName.contains(''.'')'
             - message: spec.schemaName must be a simple identifier, not a fully-qualified
                 name; use spec.databaseName for the database part
               rule: '!has(self.schemaName) || !self.schemaName.contains(''.'')'
+            - message: spec.tableName must be a simple identifier, not a fully-qualified
+                name
+              rule: '!has(self.tableName) || !self.tableName.contains(''.'')'
           status:
             description: StreamOnTableStatus defines the observed state of a StreamOnTable.
             properties:
@@ -369,6 +391,9 @@ spec:
                     description: TableName is the fully qualified source object name.
                     type: string
                 type: object
+              tableName:
+                description: TableName is the resolved Snowflake table name.
+                type: string
               trackedParameters:
                 description: TrackedParameters tracks which optional spec fields have
                   been actively SET.

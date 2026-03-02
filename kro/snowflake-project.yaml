@@ -17,6 +17,8 @@
 #     environment: prod
 #     warehouseSize: MEDIUM
 #     retentionDays: 7
+#     providerRef:
+#       name: default
 #
 apiVersion: kro.run/v1alpha1
 kind: ResourceGraphDefinition
@@ -35,8 +37,8 @@ spec:
       warehouseSize: string | default="XSMALL"
       # Time Travel retention period in days (0–90).
       retentionDays: integer | default=1
-      # ProviderConfig to use for Snowflake connectivity.
-      providerRef: string | default="default"
+      # ProviderConfig to use for Snowflake connectivity ({name: <cr-name>}).
+      providerRef: object
     status:
       databaseReady: ${database.status.conditions[?(@.type=="Ready")].status}
       warehouseReady: ${warehouse.status.conditions[?(@.type=="Ready")].status}
@@ -51,8 +53,7 @@ spec:
         metadata:
           name: ${schema.spec.name}-${schema.spec.environment}-db
         spec:
-          providerRef:
-            name: ${schema.spec.providerRef}
+          providerRef: ${schema.spec.providerRef}
           name: ${schema.spec.name}_${schema.spec.environment}
           dataRetentionTimeInDays: ${schema.spec.retentionDays}
           comment: "Managed by kro – project ${schema.spec.name}"
@@ -65,8 +66,7 @@ spec:
         metadata:
           name: ${schema.spec.name}-${schema.spec.environment}-schema
         spec:
-          providerRef:
-            name: ${schema.spec.providerRef}
+          providerRef: ${schema.spec.providerRef}
           name: PUBLIC
           databaseRef:
             name: ${database.metadata.name}
@@ -80,8 +80,7 @@ spec:
         metadata:
           name: ${schema.spec.name}-${schema.spec.environment}-wh
         spec:
-          providerRef:
-            name: ${schema.spec.providerRef}
+          providerRef: ${schema.spec.providerRef}
           name: ${schema.spec.name}_${schema.spec.environment}_WH
           warehouseSize: ${schema.spec.warehouseSize}
           autoSuspend: 60
@@ -96,8 +95,7 @@ spec:
         metadata:
           name: ${schema.spec.name}-${schema.spec.environment}-role
         spec:
-          providerRef:
-            name: ${schema.spec.providerRef}
+          providerRef: ${schema.spec.providerRef}
           name: ${schema.spec.name}_${schema.spec.environment}_ROLE
           comment: "Managed by kro – project ${schema.spec.name}"
 
@@ -109,8 +107,7 @@ spec:
         metadata:
           name: ${schema.spec.name}-${schema.spec.environment}-db-usage
         spec:
-          providerRef:
-            name: ${schema.spec.providerRef}
+          providerRef: ${schema.spec.providerRef}
           privilege: USAGE
           accountRoleRef:
             name: ${role.metadata.name}

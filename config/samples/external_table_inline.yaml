@@ -1,0 +1,23 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ExternalTable
+metadata:
+  name: my-external-table-inline
+spec:
+  name: EVENTS_EXT
+  providerRef:
+    name: default
+  databaseName: MY_DATABASE
+  schemaName: MY_SCHEMA
+  location: "@MY_DATABASE.MY_SCHEMA.EVENTS_STAGE/events/"
+  fileFormat: "TYPE = JSON"
+  partitionBy:
+    - date_part
+  columns:
+    - name: date_part
+      type: DATE
+      as: "TO_DATE(SPLIT_PART(METADATA$FILENAME, '/', 1))"
+    - name: event_data
+      type: VARIANT
+      as: "value"
+  autoRefresh: false
+  pattern: ".*[.]json[.]gz"

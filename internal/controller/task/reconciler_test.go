@@ -212,14 +212,17 @@ func TestReconcile_CreateWithAllFields(t *testing.T) {
 	task.Status.DatabaseName = "MY_DB"
 	task.Status.SchemaName = "MY_SCHEMA"
 	task.Spec.Schedule = testutil.PtrString("10 MINUTE")
-	task.Spec.Warehouse = testutil.PtrString("COMPUTE_WH")
+	task.Spec.WarehouseName = testutil.PtrString("COMPUTE_WH")
+	task.Status.WarehouseName = "COMPUTE_WH"
 	task.Spec.Comment = testutil.PtrString("test task")
 	task.Spec.When = testutil.PtrString("SYSTEM$STREAM_HAS_DATA('MYSTREAM')")
 	task.Spec.AllowOverlappingExecution = testutil.PtrBool(true)
 	task.Spec.UserTaskTimeoutMs = testutil.PtrInt32(60000)
 	task.Spec.SuspendTaskAfterNumFailures = testutil.PtrInt32(3)
-	task.Spec.ErrorIntegration = testutil.PtrString("MY_ERROR_INT")
-	task.Spec.SuccessIntegration = testutil.PtrString("MY_SUCCESS_INT")
+	task.Spec.ErrorIntegrationName = testutil.PtrString("MY_ERROR_INT")
+	task.Status.ErrorIntegrationName = "MY_ERROR_INT"
+	task.Spec.SuccessIntegrationName = testutil.PtrString("MY_SUCCESS_INT")
+	task.Status.SuccessIntegrationName = "MY_SUCCESS_INT"
 	task.Spec.TaskAutoRetryAttempts = testutil.PtrInt32(2)
 
 	var capturedOpts snowflake.CreateTaskOptions
@@ -519,14 +522,17 @@ func TestBuildCreateOptions(t *testing.T) {
 
 	task := newTestTask("mytask", "default")
 	task.Spec.Schedule = testutil.PtrString("5 MINUTE")
-	task.Spec.Warehouse = testutil.PtrString("WH")
+	task.Spec.WarehouseName = testutil.PtrString("WH")
+	task.Status.WarehouseName = "WH"
 	task.Spec.Comment = testutil.PtrString("c")
 	task.Spec.When = testutil.PtrString("SYSTEM$STREAM_HAS_DATA('S')")
 	task.Spec.AllowOverlappingExecution = testutil.PtrBool(false)
 	task.Spec.UserTaskTimeoutMs = testutil.PtrInt32(1000)
 	task.Spec.SuspendTaskAfterNumFailures = testutil.PtrInt32(5)
-	task.Spec.ErrorIntegration = testutil.PtrString("EI")
-	task.Spec.SuccessIntegration = testutil.PtrString("SI")
+	task.Spec.ErrorIntegrationName = testutil.PtrString("EI")
+	task.Status.ErrorIntegrationName = "EI"
+	task.Spec.SuccessIntegrationName = testutil.PtrString("SI")
+	task.Status.SuccessIntegrationName = "SI"
 	task.Spec.TaskAutoRetryAttempts = testutil.PtrInt32(1)
 
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_TASK")
@@ -643,8 +649,8 @@ func TestComputeTrackedParameters(t *testing.T) {
 		Schedule:                    testutil.PtrString("s"),
 		UserTaskTimeoutMs:           testutil.PtrInt32(1),
 		SuspendTaskAfterNumFailures: testutil.PtrInt32(1),
-		ErrorIntegration:            testutil.PtrString("e"),
-		SuccessIntegration:          testutil.PtrString("s"),
+		ErrorIntegrationName:        testutil.PtrString("e"),
+		SuccessIntegrationName:      testutil.PtrString("s"),
 		AllowOverlappingExecution:   testutil.PtrBool(true),
 		TaskAutoRetryAttempts:       testutil.PtrInt32(1),
 	}
@@ -692,15 +698,16 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 
 	task := &snowplanev1alpha1.Task{
 		Spec: snowplanev1alpha1.TaskSpec{
-			Name:         "MY_TASK",
-			SQLStatement: "SELECT 1",
-			Comment:      testutil.PtrString("test"),
-			Schedule:     testutil.PtrString("5 MINUTE"),
-			Warehouse:    testutil.PtrString("WH"),
+			Name:          "MY_TASK",
+			SQLStatement:  "SELECT 1",
+			Comment:       testutil.PtrString("test"),
+			Schedule:      testutil.PtrString("5 MINUTE"),
+			WarehouseName: testutil.PtrString("WH"),
 		},
 		Status: snowplanev1alpha1.TaskStatus{
-			DatabaseName: "MY_DB",
-			SchemaName:   "MY_SCHEMA",
+			DatabaseName:  "MY_DB",
+			SchemaName:    "MY_SCHEMA",
+			WarehouseName: "WH",
 		},
 	}
 

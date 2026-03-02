@@ -53,7 +53,24 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.Strea
 
 	obj.Status.SchemaName = schemaFQN
 
-	refresolver.SetDatabaseAndSchemaResolvedCondition(obj, obj.Spec.DatabaseRef, obj.Spec.DatabaseName, obj.Spec.SchemaRef, obj.Spec.SchemaName)
+	dynTableName, err := refresolver.PreReconcileSourceRef(ctx, a.client, a.recorder, obj,
+		obj.Namespace, obj.Spec.DynamicTableRef, obj.Spec.DynamicTableName, obj.Status.DynamicTableName,
+		"DynamicTable",
+		func() *snowplanev1alpha1.DynamicTable { return &snowplanev1alpha1.DynamicTable{} },
+		snowplanev1alpha1.GroupVersion.WithKind("DynamicTable"),
+		func(dt *snowplanev1alpha1.DynamicTable) string { return dt.Spec.Name },
+	)
+	if err != nil {
+		return err
+	}
+
+	obj.Status.DynamicTableName = dynTableName
+
+	refresolver.SetAllReferencesResolvedCondition(obj,
+		refresolver.RefDescriptor{KindLabel: "Database", Ref: obj.Spec.DatabaseRef, RawName: obj.Spec.DatabaseName},
+		refresolver.RefDescriptor{KindLabel: "Schema", Ref: obj.Spec.SchemaRef, RawName: obj.Spec.SchemaName},
+		refresolver.RefDescriptor{KindLabel: "DynamicTable", Ref: obj.Spec.DynamicTableRef, RawName: obj.Spec.DynamicTableName},
+	)
 
 	return nil
 }
@@ -107,6 +124,27 @@ func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
 		bldr.Watches(
 			&snowplanev1alpha1.Schema{},
 			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.StreamOnDynamicTableList{} }, ".spec.schemaRef.name", "listing stream-on-dynamic-table for schema watch")),
+		)
+
+		if err := mgr.GetFieldIndexer().IndexField(
+			ctx,
+			&snowplanev1alpha1.StreamOnDynamicTable{},
+			".spec.dynamicTableRef.name",
+			func(o sigs.Object) []string {
+				s, ok := o.(*snowplanev1alpha1.StreamOnDynamicTable)
+				if !ok || s.Spec.DynamicTableRef == nil {
+					return nil
+				}
+
+				return []string{s.Spec.DynamicTableRef.Name}
+			},
+		); err != nil {
+			return fmt.Errorf("creating field indexer for .spec.dynamicTableRef.name: %w", err)
+		}
+
+		bldr.Watches(
+			&snowplanev1alpha1.DynamicTable{},
+			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.StreamOnDynamicTableList{} }, ".spec.dynamicTableRef.name", "listing stream-on-dynamic-table for dynamic-table watch")),
 		)
 
 		return nil

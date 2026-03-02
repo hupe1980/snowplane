@@ -10,6 +10,7 @@ spec:
     name: my-database
   schemaRef:
     name: my-schema
-  dynamicTable: MY_DYNAMIC_TABLE
+  dynamicTableRef:
+    name: my-dynamic-table
   appendOnly: true
   comment: "Stream on dynamic table managed by Snowplane"

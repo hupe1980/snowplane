@@ -112,15 +112,43 @@ spec:
                 - Delete
                 - Orphan
                 type: string
-              errorIntegration:
-                description: ErrorIntegration specifies a notification integration
-                  for pipe error notifications.
-                type: string
-              integration:
+              errorIntegrationName:
                 description: |-
-                  Integration is the notification integration name for auto-ingest.
-                  Required when autoIngest is true. Immutable after creation.
+                  ErrorIntegrationName is the Snowflake notification integration name for error notifications.
+                  Mutually exclusive with ErrorIntegrationRef.
                 type: string
+              errorIntegrationRef:
+                description: |-
+                  ErrorIntegrationRef references a NotificationIntegration CR for error notifications.
+                  Mutually exclusive with ErrorIntegrationName.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              integrationName:
+                description: |-
+                  IntegrationName is the Snowflake notification integration identifier.
+                  Mutually exclusive with IntegrationRef. Immutable after creation.
+                  Required when autoIngest is true.
+                minLength: 1
+                type: string
+              integrationRef:
+                description: |-
+                  IntegrationRef references a NotificationIntegration CR in the same namespace.
+                  Mutually exclusive with IntegrationName. Immutable after creation.
+                  Required when autoIngest is true.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
               managementPolicies:
                 description: ManagementPolicies specifies lifecycle policies for this
                   resource.
@@ -243,10 +271,26 @@ spec:
                 to change)
               rule: has(oldSelf.autoIngest) == has(self.autoIngest) && (!has(self.autoIngest)
                 || self.autoIngest == oldSelf.autoIngest)
-            - message: spec.integration is immutable (delete and recreate the resource
+            - message: spec.integrationRef is immutable (delete and recreate the resource
                 to change)
-              rule: has(oldSelf.integration) == has(self.integration) && (!has(self.integration)
-                || self.integration == oldSelf.integration)
+              rule: has(oldSelf.integrationRef) == has(self.integrationRef) && (!has(self.integrationRef)
+                || self.integrationRef == oldSelf.integrationRef)
+            - message: spec.integrationName is immutable (delete and recreate the
+                resource to change)
+              rule: has(oldSelf.integrationName) == has(self.integrationName) && (!has(self.integrationName)
+                || self.integrationName == oldSelf.integrationName)
+            - message: at most one of spec.integrationRef or spec.integrationName
+                may be set
+              rule: '!(has(self.integrationRef) && has(self.integrationName))'
+            - message: spec.integrationName must be a simple identifier, not a fully-qualified
+                name
+              rule: '!has(self.integrationName) || !self.integrationName.contains(''.'')'
+            - message: at most one of spec.errorIntegrationRef or spec.errorIntegrationName
+                may be set
+              rule: '!(has(self.errorIntegrationRef) && has(self.errorIntegrationName))'
+            - message: spec.errorIntegrationName must be a simple identifier, not
+                a fully-qualified name
+              rule: '!has(self.errorIntegrationName) || !self.errorIntegrationName.contains(''.'')'
             - message: spec.awsSnsTopic is immutable (delete and recreate the resource
                 to change)
               rule: has(oldSelf.awsSnsTopic) == has(self.awsSnsTopic) && (!has(self.awsSnsTopic)
@@ -331,9 +375,17 @@ spec:
               databaseName:
                 description: DatabaseName is the parent Snowflake database name.
                 type: string
+              errorIntegrationName:
+                description: ErrorIntegrationName is the resolved error notification
+                  integration name.
+                type: string
               fullyQualifiedName:
                 description: FullyQualifiedName is the Snowflake fully qualified identifier
                   for this resource.
+                type: string
+              integrationName:
+                description: IntegrationName is the resolved notification integration
+                  name.
                 type: string
               lastAppliedSpecHash:
                 description: |-

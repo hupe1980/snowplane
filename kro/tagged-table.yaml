@@ -15,8 +15,10 @@
 #     name: orders
 #   spec:
 #     name: ORDERS
-#     databaseRef: my-db
-#     schemaRef: my-schema
+#     databaseRef:
+#       name: my-db
+#     schemaRef:
+#       name: my-schema
 #     columns:
 #       - name: ID
 #         type: NUMBER(38,0)
@@ -24,9 +26,11 @@
 #       - name: CUSTOMER_ID
 #         type: VARCHAR(255)
 #     tags:
-#       - tagRef: cost-center
+#       - tagRef:
+#           name: cost-center
 #         value: engineering
-#       - tagRef: environment
+#       - tagRef:
+#           name: environment
 #         value: production
 #
 apiVersion: kro.run/v1alpha1
@@ -40,19 +44,19 @@ spec:
     spec:
       # Snowflake table name.
       name: string
-      # Reference to a Database CR in the same namespace.
-      databaseRef: string
-      # Reference to a Schema CR in the same namespace.
-      schemaRef: string
+      # Reference to a Database CR in the same namespace ({name: <cr-name>}).
+      databaseRef: object
+      # Reference to a Schema CR in the same namespace ({name: <cr-name>}).
+      schemaRef: object
       # Column definitions (name, type, nullable, default, comment).
       columns: "[]object"
       # Tags to associate with the table. Each entry creates a TagAssociation.
-      # Format: [{tagRef: "<tag-cr-name>", value: "<string>"}]
+      # Format: [{tagRef: {name: "<tag-cr-name>"}, value: "<string>"}]
       tags: "[]object"
       # Optional table comment.
       comment: string | default=""
-      # ProviderConfig to use for Snowflake connectivity.
-      providerRef: string | default="default"
+      # ProviderConfig to use for Snowflake connectivity ({name: <cr-name>}).
+      providerRef: object
     status:
       tableReady: ${table.status.conditions[?(@.type=="Ready")].status}
       fullyQualifiedName: ${table.status.fullyQualifiedName}
@@ -66,13 +70,10 @@ spec:
         metadata:
           name: ${schema.metadata.name}
         spec:
-          providerRef:
-            name: ${schema.spec.providerRef}
+          providerRef: ${schema.spec.providerRef}
           name: ${schema.spec.name}
-          databaseRef:
-            name: ${schema.spec.databaseRef}
-          schemaRef:
-            name: ${schema.spec.schemaRef}
+          databaseRef: ${schema.spec.databaseRef}
+          schemaRef: ${schema.spec.schemaRef}
           columns: ${schema.spec.columns}
           comment: ${schema.spec.comment}
 
@@ -90,12 +91,10 @@ spec:
         apiVersion: snowplane.hupe1980.github.io/v1alpha1
         kind: TagAssociation
         metadata:
-          name: ${schema.metadata.name + '-tag-' + tag.tagRef}
+          name: ${schema.metadata.name + '-tag-' + tag.tagRef.name}
         spec:
-          providerRef:
-            name: ${schema.spec.providerRef}
-          tagRef:
-            name: ${tag.tagRef}
+          providerRef: ${schema.spec.providerRef}
+          tagRef: ${tag.tagRef}
           tagValue: ${tag.value}
           objectType: TABLE
           objectName: ${table.status.fullyQualifiedName}

@@ -67,12 +67,18 @@ rules:
   - tasks
   - tags
   - tagassociations
+  - networkpolicyattachments
+  - passwordpolicyattachments
+  - maskingpolicyapplications
   - networkpolicies
   - resourcemonitors
   - maskingpolicies
   - rowaccesspolicies
   - dynamictables
   - fileformats
+  - sequences
+  - externaltables
+  - materializedviews
   - pipes
   - storageintegrations
   - securityintegrations
@@ -116,12 +122,18 @@ rules:
   - tasks/status
   - tags/status
   - tagassociations/status
+  - networkpolicyattachments/status
+  - passwordpolicyattachments/status
+  - maskingpolicyapplications/status
   - networkpolicies/status
   - resourcemonitors/status
   - maskingpolicies/status
   - rowaccesspolicies/status
   - dynamictables/status
   - fileformats/status
+  - sequences/status
+  - externaltables/status
+  - materializedviews/status
   - pipes/status
   - storageintegrations/status
   - securityintegrations/status
@@ -161,12 +173,18 @@ rules:
   - tasks/finalizers
   - tags/finalizers
   - tagassociations/finalizers
+  - networkpolicyattachments/finalizers
+  - passwordpolicyattachments/finalizers
+  - maskingpolicyapplications/finalizers
   - networkpolicies/finalizers
   - resourcemonitors/finalizers
   - maskingpolicies/finalizers
   - rowaccesspolicies/finalizers
   - dynamictables/finalizers
   - fileformats/finalizers
+  - sequences/finalizers
+  - externaltables/finalizers
+  - materializedviews/finalizers
   - pipes/finalizers
   - storageintegrations/finalizers
   - securityintegrations/finalizers

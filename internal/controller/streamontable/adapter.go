@@ -53,7 +53,24 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.Strea
 
 	obj.Status.SchemaName = schemaFQN
 
-	refresolver.SetDatabaseAndSchemaResolvedCondition(obj, obj.Spec.DatabaseRef, obj.Spec.DatabaseName, obj.Spec.SchemaRef, obj.Spec.SchemaName)
+	tableName, err := refresolver.PreReconcileSourceRef(ctx, a.client, a.recorder, obj,
+		obj.Namespace, obj.Spec.TableRef, obj.Spec.TableName, obj.Status.TableName,
+		"Table",
+		func() *snowplanev1alpha1.Table { return &snowplanev1alpha1.Table{} },
+		snowplanev1alpha1.GroupVersion.WithKind("Table"),
+		func(t *snowplanev1alpha1.Table) string { return t.Spec.Name },
+	)
+	if err != nil {
+		return err
+	}
+
+	obj.Status.TableName = tableName
+
+	refresolver.SetAllReferencesResolvedCondition(obj,
+		refresolver.RefDescriptor{KindLabel: "Database", Ref: obj.Spec.DatabaseRef, RawName: obj.Spec.DatabaseName},
+		refresolver.RefDescriptor{KindLabel: "Schema", Ref: obj.Spec.SchemaRef, RawName: obj.Spec.SchemaName},
+		refresolver.RefDescriptor{KindLabel: "Table", Ref: obj.Spec.TableRef, RawName: obj.Spec.TableName},
+	)
 
 	return nil
 }
@@ -107,6 +124,27 @@ func (a *adapter) SetupWatches() reconciler.SetupWatchesFunc {
 		bldr.Watches(
 			&snowplanev1alpha1.Schema{},
 			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.StreamOnTableList{} }, ".spec.schemaRef.name", "listing stream-on-table for schema watch")),
+		)
+
+		if err := mgr.GetFieldIndexer().IndexField(
+			ctx,
+			&snowplanev1alpha1.StreamOnTable{},
+			".spec.tableRef.name",
+			func(o sigs.Object) []string {
+				s, ok := o.(*snowplanev1alpha1.StreamOnTable)
+				if !ok || s.Spec.TableRef == nil {
+					return nil
+				}
+
+				return []string{s.Spec.TableRef.Name}
+			},
+		); err != nil {
+			return fmt.Errorf("creating field indexer for .spec.tableRef.name: %w", err)
+		}
+
+		bldr.Watches(
+			&snowplanev1alpha1.Table{},
+			handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(a.client, func() sigs.ObjectList { return &snowplanev1alpha1.StreamOnTableList{} }, ".spec.tableRef.name", "listing stream-on-table for table watch")),
 		)
 
 		return nil

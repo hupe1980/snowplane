@@ -1,0 +1,16 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Sequence
+metadata:
+  name: my-sequence
+spec:
+  name: MY_SEQUENCE
+  providerRef:
+    name: default
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  start: 1
+  increment: 1
+  ordering: ORDER
+  comment: "Sequence managed by Snowplane"

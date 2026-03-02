@@ -17,9 +17,14 @@
 #     name: orders-pipeline
 #   spec:
 #     name: ORDERS_PIPELINE
-#     databaseRef: analytics-db
-#     schemaRef: analytics-schema
-#     warehouseRef: analytics-wh
+#     providerRef:
+#       name: default
+#     databaseRef:
+#       name: analytics-db
+#     schemaRef:
+#       name: analytics-schema
+#     warehouseRef:
+#       name: analytics-wh
 #     columns:
 #       - name: ID
 #         type: NUMBER(38,0)
@@ -43,12 +48,12 @@ spec:
     spec:
       # Pipeline name — used to derive Snowflake object names.
       name: string
-      # Reference to a Database CR in the same namespace.
-      databaseRef: string
-      # Reference to a Schema CR in the same namespace.
-      schemaRef: string
+      # Reference to a Database CR in the same namespace ({name: <cr-name>}).
+      databaseRef: object
+      # Reference to a Schema CR in the same namespace ({name: <cr-name>}).
+      schemaRef: object
       # Reference to a Warehouse CR for the task. Required when enableStream=true.
-      warehouseRef: string | default=""
+      warehouseRef: object
       # Column definitions for the landing table.
       columns: "[]object"
       # Whether to create a change stream on the table.
@@ -58,8 +63,8 @@ spec:
       taskSchedule: string | default="5 MINUTES"
       # SQL statement for the task. Only used when enableStream=true.
       taskSQL: string | default="SELECT 1"
-      # ProviderConfig to use for Snowflake connectivity.
-      providerRef: string | default="default"
+      # ProviderConfig to use for Snowflake connectivity ({name: <cr-name>}).
+      providerRef: object
     status:
       tableReady: ${table.status.conditions[?(@.type=="Ready")].status}
       tableFQN: ${table.status.fullyQualifiedName}
@@ -73,13 +78,10 @@ spec:
         metadata:
           name: ${schema.metadata.name}-table
         spec:
-          providerRef:
-            name: ${schema.spec.providerRef}
+          providerRef: ${schema.spec.providerRef}
           name: ${schema.spec.name}
-          databaseRef:
-            name: ${schema.spec.databaseRef}
-          schemaRef:
-            name: ${schema.spec.schemaRef}
+          databaseRef: ${schema.spec.databaseRef}
+          schemaRef: ${schema.spec.schemaRef}
           columns: ${schema.spec.columns}
           comment: "Landing table for pipeline ${schema.spec.name}"
 
@@ -93,14 +95,12 @@ spec:
         metadata:
           name: ${schema.metadata.name}-stream
         spec:
-          providerRef:
-            name: ${schema.spec.providerRef}
+          providerRef: ${schema.spec.providerRef}
           name: ${schema.spec.name}_STREAM
-          databaseRef:
-            name: ${schema.spec.databaseRef}
-          schemaRef:
-            name: ${schema.spec.schemaRef}
-          table: ${table.status.fullyQualifiedName}
+          databaseRef: ${schema.spec.databaseRef}
+          schemaRef: ${schema.spec.schemaRef}
+          tableRef:
+            name: ${schema.metadata.name}-table
           appendOnly: false
 
     # ── 3. Scheduled Task (conditional — only when stream is enabled) ────
@@ -113,14 +113,11 @@ spec:
         metadata:
           name: ${schema.metadata.name}-task
         spec:
-          providerRef:
-            name: ${schema.spec.providerRef}
+          providerRef: ${schema.spec.providerRef}
           name: ${schema.spec.name}_TASK
-          databaseRef:
-            name: ${schema.spec.databaseRef}
-          schemaRef:
-            name: ${schema.spec.schemaRef}
-          warehouse: ${schema.spec.warehouseRef}
+          databaseRef: ${schema.spec.databaseRef}
+          schemaRef: ${schema.spec.schemaRef}
+          warehouseRef: ${schema.spec.warehouseRef}
           schedule: ${schema.spec.taskSchedule}
           sqlStatement: ${schema.spec.taskSQL}
           comment: "Pipeline task for ${schema.spec.name}"

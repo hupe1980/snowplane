@@ -11,12 +11,15 @@ import (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName) || self.databaseName == oldSelf.databaseName)",message="spec.databaseName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef) || self.schemaRef == oldSelf.schemaRef)",message="spec.schemaRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName) || self.schemaName == oldSelf.schemaName)",message="spec.schemaName is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="self.externalTable == oldSelf.externalTable",message="spec.externalTable is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.externalTableRef) == has(self.externalTableRef) && (!has(self.externalTableRef) || self.externalTableRef == oldSelf.externalTableRef)",message="spec.externalTableRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.externalTableName) == has(self.externalTableName) && (!has(self.externalTableName) || self.externalTableName == oldSelf.externalTableName)",message="spec.externalTableName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.externalTableRef) && !has(self.externalTableName)) || (!has(self.externalTableRef) && has(self.externalTableName))",message="exactly one of spec.externalTableRef or spec.externalTableName must be set"
 // +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
 // +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
+// +kubebuilder:validation:XValidation:rule="!has(self.externalTableName) || !self.externalTableName.contains('.')",message="spec.externalTableName must be a simple identifier, not a fully-qualified name"
 type StreamOnExternalTableSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -46,10 +49,16 @@ type StreamOnExternalTableSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	SchemaName *string `json:"schemaName,omitempty"`
 
-	// ExternalTable is the fully qualified name of the source external table
-	// (e.g. "MY_DB"."MY_SCHEMA"."MY_EXT_TABLE"). Immutable after creation.
+	// ExternalTableRef references an ExternalTable CR in the same namespace.
+	// Mutually exclusive with ExternalTableName. Immutable after creation.
+	// +optional
+	ExternalTableRef *LocalObjectReference `json:"externalTableRef,omitempty"`
+
+	// ExternalTableName is the Snowflake external table identifier (e.g. "MY_EXT_TABLE").
+	// Mutually exclusive with ExternalTableRef. Immutable after creation.
+	// +optional
 	// +kubebuilder:validation:MinLength=1
-	ExternalTable string `json:"externalTable"`
+	ExternalTableName *string `json:"externalTableName,omitempty"`
 
 	// InsertOnly when true creates an insert-only stream (the only mode for external tables).
 	// +optional
@@ -69,6 +78,9 @@ type StreamOnExternalTableStatus struct {
 
 	// SchemaName is the parent Snowflake schema name.
 	SchemaName string `json:"schemaName,omitempty"`
+
+	// ExternalTableName is the resolved Snowflake external table name.
+	ExternalTableName string `json:"externalTableName,omitempty"`
 
 	// ShowOutput contains the raw SHOW STREAMS output for this stream.
 	ShowOutput *StreamShowOutput `json:"showOutput,omitempty"`

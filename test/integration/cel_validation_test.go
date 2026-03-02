@@ -817,7 +817,7 @@ func TestCEL_Task_WarehouseMutualExclusion(t *testing.T) {
 			DatabaseName:                        strPtr("MY_DB"),
 			SchemaName:                          strPtr("MY_SCHEMA"),
 			SQLStatement:                        "SELECT 1",
-			Warehouse:                           &wh,
+			WarehouseName:                       &wh,
 			UserTaskManagedInitialWarehouseSize: &size,
 		},
 	}

@@ -191,6 +191,12 @@ func managedResourceTypes() []managedResourceEntry {
 		{proto: &snowplanev1alpha1.AccountRoleAssignment{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AccountRoleAssignmentList{} }},
 		{proto: &snowplanev1alpha1.DatabaseRoleAssignment{}, newList: func() client.ObjectList { return &snowplanev1alpha1.DatabaseRoleAssignmentList{} }},
 		{proto: &snowplanev1alpha1.TagAssociation{}, newList: func() client.ObjectList { return &snowplanev1alpha1.TagAssociationList{} }},
+		{proto: &snowplanev1alpha1.NetworkPolicyAttachment{}, newList: func() client.ObjectList { return &snowplanev1alpha1.NetworkPolicyAttachmentList{} }},
+		{proto: &snowplanev1alpha1.PasswordPolicyAttachment{}, newList: func() client.ObjectList { return &snowplanev1alpha1.PasswordPolicyAttachmentList{} }},
+		{proto: &snowplanev1alpha1.MaskingPolicyApplication{}, newList: func() client.ObjectList { return &snowplanev1alpha1.MaskingPolicyApplicationList{} }},
+		{proto: &snowplanev1alpha1.Sequence{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SequenceList{} }},
+		{proto: &snowplanev1alpha1.ExternalTable{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ExternalTableList{} }},
+		{proto: &snowplanev1alpha1.MaterializedView{}, newList: func() client.ObjectList { return &snowplanev1alpha1.MaterializedViewList{} }},
 	}
 }
 

@@ -212,8 +212,9 @@ func TestReconcile_CreateWithAllFields(t *testing.T) {
 	alert.Finalizers = []string{finalizerName}
 	alert.Status.DatabaseName = "MY_DB"
 	alert.Status.SchemaName = "MY_SCHEMA"
+	alert.Status.WarehouseName = "COMPUTE_WH"
 	alert.Spec.Schedule = testutil.PtrString("10 MINUTE")
-	alert.Spec.Warehouse = testutil.PtrString("COMPUTE_WH")
+	alert.Spec.WarehouseName = testutil.PtrString("COMPUTE_WH")
 	alert.Spec.Comment = testutil.PtrString("my alert comment")
 
 	var capturedOpts snowflake.CreateAlertOptions
@@ -538,7 +539,8 @@ func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
 	alert := newTestAlert("myalert", "default")
-	alert.Spec.Warehouse = testutil.PtrString("COMPUTE_WH")
+	alert.Spec.WarehouseName = testutil.PtrString("COMPUTE_WH")
+	alert.Status.WarehouseName = "COMPUTE_WH"
 	alert.Spec.Schedule = testutil.PtrString("USING CRON 0 9 * * * America/New_York")
 	alert.Spec.Comment = testutil.PtrString("my comment")
 
@@ -652,9 +654,9 @@ func TestComputeTrackedParameters(t *testing.T) {
 
 	t.Run("AllSet", func(t *testing.T) {
 		spec := &snowplanev1alpha1.AlertSpec{
-			Comment:   testutil.PtrString("c"),
-			Schedule:  testutil.PtrString("s"),
-			Warehouse: testutil.PtrString("w"),
+			Comment:       testutil.PtrString("c"),
+			Schedule:      testutil.PtrString("s"),
+			WarehouseName: testutil.PtrString("w"),
 		}
 		result := tracked.ComputeTracked(spec)
 		assert.Contains(t, result, "COMMENT")

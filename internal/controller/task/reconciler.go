@@ -118,29 +118,47 @@ func applyObservation(task *snowplanev1alpha1.Task, obs *snowflake.TaskObservati
 }
 
 func buildCreateOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectIdentifier) snowflake.CreateTaskOptions {
-	return snowflake.CreateTaskOptions{
+	opts := snowflake.CreateTaskOptions{
 		Name:                                    id,
-		Warehouse:                               task.Spec.Warehouse,
 		UserTaskManagedInitialWarehouseSize:     task.Spec.UserTaskManagedInitialWarehouseSize,
 		Schedule:                                task.Spec.Schedule,
 		SQLStatement:                            task.Spec.SQLStatement,
-		After:                                   task.Spec.After,
+		After:                                   task.Status.AfterNames,
 		When:                                    task.Spec.When,
 		Comment:                                 task.Spec.Comment,
 		AllowOverlappingExecution:               task.Spec.AllowOverlappingExecution,
 		UserTaskTimeoutMs:                       task.Spec.UserTaskTimeoutMs,
 		SuspendTaskAfterNumFailures:             task.Spec.SuspendTaskAfterNumFailures,
-		ErrorIntegration:                        task.Spec.ErrorIntegration,
-		SuccessIntegration:                      task.Spec.SuccessIntegration,
 		TaskAutoRetryAttempts:                   task.Spec.TaskAutoRetryAttempts,
 		Config:                                  task.Spec.Config,
-		Finalize:                                task.Spec.Finalize,
 		LogLevel:                                task.Spec.LogLevel,
 		UserTaskMinimumTriggerIntervalInSeconds: task.Spec.UserTaskMinimumTriggerIntervalInSeconds,
 		TargetCompletionInterval:                task.Spec.TargetCompletionInterval,
 		ServerlessTaskMinStatementSize:          task.Spec.ServerlessTaskMinStatementSize,
 		ServerlessTaskMaxStatementSize:          task.Spec.ServerlessTaskMaxStatementSize,
 	}
+
+	if task.Status.WarehouseName != "" {
+		wh := task.Status.WarehouseName
+		opts.Warehouse = &wh
+	}
+
+	if task.Status.ErrorIntegrationName != "" {
+		ei := task.Status.ErrorIntegrationName
+		opts.ErrorIntegration = &ei
+	}
+
+	if task.Status.SuccessIntegrationName != "" {
+		si := task.Status.SuccessIntegrationName
+		opts.SuccessIntegration = &si
+	}
+
+	if task.Status.FinalizeName != "" {
+		fn := task.Status.FinalizeName
+		opts.Finalize = &fn
+	}
+
+	return opts
 }
 
 func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectIdentifier, obs *snowflake.TaskObservation) snowflake.AlterTaskOptions {
@@ -160,8 +178,9 @@ func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectId
 		}
 
 		// Warehouse changes.
-		if task.Spec.Warehouse != nil && *task.Spec.Warehouse != obs.ShowOutput.Warehouse {
-			opts.Warehouse = task.Spec.Warehouse
+		if task.Status.WarehouseName != "" && task.Status.WarehouseName != obs.ShowOutput.Warehouse {
+			wh := task.Status.WarehouseName
+			opts.Warehouse = &wh
 		}
 
 		// SQL statement changes.
@@ -196,15 +215,17 @@ func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectId
 		}
 	}
 
-	if task.Spec.ErrorIntegration != nil {
-		if obs.ShowOutput == nil || *task.Spec.ErrorIntegration != obs.ShowOutput.ErrorIntegration {
-			opts.ErrorIntegration = task.Spec.ErrorIntegration
+	if task.Status.ErrorIntegrationName != "" {
+		if obs.ShowOutput == nil || task.Status.ErrorIntegrationName != obs.ShowOutput.ErrorIntegration {
+			ei := task.Status.ErrorIntegrationName
+			opts.ErrorIntegration = &ei
 		}
 	}
 
-	if task.Spec.SuccessIntegration != nil {
+	if task.Status.SuccessIntegrationName != "" {
 		// SuccessIntegration is not exposed in SHOW TASKS output, so always include when set.
-		opts.SuccessIntegration = task.Spec.SuccessIntegration
+		si := task.Status.SuccessIntegrationName
+		opts.SuccessIntegration = &si
 	}
 
 	if task.Spec.AllowOverlappingExecution != nil {
@@ -226,8 +247,9 @@ func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectId
 	}
 
 	// Finalize — uses dedicated SET/UNSET FINALIZE.
-	if task.Spec.Finalize != nil {
-		opts.SetFinalize = task.Spec.Finalize
+	if task.Status.FinalizeName != "" {
+		fn := task.Status.FinalizeName
+		opts.SetFinalize = &fn
 	} else {
 		for _, p := range task.Status.TrackedParameters {
 			if p == "FINALIZE" {
@@ -284,11 +306,24 @@ func detectDrift(task *snowplanev1alpha1.Task, obs *snowflake.TaskObservation) *
 		// Mutable fields from SHOW output.
 		d.CompareString("COMMENT", task.Spec.Comment, obs.ShowOutput.Comment, false)
 		d.CompareString("SCHEDULE", task.Spec.Schedule, obs.ShowOutput.Schedule, false)
-		d.CompareString("WAREHOUSE", task.Spec.Warehouse, obs.ShowOutput.Warehouse, false)
+
+		var warehousePtr *string
+		if task.Status.WarehouseName != "" {
+			wh := task.Status.WarehouseName
+			warehousePtr = &wh
+		}
+
+		d.CompareString("WAREHOUSE", warehousePtr, obs.ShowOutput.Warehouse, false)
 
 		d.CompareStringValue("SQL_STATEMENT", task.Spec.SQLStatement, obs.ShowOutput.Definition, false)
 		d.CompareString("WHEN", task.Spec.When, obs.ShowOutput.Condition, false)
-		d.CompareString("ERROR_INTEGRATION", task.Spec.ErrorIntegration, obs.ShowOutput.ErrorIntegration, false)
+		var errorIntPtr *string
+		if task.Status.ErrorIntegrationName != "" {
+			ei := task.Status.ErrorIntegrationName
+			errorIntPtr = &ei
+		}
+
+		d.CompareString("ERROR_INTEGRATION", errorIntPtr, obs.ShowOutput.ErrorIntegration, false)
 
 		// AllowOverlappingExecution: spec is *bool, observed is plain bool.
 		if task.Spec.AllowOverlappingExecution != nil {
