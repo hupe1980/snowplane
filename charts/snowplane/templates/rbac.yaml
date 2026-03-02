@@ -104,6 +104,7 @@ rules:
   - apiauthenticationintegrationwithjwtbearers
   - notificationintegrations
   - passwordpolicies
+  - authenticationpolicies
   - networkrules
   - fieldexports
   - providerconfigs
@@ -177,6 +178,7 @@ rules:
   - apiauthenticationintegrationwithjwtbearers/status
   - notificationintegrations/status
   - passwordpolicies/status
+  - authenticationpolicies/status
   - networkrules/status
   - fieldexports/status
   - providerconfigs/status
@@ -246,6 +248,7 @@ rules:
   - apiauthenticationintegrationwithjwtbearers/finalizers
   - notificationintegrations/finalizers
   - passwordpolicies/finalizers
+  - authenticationpolicies/finalizers
   - networkrules/finalizers
   - fieldexports/finalizers
   - providerconfigs/finalizers
@@ -372,6 +375,7 @@ rules:
   - materializedviews
   - notificationintegrations
   - passwordpolicies
+  - authenticationpolicies
   - networkrules
   - fieldexports
   - providerconfigs
@@ -441,6 +445,7 @@ rules:
   - notificationintegrations/status
   - materializedviews/status
   - passwordpolicies/status
+  - authenticationpolicies/status
   - networkrules/status
   - fieldexports/status
   - providerconfigs/status
@@ -517,6 +522,7 @@ rules:
   - apiauthenticationintegrationwithjwtbearers
   - notificationintegrations
   - passwordpolicies
+  - authenticationpolicies
   - materializedviews
   - networkrules
   - fieldexports
@@ -590,6 +596,7 @@ rules:
   - apiauthenticationintegrationwithjwtbearers/status
   - notificationintegrations/status
   - passwordpolicies/status
+  - authenticationpolicies/status
   - networkrules/status
   - materializedviews/status
   - fieldexports/status

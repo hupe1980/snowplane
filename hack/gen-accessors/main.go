@@ -119,6 +119,7 @@ var types = []TypeDef{
 	{TypeName: "NotificationIntegration", Receiver: "ni", Owner: OwnerEmpty, OwnerComment: "SHOW NOTIFICATION INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "SecurityIntegration", Receiver: "si", Owner: OwnerEmpty, OwnerComment: "SHOW SECURITY INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "PasswordPolicy", Receiver: "pp", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "AuthenticationPolicy", Receiver: "ap", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "NetworkRule", Receiver: "nr", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "Sequence", Receiver: "seq", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "ExternalTable", Receiver: "et", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},

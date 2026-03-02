@@ -546,3 +546,39 @@ func roleAssignmentObservation(role, grantedTo, granteeName string) *snowflake.R
 		},
 	}
 }
+
+func newTestAuthenticationPolicy(name, sfName, dbRefName, schemaRefName string) *snowplanev1alpha1.AuthenticationPolicy {
+	return &snowplanev1alpha1.AuthenticationPolicy{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.AuthenticationPolicySpec{
+			CommonSpec: snowplanev1alpha1.CommonSpec{
+				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
+			},
+			Name:                  sfName,
+			DatabaseRef:           &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
+			SchemaRef:             &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			AuthenticationMethods: []string{"PASSWORD", "SAML"},
+			ClientTypes:           []string{"SNOWFLAKE_UI", "DRIVERS"},
+		},
+	}
+}
+
+func authenticationPolicyObservation(name, dbName, schemaName, owner string) *snowflake.AuthenticationPolicyObservation {
+	return &snowflake.AuthenticationPolicyObservation{
+		Exists: true,
+		ShowOutput: &snowflake.AuthenticationPolicyShowOutput{
+			CreatedOn:    "2024-01-01",
+			Name:         name,
+			DatabaseName: dbName,
+			SchemaName:   schemaName,
+			Owner:        owner,
+		},
+		DescribeOutput: map[string]string{
+			"AUTHENTICATION_METHODS": "[PASSWORD, SAML]",
+			"CLIENT_TYPES":           "[SNOWFLAKE_UI, DRIVERS]",
+		},
+	}
+}

@@ -1537,3 +1537,101 @@ func (m *mockNotificationIntegrationService) Reset() {
 	m.alterFn = nil
 	m.dropFn = nil
 }
+
+// ---------------------------------------------------------------------------
+// mockAuthenticationPolicyService
+// ---------------------------------------------------------------------------
+
+type mockAuthenticationPolicyService struct {
+	mu        sync.Mutex
+	observeFn func(ctx context.Context, name snowflake.SchemaObjectIdentifier) (*snowflake.AuthenticationPolicyObservation, error)
+	createFn  func(ctx context.Context, opts snowflake.CreateAuthenticationPolicyOptions) error
+	alterFn   func(ctx context.Context, opts snowflake.AlterAuthenticationPolicyOptions) error
+	dropFn    func(ctx context.Context, name snowflake.SchemaObjectIdentifier) error
+}
+
+func (m *mockAuthenticationPolicyService) Observe(ctx context.Context, name snowflake.SchemaObjectIdentifier) (*snowflake.AuthenticationPolicyObservation, error) {
+	m.mu.Lock()
+	fn := m.observeFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, name)
+	}
+
+	return &snowflake.AuthenticationPolicyObservation{Exists: false}, nil
+}
+
+func (m *mockAuthenticationPolicyService) Create(ctx context.Context, opts snowflake.CreateAuthenticationPolicyOptions) error {
+	m.mu.Lock()
+	fn := m.createFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, opts)
+	}
+
+	return nil
+}
+
+func (m *mockAuthenticationPolicyService) Alter(ctx context.Context, opts snowflake.AlterAuthenticationPolicyOptions) error {
+	m.mu.Lock()
+	fn := m.alterFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, opts)
+	}
+
+	return nil
+}
+
+func (m *mockAuthenticationPolicyService) Drop(ctx context.Context, name snowflake.SchemaObjectIdentifier) error {
+	m.mu.Lock()
+	fn := m.dropFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, name)
+	}
+
+	return nil
+}
+
+func (m *mockAuthenticationPolicyService) SetObserve(fn func(ctx context.Context, name snowflake.SchemaObjectIdentifier) (*snowflake.AuthenticationPolicyObservation, error)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.observeFn = fn
+}
+
+func (m *mockAuthenticationPolicyService) SetCreate(fn func(ctx context.Context, opts snowflake.CreateAuthenticationPolicyOptions) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.createFn = fn
+}
+
+func (m *mockAuthenticationPolicyService) SetAlter(fn func(ctx context.Context, opts snowflake.AlterAuthenticationPolicyOptions) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.alterFn = fn
+}
+
+func (m *mockAuthenticationPolicyService) SetDrop(fn func(ctx context.Context, name snowflake.SchemaObjectIdentifier) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.dropFn = fn
+}
+
+func (m *mockAuthenticationPolicyService) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.observeFn = nil
+	m.createFn = nil
+	m.alterFn = nil
+	m.dropFn = nil
+}

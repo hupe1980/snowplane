@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
-  name: passwordpolicies.snowplane.hupe1980.github.io
+  name: authenticationpolicies.snowplane.hupe1980.github.io
 spec:
   group: snowplane.hupe1980.github.io
   names:
     categories:
     - snowplane
-    kind: PasswordPolicy
-    listKind: PasswordPolicyList
-    plural: passwordpolicies
-    singular: passwordpolicy
+    kind: AuthenticationPolicy
+    listKind: AuthenticationPolicyList
+    plural: authenticationpolicies
+    singular: authenticationpolicy
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -42,7 +42,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: PasswordPolicy is the Schema for the passwordpolicies API.
+        description: AuthenticationPolicy is the Schema for the authenticationpolicies
+          API.
         properties:
           apiVersion:
             description: |-
@@ -62,11 +63,26 @@ spec:
           metadata:
             type: object
           spec:
-            description: PasswordPolicySpec defines the desired state of a Snowflake
-              Password Policy.
+            description: AuthenticationPolicySpec defines the desired state of a Snowflake
+              Authentication Policy.
             properties:
+              authenticationMethods:
+                description: |-
+                  AuthenticationMethods is the list of authentication methods allowed.
+                  Valid values include: ALL, SAML, PASSWORD, OAUTH, KEYPAIR, PROGRAMMATIC_ACCESS_TOKEN, WORKLOAD_IDENTITY.
+                items:
+                  type: string
+                type: array
+              clientTypes:
+                description: |-
+                  ClientTypes is the list of client types allowed.
+                  Valid values include: ALL, SNOWFLAKE_UI, DRIVERS, SNOWFLAKE_CLI, SNOWSQL.
+                items:
+                  type: string
+                type: array
               comment:
-                description: Comment is an optional description for the password policy.
+                description: Comment is an optional description for the authentication
+                  policy.
                 type: string
               databaseName:
                 description: |-
@@ -133,88 +149,65 @@ spec:
                     - detect-only
                     type: string
                 type: object
+              mfaEnrollment:
+                description: |-
+                  MfaEnrollment controls MFA enrollment behavior.
+                  Valid values: REQUIRED, REQUIRED_PASSWORD_ONLY, OPTIONAL.
+                enum:
+                - REQUIRED
+                - REQUIRED_PASSWORD_ONLY
+                - OPTIONAL
+                type: string
+              mfaPolicy:
+                description: MfaPolicy configures multi-factor authentication sub-policy.
+                properties:
+                  allowedMethods:
+                    description: AllowedMethods is the list of MFA methods allowed
+                      (e.g. "TOTP").
+                    items:
+                      type: string
+                    type: array
+                  enforceMfaOnExternalAuthentication:
+                    description: |-
+                      EnforceMfaOnExternalAuthentication controls MFA for external auth.
+                      Valid values: "OPTIONAL", "REQUIRED".
+                    enum:
+                    - OPTIONAL
+                    - REQUIRED
+                    type: string
+                type: object
               name:
-                description: Name is the Snowflake password policy name. Immutable
+                description: Name is the Snowflake authentication policy name. Immutable
                   after creation.
                 minLength: 1
                 type: string
-              passwordHistory:
-                description: PasswordHistory is the number of recent passwords that
-                  cannot be reused.
-                format: int32
-                maximum: 24
-                minimum: 0
-                type: integer
-              passwordLockoutTimeMins:
-                description: PasswordLockoutTimeMins is the lockout duration in minutes
-                  after exceeding max retries.
-                format: int32
-                maximum: 999
-                minimum: 1
-                type: integer
-              passwordMaxAgeDays:
-                description: PasswordMaxAgeDays is the maximum number of days a password
-                  is valid (0 = no expiry).
-                format: int32
-                maximum: 999
-                minimum: 0
-                type: integer
-              passwordMaxLength:
-                description: PasswordMaxLength is the maximum number of characters
-                  the password can contain.
-                format: int32
-                maximum: 256
-                minimum: 8
-                type: integer
-              passwordMaxRetries:
-                description: PasswordMaxRetries is the maximum number of failed login
-                  attempts before lockout.
-                format: int32
-                maximum: 10
-                minimum: 1
-                type: integer
-              passwordMinAgeDays:
-                description: PasswordMinAgeDays is the minimum number of days before
-                  a password can be changed.
-                format: int32
-                maximum: 999
-                minimum: 0
-                type: integer
-              passwordMinLength:
-                description: PasswordMinLength is the minimum number of characters
-                  the password must contain.
-                format: int32
-                maximum: 256
-                minimum: 8
-                type: integer
-              passwordMinLowerCaseChars:
-                description: PasswordMinLowerCaseChars is the minimum number of lowercase
-                  characters.
-                format: int32
-                maximum: 256
-                minimum: 0
-                type: integer
-              passwordMinNumericChars:
-                description: PasswordMinNumericChars is the minimum number of numeric
-                  characters.
-                format: int32
-                maximum: 256
-                minimum: 0
-                type: integer
-              passwordMinSpecialChars:
-                description: PasswordMinSpecialChars is the minimum number of special
-                  characters.
-                format: int32
-                maximum: 256
-                minimum: 0
-                type: integer
-              passwordMinUpperCaseChars:
-                description: PasswordMinUpperCaseChars is the minimum number of uppercase
-                  characters.
-                format: int32
-                maximum: 256
-                minimum: 0
-                type: integer
+              patPolicy:
+                description: PatPolicy configures programmatic access token sub-policy.
+                properties:
+                  defaultExpiryInDays:
+                    description: DefaultExpiryInDays is the default token expiry in
+                      days.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  maxExpiryInDays:
+                    description: MaxExpiryInDays is the maximum token expiry in days.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  networkPolicyEvaluation:
+                    description: |-
+                      NetworkPolicyEvaluation controls whether the network policy is evaluated
+                      for PAT-based authentication. Valid values: "OPTIONAL", "REQUIRED".
+                    enum:
+                    - OPTIONAL
+                    - REQUIRED
+                    type: string
+                  requireRoleRestrictionForServiceUsers:
+                    description: RequireRoleRestrictionForServiceUsers requires a
+                      role restriction for service users.
+                    type: boolean
+                type: object
               paused:
                 description: |-
                   Paused suspends reconciliation of this resource. When true, the
@@ -263,6 +256,13 @@ spec:
                 x-kubernetes-validations:
                 - message: spec.schemaRef is immutable
                   rule: self == oldSelf
+              securityIntegrations:
+                description: |-
+                  SecurityIntegrations is the list of security integration names
+                  that can be used with this authentication policy.
+                items:
+                  type: string
+                type: array
               useRole:
                 description: |-
                   UseRole specifies the Snowflake role to activate via USE ROLE before
@@ -272,6 +272,35 @@ spec:
                   This field is immutable after the resource has been created in Snowflake.
                 minLength: 1
                 type: string
+              workloadIdentityPolicy:
+                description: WorkloadIdentityPolicy configures the workload identity
+                  sub-policy.
+                properties:
+                  allowedAwsAccounts:
+                    description: AllowedAwsAccounts is the list of AWS account IDs
+                      allowed for workload identity.
+                    items:
+                      type: string
+                    type: array
+                  allowedAzureIssuers:
+                    description: AllowedAzureIssuers is the list of Azure issuers
+                      allowed for workload identity.
+                    items:
+                      type: string
+                    type: array
+                  allowedOidcIssuers:
+                    description: AllowedOidcIssuers is the list of OIDC issuers allowed
+                      for workload identity.
+                    items:
+                      type: string
+                    type: array
+                  allowedProviders:
+                    description: AllowedProviders is the list of identity providers
+                      allowed (e.g. "AWS", "AZURE", "GCP").
+                    items:
+                      type: string
+                    type: array
+                type: object
             required:
             - name
             - providerRef
@@ -314,7 +343,8 @@ spec:
                 name; use spec.databaseName for the database part
               rule: '!has(self.schemaName) || !self.schemaName.contains(''.'')'
           status:
-            description: PasswordPolicyStatus defines the observed state of a PasswordPolicy.
+            description: AuthenticationPolicyStatus defines the observed state of
+              an AuthenticationPolicy.
             properties:
               conditions:
                 description: Conditions represent the latest available observations
@@ -384,7 +414,7 @@ spec:
               describeOutput:
                 additionalProperties:
                   type: string
-                description: DescribeOutput contains the DESCRIBE PASSWORD POLICY
+                description: DescribeOutput contains the DESCRIBE AUTHENTICATION POLICY
                   key-value pairs.
                 type: object
               fullyQualifiedName:
@@ -410,7 +440,8 @@ spec:
                 description: SchemaName is the resolved schema fully-qualified name.
                 type: string
               showOutput:
-                description: ShowOutput contains the raw SHOW PASSWORD POLICIES output.
+                description: ShowOutput contains the raw SHOW AUTHENTICATION POLICIES
+                  output.
                 properties:
                   comment:
                     description: Comment is the policy description.

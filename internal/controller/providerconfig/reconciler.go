@@ -187,6 +187,7 @@ func managedResourceTypes() []managedResourceEntry {
 		{proto: &snowplanev1alpha1.NotificationIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.NotificationIntegrationList{} }},
 		{proto: &snowplanev1alpha1.SecurityIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SecurityIntegrationList{} }},
 		{proto: &snowplanev1alpha1.PasswordPolicy{}, newList: func() client.ObjectList { return &snowplanev1alpha1.PasswordPolicyList{} }},
+		{proto: &snowplanev1alpha1.AuthenticationPolicy{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AuthenticationPolicyList{} }},
 		{proto: &snowplanev1alpha1.NetworkRule{}, newList: func() client.ObjectList { return &snowplanev1alpha1.NetworkRuleList{} }},
 		{proto: &snowplanev1alpha1.AccountRoleAssignment{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AccountRoleAssignmentList{} }},
 		{proto: &snowplanev1alpha1.DatabaseRoleAssignment{}, newList: func() client.ObjectList { return &snowplanev1alpha1.DatabaseRoleAssignmentList{} }},

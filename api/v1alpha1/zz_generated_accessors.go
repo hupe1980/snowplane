@@ -2454,6 +2454,94 @@ func (pp *PasswordPolicy) SetTrackedParametersList(val []string) {
 }
 
 // ---------------------------------------------------------------------------
+// AuthenticationPolicy
+// ---------------------------------------------------------------------------
+
+func (ap *AuthenticationPolicy) GetConditions() []metav1.Condition {
+	return ap.Status.Conditions
+}
+
+func (ap *AuthenticationPolicy) SetConditions(conditions []metav1.Condition) {
+	ap.Status.Conditions = conditions
+}
+
+func (ap *AuthenticationPolicy) GetDeletionPolicy() DeletionPolicy {
+	if ap.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return ap.Spec.DeletionPolicy
+}
+
+func (ap *AuthenticationPolicy) GetFullyQualifiedName() string {
+	return ap.Status.FullyQualifiedName
+}
+
+func (ap *AuthenticationPolicy) GetProviderRef() ProviderReference {
+	return ap.Spec.ProviderRef
+}
+
+func (ap *AuthenticationPolicy) GetSpecName() string {
+	return ap.Spec.Name
+}
+
+func (ap *AuthenticationPolicy) GetUseRole() *string {
+	return ap.Spec.UseRole
+}
+
+func (ap *AuthenticationPolicy) GetPaused() bool {
+	return ap.Spec.Paused
+}
+
+func (ap *AuthenticationPolicy) GetManagementPolicies() ManagementPolicies {
+	return ap.Spec.ManagementPolicies
+}
+
+func (ap *AuthenticationPolicy) SetCreateOrAlter(val *bool) {
+	ap.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (ap *AuthenticationPolicy) GetObservedGeneration() int64 {
+	return ap.Status.ObservedGeneration
+}
+
+func (ap *AuthenticationPolicy) SetObservedGeneration(val int64) {
+	ap.Status.ObservedGeneration = val
+}
+
+func (ap *AuthenticationPolicy) GetLastAppliedSpecHash() string {
+	return ap.Status.LastAppliedSpecHash
+}
+
+func (ap *AuthenticationPolicy) SetLastAppliedSpecHash(val string) {
+	ap.Status.LastAppliedSpecHash = val
+}
+
+func (ap *AuthenticationPolicy) ValidateSpec() error {
+	return ap.Spec.Validate()
+}
+
+func (ap *AuthenticationPolicy) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(ap.Spec)
+}
+
+func (ap *AuthenticationPolicy) GetOwner() string {
+	if ap.Status.ShowOutput != nil {
+		return ap.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (ap *AuthenticationPolicy) GetTrackedParametersList() []string {
+	return ap.Status.TrackedParameters
+}
+
+func (ap *AuthenticationPolicy) SetTrackedParametersList(val []string) {
+	ap.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
 // NetworkRule
 // ---------------------------------------------------------------------------
 

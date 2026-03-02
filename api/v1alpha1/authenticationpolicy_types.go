@@ -4,7 +4,62 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PasswordPolicySpec defines the desired state of a Snowflake Password Policy.
+// AuthenticationPolicyMfaPolicy defines the MFA sub-policy for an authentication policy.
+type AuthenticationPolicyMfaPolicy struct {
+	// AllowedMethods is the list of MFA methods allowed (e.g. "TOTP").
+	// +optional
+	AllowedMethods []string `json:"allowedMethods,omitempty"`
+
+	// EnforceMfaOnExternalAuthentication controls MFA for external auth.
+	// Valid values: "OPTIONAL", "REQUIRED".
+	// +optional
+	// +kubebuilder:validation:Enum=OPTIONAL;REQUIRED
+	EnforceMfaOnExternalAuthentication *string `json:"enforceMfaOnExternalAuthentication,omitempty"`
+}
+
+// AuthenticationPolicyPatPolicy defines the PAT (Programmatic Access Token) sub-policy.
+type AuthenticationPolicyPatPolicy struct {
+	// DefaultExpiryInDays is the default token expiry in days.
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	DefaultExpiryInDays *int32 `json:"defaultExpiryInDays,omitempty"`
+
+	// MaxExpiryInDays is the maximum token expiry in days.
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	MaxExpiryInDays *int32 `json:"maxExpiryInDays,omitempty"`
+
+	// NetworkPolicyEvaluation controls whether the network policy is evaluated
+	// for PAT-based authentication. Valid values: "OPTIONAL", "REQUIRED".
+	// +optional
+	// +kubebuilder:validation:Enum=OPTIONAL;REQUIRED
+	NetworkPolicyEvaluation *string `json:"networkPolicyEvaluation,omitempty"`
+
+	// RequireRoleRestrictionForServiceUsers requires a role restriction for service users.
+	// +optional
+	RequireRoleRestrictionForServiceUsers *bool `json:"requireRoleRestrictionForServiceUsers,omitempty"`
+}
+
+// AuthenticationPolicyWorkloadIdentityPolicy defines the workload identity sub-policy.
+type AuthenticationPolicyWorkloadIdentityPolicy struct {
+	// AllowedProviders is the list of identity providers allowed (e.g. "AWS", "AZURE", "GCP").
+	// +optional
+	AllowedProviders []string `json:"allowedProviders,omitempty"`
+
+	// AllowedAwsAccounts is the list of AWS account IDs allowed for workload identity.
+	// +optional
+	AllowedAwsAccounts []string `json:"allowedAwsAccounts,omitempty"`
+
+	// AllowedAzureIssuers is the list of Azure issuers allowed for workload identity.
+	// +optional
+	AllowedAzureIssuers []string `json:"allowedAzureIssuers,omitempty"`
+
+	// AllowedOidcIssuers is the list of OIDC issuers allowed for workload identity.
+	// +optional
+	AllowedOidcIssuers []string `json:"allowedOidcIssuers,omitempty"`
+}
+
+// AuthenticationPolicySpec defines the desired state of a Snowflake Authentication Policy.
 //
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
@@ -16,10 +71,10 @@ import (
 // +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !has(oldSelf.schemaName) || self.schemaName == oldSelf.schemaName",message="spec.schemaName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
 // +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
-type PasswordPolicySpec struct {
+type AuthenticationPolicySpec struct {
 	CommonSpec `json:",inline"`
 
-	// Name is the Snowflake password policy name. Immutable after creation.
+	// Name is the Snowflake authentication policy name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
@@ -50,79 +105,46 @@ type PasswordPolicySpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.schemaName is immutable"
 	SchemaName *string `json:"schemaName,omitempty"`
 
-	// PasswordMinLength is the minimum number of characters the password must contain.
+	// AuthenticationMethods is the list of authentication methods allowed.
+	// Valid values include: ALL, SAML, PASSWORD, OAUTH, KEYPAIR, PROGRAMMATIC_ACCESS_TOKEN, WORKLOAD_IDENTITY.
 	// +optional
-	// +kubebuilder:validation:Minimum=8
-	// +kubebuilder:validation:Maximum=256
-	PasswordMinLength *int32 `json:"passwordMinLength,omitempty" snowflake:"PASSWORD_MIN_LENGTH"`
+	AuthenticationMethods []string `json:"authenticationMethods,omitempty" snowflake:"AUTHENTICATION_METHODS"`
 
-	// PasswordMaxLength is the maximum number of characters the password can contain.
+	// ClientTypes is the list of client types allowed.
+	// Valid values include: ALL, SNOWFLAKE_UI, DRIVERS, SNOWFLAKE_CLI, SNOWSQL.
 	// +optional
-	// +kubebuilder:validation:Minimum=8
-	// +kubebuilder:validation:Maximum=256
-	PasswordMaxLength *int32 `json:"passwordMaxLength,omitempty" snowflake:"PASSWORD_MAX_LENGTH"`
+	ClientTypes []string `json:"clientTypes,omitempty" snowflake:"CLIENT_TYPES"`
 
-	// PasswordMinUpperCaseChars is the minimum number of uppercase characters.
+	// SecurityIntegrations is the list of security integration names
+	// that can be used with this authentication policy.
 	// +optional
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=256
-	PasswordMinUpperCaseChars *int32 `json:"passwordMinUpperCaseChars,omitempty" snowflake:"PASSWORD_MIN_UPPER_CASE_CHARS"`
+	SecurityIntegrations []string `json:"securityIntegrations,omitempty" snowflake:"SECURITY_INTEGRATIONS"`
 
-	// PasswordMinLowerCaseChars is the minimum number of lowercase characters.
+	// MfaEnrollment controls MFA enrollment behavior.
+	// Valid values: REQUIRED, REQUIRED_PASSWORD_ONLY, OPTIONAL.
 	// +optional
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=256
-	PasswordMinLowerCaseChars *int32 `json:"passwordMinLowerCaseChars,omitempty" snowflake:"PASSWORD_MIN_LOWER_CASE_CHARS"`
+	// +kubebuilder:validation:Enum=REQUIRED;REQUIRED_PASSWORD_ONLY;OPTIONAL
+	MfaEnrollment *string `json:"mfaEnrollment,omitempty" snowflake:"MFA_ENROLLMENT"`
 
-	// PasswordMinNumericChars is the minimum number of numeric characters.
+	// MfaPolicy configures multi-factor authentication sub-policy.
 	// +optional
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=256
-	PasswordMinNumericChars *int32 `json:"passwordMinNumericChars,omitempty" snowflake:"PASSWORD_MIN_NUMERIC_CHARS"`
+	MfaPolicy *AuthenticationPolicyMfaPolicy `json:"mfaPolicy,omitempty" snowflake:"MFA_POLICY"`
 
-	// PasswordMinSpecialChars is the minimum number of special characters.
+	// PatPolicy configures programmatic access token sub-policy.
 	// +optional
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=256
-	PasswordMinSpecialChars *int32 `json:"passwordMinSpecialChars,omitempty" snowflake:"PASSWORD_MIN_SPECIAL_CHARS"`
+	PatPolicy *AuthenticationPolicyPatPolicy `json:"patPolicy,omitempty" snowflake:"PAT_POLICY"`
 
-	// PasswordMinAgeDays is the minimum number of days before a password can be changed.
+	// WorkloadIdentityPolicy configures the workload identity sub-policy.
 	// +optional
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=999
-	PasswordMinAgeDays *int32 `json:"passwordMinAgeDays,omitempty" snowflake:"PASSWORD_MIN_AGE_DAYS"`
+	WorkloadIdentityPolicy *AuthenticationPolicyWorkloadIdentityPolicy `json:"workloadIdentityPolicy,omitempty" snowflake:"WORKLOAD_IDENTITY_POLICY"`
 
-	// PasswordMaxAgeDays is the maximum number of days a password is valid (0 = no expiry).
-	// +optional
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=999
-	PasswordMaxAgeDays *int32 `json:"passwordMaxAgeDays,omitempty" snowflake:"PASSWORD_MAX_AGE_DAYS"`
-
-	// PasswordMaxRetries is the maximum number of failed login attempts before lockout.
-	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=10
-	PasswordMaxRetries *int32 `json:"passwordMaxRetries,omitempty" snowflake:"PASSWORD_MAX_RETRIES"`
-
-	// PasswordLockoutTimeMins is the lockout duration in minutes after exceeding max retries.
-	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=999
-	PasswordLockoutTimeMins *int32 `json:"passwordLockoutTimeMins,omitempty" snowflake:"PASSWORD_LOCKOUT_TIME_MINS"`
-
-	// PasswordHistory is the number of recent passwords that cannot be reused.
-	// +optional
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=24
-	PasswordHistory *int32 `json:"passwordHistory,omitempty" snowflake:"PASSWORD_HISTORY"`
-
-	// Comment is an optional description for the password policy.
+	// Comment is an optional description for the authentication policy.
 	// +optional
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
-// PasswordPolicyShowOutput mirrors the SHOW PASSWORD POLICIES output stored in status.
-type PasswordPolicyShowOutput struct {
+// AuthenticationPolicyShowOutput mirrors the SHOW AUTHENTICATION POLICIES output stored in status.
+type AuthenticationPolicyShowOutput struct {
 	// CreatedOn is the timestamp when the policy was created.
 	CreatedOn string `json:"createdOn,omitempty"`
 
@@ -139,11 +161,11 @@ type PasswordPolicyShowOutput struct {
 	Owner string `json:"owner,omitempty"`
 
 	// Comment is the policy description.
-	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
+	Comment string `json:"comment,omitempty"`
 }
 
-// PasswordPolicyStatus defines the observed state of a PasswordPolicy.
-type PasswordPolicyStatus struct {
+// AuthenticationPolicyStatus defines the observed state of an AuthenticationPolicy.
+type AuthenticationPolicyStatus struct {
 	CommonStatus `json:",inline"`
 
 	// DatabaseName is the resolved database fully-qualified name.
@@ -152,17 +174,17 @@ type PasswordPolicyStatus struct {
 	// SchemaName is the resolved schema fully-qualified name.
 	SchemaName string `json:"schemaName,omitempty"`
 
-	// ShowOutput contains the raw SHOW PASSWORD POLICIES output.
-	ShowOutput *PasswordPolicyShowOutput `json:"showOutput,omitempty"`
+	// ShowOutput contains the raw SHOW AUTHENTICATION POLICIES output.
+	ShowOutput *AuthenticationPolicyShowOutput `json:"showOutput,omitempty"`
 
-	// DescribeOutput contains the DESCRIBE PASSWORD POLICY key-value pairs.
+	// DescribeOutput contains the DESCRIBE AUTHENTICATION POLICY key-value pairs.
 	DescribeOutput map[string]string `json:"describeOutput,omitempty"`
 
 	// TrackedParameters tracks which optional spec fields have been actively SET.
 	TrackedParameters []string `json:"trackedParameters,omitempty"`
 }
 
-// PasswordPolicy is the Schema for the passwordpolicies API.
+// AuthenticationPolicy is the Schema for the authenticationpolicies API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories=snowplane
@@ -173,22 +195,22 @@ type PasswordPolicyStatus struct {
 // +kubebuilder:printcolumn:name="SCHEMA",type=string,JSONPath=`.status.schemaName`
 // +kubebuilder:printcolumn:name="PROVIDER",type=string,JSONPath=`.spec.providerRef.name`,priority=1
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
-type PasswordPolicy struct {
+type AuthenticationPolicy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   PasswordPolicySpec   `json:"spec,omitempty"`
-	Status PasswordPolicyStatus `json:"status,omitempty"`
+	Spec   AuthenticationPolicySpec   `json:"spec,omitempty"`
+	Status AuthenticationPolicyStatus `json:"status,omitempty"`
 }
 
-// PasswordPolicyList contains a list of PasswordPolicy.
+// AuthenticationPolicyList contains a list of AuthenticationPolicy.
 // +kubebuilder:object:root=true
-type PasswordPolicyList struct {
+type AuthenticationPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []PasswordPolicy `json:"items"`
+	Items           []AuthenticationPolicy `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&PasswordPolicy{}, &PasswordPolicyList{})
+	SchemeBuilder.Register(&AuthenticationPolicy{}, &AuthenticationPolicyList{})
 }

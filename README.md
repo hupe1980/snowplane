@@ -41,7 +41,7 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 - 🛡️ **Dangerous Grant Protection** — Blocks grants to ACCOUNTADMIN/SECURITYADMIN/ORGADMIN and dangerous privileges by default
 - 🛡️ **Policy Body Validation** — Blocklist-based SQL injection prevention for MaskingPolicy and RowAccessPolicy `body` fields
 - 🏷️ **Ownership Conflict Detection** — Prevents duplicate CRs from managing the same Snowflake object via label-based conflict detection
-- ⚛️ **CREATE OR ALTER** — Atomic `CREATE OR ALTER` enabled by default for Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, NetworkRule, RowAccessPolicy & User, with graceful fallback for unsupported Snowflake editions (opt out via `spec.managementPolicies.createOrAlter: false`)
+- ⚛️ **CREATE OR ALTER** — Atomic `CREATE OR ALTER` enabled by default for Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, AuthenticationPolicy, NetworkRule, RowAccessPolicy & User, with graceful fallback for unsupported Snowflake editions (opt out via `spec.managementPolicies.createOrAlter: false`)
 - 🗑️ **Deletion Policies** — `Delete` (drop resource) or `Orphan` (leave intact)
 - 🏷️ **ForceNew Annotation** — Delete+recreate on immutable field changes
 
@@ -221,7 +221,7 @@ kubectl get databases
 |-------|---------|--------|-------------|
 | `adoptionPolicy` | `fail-if-exists` | `adopt` / `fail-if-exists` | Control adoption of pre-existing resources |
 | `driftPolicy` | `correct` | `correct` / `detect-only` | Report drift without correcting it, or correct automatically |
-| `createOrAlter` | `true` | `true` / `false` | Atomic `CREATE OR ALTER` (Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, NetworkRule, RowAccessPolicy, User) |
+| `createOrAlter` | `true` | `true` / `false` | Atomic `CREATE OR ALTER` (Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, AuthenticationPolicy, NetworkRule, RowAccessPolicy, User) |
 
 **Annotations**:
 
@@ -327,7 +327,7 @@ Complete field-level documentation for all Snowplane CRDs is available in the **
 | 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
 | ⏰ **Orchestration** | Task, Alert |
 | 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
-| 🛡️ **Security & Governance** | NetworkPolicy, NetworkPolicyAttachment, NetworkRule, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
+| 🛡️ **Security & Governance** | AuthenticationPolicy, NetworkPolicy, NetworkPolicyAttachment, NetworkRule, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
 | 🔧 **Programmability** | ProcedureSQL, ProcedureJavascript, ProcedurePython, ProcedureJava, ProcedureScala, FunctionSQL, FunctionJavascript, FunctionPython, FunctionJava, FunctionScala |
 | �📤 **Utilities** | FieldExport |
 

@@ -30,7 +30,7 @@ Full lifecycle management for every resource — create, alter, drop, drift dete
 | **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
 | **Orchestration** | Task, Alert |
 | **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
-| **Security & Governance** | NetworkPolicy, NetworkRule, PasswordPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
+| **Security & Governance** | AuthenticationPolicy, NetworkPolicy, NetworkRule, PasswordPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
 | **Utilities** | FieldExport |
 
 ---

@@ -194,6 +194,7 @@ var controllerRegistrationNames = map[string]bool{
 	"apiauthenticationintegrationwithclientcredentials":      true,
 	"apiauthenticationintegrationwithauthorizationcodegrant": true,
 	"apiauthenticationintegrationwithjwtbearer":              true,
+	"authenticationpolicy":                                   true,
 	// standalone controller (not in GenericReconciler registration loop)
 	"fieldexport": true,
 }

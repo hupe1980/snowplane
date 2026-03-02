@@ -1599,6 +1599,29 @@ func (s *SecurityIntegrationSpec) Validate() error {
 	return errors.Join(errs...)
 }
 
+// Validate checks the AuthenticationPolicySpec for configuration errors.
+func (s *AuthenticationPolicySpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
 // Validate checks the PasswordPolicySpec for configuration errors.
 func (s *PasswordPolicySpec) Validate() error {
 	var errs []error
@@ -1946,6 +1969,7 @@ func (s *APIAuthenticationIntegrationWithJWTBearerSpec) Validate() error {
 //nolint:gochecknoglobals // package-level constant set
 var ValidFieldExportSourceKinds = map[string]struct{}{
 	"Alert":                            {},
+	"AuthenticationPolicy":             {},
 	"Database":                         {},
 	"Schema":                           {},
 	"Warehouse":                        {},

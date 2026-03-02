@@ -531,7 +531,7 @@ spec:
 
 ## CREATE OR ALTER
 
-For Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, NetworkRule, RowAccessPolicy, and User, `CREATE OR ALTER` is **enabled by default**. To opt out and use the legacy `CREATE IF NOT EXISTS` + `ALTER` two-step flow:
+For Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, AuthenticationPolicy, NetworkRule, RowAccessPolicy, and User, `CREATE OR ALTER` is **enabled by default**. To opt out and use the legacy `CREATE IF NOT EXISTS` + `ALTER` two-step flow:
 
 ```yaml
 spec:
@@ -562,6 +562,6 @@ See [Annotations Reference]({% link annotations.md %}) for the full list of anno
 
 ## What's Next
 
-Snowplane manages many Snowflake resource types including Task, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, Tag, NetworkPolicy, NetworkRule, PasswordPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, StorageIntegration, SecurityIntegration, NotificationIntegration, FileFormat, Pipe, DynamicTable, MaterializedView, Sequence, ExternalTable, AccountRoleAssignment, and DatabaseRoleAssignment.
+Snowplane manages many Snowflake resource types including Task, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, Tag, NetworkPolicy, NetworkRule, PasswordPolicy, AuthenticationPolicy, ResourceMonitor, MaskingPolicy, RowAccessPolicy, StorageIntegration, SecurityIntegration, NotificationIntegration, FileFormat, Pipe, DynamicTable, MaterializedView, Sequence, ExternalTable, AccountRoleAssignment, and DatabaseRoleAssignment.
 
 See `config/samples/` for example CRs of every resource type.

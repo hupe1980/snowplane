@@ -1,0 +1,29 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: AuthenticationPolicy
+metadata:
+  name: example-auth-policy
+spec:
+  providerRef:
+    name: default
+  name: EXAMPLE_AUTH_POLICY
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  authenticationMethods:
+    - PASSWORD
+    - SAML
+  clientTypes:
+    - SNOWFLAKE_UI
+    - DRIVERS
+  securityIntegrations:
+    - ALL
+  mfaEnrollment: OPTIONAL
+  mfaPolicy:
+    allowedMethods:
+      - TOTP
+    enforceMfaOnExternalAuthentication: OPTIONAL
+  patPolicy:
+    defaultExpiryInDays: 30
+    maxExpiryInDays: 90
+  comment: "Authentication policy managed by Snowplane"

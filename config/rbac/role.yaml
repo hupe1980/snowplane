@@ -91,6 +91,7 @@ rules:
   - apiauthenticationintegrationwithauthorizationcodegrants
   - apiauthenticationintegrationwithjwtbearers
   - passwordpolicies
+  - authenticationpolicies
   - networkrules
   - alerts
   - notificationintegrations
@@ -164,6 +165,7 @@ rules:
   - apiauthenticationintegrationwithauthorizationcodegrants/status
   - apiauthenticationintegrationwithjwtbearers/status
   - passwordpolicies/status
+  - authenticationpolicies/status
   - networkrules/status
   - alerts/status
   - notificationintegrations/status
@@ -233,6 +235,7 @@ rules:
   - apiauthenticationintegrationwithauthorizationcodegrants/finalizers
   - apiauthenticationintegrationwithjwtbearers/finalizers
   - passwordpolicies/finalizers
+  - authenticationpolicies/finalizers
   - networkrules/finalizers
   - alerts/finalizers
   - notificationintegrations/finalizers

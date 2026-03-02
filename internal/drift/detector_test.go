@@ -367,3 +367,59 @@ func TestResult_SafeSummary_VsSummary(t *testing.T) {
 	assert.NotContains(t, r.SafeSummary(), "old-token")
 	assert.Contains(t, r.SafeSummary(), "SCIM_TOKEN")
 }
+
+// --------------------------------------------------------------------------
+// Tests: CompareStringSliceFold
+// --------------------------------------------------------------------------
+
+func TestDetector_CompareStringSliceFold_Match(t *testing.T) {
+	t.Parallel()
+	d := New().CompareStringSliceFold("AUTH_METHODS", []string{"PASSWORD", "SAML"}, []string{"PASSWORD", "SAML"}, false)
+	r := d.Result()
+	assert.False(t, r.HasDrift)
+	assert.Empty(t, r.Changes)
+}
+
+func TestDetector_CompareStringSliceFold_CaseInsensitiveMatch(t *testing.T) {
+	t.Parallel()
+	d := New().CompareStringSliceFold("AUTH_METHODS", []string{"PASSWORD", "SAML"}, []string{"password", "saml"}, false)
+	r := d.Result()
+	assert.False(t, r.HasDrift)
+}
+
+func TestDetector_CompareStringSliceFold_OrderIndependent(t *testing.T) {
+	t.Parallel()
+	d := New().CompareStringSliceFold("AUTH_METHODS", []string{"SAML", "PASSWORD"}, []string{"PASSWORD", "SAML"}, false)
+	r := d.Result()
+	assert.False(t, r.HasDrift)
+}
+
+func TestDetector_CompareStringSliceFold_Drift_DifferentValues(t *testing.T) {
+	t.Parallel()
+	d := New().CompareStringSliceFold("AUTH_METHODS", []string{"PASSWORD", "SAML"}, []string{"PASSWORD", "OAUTH"}, false)
+	r := d.Result()
+	assert.True(t, r.HasDrift)
+	require.Len(t, r.Changes, 1)
+	assert.Equal(t, "AUTH_METHODS", r.Changes[0].Field)
+}
+
+func TestDetector_CompareStringSliceFold_Drift_DifferentLength(t *testing.T) {
+	t.Parallel()
+	d := New().CompareStringSliceFold("AUTH_METHODS", []string{"PASSWORD", "SAML"}, []string{"PASSWORD"}, false)
+	r := d.Result()
+	assert.True(t, r.HasDrift)
+}
+
+func TestDetector_CompareStringSliceFold_NilDesiredSkipped(t *testing.T) {
+	t.Parallel()
+	d := New().CompareStringSliceFold("AUTH_METHODS", nil, []string{"PASSWORD"}, false)
+	r := d.Result()
+	assert.False(t, r.HasDrift)
+}
+
+func TestDetector_CompareStringSliceFold_EmptyDesiredSkipped(t *testing.T) {
+	t.Parallel()
+	d := New().CompareStringSliceFold("AUTH_METHODS", []string{}, []string{"PASSWORD"}, false)
+	r := d.Result()
+	assert.False(t, r.HasDrift)
+}

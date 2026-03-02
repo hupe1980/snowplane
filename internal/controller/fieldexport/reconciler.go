@@ -633,6 +633,7 @@ func sourceResourceTypes() []client.Object {
 		&snowplanev1alpha1.MaskingPolicy{},
 		&snowplanev1alpha1.RowAccessPolicy{},
 		&snowplanev1alpha1.PasswordPolicy{},
+		&snowplanev1alpha1.AuthenticationPolicy{},
 		&snowplanev1alpha1.FileFormat{},
 		&snowplanev1alpha1.Pipe{},
 		&snowplanev1alpha1.StorageIntegration{},

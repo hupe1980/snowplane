@@ -24,6 +24,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	accountrolectl "github.com/hupe1980/snowplane/internal/controller/accountrole"
 	alertctl "github.com/hupe1980/snowplane/internal/controller/alert"
+	authenticationpolicyctl "github.com/hupe1980/snowplane/internal/controller/authenticationpolicy"
 	database "github.com/hupe1980/snowplane/internal/controller/database"
 	databaserolectl "github.com/hupe1980/snowplane/internal/controller/databaserole"
 	dynamictablectl "github.com/hupe1980/snowplane/internal/controller/dynamictable"
@@ -86,6 +87,7 @@ var (
 	grantOwnershipMockSvc          *mockGrantOwnershipService
 	roleAssignmentMockSvc          *mockRoleAssignmentService
 	notificationIntegrationMockSvc *mockNotificationIntegrationService
+	authenticationPolicyMockSvc    *mockAuthenticationPolicyService
 )
 
 const (
@@ -402,6 +404,21 @@ func TestMain(m *testing.M) {
 
 	if err := maskingPolicyReconciler.SetupWithManager(mgr, 1); err != nil {
 		panic("failed to setup maskingpolicy controller: " + err.Error())
+	}
+
+	// --- AuthenticationPolicy controller ---
+	authenticationPolicyMockSvc = &mockAuthenticationPolicyService{}
+
+	authenticationPolicyServiceFactory := func(_ context.Context, _ authenticationpolicyctl.SnowflakeClient, _ string) (authenticationpolicyctl.Service, func(context.Context), error) {
+		return authenticationPolicyMockSvc, func(context.Context) {}, nil
+	}
+
+	authenticationPolicyReconciler := authenticationpolicyctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, authenticationPolicyServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := authenticationPolicyReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup authenticationpolicy controller: " + err.Error())
 	}
 
 	// --- PasswordPolicy controller ---

@@ -660,7 +660,35 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 </details>
 
 <details>
-<summary>🔒 <strong>PasswordPolicy</strong></summary>
+<summary>�️ <strong>AuthenticationPolicy</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Authentication policy name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.authenticationMethods` | `[]string` | Allowed authentication methods (e.g. `PASSWORD`, `SAML`, `OAUTH`, `KEYPAIR`, `PROGRAMMATIC_ACCESS_TOKEN`, `WORKLOAD_IDENTITY`) |
+| `spec.clientTypes` | `[]string` | Allowed client types (e.g. `SNOWFLAKE_UI`, `DRIVERS`, `SNOWFLAKE_CLI`, `SNOWSQL`) |
+| `spec.securityIntegrations` | `[]string` | Security integration names allowed with this policy |
+| `spec.mfaEnrollment` | `*enum` | MFA enrollment: `REQUIRED` / `REQUIRED_PASSWORD_ONLY` / `OPTIONAL` |
+| `spec.mfaPolicy.allowedMethods` | `[]string` | MFA methods allowed (e.g. `TOTP`) |
+| `spec.mfaPolicy.enforceMfaOnExternalAuthentication` | `*enum` | MFA for external auth: `OPTIONAL` / `REQUIRED` |
+| `spec.patPolicy.defaultExpiryInDays` | `*int32` | Default PAT expiry in days |
+| `spec.patPolicy.maxExpiryInDays` | `*int32` | Maximum PAT expiry in days |
+| `spec.patPolicy.networkPolicyEvaluation` | `*enum` | PAT network policy eval: `OPTIONAL` / `REQUIRED` |
+| `spec.patPolicy.requireRoleRestrictionForServiceUsers` | `*bool` | Require role restriction for service users |
+| `spec.workloadIdentityPolicy.allowedProviders` | `[]string` | Identity providers (e.g. `AWS`, `AZURE`, `GCP`) |
+| `spec.workloadIdentityPolicy.allowedAwsAccounts` | `[]string` | AWS account IDs for workload identity |
+| `spec.workloadIdentityPolicy.allowedAzureIssuers` | `[]string` | Azure issuers for workload identity |
+| `spec.workloadIdentityPolicy.allowedOidcIssuers` | `[]string` | OIDC issuers for workload identity |
+| `spec.comment` | `*string` | Optional description |
+
+> 🛡️ **Authentication Security:** Authentication policies control how users authenticate to Snowflake. They define allowed methods, client types, MFA requirements, PAT settings, and workload identity providers. Supports `CREATE OR ALTER` for atomic updates. Assign to users or accounts for comprehensive authentication governance.
+
+</details>
+
+<details>
+<summary>�🔒 <strong>PasswordPolicy</strong></summary>
 
 | Field | Type | Description |
 |-------|------|-------------|

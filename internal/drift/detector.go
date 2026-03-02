@@ -253,6 +253,47 @@ func (d *Detector) CompareBoolValue(field string, desired, actual bool, immutabl
 	return d
 }
 
+// CompareStringSliceFold compares two string slices using case-insensitive,
+// order-independent comparison (set equality). If the slices differ, a drift
+// entry is recorded. Nil or empty desired slices are treated as unmanaged and
+// skipped.
+func (d *Detector) CompareStringSliceFold(field string, desired, actual []string, immutable bool) *Detector {
+	if len(desired) == 0 {
+		return d
+	}
+
+	if len(desired) != len(actual) {
+		d.changes = append(d.changes, FieldChange{
+			Field:     field,
+			Desired:   fmt.Sprintf("%v", desired),
+			Actual:    fmt.Sprintf("%v", actual),
+			Immutable: immutable,
+		})
+
+		return d
+	}
+
+	actualSet := make(map[string]struct{}, len(actual))
+	for _, v := range actual {
+		actualSet[strings.ToUpper(strings.TrimSpace(v))] = struct{}{}
+	}
+
+	for _, v := range desired {
+		if _, ok := actualSet[strings.ToUpper(strings.TrimSpace(v))]; !ok {
+			d.changes = append(d.changes, FieldChange{
+				Field:     field,
+				Desired:   fmt.Sprintf("%v", desired),
+				Actual:    fmt.Sprintf("%v", actual),
+				Immutable: immutable,
+			})
+
+			return d
+		}
+	}
+
+	return d
+}
+
 // Result builds the final drift result.
 func (d *Detector) Result() *Result {
 	r := &Result{

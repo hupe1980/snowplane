@@ -49,6 +49,7 @@ func resetMocks() {
 	rowAccessPolicyMockSvc.Reset()
 	grantOwnershipMockSvc.Reset()
 	roleAssignmentMockSvc.Reset()
+	authenticationPolicyMockSvc.Reset()
 }
 
 // ---------------------------------------------------------------------------

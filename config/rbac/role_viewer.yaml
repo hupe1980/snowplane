@@ -43,6 +43,7 @@ rules:
   - storageintegrations
   - securityintegrations
   - passwordpolicies
+  - authenticationpolicies
   - networkrules
   - alerts
   - notificationintegrations
@@ -112,6 +113,7 @@ rules:
   - storageintegrations/status
   - securityintegrations/status
   - passwordpolicies/status
+  - authenticationpolicies/status
   - networkrules/status
   - alerts/status
   - notificationintegrations/status

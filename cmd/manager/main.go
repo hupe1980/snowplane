@@ -26,6 +26,7 @@ import (
 	apiauthacgctl "github.com/hupe1980/snowplane/internal/controller/apiauthenticationintegrationwithauthorizationcodegrant"
 	apiauthccctl "github.com/hupe1980/snowplane/internal/controller/apiauthenticationintegrationwithclientcredentials"
 	apiauthjwtctl "github.com/hupe1980/snowplane/internal/controller/apiauthenticationintegrationwithjwtbearer"
+	authenticationpolicyctl "github.com/hupe1980/snowplane/internal/controller/authenticationpolicy"
 	database "github.com/hupe1980/snowplane/internal/controller/database"
 	databaserolectl "github.com/hupe1980/snowplane/internal/controller/databaserole"
 	dynamictablectl "github.com/hupe1980/snowplane/internal/controller/dynamictable"
@@ -101,6 +102,7 @@ func init() {
 // validControllerNames is the set of controller names accepted by --disable-controllers.
 var validControllerNames = map[string]bool{
 	"alert":                            true,
+	"authenticationpolicy":             true,
 	"database":                         true,
 	"schema":                           true,
 	"warehouse":                        true,
@@ -383,6 +385,7 @@ func main() {
 		ctrl reconciler.Registerable
 	}{
 		{"alert", alertctl.NewReconciler(kc, factory, controllerRec("alert"), rl)},
+		{"authenticationpolicy", authenticationpolicyctl.NewReconciler(kc, factory, controllerRec("authenticationpolicy"), rl)},
 		{"database", database.NewReconciler(kc, factory, controllerRec("database"), rl)},
 		{"schema", schemactl.NewReconciler(kc, factory, controllerRec("schema"), rl)},
 		{"warehouse", warehousectl.NewReconciler(kc, factory, controllerRec("warehouse"), rl)},
