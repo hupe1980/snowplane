@@ -110,7 +110,7 @@ func NewMaterializedViewClient(c SQLExecutor) *MaterializedViewClient {
 }
 
 // buildCreateMaterializedViewSQL builds the CREATE MATERIALIZED VIEW SQL statement.
-func buildCreateMaterializedViewSQL(opts CreateMaterializedViewOptions) string {
+func buildCreateMaterializedViewSQL(opts CreateMaterializedViewOptions) (string, error) {
 	var b sqlbuilder.Builder
 
 	b.WriteString("CREATE")
@@ -143,7 +143,11 @@ func buildCreateMaterializedViewSQL(opts CreateMaterializedViewOptions) string {
 	b.WriteString(" AS ")
 	b.WriteString(opts.Statement)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a materialized view in Snowflake.
@@ -152,7 +156,12 @@ func (c *MaterializedViewClient) Create(ctx context.Context, opts CreateMaterial
 		return NewTerminalError(fmt.Errorf("invalid create materialized view options: %w", err))
 	}
 
-	if _, err := c.client.Exec(ctx, buildCreateMaterializedViewSQL(opts)); err != nil {
+	sql, err := buildCreateMaterializedViewSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create materialized view SQL: %w", err))
+	}
+
+	if _, err := c.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating materialized view %s: %w", opts.Name, err)
 	}
 
@@ -269,62 +278,29 @@ func (c *MaterializedViewClient) Observe(ctx context.Context, name SchemaObjectI
 
 // scanMaterializedViewShowOutput scans SHOW MATERIALIZED VIEWS results for a matching row.
 func scanMaterializedViewShowOutput(rows *sql.Rows, name string) (*MaterializedViewShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*MaterializedViewShowOutput, error) {
 		return &MaterializedViewShowOutput{
-			CreatedOn:           colMap["created_on"],
-			Name:                colMap["name"],
-			DatabaseName:        colMap["database_name"],
-			SchemaName:          colMap["schema_name"],
-			ClusterBy:           colMap["cluster_by"],
-			Rows:                colMap["rows"],
-			Bytes:               colMap["bytes"],
-			SourceDatabaseName:  colMap["source_database_name"],
-			SourceSchemaName:    colMap["source_schema_name"],
-			SourceTableName:     colMap["source_table_name"],
-			RefreshedOn:         colMap["refreshed_on"],
-			CompactedOn:         colMap["compacted_on"],
-			Owner:               colMap["owner"],
-			Invalid:             colMap["invalid"],
-			InvalidReason:       colMap["invalid_reason"],
-			BehindBy:            colMap["behind_by"],
-			Comment:             colMap["comment"],
-			Text:                colMap["text"],
-			IsSecure:            colMap["is_secure"],
-			AutomaticClustering: colMap["automatic_clustering"],
-			OwnerRoleType:       colMap["owner_role_type"],
+			CreatedOn:           m["created_on"],
+			Name:                m["name"],
+			DatabaseName:        m["database_name"],
+			SchemaName:          m["schema_name"],
+			ClusterBy:           m["cluster_by"],
+			Rows:                m["rows"],
+			Bytes:               m["bytes"],
+			SourceDatabaseName:  m["source_database_name"],
+			SourceSchemaName:    m["source_schema_name"],
+			SourceTableName:     m["source_table_name"],
+			RefreshedOn:         m["refreshed_on"],
+			CompactedOn:         m["compacted_on"],
+			Owner:               m["owner"],
+			Invalid:             m["invalid"],
+			InvalidReason:       m["invalid_reason"],
+			BehindBy:            m["behind_by"],
+			Comment:             m["comment"],
+			Text:                m["text"],
+			IsSecure:            m["is_secure"],
+			AutomaticClustering: m["automatic_clustering"],
+			OwnerRoleType:       m["owner_role_type"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

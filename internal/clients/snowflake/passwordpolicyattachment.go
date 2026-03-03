@@ -3,8 +3,11 @@ package snowflake
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/snowflakedb/gosnowflake"
 )
 
 // PasswordPolicyAttachmentObservation holds the result of observing a password policy attachment.
@@ -184,9 +187,16 @@ func scanPasswordPolicyReference(rows *sql.Rows, expectedPolicy string) (*Passwo
 	return &PasswordPolicyAttachmentObservation{Exists: false}, nil
 }
 
-// IsSQLCompilationError checks if the error is a SQL compilation error.
+// IsSQLCompilationError checks if the error is a SQL compilation error
+// using the structured Snowflake error code (1003).
 func IsSQLCompilationError(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "SQL compilation error")
+	if err == nil {
+		return false
+	}
+
+	var sfErr *gosnowflake.SnowflakeError
+
+	return errors.As(err, &sfErr) && sfErr.Number == ErrCodeSQLCompilation
 }
 
 // SetPasswordPolicy attaches a password policy to the target.

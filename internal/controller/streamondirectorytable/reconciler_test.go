@@ -73,9 +73,9 @@ func newTestStreamOnDirectoryTable(name, namespace string) *snowplanev1alpha1.St
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:         "MY_STREAM",
-			DatabaseName: testutil.PtrString("MY_DB"),
-			SchemaName:   testutil.PtrString("MY_SCHEMA"),
-			StageName:    testutil.PtrString("MY_STAGE"),
+			DatabaseName: testutil.Ptr("MY_DB"),
+			SchemaName:   testutil.Ptr("MY_SCHEMA"),
+			StageName:    testutil.Ptr("MY_STAGE"),
 		},
 	}
 }
@@ -229,7 +229,7 @@ func TestReconcile_Delete(t *testing.T) {
 func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 	s := newTestStreamOnDirectoryTable("mys", "default")
-	s.Spec.Comment = testutil.PtrString("test")
+	s.Spec.Comment = testutil.Ptr("test")
 	s.Status.StageName = "MY_STAGE"
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_STREAM")
 	opts := buildCreateOptions(s, id)
@@ -250,7 +250,7 @@ func TestBuildAlterOptions_NoChanges(t *testing.T) {
 
 func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
-	spec := &snowplanev1alpha1.StreamOnDirectoryTableSpec{Comment: testutil.PtrString("x")}
+	spec := &snowplanev1alpha1.StreamOnDirectoryTableSpec{Comment: testutil.Ptr("x")}
 	fields := tracked.ComputeTracked(spec)
 	assert.ElementsMatch(t, []string{"COMMENT"}, fields)
 }
@@ -268,7 +268,7 @@ func TestApplyObservation(t *testing.T) {
 func TestDetectDrift_NoDrift(t *testing.T) {
 	t.Parallel()
 	s := &snowplanev1alpha1.StreamOnDirectoryTable{
-		Spec:   snowplanev1alpha1.StreamOnDirectoryTableSpec{Name: "MY_STREAM", StageName: testutil.PtrString("MY_STAGE")},
+		Spec:   snowplanev1alpha1.StreamOnDirectoryTableSpec{Name: "MY_STREAM", StageName: testutil.Ptr("MY_STAGE")},
 		Status: snowplanev1alpha1.StreamOnDirectoryTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", StageName: "MY_STAGE"},
 	}
 	obs := &snowflake.StreamObservation{
@@ -284,7 +284,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 func TestDetectDrift_WithDrift(t *testing.T) {
 	t.Parallel()
 	s := &snowplanev1alpha1.StreamOnDirectoryTable{
-		Spec:   snowplanev1alpha1.StreamOnDirectoryTableSpec{Name: "MY_STREAM", StageName: testutil.PtrString("MY_STAGE"), Comment: testutil.PtrString("desired")},
+		Spec:   snowplanev1alpha1.StreamOnDirectoryTableSpec{Name: "MY_STREAM", StageName: testutil.Ptr("MY_STAGE"), Comment: testutil.Ptr("desired")},
 		Status: snowplanev1alpha1.StreamOnDirectoryTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", StageName: "MY_STAGE"},
 	}
 	obs := &snowflake.StreamObservation{

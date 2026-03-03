@@ -308,7 +308,7 @@ Hierarchical token-bucket rate limiting:
 
 LRU-cached client pool with singleflight deduplication:
 
-- **Keyed** by provider name + config hash (hash change → close + replace).
+- **Keyed** by namespace-qualified provider name (`namespace/name`) + config hash. Namespace qualification ensures multi-tenant isolation — two ProviderConfigs named `"default"` in different namespaces cannot collide.
 - **Singleflight** — only one connection attempt per provider during thundering-herd scenarios.
 - **Idle TTL** — optional time-based eviction for unused clients.
 - **LRU eviction** — when `MaxSize` is reached, least-recently-used client is closed.

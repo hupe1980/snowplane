@@ -63,7 +63,6 @@ func (m *mockService) UnsetTag(ctx context.Context, opts snowflake.UnsetTagOptio
 // Helpers
 // --------------------------------------------------------------------------
 
-func ptrStr(s string) *string { return &s }
 
 func newTestTA(name, namespace string) *snowplanev1alpha1.TagAssociation {
 	return &snowplanev1alpha1.TagAssociation{
@@ -77,7 +76,7 @@ func newTestTA(name, namespace string) *snowplanev1alpha1.TagAssociation {
 				DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete,
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
-			TagName:    ptrStr("\"DB\".\"SCHEMA\".\"MY_TAG\""),
+			TagName:    testutil.Ptr("\"DB\".\"SCHEMA\".\"MY_TAG\""),
 			TagValue:   "production",
 			ObjectType: "TABLE",
 			ObjectName: "\"DB\".\"SCHEMA\".\"MY_TABLE\"",
@@ -674,7 +673,7 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 	ta.Finalizers = []string{finalizerName}
 	ta.Generation = 1
 	ta.Status.ObservedGeneration = 1
-	ta.Spec.UseRole = testutil.PtrString("DATA_ADMIN")
+	ta.Spec.UseRole = testutil.Ptr("DATA_ADMIN")
 
 	obs := successfulObservation()
 

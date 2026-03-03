@@ -187,16 +187,10 @@ func NewFileFormatClient(c SQLExecutor) *FileFormatClient {
 }
 
 // buildCreateFileFormatSQL builds the CREATE FILE FORMAT SQL statement.
-func buildCreateFileFormatSQL(opts CreateFileFormatOptions) string {
+func buildCreateFileFormatSQL(opts CreateFileFormatOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER FILE FORMAT ")
-	} else {
-		b.WriteString("CREATE FILE FORMAT IF NOT EXISTS ")
-	}
-
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "FILE FORMAT", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 	fmt.Fprintf(&b.Builder, " TYPE = '%s'", opts.Type)
 
 	// CSV-specific.
@@ -252,7 +246,11 @@ func buildCreateFileFormatSQL(opts CreateFileFormatOptions) string {
 		fmt.Fprintf(&b.Builder, " NULL_IF = (%s)", strings.Join(quoted, ", "))
 	}
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a file format in Snowflake.
@@ -261,7 +259,12 @@ func (ff *FileFormatClient) Create(ctx context.Context, opts CreateFileFormatOpt
 		return NewTerminalError(fmt.Errorf("invalid create file format options: %w", err))
 	}
 
-	if _, err := ff.client.Exec(ctx, buildCreateFileFormatSQL(opts)); err != nil {
+	sql, err := buildCreateFileFormatSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create file format SQL: %w", err))
+	}
+
+	if _, err := ff.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating file format %s: %w", opts.Name, err)
 	}
 
@@ -390,48 +393,15 @@ func (ff *FileFormatClient) Observe(ctx context.Context, name SchemaObjectIdenti
 
 // scanFileFormatShowOutput scans SHOW FILE FORMATS results for a matching row.
 func scanFileFormatShowOutput(rows *sql.Rows, name string) (*FileFormatShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*FileFormatShowOutput, error) {
 		return &FileFormatShowOutput{
-			CreatedOn:    colMap["created_on"],
-			Name:         colMap["name"],
-			DatabaseName: colMap["database_name"],
-			SchemaName:   colMap["schema_name"],
-			Owner:        colMap["owner"],
-			Comment:      colMap["comment"],
-			Type:         colMap["type"],
+			CreatedOn:    m["created_on"],
+			Name:         m["name"],
+			DatabaseName: m["database_name"],
+			SchemaName:   m["schema_name"],
+			Owner:        m["owner"],
+			Comment:      m["comment"],
+			Type:         m["type"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

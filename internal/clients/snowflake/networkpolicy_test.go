@@ -5,33 +5,50 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
 // --------------------------------------------------------------------------
 // SQL generation tests
 // --------------------------------------------------------------------------
 
-func TestBuildIPListClause(t *testing.T) {
+func TestBuildEscapedListClause_IP(t *testing.T) {
 	t.Parallel()
 
 	t.Run("SingleIP", func(t *testing.T) {
 		t.Parallel()
-		got := buildIPListClause("ALLOWED_IP_LIST", []string{"1.2.3.4"})
+		got := sqlbuilder.BuildEscapedListClause("ALLOWED_IP_LIST", []string{"1.2.3.4"})
 		assert.Equal(t, "ALLOWED_IP_LIST = ('1.2.3.4')", got)
 	})
 
 	t.Run("MultipleIPs", func(t *testing.T) {
 		t.Parallel()
-		got := buildIPListClause("BLOCKED_IP_LIST", []string{"1.1.1.1", "2.2.2.2"})
+		got := sqlbuilder.BuildEscapedListClause("BLOCKED_IP_LIST", []string{"1.1.1.1", "2.2.2.2"})
 		assert.Equal(t, "BLOCKED_IP_LIST = ('1.1.1.1', '2.2.2.2')", got)
+	})
+
+	t.Run("InjectionAttemptEscaped", func(t *testing.T) {
+		t.Parallel()
+		got := sqlbuilder.BuildEscapedListClause("ALLOWED_IP_LIST", []string{"1.2.3.4' OR '1'='1"})
+		assert.Equal(t, "ALLOWED_IP_LIST = ('1.2.3.4'' OR ''1''=''1')", got)
 	})
 }
 
-func TestBuildNetworkRuleListClause(t *testing.T) {
+func TestBuildEscapedListClause_NetworkRule(t *testing.T) {
 	t.Parallel()
 
-	got := buildNetworkRuleListClause("ALLOWED_NETWORK_RULE_LIST", []string{"rule1", "rule2"})
-	assert.Equal(t, "ALLOWED_NETWORK_RULE_LIST = ('rule1', 'rule2')", got)
+	t.Run("ValidRules", func(t *testing.T) {
+		t.Parallel()
+		got := sqlbuilder.BuildEscapedListClause("ALLOWED_NETWORK_RULE_LIST", []string{"rule1", "rule2"})
+		assert.Equal(t, "ALLOWED_NETWORK_RULE_LIST = ('rule1', 'rule2')", got)
+	})
+
+	t.Run("InjectionAttemptEscaped", func(t *testing.T) {
+		t.Parallel()
+		got := sqlbuilder.BuildEscapedListClause("ALLOWED_NETWORK_RULE_LIST", []string{"rule'; DROP TABLE x;--"})
+		assert.Equal(t, "ALLOWED_NETWORK_RULE_LIST = ('rule''; DROP TABLE x;--')", got)
+	})
 }
 
 func TestBuildCreateNetworkPolicySQL(t *testing.T) {
@@ -42,7 +59,8 @@ func TestBuildCreateNetworkPolicySQL(t *testing.T) {
 		opts := CreateNetworkPolicyOptions{
 			Name: NewAccountObjectIdentifier("MY_POLICY"),
 		}
-		got := buildCreateNetworkPolicySQL(opts)
+		got, err := buildCreateNetworkPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE NETWORK POLICY IF NOT EXISTS "MY_POLICY"`, got)
 	})
 
@@ -52,7 +70,8 @@ func TestBuildCreateNetworkPolicySQL(t *testing.T) {
 			Name:          NewAccountObjectIdentifier("POL"),
 			AllowedIPList: []string{"10.0.0.0/8"},
 		}
-		got := buildCreateNetworkPolicySQL(opts)
+		got, err := buildCreateNetworkPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "ALLOWED_IP_LIST = ('10.0.0.0/8')")
 	})
 
@@ -62,7 +81,8 @@ func TestBuildCreateNetworkPolicySQL(t *testing.T) {
 			Name:          NewAccountObjectIdentifier("POL"),
 			BlockedIPList: []string{"192.168.1.1", "192.168.1.2"},
 		}
-		got := buildCreateNetworkPolicySQL(opts)
+		got, err := buildCreateNetworkPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "BLOCKED_IP_LIST = ('192.168.1.1', '192.168.1.2')")
 	})
 
@@ -73,7 +93,8 @@ func TestBuildCreateNetworkPolicySQL(t *testing.T) {
 			AllowedNetworkRuleList: []string{"rule_a"},
 			BlockedNetworkRuleList: []string{"rule_b"},
 		}
-		got := buildCreateNetworkPolicySQL(opts)
+		got, err := buildCreateNetworkPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "ALLOWED_NETWORK_RULE_LIST = ('rule_a')")
 		assert.Contains(t, got, "BLOCKED_NETWORK_RULE_LIST = ('rule_b')")
 	})
@@ -85,7 +106,8 @@ func TestBuildCreateNetworkPolicySQL(t *testing.T) {
 			Name:    NewAccountObjectIdentifier("POL"),
 			Comment: &comment,
 		}
-		got := buildCreateNetworkPolicySQL(opts)
+		got, err := buildCreateNetworkPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "COMMENT = 'security policy'")
 	})
 
@@ -100,7 +122,8 @@ func TestBuildCreateNetworkPolicySQL(t *testing.T) {
 			BlockedNetworkRuleList: []string{"r2"},
 			Comment:                &comment,
 		}
-		got := buildCreateNetworkPolicySQL(opts)
+		got, err := buildCreateNetworkPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `"FULL_POL"`)
 		assert.Contains(t, got, "ALLOWED_IP_LIST")
 		assert.Contains(t, got, "BLOCKED_IP_LIST")
@@ -160,9 +183,9 @@ func TestBuildAlterNetworkPolicyStatements(t *testing.T) {
 		}
 		stmts, err := buildAlterNetworkPolicyStatements(opts)
 		require.NoError(t, err)
-		assert.Len(t, stmts, 2)
-		assert.Contains(t, stmts[0], "SET ALLOWED_NETWORK_RULE_LIST")
-		assert.Contains(t, stmts[1], "SET BLOCKED_NETWORK_RULE_LIST")
+		require.Len(t, stmts, 1)
+		assert.Contains(t, stmts[0], "ALLOWED_NETWORK_RULE_LIST = ('r1')")
+		assert.Contains(t, stmts[0], "BLOCKED_NETWORK_RULE_LIST = ('r2')")
 	})
 
 	t.Run("SetComment", func(t *testing.T) {

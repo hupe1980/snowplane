@@ -1583,8 +1583,8 @@ func (s *SecurityIntegrationSpec) Validate() error {
 			if s.APIAuthentication.OAuthClientID == "" {
 				errs = append(errs, errors.New("spec.apiAuthentication.oauthClientID is required"))
 			}
-			if s.APIAuthentication.OAuthClientSecret == "" {
-				errs = append(errs, errors.New("spec.apiAuthentication.oauthClientSecret is required"))
+			if err := validateRequiredSecretKeyRef("spec.apiAuthentication.oauthClientSecretRef", s.APIAuthentication.OAuthClientSecretRef); err != nil {
+				errs = append(errs, err)
 			}
 			if s.APIAuthentication.OAuthTokenEndpoint == "" {
 				errs = append(errs, errors.New("spec.apiAuthentication.oauthTokenEndpoint is required"))
@@ -1902,8 +1902,8 @@ func (s *APIAuthenticationIntegrationWithClientCredentialsSpec) Validate() error
 		errs = append(errs, errors.New("spec.oauthClientId is required"))
 	}
 
-	if s.OAuthClientSecret == "" {
-		errs = append(errs, errors.New("spec.oauthClientSecret is required"))
+	if err := validateRequiredSecretKeyRef("spec.oauthClientSecretRef", s.OAuthClientSecretRef); err != nil {
+		errs = append(errs, err)
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -1925,8 +1925,8 @@ func (s *APIAuthenticationIntegrationWithAuthorizationCodeGrantSpec) Validate() 
 		errs = append(errs, errors.New("spec.oauthClientId is required"))
 	}
 
-	if s.OAuthClientSecret == "" {
-		errs = append(errs, errors.New("spec.oauthClientSecret is required"))
+	if err := validateRequiredSecretKeyRef("spec.oauthClientSecretRef", s.OAuthClientSecretRef); err != nil {
+		errs = append(errs, err)
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -1948,8 +1948,8 @@ func (s *APIAuthenticationIntegrationWithJWTBearerSpec) Validate() error {
 		errs = append(errs, errors.New("spec.oauthClientId is required"))
 	}
 
-	if s.OAuthClientSecret == "" {
-		errs = append(errs, errors.New("spec.oauthClientSecret is required"))
+	if err := validateRequiredSecretKeyRef("spec.oauthClientSecretRef", s.OAuthClientSecretRef); err != nil {
+		errs = append(errs, err)
 	}
 
 	if s.OAuthAssertionIssuer == "" {
@@ -2084,14 +2084,19 @@ func validateSecretKeyRef(field string, ref *SecretKeyReference) error {
 		return nil
 	}
 
+	return validateRequiredSecretKeyRef(field, *ref)
+}
+
+// validateRequiredSecretKeyRef checks that a required SecretKeyReference has both name and key set.
+func validateRequiredSecretKeyRef(field string, ref SecretKeyReference) error {
 	var errs []error
 
 	if ref.Name == "" {
-		errs = append(errs, fmt.Errorf("%s.name is required when %s is set", field, field))
+		errs = append(errs, fmt.Errorf("%s.name is required", field))
 	}
 
 	if ref.Key == "" {
-		errs = append(errs, fmt.Errorf("%s.key is required when %s is set", field, field))
+		errs = append(errs, fmt.Errorf("%s.key is required", field))
 	}
 
 	return errors.Join(errs...)

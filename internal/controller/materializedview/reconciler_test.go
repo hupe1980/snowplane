@@ -539,7 +539,7 @@ func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
 	mv := newTestMaterializedView("mymv", "default")
-	mv.Spec.Comment = testutil.PtrString("test mv")
+	mv.Spec.Comment = testutil.Ptr("test mv")
 	mv.Spec.Secure = true
 	mv.Spec.ClusterBy = []string{"sale_date"}
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "DAILY_SALES")
@@ -583,7 +583,7 @@ func TestBuildAlterOptions_CommentChange(t *testing.T) {
 	t.Parallel()
 
 	mv := newTestMaterializedView("mymv", "default")
-	mv.Spec.Comment = testutil.PtrString("new comment")
+	mv.Spec.Comment = testutil.Ptr("new comment")
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "DAILY_SALES")
 	obs := successfulObservation() // Comment = ""
 
@@ -608,7 +608,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.MaterializedViewSpec{
-		Comment: testutil.PtrString("test"),
+		Comment: testutil.Ptr("test"),
 	}
 
 	fields := tracked.ComputeTracked(spec)
@@ -623,7 +623,7 @@ func TestDetectDrift_CommentDrift(t *testing.T) {
 	t.Parallel()
 
 	mv := newTestMaterializedView("mymv", "default")
-	mv.Spec.Comment = testutil.PtrString("expected")
+	mv.Spec.Comment = testutil.Ptr("expected")
 
 	obs := &snowflake.MaterializedViewObservation{
 		Exists: true,

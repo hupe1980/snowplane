@@ -79,6 +79,20 @@ func validateMaxDataExtension(v *int32) error {
 	return nil
 }
 
+// CollectErrors runs each validator and returns all non-nil errors joined.
+// This eliminates the repetitive if-err-append pattern in Validate methods.
+func CollectErrors(validators ...func() error) error {
+	var errs []error
+
+	for _, v := range validators {
+		if err := v(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
 // DatabaseObservation holds the result of observing a Snowflake database.
 type DatabaseObservation struct {
 	// Exists indicates whether the database was found.
@@ -138,37 +152,20 @@ type CreateDatabaseOptions struct {
 
 // Validate checks the CreateDatabaseOptions for validity.
 func (o *CreateDatabaseOptions) Validate() error {
-	var errs []error
-
-	if !ValidObjectIdentifier(o.Name) {
-		errs = append(errs, fmt.Errorf("database name is required"))
-	}
-
-	if err := validateDataRetention(o.DataRetentionTimeInDays); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateMaxDataExtension(o.MaxDataExtensionTimeInDays); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateStorageSerializationPolicy(o.StorageSerializationPolicy); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateLogLevel(o.LogLevel); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateMetricLevel(o.MetricLevel); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateTraceLevel(o.TraceLevel); err != nil {
-		errs = append(errs, err)
-	}
-
-	return errors.Join(errs...)
+	return CollectErrors(
+		func() error {
+			if !ValidObjectIdentifier(o.Name) {
+				return fmt.Errorf("database name is required")
+			}
+			return nil
+		},
+		func() error { return validateDataRetention(o.DataRetentionTimeInDays) },
+		func() error { return validateMaxDataExtension(o.MaxDataExtensionTimeInDays) },
+		func() error { return validateStorageSerializationPolicy(o.StorageSerializationPolicy) },
+		func() error { return validateLogLevel(o.LogLevel) },
+		func() error { return validateMetricLevel(o.MetricLevel) },
+		func() error { return validateTraceLevel(o.TraceLevel) },
+	)
 }
 
 // AlterDatabaseOptions holds the parameters for altering a database.
@@ -194,37 +191,20 @@ type AlterDatabaseOptions struct {
 
 // Validate checks the AlterDatabaseOptions for validity.
 func (o *AlterDatabaseOptions) Validate() error {
-	var errs []error
-
-	if !ValidObjectIdentifier(o.Name) {
-		errs = append(errs, fmt.Errorf("database name is required"))
-	}
-
-	if err := validateDataRetention(o.DataRetentionTimeInDays); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateMaxDataExtension(o.MaxDataExtensionTimeInDays); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateStorageSerializationPolicy(o.StorageSerializationPolicy); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateLogLevel(o.LogLevel); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateMetricLevel(o.MetricLevel); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateTraceLevel(o.TraceLevel); err != nil {
-		errs = append(errs, err)
-	}
-
-	return errors.Join(errs...)
+	return CollectErrors(
+		func() error {
+			if !ValidObjectIdentifier(o.Name) {
+				return fmt.Errorf("database name is required")
+			}
+			return nil
+		},
+		func() error { return validateDataRetention(o.DataRetentionTimeInDays) },
+		func() error { return validateMaxDataExtension(o.MaxDataExtensionTimeInDays) },
+		func() error { return validateStorageSerializationPolicy(o.StorageSerializationPolicy) },
+		func() error { return validateLogLevel(o.LogLevel) },
+		func() error { return validateMetricLevel(o.MetricLevel) },
+		func() error { return validateTraceLevel(o.TraceLevel) },
+	)
 }
 
 // HasChanges reports whether any fields are set for alteration.
@@ -257,23 +237,7 @@ func NewDatabaseClient(c SQLExecutor) *DatabaseClient {
 func buildCreateSQL(opts CreateDatabaseOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER")
-	} else {
-		b.WriteString("CREATE")
-	}
-
-	if opts.Transient {
-		b.WriteString(" TRANSIENT")
-	}
-
-	if opts.UseCreateOrAlter {
-		b.WriteString(" DATABASE ")
-	} else {
-		b.WriteString(" DATABASE IF NOT EXISTS ")
-	}
-
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "DATABASE", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, opts.Transient)
 
 	b.SetString("COMMENT", opts.Comment)
 	b.SetInt32("DATA_RETENTION_TIME_IN_DAYS", opts.DataRetentionTimeInDays)
@@ -358,6 +322,11 @@ func buildDropSQL(name AccountObjectIdentifier) string {
 	return sqlbuilder.DropIfExists("DATABASE", name.FullyQualifiedName())
 }
 
+// buildDropCascadeSQL builds the DROP DATABASE … CASCADE SQL statement.
+func buildDropCascadeSQL(name AccountObjectIdentifier) string {
+	return sqlbuilder.DropIfExistsCascade("DATABASE", name.FullyQualifiedName())
+}
+
 // Drop drops a database from Snowflake.
 func (d *DatabaseClient) Drop(ctx context.Context, name AccountObjectIdentifier) error {
 	if !ValidObjectIdentifier(name) {
@@ -366,6 +335,19 @@ func (d *DatabaseClient) Drop(ctx context.Context, name AccountObjectIdentifier)
 
 	if _, err := d.client.Exec(ctx, buildDropSQL(name)); err != nil {
 		return fmt.Errorf("dropping database %s: %w", name, err)
+	}
+
+	return nil
+}
+
+// DropCascade drops a database and all its child objects from Snowflake.
+func (d *DatabaseClient) DropCascade(ctx context.Context, name AccountObjectIdentifier) error {
+	if !ValidObjectIdentifier(name) {
+		return NewTerminalError(fmt.Errorf("database name is required"))
+	}
+
+	if _, err := d.client.Exec(ctx, buildDropCascadeSQL(name)); err != nil {
+		return fmt.Errorf("cascade dropping database %s: %w", name, err)
 	}
 
 	return nil
@@ -436,84 +418,23 @@ func (d *DatabaseClient) Observe(ctx context.Context, name AccountObjectIdentifi
 
 // scanDatabaseShowOutput scans SHOW DATABASES results for a matching row.
 func scanDatabaseShowOutput(rows *sql.Rows, name string) (*DatabaseShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
-		rt, _ := parseInt32(colMap["retention_time"])
+	return ScanShowOutput(rows, name, func(m map[string]string) (*DatabaseShowOutput, error) {
+		rt, _ := parseInt32(m["retention_time"])
 
 		return &DatabaseShowOutput{
-			CreatedOn:     colMap["created_on"],
-			Name:          colMap["name"],
-			Kind:          colMap["kind"],
-			Comment:       colMap["comment"],
-			Owner:         colMap["owner"],
+			CreatedOn:     m["created_on"],
+			Name:          m["name"],
+			Kind:          m["kind"],
+			Comment:       m["comment"],
+			Owner:         m["owner"],
 			RetentionTime: rt,
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }
 
 // scanDatabaseParameters parses SHOW PARAMETERS results into DatabaseParameters.
 func scanDatabaseParameters(rows *sql.Rows) (*DatabaseParameters, error) {
-	params := &DatabaseParameters{}
-
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning parameter row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		key := strings.ToUpper(colMap["key"])
-		val := colMap["value"]
-
+	return ScanParameters(rows, func(params *DatabaseParameters, key, val string) {
 		switch key {
 		case "DATA_RETENTION_TIME_IN_DAYS":
 			if v, ok := parseInt32(val); ok {
@@ -541,11 +462,5 @@ func scanDatabaseParameters(rows *sql.Rows) (*DatabaseParameters, error) {
 		case "TRACE_LEVEL":
 			params.TraceLevel = val
 		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating parameter rows: %w", err)
-	}
-
-	return params, nil
+	})
 }

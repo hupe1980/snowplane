@@ -322,6 +322,8 @@ metadata:
   labels:
     {{- include "snowplane.labels" . | nindent 4 }}
     rbac.snowplane.hupe1980.github.io/aggregate-to-viewer: "true"
+    # Standard Kubernetes RBAC aggregation: auto-compose into built-in view role.
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
 rules:
 - apiGroups:
   - snowplane.hupe1980.github.io
@@ -470,6 +472,9 @@ metadata:
   labels:
     {{- include "snowplane.labels" . | nindent 4 }}
     rbac.snowplane.hupe1980.github.io/aggregate-to-editor: "true"
+    # Standard Kubernetes RBAC aggregation: auto-compose into built-in edit and admin roles.
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
 rules:
 - apiGroups:
   - snowplane.hupe1980.github.io

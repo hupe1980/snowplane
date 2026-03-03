@@ -245,7 +245,7 @@ func TestReconcile_CreateWithComment(t *testing.T) {
 
 	role := newTestRole("myrole", "default")
 	role.Finalizers = []string{finalizerName}
-	role.Spec.Comment = testutil.PtrString("analyst role")
+	role.Spec.Comment = testutil.Ptr("analyst role")
 
 	var capturedOpts snowflake.CreateAccountRoleOptions
 	obs := successfulObservation()
@@ -402,7 +402,7 @@ func TestReconcile_UpdateWithChanges(t *testing.T) {
 	role.Finalizers = []string{finalizerName}
 	role.Status.ObservedGeneration = 1
 	role.Generation = 2
-	role.Spec.Comment = testutil.PtrString("new comment")
+	role.Spec.Comment = testutil.Ptr("new comment")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old comment"
@@ -435,7 +435,7 @@ func TestReconcile_AlterFails(t *testing.T) {
 	role := newTestRole("myrole", "default")
 	role.Finalizers = []string{finalizerName}
 	role.Status.ObservedGeneration = 1
-	role.Spec.Comment = testutil.PtrString("changed")
+	role.Spec.Comment = testutil.Ptr("changed")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "original"
@@ -466,7 +466,7 @@ func TestReconcile_AlterTerminalError(t *testing.T) {
 	role := newTestRole("myrole", "default")
 	role.Finalizers = []string{finalizerName}
 	role.Status.ObservedGeneration = 1
-	role.Spec.Comment = testutil.PtrString("bad")
+	role.Spec.Comment = testutil.Ptr("bad")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "original"
@@ -724,7 +724,7 @@ func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
 	role := newTestRole("myrole", "default")
-	role.Spec.Comment = testutil.PtrString("my role")
+	role.Spec.Comment = testutil.Ptr("my role")
 	id := snowflake.NewAccountObjectIdentifier("DATA_ANALYST")
 
 	opts := buildCreateOptions(role, id)
@@ -747,7 +747,7 @@ func TestBuildAlterOptions_CommentChanged(t *testing.T) {
 	t.Parallel()
 
 	role := newTestRole("myrole", "default")
-	role.Spec.Comment = testutil.PtrString("new")
+	role.Spec.Comment = testutil.Ptr("new")
 
 	id := snowflake.NewAccountObjectIdentifier("DATA_ANALYST")
 	obs := successfulObservation()
@@ -788,7 +788,7 @@ func TestBuildAlterOptions_NoUnsetWhenFieldStillSet(t *testing.T) {
 	t.Parallel()
 
 	role := newTestRole("myrole", "default")
-	role.Spec.Comment = testutil.PtrString("still here")
+	role.Spec.Comment = testutil.Ptr("still here")
 	role.Status.TrackedParameters = []string{"COMMENT"}
 
 	id := snowflake.NewAccountObjectIdentifier("DATA_ANALYST")
@@ -804,7 +804,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.AccountRoleSpec{
-		Comment: testutil.PtrString("x"),
+		Comment: testutil.Ptr("x"),
 	}
 
 	fields := tracked.ComputeTracked(spec)
@@ -856,7 +856,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 
 	role := &snowplanev1alpha1.AccountRole{
 		Spec: snowplanev1alpha1.AccountRoleSpec{
-			Comment: testutil.PtrString("test"),
+			Comment: testutil.Ptr("test"),
 		},
 	}
 
@@ -874,7 +874,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 
 	role := &snowplanev1alpha1.AccountRole{
 		Spec: snowplanev1alpha1.AccountRoleSpec{
-			Comment: testutil.PtrString("desired"),
+			Comment: testutil.Ptr("desired"),
 		},
 	}
 
@@ -895,7 +895,7 @@ func TestReconcile_DriftCorrection(t *testing.T) {
 	role.Finalizers = []string{finalizerName}
 	role.Generation = 1
 	role.Status.ObservedGeneration = 1
-	role.Spec.Comment = testutil.PtrString("desired comment")
+	role.Spec.Comment = testutil.Ptr("desired comment")
 	hash, err := snowplanev1alpha1.ComputeSpecHash(role.Spec)
 	require.NoError(t, err)
 	role.Status.LastAppliedSpecHash = hash
@@ -936,7 +936,7 @@ func TestReconcile_DriftDetectOnlyPolicy(t *testing.T) {
 	role.Generation = 1
 	role.Status.ObservedGeneration = 1
 	role.Spec.ManagementPolicies.DriftPolicy = snowplanev1alpha1.DriftPolicyDetectOnly
-	role.Spec.Comment = testutil.PtrString("desired")
+	role.Spec.Comment = testutil.Ptr("desired")
 	hash, err := snowplanev1alpha1.ComputeSpecHash(role.Spec)
 	require.NoError(t, err)
 	role.Status.LastAppliedSpecHash = hash
@@ -1125,7 +1125,7 @@ func TestReconcile_TrackedParametersPersistedOnCreate(t *testing.T) {
 
 	role := newTestRole("myrole", "default")
 	role.Finalizers = []string{finalizerName}
-	role.Spec.Comment = testutil.PtrString("hello")
+	role.Spec.Comment = testutil.Ptr("hello")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "hello"
@@ -1200,7 +1200,7 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 	role.Finalizers = []string{finalizerName}
 	role.Generation = 1
 	role.Status.ObservedGeneration = 1
-	role.Spec.UseRole = testutil.PtrString("USERADMIN")
+	role.Spec.UseRole = testutil.Ptr("USERADMIN")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Owner = "USERADMIN"

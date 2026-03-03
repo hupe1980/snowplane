@@ -90,7 +90,7 @@ func newTestPasswordPolicy(name, namespace string) *snowplanev1alpha1.PasswordPo
 			Name:              "MY_POLICY",
 			DatabaseName:      &dbName,
 			SchemaName:        &schemaName,
-			PasswordMinLength: testutil.PtrInt32(10),
+			PasswordMinLength: testutil.Ptr(int32(10)),
 		},
 	}
 }
@@ -339,7 +339,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Run("MinLengthSet", func(t *testing.T) {
 		t.Parallel()
 		spec := &snowplanev1alpha1.PasswordPolicySpec{
-			PasswordMinLength: testutil.PtrInt32(10),
+			PasswordMinLength: testutil.Ptr(int32(10)),
 		}
 		assert.Contains(t, tracked.ComputeTracked(spec), "PASSWORD_MIN_LENGTH")
 	})
@@ -347,7 +347,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Run("CommentSet", func(t *testing.T) {
 		t.Parallel()
 		spec := &snowplanev1alpha1.PasswordPolicySpec{
-			Comment: testutil.PtrString("test"),
+			Comment: testutil.Ptr("test"),
 		}
 		assert.Contains(t, tracked.ComputeTracked(spec), "COMMENT")
 	})
@@ -392,7 +392,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	pp := &snowplanev1alpha1.PasswordPolicy{
 		Spec: snowplanev1alpha1.PasswordPolicySpec{
 			Name:    "MY_POLICY",
-			Comment: testutil.PtrString("desired"),
+			Comment: testutil.Ptr("desired"),
 		},
 	}
 

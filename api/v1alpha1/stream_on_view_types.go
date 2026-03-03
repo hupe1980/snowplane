@@ -25,6 +25,7 @@ type StreamOnViewSpec struct {
 
 	// Name is the Snowflake stream name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -36,6 +37,7 @@ type StreamOnViewSpec struct {
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -47,6 +49,7 @@ type StreamOnViewSpec struct {
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// ViewRef references a View CR in the same namespace.
@@ -58,6 +61,7 @@ type StreamOnViewSpec struct {
 	// Mutually exclusive with ViewRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	ViewName *string `json:"viewName,omitempty"`
 
 	// AppendOnly when true creates an append-only stream that tracks row inserts only.

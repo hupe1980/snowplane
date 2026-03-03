@@ -84,11 +84,11 @@ func newTestDynamicTable(name, namespace string) *snowplanev1alpha1.DynamicTable
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:          "MY_DT",
-			DatabaseName:  testutil.PtrString("MY_DB"),
-			SchemaName:    testutil.PtrString("MY_SCHEMA"),
+			DatabaseName:  testutil.Ptr("MY_DB"),
+			SchemaName:    testutil.Ptr("MY_SCHEMA"),
 			Query:         "SELECT * FROM src",
 			TargetLag:     "1 minute",
-			WarehouseName: testutil.PtrString("MY_WH"),
+			WarehouseName: testutil.Ptr("MY_WH"),
 		},
 	}
 }
@@ -229,7 +229,7 @@ func TestReconcile_UpdateComment(t *testing.T) {
 	dt.Finalizers = []string{finalizerName}
 	dt.Status.ObservedGeneration = 1
 	dt.Generation = 2
-	dt.Spec.Comment = testutil.PtrString("new comment")
+	dt.Spec.Comment = testutil.Ptr("new comment")
 	dt.Status.DatabaseName = "MY_DB"
 	dt.Status.SchemaName = "MY_SCHEMA"
 	dt.Status.WarehouseName = "MY_WH"

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	sigs "sigs.k8s.io/controller-runtime/pkg/client"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
@@ -13,6 +15,7 @@ import (
 )
 
 type adapter struct {
+	client     sigs.Client
 	newService ServiceFactory
 }
 
@@ -50,7 +53,12 @@ func (a *adapter) Create(ctx context.Context, svc Service, obj *snowplanev1alpha
 		return err
 	}
 
-	return svc.Create(ctx, buildCreateOptions(obj, aid))
+	opts, err := buildCreateOptions(ctx, a.client, obj, aid)
+	if err != nil {
+		return err
+	}
+
+	return svc.Create(ctx, opts)
 }
 
 func (a *adapter) Alter(ctx context.Context, svc Service, opts reconciler.AlterOptions) error {

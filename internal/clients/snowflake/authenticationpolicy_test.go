@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
 // --------------------------------------------------------------------------
@@ -19,7 +21,8 @@ func TestBuildCreateAuthenticationPolicySQL(t *testing.T) {
 		opts := CreateAuthenticationPolicyOptions{
 			Name: NewSchemaObjectIdentifier("DB", "SCH", "MY_AUTH_POLICY"),
 		}
-		got := buildCreateAuthenticationPolicySQL(opts)
+		got, err := buildCreateAuthenticationPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE AUTHENTICATION POLICY IF NOT EXISTS "DB"."SCH"."MY_AUTH_POLICY"`)
 	})
 
@@ -29,7 +32,8 @@ func TestBuildCreateAuthenticationPolicySQL(t *testing.T) {
 			Name:                  NewSchemaObjectIdentifier("DB", "SCH", "P"),
 			AuthenticationMethods: []string{"PASSWORD", "SAML"},
 		}
-		got := buildCreateAuthenticationPolicySQL(opts)
+		got, err := buildCreateAuthenticationPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "AUTHENTICATION_METHODS = (PASSWORD, SAML)")
 	})
 
@@ -39,7 +43,8 @@ func TestBuildCreateAuthenticationPolicySQL(t *testing.T) {
 			Name:        NewSchemaObjectIdentifier("DB", "SCH", "P"),
 			ClientTypes: []string{"SNOWFLAKE_UI", "DRIVERS"},
 		}
-		got := buildCreateAuthenticationPolicySQL(opts)
+		got, err := buildCreateAuthenticationPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "CLIENT_TYPES = (SNOWFLAKE_UI, DRIVERS)")
 	})
 
@@ -49,7 +54,8 @@ func TestBuildCreateAuthenticationPolicySQL(t *testing.T) {
 			Name:                 NewSchemaObjectIdentifier("DB", "SCH", "P"),
 			SecurityIntegrations: []string{"MY_INT1", "MY_INT2"},
 		}
-		got := buildCreateAuthenticationPolicySQL(opts)
+		got, err := buildCreateAuthenticationPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "SECURITY_INTEGRATIONS = ('MY_INT1', 'MY_INT2')")
 	})
 
@@ -61,7 +67,8 @@ func TestBuildCreateAuthenticationPolicySQL(t *testing.T) {
 			MfaAllowedMethods:           []string{"TOTP"},
 			MfaEnforceMfaOnExternalAuth: &enf,
 		}
-		got := buildCreateAuthenticationPolicySQL(opts)
+		got, err := buildCreateAuthenticationPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "MFA_AUTHENTICATION_METHODS = (TOTP)")
 		assert.Contains(t, got, "ENFORCE_MFA_ON_EXTERNAL_AUTHENTICATION = REQUIRED")
 	})
@@ -71,12 +78,13 @@ func TestBuildCreateAuthenticationPolicySQL(t *testing.T) {
 		networkEval := "REQUIRED"
 		opts := CreateAuthenticationPolicyOptions{
 			Name:                       NewSchemaObjectIdentifier("DB", "SCH", "P"),
-			PatDefaultExpiryInDays:     int32Ptr(30),
-			PatMaxExpiryInDays:         int32Ptr(90),
+			PatDefaultExpiryInDays:     ptr(int32(30)),
+			PatMaxExpiryInDays:         ptr(int32(90)),
 			PatNetworkPolicyEvaluation: &networkEval,
-			PatRequireRoleRestriction:  boolPtr(true),
+			PatRequireRoleRestriction:  ptr(true),
 		}
-		got := buildCreateAuthenticationPolicySQL(opts)
+		got, err := buildCreateAuthenticationPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "PAT_DEFAULT_EXPIRY_IN_DAYS = 30")
 		assert.Contains(t, got, "PAT_MAX_EXPIRY_IN_DAYS = 90")
 		assert.Contains(t, got, "PAT_NETWORK_POLICY_EVALUATION = REQUIRED")
@@ -92,7 +100,8 @@ func TestBuildCreateAuthenticationPolicySQL(t *testing.T) {
 			WorkloadIdentityAllowedAzureIssuers: []string{"https://sts.windows.net/tenant"},
 			WorkloadIdentityAllowedOidcIssuers:  []string{"https://accounts.google.com"},
 		}
-		got := buildCreateAuthenticationPolicySQL(opts)
+		got, err := buildCreateAuthenticationPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "WORKLOAD_IDENTITY_ALLOWED_PROVIDERS = (AWS, AZURE)")
 		assert.Contains(t, got, "WORKLOAD_IDENTITY_ALLOWED_AWS_ACCOUNTS = ('123456789012')")
 		assert.Contains(t, got, "WORKLOAD_IDENTITY_ALLOWED_AZURE_ISSUERS = ('https://sts.windows.net/tenant')")
@@ -106,7 +115,8 @@ func TestBuildCreateAuthenticationPolicySQL(t *testing.T) {
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "P"),
 			Comment: &comment,
 		}
-		got := buildCreateAuthenticationPolicySQL(opts)
+		got, err := buildCreateAuthenticationPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "COMMENT = 'my auth policy'")
 	})
 
@@ -117,7 +127,8 @@ func TestBuildCreateAuthenticationPolicySQL(t *testing.T) {
 			Name:          NewSchemaObjectIdentifier("DB", "SCH", "P"),
 			MfaEnrollment: &enrollment,
 		}
-		got := buildCreateAuthenticationPolicySQL(opts)
+		got, err := buildCreateAuthenticationPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "MFA_ENROLLMENT = REQUIRED")
 	})
 }
@@ -130,7 +141,8 @@ func TestBuildCreateAuthenticationPolicySQL_CreateOrAlter(t *testing.T) {
 		AuthenticationMethods: []string{"PASSWORD"},
 		UseCreateOrAlter:      true,
 	}
-	got := buildCreateAuthenticationPolicySQL(opts)
+	got, err := buildCreateAuthenticationPolicySQL(opts)
+	require.NoError(t, err)
 	assert.Contains(t, got, `CREATE OR ALTER AUTHENTICATION POLICY "DB"."SCH"."MY_AUTH_POLICY"`)
 	assert.NotContains(t, got, "IF NOT EXISTS")
 	assert.Contains(t, got, "AUTHENTICATION_METHODS = (PASSWORD)")
@@ -190,8 +202,8 @@ func TestBuildAlterAuthenticationPolicyStatements(t *testing.T) {
 		t.Parallel()
 		opts := AlterAuthenticationPolicyOptions{
 			Name:                      NewSchemaObjectIdentifier("DB", "SCH", "P"),
-			PatDefaultExpiryInDays:    int32Ptr(30),
-			PatRequireRoleRestriction: boolPtr(true),
+			PatDefaultExpiryInDays:    ptr(int32(30)),
+			PatRequireRoleRestriction: ptr(true),
 		}
 		stmts, err := buildAlterAuthenticationPolicyStatements(opts)
 		require.NoError(t, err)
@@ -308,12 +320,34 @@ func TestAlterAuthenticationPolicyOptions_HasChanges(t *testing.T) {
 
 func TestBuildKeywordListClause(t *testing.T) {
 	t.Parallel()
-	got := buildKeywordListClause("AUTH_METHODS", []string{"PASSWORD", "SAML"})
-	assert.Equal(t, "AUTH_METHODS = (PASSWORD, SAML)", got)
+
+	t.Run("ValidKeywords", func(t *testing.T) {
+		t.Parallel()
+		got, err := sqlbuilder.BuildKeywordListClause("AUTH_METHODS", []string{"PASSWORD", "SAML"})
+		require.NoError(t, err)
+		assert.Equal(t, "AUTH_METHODS = (PASSWORD, SAML)", got)
+	})
+
+	t.Run("InjectionAttemptReturnsError", func(t *testing.T) {
+		t.Parallel()
+		_, err := sqlbuilder.BuildKeywordListClause("AUTH_METHODS", []string{"SAML); DROP TABLE x;--"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid keyword value character")
+	})
 }
 
-func TestBuildQuotedListClause(t *testing.T) {
+func TestBuildEscapedListClause(t *testing.T) {
 	t.Parallel()
-	got := buildQuotedListClause("INTEGRATIONS", []string{"INT1", "INT2"})
-	assert.Equal(t, "INTEGRATIONS = ('INT1', 'INT2')", got)
+
+	t.Run("ValidValues", func(t *testing.T) {
+		t.Parallel()
+		got := sqlbuilder.BuildEscapedListClause("INTEGRATIONS", []string{"INT1", "INT2"})
+		assert.Equal(t, "INTEGRATIONS = ('INT1', 'INT2')", got)
+	})
+
+	t.Run("EscapesSingleQuotes", func(t *testing.T) {
+		t.Parallel()
+		got := sqlbuilder.BuildEscapedListClause("INTEGRATIONS", []string{"INT'1"})
+		assert.Equal(t, "INTEGRATIONS = ('INT''1')", got)
+	})
 }

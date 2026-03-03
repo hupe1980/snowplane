@@ -156,7 +156,7 @@ func TestForEvent_DescribeTable(t *testing.T) {
 func TestSafeRecorder_Event(t *testing.T) {
 	t.Parallel()
 	fake := record.NewFakeRecorder(10)
-	rec := NewSafeRecorder(fake)
+	rec := newSafeRecorder(fake)
 
 	obj := &stubObject{}
 	rec.Event(obj, corev1.EventTypeWarning, "TestReason",
@@ -175,7 +175,7 @@ func TestSafeRecorder_Event(t *testing.T) {
 func TestSafeRecorder_Eventf(t *testing.T) {
 	t.Parallel()
 	fake := record.NewFakeRecorder(10)
-	rec := NewSafeRecorder(fake)
+	rec := newSafeRecorder(fake)
 
 	obj := &stubObject{}
 	rec.Eventf(obj, corev1.EventTypeWarning, "TestReason",

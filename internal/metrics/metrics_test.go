@@ -127,18 +127,6 @@ func TestDriftDetectedTotal_RecordDriftDetected(t *testing.T) {
 	assert.GreaterOrEqual(t, collectCounter(c), float64(1))
 }
 
-func TestManagedResources_SetAndGet(t *testing.T) {
-	t.Parallel()
-
-	SetManagedResources("test-mr", "ready", 5)
-	g := ManagedResources.With(prometheus.Labels{"controller": "test-mr", "state": "ready"})
-	assert.Equal(t, float64(5), collectGauge(g))
-
-	SetManagedResources("test-mr", "not_ready", 2)
-	g2 := ManagedResources.With(prometheus.Labels{"controller": "test-mr", "state": "not_ready"})
-	assert.Equal(t, float64(2), collectGauge(g2))
-}
-
 func TestMetricLabels(t *testing.T) {
 	t.Parallel()
 
@@ -175,10 +163,6 @@ func TestMetricLabels(t *testing.T) {
 			AdoptionTotal.With(prometheus.Labels{"controller": c, "result": r})
 		}
 
-		// Managed resources metric labels.
-		for _, s := range []string{"ready", "not_ready", "terminal"} {
-			ManagedResources.With(prometheus.Labels{"controller": c, "state": s})
-		}
 	}
 }
 

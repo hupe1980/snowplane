@@ -81,8 +81,8 @@ func newTestRowAccessPolicy(name, namespace string) *snowplanev1alpha1.RowAccess
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:         "MY_ROW_POLICY",
-			DatabaseName: testutil.PtrString("MY_DB"),
-			SchemaName:   testutil.PtrString("MY_SCHEMA"),
+			DatabaseName: testutil.Ptr("MY_DB"),
+			SchemaName:   testutil.Ptr("MY_SCHEMA"),
 			Signature: []snowplanev1alpha1.RowAccessPolicyArgument{
 				{Name: "val", Type: "VARCHAR"},
 			},
@@ -266,9 +266,9 @@ func TestReconcile_UpdateCommentChanged(t *testing.T) {
 	rap.Generation = 2
 	rap.Status.DatabaseName = "MY_DB"
 	rap.Status.SchemaName = "MY_SCHEMA"
-	rap.Spec.Comment = testutil.PtrString("updated")
+	rap.Spec.Comment = testutil.Ptr("updated")
 
-	rap.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	rap.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -305,9 +305,9 @@ func TestReconcile_AlterFails(t *testing.T) {
 	rap.Generation = 2
 	rap.Status.DatabaseName = "MY_DB"
 	rap.Status.SchemaName = "MY_SCHEMA"
-	rap.Spec.Comment = testutil.PtrString("change")
+	rap.Spec.Comment = testutil.Ptr("change")
 
-	rap.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	rap.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -461,7 +461,7 @@ func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
 	rap := newTestRowAccessPolicy("myrap", "default")
-	rap.Spec.Comment = testutil.PtrString("test policy")
+	rap.Spec.Comment = testutil.Ptr("test policy")
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_ROW_POLICY")
 
 	opts := buildCreateOptions(rap, id)
@@ -491,7 +491,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 
 	spec := &snowplanev1alpha1.RowAccessPolicySpec{
 		Body:    "x",
-		Comment: testutil.PtrString("c"),
+		Comment: testutil.Ptr("c"),
 	}
 
 	fields := tracked.ComputeTracked(spec)
@@ -552,7 +552,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	rap := &snowplanev1alpha1.RowAccessPolicy{
 		Spec: snowplanev1alpha1.RowAccessPolicySpec{
 			Name:    "MY_ROW_POLICY",
-			Comment: testutil.PtrString("test"),
+			Comment: testutil.Ptr("test"),
 		},
 	}
 
@@ -573,7 +573,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	rap := &snowplanev1alpha1.RowAccessPolicy{
 		Spec: snowplanev1alpha1.RowAccessPolicySpec{
 			Name:    "MY_ROW_POLICY",
-			Comment: testutil.PtrString("desired"),
+			Comment: testutil.Ptr("desired"),
 		},
 	}
 

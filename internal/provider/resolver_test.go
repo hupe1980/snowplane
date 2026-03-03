@@ -99,6 +99,7 @@ func TestResolveClient_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, resolved.Client)
 	assert.Equal(t, "default-pc", resolved.Name)
+	assert.Equal(t, "default/default-pc", resolved.CacheKey)
 	assert.Equal(t, "acct", resolved.Account)
 }
 
@@ -127,6 +128,7 @@ func TestResolveClient_CrossNamespace(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, resolved.Client)
 	assert.Equal(t, "default-pc", resolved.Name)
+	assert.Equal(t, "system/default-pc", resolved.CacheKey)
 	assert.Equal(t, "acct", resolved.Account)
 }
 
@@ -367,6 +369,72 @@ func TestResolveClient_FactoryGetOrCreateFailure(t *testing.T) {
 	require.NotNil(t, cond)
 	assert.Equal(t, metav1.ConditionFalse, cond.Status)
 	assert.Equal(t, snowplanev1alpha1.ReasonReconcileError, cond.Reason)
+}
+
+func TestProviderCacheKey(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		namespace string
+		name      string
+		want      string
+	}{
+		{"default", "default", "default/default"},
+		{"team-a", "my-pc", "team-a/my-pc"},
+		{"system", "default", "system/default"},
+	}
+
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, ProviderCacheKey(tt.namespace, tt.name))
+	}
+}
+
+func TestResolveClient_NamespaceIsolation(t *testing.T) {
+	t.Parallel()
+
+	// Two ProviderConfigs with the same name in different namespaces
+	// must produce different cache keys (C-3 fix).
+	pcA := newReadyPC("team-a")
+	pcA.Name = "default"
+	pcA.Spec.Account = "acct-a"
+
+	pcB := newReadyPC("team-b")
+	pcB.Name = "default"
+	pcB.Spec.Account = "acct-b"
+
+	secretA := newTestSecret("team-a")
+	secretB := newTestSecret("team-b")
+
+	c := fake.NewClientBuilder().
+		WithScheme(testScheme()).
+		WithRuntimeObjects(pcA, pcB, secretA, secretB).
+		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
+		Build()
+
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+		return &fakeSnowflakeClient{}, nil
+	})
+
+	// Resolve for team-a
+	objA := &testConditionedObject{}
+	refA := snowplanev1alpha1.ProviderReference{Name: "default", Namespace: "team-a"}
+
+	resolvedA, err := ResolveClient(context.Background(), c, factory, objA, refA, "team-a", nil, nil, "test")
+	require.NoError(t, err)
+	assert.Equal(t, "team-a/default", resolvedA.CacheKey)
+	assert.Equal(t, "acct-a", resolvedA.Account)
+
+	// Resolve for team-b
+	objB := &testConditionedObject{}
+	refB := snowplanev1alpha1.ProviderReference{Name: "default", Namespace: "team-b"}
+
+	resolvedB, err := ResolveClient(context.Background(), c, factory, objB, refB, "team-b", nil, nil, "test")
+	require.NoError(t, err)
+	assert.Equal(t, "team-b/default", resolvedB.CacheKey)
+	assert.Equal(t, "acct-b", resolvedB.Account)
+
+	// Cache keys must differ
+	assert.NotEqual(t, resolvedA.CacheKey, resolvedB.CacheKey)
 }
 
 // fakeSnowflakeClient implements clientfactory.SnowflakeClient for tests.

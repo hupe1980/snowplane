@@ -3,6 +3,7 @@ package securityintegration
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"k8s.io/client-go/tools/record"
@@ -12,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/tracked"
@@ -37,7 +39,7 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 
 // NewReconciler returns a new SecurityIntegration reconciler.
 func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.SecurityIntegration, Service, *snowflake.SecurityIntegrationObservation] {
-	a := &adapter{newService: defaultServiceFactory}
+	a := &adapter{client: c, newService: defaultServiceFactory}
 	return &reconciler.GenericReconciler[*snowplanev1alpha1.SecurityIntegration, Service, *snowflake.SecurityIntegrationObservation]{
 		Client:      c,
 		Factory:     factory,
@@ -56,7 +58,7 @@ func NewReconcilerWithServiceFactory(
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.SecurityIntegration, Service, *snowflake.SecurityIntegrationObservation] {
-	a := &adapter{newService: sf}
+	a := &adapter{client: c, newService: sf}
 	return &reconciler.GenericReconciler[*snowplanev1alpha1.SecurityIntegration, Service, *snowflake.SecurityIntegrationObservation]{
 		Client:      c,
 		Factory:     factory,
@@ -95,7 +97,7 @@ func applyObservation(si *snowplanev1alpha1.SecurityIntegration, obs *snowflake.
 	}
 }
 
-func buildCreateOptions(si *snowplanev1alpha1.SecurityIntegration, id snowflake.AccountObjectIdentifier) snowflake.CreateSecurityIntegrationOptions {
+func buildCreateOptions(ctx context.Context, kc client.Client, si *snowplanev1alpha1.SecurityIntegration, id snowflake.AccountObjectIdentifier) (snowflake.CreateSecurityIntegrationOptions, error) {
 	opts := snowflake.CreateSecurityIntegrationOptions{
 		Name:    id,
 		Type:    string(si.Spec.Type),
@@ -143,15 +145,20 @@ func buildCreateOptions(si *snowplanev1alpha1.SecurityIntegration, id snowflake.
 		}
 	case snowplanev1alpha1.SecurityIntegrationTypeAPIAuthentication:
 		if c := si.Spec.APIAuthentication; c != nil {
+			clientSecret, err := refresolver.ResolveSecretKeyRef(ctx, kc, si.Namespace, c.OAuthClientSecretRef)
+			if err != nil {
+				return snowflake.CreateSecurityIntegrationOptions{}, fmt.Errorf("resolving oauthClientSecretRef: %w", err)
+			}
+
 			opts.OAuthClientID = &c.OAuthClientID
-			opts.OAuthClientSecret = &c.OAuthClientSecret
+			opts.OAuthClientSecret = &clientSecret
 			opts.OAuthTokenEndpoint = &c.OAuthTokenEndpoint
 			opts.OAuthAllowedScopes = c.OAuthAllowedScopes
 			opts.OAuthGrantType = c.OAuthGrantType
 		}
 	}
 
-	return opts
+	return opts, nil
 }
 
 func buildAlterOptions(si *snowplanev1alpha1.SecurityIntegration, id snowflake.AccountObjectIdentifier, obs *snowflake.SecurityIntegrationObservation) snowflake.AlterSecurityIntegrationOptions {

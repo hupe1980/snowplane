@@ -85,6 +85,7 @@ type TaskSpec struct {
 
 	// SQLStatement is the SQL code executed when the task runs.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SQLStatement string `json:"sqlStatement"`
 
 	// After specifies predecessor tasks for DAG scheduling.
@@ -126,6 +127,7 @@ type TaskSpec struct {
 	// Mutually exclusive with ErrorIntegrationRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	ErrorIntegrationName *string `json:"errorIntegrationName,omitempty" snowflake:"ERROR_INTEGRATION"`
 
 	// SuccessIntegrationRef references a NotificationIntegration CR for success notifications.
@@ -137,6 +139,7 @@ type TaskSpec struct {
 	// Mutually exclusive with SuccessIntegrationRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SuccessIntegrationName *string `json:"successIntegrationName,omitempty" snowflake:"SUCCESS_INTEGRATION"`
 
 	// TaskAutoRetryAttempts specifies the number of automatic retry attempts (0-30).
@@ -171,7 +174,7 @@ type TaskSpec struct {
 	// LogLevel specifies the severity level of events for the task.
 	// +optional
 	// +kubebuilder:validation:Enum=TRACE;DEBUG;INFO;WARN;ERROR;FATAL;OFF
-	LogLevel *string `json:"logLevel,omitempty" snowflake:"LOG_LEVEL"`
+	LogLevel *LogLevel `json:"logLevel,omitempty" snowflake:"LOG_LEVEL"`
 
 	// UserTaskMinimumTriggerIntervalInSeconds defines how frequently a triggered task
 	// can execute, in seconds. Changes within this interval are batched together.
@@ -273,7 +276,7 @@ type TaskParameters struct {
 	TaskAutoRetryAttempts *int32 `json:"taskAutoRetryAttempts,omitempty" snowflake:"TASK_AUTO_RETRY_ATTEMPTS"`
 
 	// LogLevel is the severity level of events for the task.
-	LogLevel string `json:"logLevel,omitempty" snowflake:"LOG_LEVEL"`
+	LogLevel LogLevel `json:"logLevel,omitempty" snowflake:"LOG_LEVEL"`
 
 	// UserTaskMinimumTriggerIntervalInSeconds defines how frequently a triggered task can execute.
 	UserTaskMinimumTriggerIntervalInSeconds *int32 `json:"userTaskMinimumTriggerIntervalInSeconds,omitempty" snowflake:"USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS"`

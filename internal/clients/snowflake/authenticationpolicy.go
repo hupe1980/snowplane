@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
@@ -142,45 +141,16 @@ func NewAuthenticationPolicyClient(c SQLExecutor) *AuthenticationPolicyClient {
 	return &AuthenticationPolicyClient{client: c}
 }
 
-// buildKeywordListClause formats a keyword list like AUTHENTICATION_METHODS = (PASSWORD, SAML).
-func buildKeywordListClause(key string, vals []string) string {
-	return fmt.Sprintf("%s = (%s)", key, strings.Join(vals, ", "))
-}
-
-// buildQuotedListClause formats a quoted list like SECURITY_INTEGRATIONS = ('INT1', 'INT2').
-func buildQuotedListClause(key string, vals []string) string {
-	quoted := make([]string, len(vals))
-	for i, v := range vals {
-		quoted[i] = fmt.Sprintf("'%s'", sqlbuilder.EscapeString(v))
-	}
-
-	return fmt.Sprintf("%s = (%s)", key, strings.Join(quoted, ", "))
-}
-
 // writeListClauses writes list and scalar clauses to a Builder for CREATE.
 func writeListClauses(b *sqlbuilder.Builder, opts *CreateAuthenticationPolicyOptions) {
-	if len(opts.AuthenticationMethods) > 0 {
-		b.WriteString(" ")
-		b.WriteString(buildKeywordListClause("AUTHENTICATION_METHODS", opts.AuthenticationMethods))
-	}
-
-	if len(opts.ClientTypes) > 0 {
-		b.WriteString(" ")
-		b.WriteString(buildKeywordListClause("CLIENT_TYPES", opts.ClientTypes))
-	}
-
-	if len(opts.SecurityIntegrations) > 0 {
-		b.WriteString(" ")
-		b.WriteString(buildQuotedListClause("SECURITY_INTEGRATIONS", opts.SecurityIntegrations))
-	}
+	b.SetKeywordList("AUTHENTICATION_METHODS", opts.AuthenticationMethods)
+	b.SetKeywordList("CLIENT_TYPES", opts.ClientTypes)
+	b.SetEscapedList("SECURITY_INTEGRATIONS", opts.SecurityIntegrations)
 
 	b.SetKeyword("MFA_ENROLLMENT", opts.MfaEnrollment)
 
 	// MFA sub-policy fields.
-	if len(opts.MfaAllowedMethods) > 0 {
-		b.WriteString(" ")
-		b.WriteString(buildKeywordListClause("MFA_AUTHENTICATION_METHODS", opts.MfaAllowedMethods))
-	}
+	b.SetKeywordList("MFA_AUTHENTICATION_METHODS", opts.MfaAllowedMethods)
 
 	b.SetKeyword("ENFORCE_MFA_ON_EXTERNAL_AUTHENTICATION", opts.MfaEnforceMfaOnExternalAuth)
 
@@ -191,44 +161,27 @@ func writeListClauses(b *sqlbuilder.Builder, opts *CreateAuthenticationPolicyOpt
 	b.SetBool("PAT_REQUIRE_ROLE_RESTRICTION_FOR_SERVICE_USERS", opts.PatRequireRoleRestriction)
 
 	// Workload identity sub-policy fields.
-	if len(opts.WorkloadIdentityAllowedProviders) > 0 {
-		b.WriteString(" ")
-		b.WriteString(buildKeywordListClause("WORKLOAD_IDENTITY_ALLOWED_PROVIDERS", opts.WorkloadIdentityAllowedProviders))
-	}
-
-	if len(opts.WorkloadIdentityAllowedAwsAccounts) > 0 {
-		b.WriteString(" ")
-		b.WriteString(buildQuotedListClause("WORKLOAD_IDENTITY_ALLOWED_AWS_ACCOUNTS", opts.WorkloadIdentityAllowedAwsAccounts))
-	}
-
-	if len(opts.WorkloadIdentityAllowedAzureIssuers) > 0 {
-		b.WriteString(" ")
-		b.WriteString(buildQuotedListClause("WORKLOAD_IDENTITY_ALLOWED_AZURE_ISSUERS", opts.WorkloadIdentityAllowedAzureIssuers))
-	}
-
-	if len(opts.WorkloadIdentityAllowedOidcIssuers) > 0 {
-		b.WriteString(" ")
-		b.WriteString(buildQuotedListClause("WORKLOAD_IDENTITY_ALLOWED_OIDC_ISSUERS", opts.WorkloadIdentityAllowedOidcIssuers))
-	}
+	b.SetKeywordList("WORKLOAD_IDENTITY_ALLOWED_PROVIDERS", opts.WorkloadIdentityAllowedProviders)
+	b.SetEscapedList("WORKLOAD_IDENTITY_ALLOWED_AWS_ACCOUNTS", opts.WorkloadIdentityAllowedAwsAccounts)
+	b.SetEscapedList("WORKLOAD_IDENTITY_ALLOWED_AZURE_ISSUERS", opts.WorkloadIdentityAllowedAzureIssuers)
+	b.SetEscapedList("WORKLOAD_IDENTITY_ALLOWED_OIDC_ISSUERS", opts.WorkloadIdentityAllowedOidcIssuers)
 
 	b.SetString("COMMENT", opts.Comment)
 }
 
 // buildCreateAuthenticationPolicySQL builds the CREATE AUTHENTICATION POLICY SQL statement.
-func buildCreateAuthenticationPolicySQL(opts CreateAuthenticationPolicyOptions) string {
+func buildCreateAuthenticationPolicySQL(opts CreateAuthenticationPolicyOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER AUTHENTICATION POLICY ")
-	} else {
-		b.WriteString("CREATE AUTHENTICATION POLICY IF NOT EXISTS ")
-	}
-
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "AUTHENTICATION POLICY", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 
 	writeListClauses(&b, &opts)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates an authentication policy in Snowflake.
@@ -237,7 +190,12 @@ func (c *AuthenticationPolicyClient) Create(ctx context.Context, opts CreateAuth
 		return NewTerminalError(fmt.Errorf("invalid create authentication policy options: %w", err))
 	}
 
-	if _, err := c.client.Exec(ctx, buildCreateAuthenticationPolicySQL(opts)); err != nil {
+	sql, err := buildCreateAuthenticationPolicySQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create authentication policy SQL: %w", err))
+	}
+
+	if _, err := c.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating authentication policy %s: %w", opts.Name, err)
 	}
 
@@ -248,86 +206,29 @@ func (c *AuthenticationPolicyClient) Create(ctx context.Context, opts CreateAuth
 func buildAlterAuthenticationPolicyStatements(opts AlterAuthenticationPolicyOptions) ([]string, error) {
 	fqn := opts.Name.FullyQualifiedName()
 
-	var statements []string
+	var sc sqlbuilder.SetClauses
 
-	// Build SET clauses.
-	var setClauses []string
+	sc.KeywordList("AUTHENTICATION_METHODS", opts.AuthenticationMethods)
+	sc.KeywordList("CLIENT_TYPES", opts.ClientTypes)
+	sc.EscapedList("SECURITY_INTEGRATIONS", opts.SecurityIntegrations)
 
-	if len(opts.AuthenticationMethods) > 0 {
-		setClauses = append(setClauses, buildKeywordListClause("AUTHENTICATION_METHODS", opts.AuthenticationMethods))
-	}
+	sc.Keyword("MFA_ENROLLMENT", opts.MfaEnrollment)
+	sc.KeywordList("MFA_AUTHENTICATION_METHODS", opts.MfaAllowedMethods)
+	sc.Keyword("ENFORCE_MFA_ON_EXTERNAL_AUTHENTICATION", opts.MfaEnforceMfaOnExternalAuth)
 
-	if len(opts.ClientTypes) > 0 {
-		setClauses = append(setClauses, buildKeywordListClause("CLIENT_TYPES", opts.ClientTypes))
-	}
+	sc.Int32("PAT_DEFAULT_EXPIRY_IN_DAYS", opts.PatDefaultExpiryInDays)
+	sc.Int32("PAT_MAX_EXPIRY_IN_DAYS", opts.PatMaxExpiryInDays)
+	sc.Keyword("PAT_NETWORK_POLICY_EVALUATION", opts.PatNetworkPolicyEvaluation)
+	sc.Bool("PAT_REQUIRE_ROLE_RESTRICTION_FOR_SERVICE_USERS", opts.PatRequireRoleRestriction)
 
-	if len(opts.SecurityIntegrations) > 0 {
-		setClauses = append(setClauses, buildQuotedListClause("SECURITY_INTEGRATIONS", opts.SecurityIntegrations))
-	}
+	sc.KeywordList("WORKLOAD_IDENTITY_ALLOWED_PROVIDERS", opts.WorkloadIdentityAllowedProviders)
+	sc.EscapedList("WORKLOAD_IDENTITY_ALLOWED_AWS_ACCOUNTS", opts.WorkloadIdentityAllowedAwsAccounts)
+	sc.EscapedList("WORKLOAD_IDENTITY_ALLOWED_AZURE_ISSUERS", opts.WorkloadIdentityAllowedAzureIssuers)
+	sc.EscapedList("WORKLOAD_IDENTITY_ALLOWED_OIDC_ISSUERS", opts.WorkloadIdentityAllowedOidcIssuers)
 
-	if opts.MfaEnrollment != nil {
-		setClauses = append(setClauses, fmt.Sprintf("MFA_ENROLLMENT = %s", *opts.MfaEnrollment))
-	}
+	sc.String("COMMENT", opts.Comment)
 
-	if len(opts.MfaAllowedMethods) > 0 {
-		setClauses = append(setClauses, buildKeywordListClause("MFA_AUTHENTICATION_METHODS", opts.MfaAllowedMethods))
-	}
-
-	if opts.MfaEnforceMfaOnExternalAuth != nil {
-		setClauses = append(setClauses, fmt.Sprintf("ENFORCE_MFA_ON_EXTERNAL_AUTHENTICATION = %s", *opts.MfaEnforceMfaOnExternalAuth))
-	}
-
-	if opts.PatDefaultExpiryInDays != nil {
-		setClauses = append(setClauses, fmt.Sprintf("PAT_DEFAULT_EXPIRY_IN_DAYS = %d", *opts.PatDefaultExpiryInDays))
-	}
-
-	if opts.PatMaxExpiryInDays != nil {
-		setClauses = append(setClauses, fmt.Sprintf("PAT_MAX_EXPIRY_IN_DAYS = %d", *opts.PatMaxExpiryInDays))
-	}
-
-	if opts.PatNetworkPolicyEvaluation != nil {
-		setClauses = append(setClauses, fmt.Sprintf("PAT_NETWORK_POLICY_EVALUATION = %s", *opts.PatNetworkPolicyEvaluation))
-	}
-
-	if opts.PatRequireRoleRestriction != nil {
-		val := "FALSE"
-		if *opts.PatRequireRoleRestriction {
-			val = "TRUE"
-		}
-
-		setClauses = append(setClauses, fmt.Sprintf("PAT_REQUIRE_ROLE_RESTRICTION_FOR_SERVICE_USERS = %s", val))
-	}
-
-	if len(opts.WorkloadIdentityAllowedProviders) > 0 {
-		setClauses = append(setClauses, buildKeywordListClause("WORKLOAD_IDENTITY_ALLOWED_PROVIDERS", opts.WorkloadIdentityAllowedProviders))
-	}
-
-	if len(opts.WorkloadIdentityAllowedAwsAccounts) > 0 {
-		setClauses = append(setClauses, buildQuotedListClause("WORKLOAD_IDENTITY_ALLOWED_AWS_ACCOUNTS", opts.WorkloadIdentityAllowedAwsAccounts))
-	}
-
-	if len(opts.WorkloadIdentityAllowedAzureIssuers) > 0 {
-		setClauses = append(setClauses, buildQuotedListClause("WORKLOAD_IDENTITY_ALLOWED_AZURE_ISSUERS", opts.WorkloadIdentityAllowedAzureIssuers))
-	}
-
-	if len(opts.WorkloadIdentityAllowedOidcIssuers) > 0 {
-		setClauses = append(setClauses, buildQuotedListClause("WORKLOAD_IDENTITY_ALLOWED_OIDC_ISSUERS", opts.WorkloadIdentityAllowedOidcIssuers))
-	}
-
-	if opts.Comment != nil {
-		setClauses = append(setClauses, fmt.Sprintf("COMMENT = '%s'", sqlbuilder.EscapeString(*opts.Comment)))
-	}
-
-	if len(setClauses) > 0 {
-		statements = append(statements, fmt.Sprintf("ALTER AUTHENTICATION POLICY %s SET %s", fqn, strings.Join(setClauses, " ")))
-	}
-
-	// Build UNSET statement.
-	if len(opts.UnsetFields) > 0 {
-		statements = append(statements, fmt.Sprintf("ALTER AUTHENTICATION POLICY %s UNSET %s", fqn, strings.Join(opts.UnsetFields, ", ")))
-	}
-
-	return statements, nil
+	return sqlbuilder.BuildAlterStatements("AUTHENTICATION POLICY", fqn, &sc, opts.UnsetFields)
 }
 
 // Alter alters an authentication policy in Snowflake.
@@ -436,47 +337,14 @@ func (c *AuthenticationPolicyClient) Observe(ctx context.Context, name SchemaObj
 
 // scanAuthenticationPolicyShowOutput scans SHOW AUTHENTICATION POLICIES results for a matching row.
 func scanAuthenticationPolicyShowOutput(rows *sql.Rows, name string) (*AuthenticationPolicyShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*AuthenticationPolicyShowOutput, error) {
 		return &AuthenticationPolicyShowOutput{
-			CreatedOn:    colMap["created_on"],
-			Name:         colMap["name"],
-			DatabaseName: colMap["database_name"],
-			SchemaName:   colMap["schema_name"],
-			Owner:        colMap["owner"],
-			Comment:      colMap["comment"],
+			CreatedOn:    m["created_on"],
+			Name:         m["name"],
+			DatabaseName: m["database_name"],
+			SchemaName:   m["schema_name"],
+			Owner:        m["owner"],
+			Comment:      m["comment"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

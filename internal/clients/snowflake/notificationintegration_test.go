@@ -29,7 +29,8 @@ func TestBuildCreateNotificationIntegrationSQL(t *testing.T) {
 			Enabled:           &enabled,
 			AllowedRecipients: []string{"admin@example.com", "ops@example.com"},
 		}
-		got := buildCreateNotificationIntegrationSQL(opts)
+		got, err := buildCreateNotificationIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE NOTIFICATION INTEGRATION IF NOT EXISTS "MY_EMAIL_NI"`)
 		assert.Contains(t, got, "TYPE = EMAIL")
 		assert.Contains(t, got, "ALLOWED_RECIPIENTS = ('admin@example.com', 'ops@example.com')")
@@ -43,10 +44,11 @@ func TestBuildCreateNotificationIntegrationSQL(t *testing.T) {
 			Type:              "EMAIL",
 			AllowedRecipients: []string{"admin@example.com"},
 			DefaultRecipients: []string{"default@example.com"},
-			DefaultSubject:    strPtr("Alert Notification"),
-			Comment:           strPtr("test email integration"),
+			DefaultSubject:    ptr("Alert Notification"),
+			Comment:           ptr("test email integration"),
 		}
-		got := buildCreateNotificationIntegrationSQL(opts)
+		got, err := buildCreateNotificationIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "ALLOWED_RECIPIENTS = ('admin@example.com')")
 		assert.Contains(t, got, "DEFAULT_RECIPIENTS = ('default@example.com')")
 		assert.Contains(t, got, "DEFAULT_SUBJECT = 'Alert Notification'")
@@ -58,12 +60,13 @@ func TestBuildCreateNotificationIntegrationSQL(t *testing.T) {
 		opts := CreateNotificationIntegrationOptions{
 			Name:                 NewAccountObjectIdentifier("MY_SNS"),
 			Type:                 "QUEUE",
-			NotificationProvider: strPtr("AWS_SNS"),
-			Direction:            strPtr("OUTBOUND"),
-			AWSSNSTopicARN:       strPtr("arn:aws:sns:us-east-1:123456789012:my-topic"),
-			AWSSNSRoleARN:        strPtr("arn:aws:iam::123456789012:role/sns-role"),
+			NotificationProvider: ptr("AWS_SNS"),
+			Direction:            ptr("OUTBOUND"),
+			AWSSNSTopicARN:       ptr("arn:aws:sns:us-east-1:123456789012:my-topic"),
+			AWSSNSRoleARN:        ptr("arn:aws:iam::123456789012:role/sns-role"),
 		}
-		got := buildCreateNotificationIntegrationSQL(opts)
+		got, err := buildCreateNotificationIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "TYPE = QUEUE")
 		assert.Contains(t, got, "NOTIFICATION_PROVIDER = AWS_SNS")
 		assert.Contains(t, got, "DIRECTION = OUTBOUND")
@@ -76,12 +79,13 @@ func TestBuildCreateNotificationIntegrationSQL(t *testing.T) {
 		opts := CreateNotificationIntegrationOptions{
 			Name:                      NewAccountObjectIdentifier("MY_PUBSUB"),
 			Type:                      "QUEUE",
-			NotificationProvider:      strPtr("GCP_PUBSUB"),
-			Direction:                 strPtr("OUTBOUND"),
-			GCPPubSubTopicName:        strPtr("projects/myproj/topics/mytopic"),
-			GCPPubSubSubscriptionName: strPtr("projects/myproj/subscriptions/mysub"),
+			NotificationProvider:      ptr("GCP_PUBSUB"),
+			Direction:                 ptr("OUTBOUND"),
+			GCPPubSubTopicName:        ptr("projects/myproj/topics/mytopic"),
+			GCPPubSubSubscriptionName: ptr("projects/myproj/subscriptions/mysub"),
 		}
-		got := buildCreateNotificationIntegrationSQL(opts)
+		got, err := buildCreateNotificationIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "NOTIFICATION_PROVIDER = GCP_PUBSUB")
 		assert.Contains(t, got, "GCP_PUBSUB_TOPIC_NAME = 'projects/myproj/topics/mytopic'")
 		assert.Contains(t, got, "GCP_PUBSUB_SUBSCRIPTION_NAME = 'projects/myproj/subscriptions/mysub'")
@@ -92,12 +96,13 @@ func TestBuildCreateNotificationIntegrationSQL(t *testing.T) {
 		opts := CreateNotificationIntegrationOptions{
 			Name:                        NewAccountObjectIdentifier("MY_AZURE"),
 			Type:                        "QUEUE",
-			NotificationProvider:        strPtr("AZURE_STORAGE_QUEUE"),
-			Direction:                   strPtr("OUTBOUND"),
-			AzureStorageQueuePrimaryURI: strPtr("https://myaccount.queue.core.windows.net/myqueue"),
-			AzureTenantID:               strPtr("tenant-id-123"),
+			NotificationProvider:        ptr("AZURE_STORAGE_QUEUE"),
+			Direction:                   ptr("OUTBOUND"),
+			AzureStorageQueuePrimaryURI: ptr("https://myaccount.queue.core.windows.net/myqueue"),
+			AzureTenantID:               ptr("tenant-id-123"),
 		}
-		got := buildCreateNotificationIntegrationSQL(opts)
+		got, err := buildCreateNotificationIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "NOTIFICATION_PROVIDER = AZURE_STORAGE_QUEUE")
 		assert.Contains(t, got, "AZURE_STORAGE_QUEUE_PRIMARY_URI = 'https://myaccount.queue.core.windows.net/myqueue'")
 		assert.Contains(t, got, "AZURE_TENANT_ID = 'tenant-id-123'")
@@ -108,9 +113,10 @@ func TestBuildCreateNotificationIntegrationSQL(t *testing.T) {
 		opts := CreateNotificationIntegrationOptions{
 			Name:       NewAccountObjectIdentifier("MY_WEBHOOK"),
 			Type:       "WEBHOOK",
-			WebhookURL: strPtr("https://hooks.example.com/alert"),
+			WebhookURL: ptr("https://hooks.example.com/alert"),
 		}
-		got := buildCreateNotificationIntegrationSQL(opts)
+		got, err := buildCreateNotificationIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "TYPE = WEBHOOK")
 		assert.Contains(t, got, "WEBHOOK_URL = 'https://hooks.example.com/alert'")
 	})
@@ -120,11 +126,12 @@ func TestBuildCreateNotificationIntegrationSQL(t *testing.T) {
 		opts := CreateNotificationIntegrationOptions{
 			Name:                NewAccountObjectIdentifier("MY_WEBHOOK"),
 			Type:                "WEBHOOK",
-			WebhookURL:          strPtr("https://hooks.example.com/alert"),
-			WebhookSecret:       strPtr("my-secret"),
-			WebhookBodyTemplate: strPtr(`{"text": "$BODY"}`),
+			WebhookURL:          ptr("https://hooks.example.com/alert"),
+			WebhookSecret:       ptr("my-secret"),
+			WebhookBodyTemplate: ptr(`{"text": "$BODY"}`),
 		}
-		got := buildCreateNotificationIntegrationSQL(opts)
+		got, err := buildCreateNotificationIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "WEBHOOK_SECRET = 'my-secret'")
 		assert.Contains(t, got, `WEBHOOK_BODY_TEMPLATE = '{"text": "$BODY"}'`)
 	})
@@ -134,13 +141,14 @@ func TestBuildCreateNotificationIntegrationSQL(t *testing.T) {
 		opts := CreateNotificationIntegrationOptions{
 			Name:       NewAccountObjectIdentifier("MY_WEBHOOK"),
 			Type:       "WEBHOOK",
-			WebhookURL: strPtr("https://hooks.example.com"),
+			WebhookURL: ptr("https://hooks.example.com"),
 			WebhookHeaders: map[string]string{
 				"X-Zebra": "z",
 				"X-Alpha": "a",
 			},
 		}
-		got := buildCreateNotificationIntegrationSQL(opts)
+		got, err := buildCreateNotificationIntegrationSQL(opts)
+		require.NoError(t, err)
 		// Headers must be sorted by key for deterministic SQL.
 		alphaIdx := findIndex(got, "WEBHOOK_HEADER_X-Alpha")
 		zebraIdx := findIndex(got, "WEBHOOK_HEADER_X-Zebra")
@@ -186,7 +194,7 @@ func TestBuildAlterNotificationIntegrationStatements(t *testing.T) {
 		opts := AlterNotificationIntegrationOptions{
 			Name:    NewAccountObjectIdentifier("MY_NI"),
 			Type:    "EMAIL",
-			Comment: strPtr("updated comment"),
+			Comment: ptr("updated comment"),
 		}
 		stmts, err := buildAlterNotificationIntegrationStatements(opts)
 		require.NoError(t, err)
@@ -223,7 +231,7 @@ func TestBuildAlterNotificationIntegrationStatements(t *testing.T) {
 		opts := AlterNotificationIntegrationOptions{
 			Name:           NewAccountObjectIdentifier("MY_NI"),
 			Type:           "WEBHOOK",
-			WebhookURL:     strPtr("https://example.com/hook"),
+			WebhookURL:     ptr("https://example.com/hook"),
 			WebhookHeaders: map[string]string{"Authorization": "Bearer x", "Content-Type": "application/json"},
 		}
 		stmts, err := buildAlterNotificationIntegrationStatements(opts)
@@ -351,7 +359,7 @@ func TestAlterNotificationIntegrationOptions_HasChanges(t *testing.T) {
 		t.Parallel()
 		opts := AlterNotificationIntegrationOptions{
 			Name:    NewAccountObjectIdentifier("NI"),
-			Comment: strPtr("c"),
+			Comment: ptr("c"),
 		}
 		assert.True(t, opts.HasChanges())
 	})

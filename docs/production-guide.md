@@ -382,4 +382,4 @@ done
 ```
 
 {: .warning }
-> Set `spec.managementPolicies.adoptionPolicy: adopt` on resources if the Snowflake objects already exist to prevent creation errors.
+> Set `spec.managementPolicies.adoptionPolicy: adopt` on resources if the Snowflake objects already exist to prevent creation errors. Nil spec fields will be late-initialized from the existing Snowflake state during adoption.

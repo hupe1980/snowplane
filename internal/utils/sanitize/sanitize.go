@@ -111,8 +111,8 @@ type SafeRecorder struct {
 	inner record.EventRecorder
 }
 
-// NewSafeRecorder returns a record.EventRecorder that sanitises messages.
-func NewSafeRecorder(inner record.EventRecorder) record.EventRecorder {
+// newSafeRecorder returns a record.EventRecorder that sanitises messages.
+func newSafeRecorder(inner record.EventRecorder) record.EventRecorder {
 	return &SafeRecorder{inner: inner}
 }
 
@@ -163,5 +163,5 @@ func (a *eventsAdapter) AnnotatedEventf(object runtime.Object, _ map[string]stri
 // NewSafeRecorderFromEvents creates a sanitised record.EventRecorder from the
 // non-deprecated events.EventRecorder returned by mgr.GetEventRecorder().
 func NewSafeRecorderFromEvents(rec events.EventRecorder) record.EventRecorder {
-	return NewSafeRecorder(&eventsAdapter{inner: rec})
+	return newSafeRecorder(&eventsAdapter{inner: rec})
 }

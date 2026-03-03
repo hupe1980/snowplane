@@ -53,7 +53,7 @@ Every Snowplane resource reports its state through standard Kubernetes condition
 | `NamespaceNotAllowed` | **Terminal** | Resource is in a namespace not in watchNamespaces |
 | `RoleNotAllowed` | **Terminal** | Requested useRole is not in allowedRoles |
 | `Adopted` | Info | Resource was adopted from existing Snowflake object |
-| `LateInitialized` | Info | Status was populated from an existing resource |
+| `LateInitialized` | Info | Spec fields were late-initialized from observed Snowflake state during adoption |
 | `OrphanedResource` | Info | Resource was deleted with orphan policy |
 | `ConflictDetected` | Warning | Another CR already manages this Snowflake object |
 | `DeleteBlocked` | Blocking | DROP failed — resource stuck in deleting state |
@@ -327,6 +327,9 @@ groups:
           summary: "p99 Snowflake API latency exceeds 10s for {{ $labels.controller }}"
 ```
 
+{: .tip }
+> Use `status.lastReconcileTime` to build staleness alerts. If a resource's `lastReconcileTime` is older than 2× the requeue interval (default 5m), the controller may be stuck or paused.
+
 See [Observability]({% link observability.md %}) for the full metrics reference.
 
 ---
@@ -349,17 +352,22 @@ kubectl get databases -o custom-columns=\
   REASON:.status.conditions[0].reason,\
   MESSAGE:.status.conditions[0].message
 
-# 4. CRD version
+# 4. Check last reconcile time (staleness)
+kubectl get databases -o custom-columns=\
+  NAME:.metadata.name,\
+  LAST-RECONCILE:.status.lastReconcileTime
+
+# 5. CRD version
 kubectl get crd databases.snowplane.hupe1980.github.io -o jsonpath='{.metadata.resourceVersion}'
 
-# 5. Controller version
+# 6. Controller version
 kubectl get deployment snowplane-controller -n snowplane-system \
   -o jsonpath='{.spec.template.spec.containers[0].image}'
 
-# 6. ProviderConfig status
+# 7. ProviderConfig status
 kubectl get providerconfig -o yaml
 
-# 7. Metrics snapshot (if port-forwarded)
+# 8. Metrics snapshot (if port-forwarded)
 curl -s localhost:8080/metrics | grep snowplane_
 ```
 

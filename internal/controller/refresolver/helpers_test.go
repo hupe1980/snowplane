@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
+	"github.com/hupe1980/snowplane/internal/testutil"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
@@ -118,7 +119,7 @@ func readySchema(name, namespace, fqn string) *snowplanev1alpha1.Schema {
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: snowplanev1alpha1.SchemaSpec{
 			Name:         "PUBLIC",
-			DatabaseName: strPtr("ANALYTICS"),
+			DatabaseName: testutil.Ptr("ANALYTICS"),
 		},
 		Status: snowplanev1alpha1.SchemaStatus{
 			CommonStatus: snowplanev1alpha1.CommonStatus{FullyQualifiedName: fqn},
@@ -128,8 +129,6 @@ func readySchema(name, namespace, fqn string) *snowplanev1alpha1.Schema {
 
 	return s
 }
-
-func strPtr(s string) *string { return &s }
 
 func TestResolveSchemaRefWithConditions_Success(t *testing.T) {
 	t.Parallel()

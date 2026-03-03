@@ -50,6 +50,8 @@ type TaskParameters struct {
 	UserTaskMinimumTriggerIntervalInSeconds *int32
 	TargetCompletionInterval                *string
 	UserTaskManagedInitialWarehouseSize     *string
+	ServerlessTaskMinStatementSize          *string
+	ServerlessTaskMaxStatementSize          *string
 }
 
 // CreateTaskOptions holds the parameters for creating a task.
@@ -216,16 +218,10 @@ func NewTaskClient(c SQLExecutor) *TaskClient {
 }
 
 // buildCreateTaskSQL builds the CREATE TASK SQL statement.
-func buildCreateTaskSQL(opts CreateTaskOptions) string {
+func buildCreateTaskSQL(opts CreateTaskOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER TASK ")
-	} else {
-		b.WriteString("CREATE TASK IF NOT EXISTS ")
-	}
-
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "TASK", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 
 	if opts.Warehouse != nil {
 		fmt.Fprintf(&b.Builder, " WAREHOUSE = %s", sqlbuilder.QuoteIdentifier(*opts.Warehouse))
@@ -283,7 +279,11 @@ func buildCreateTaskSQL(opts CreateTaskOptions) string {
 
 	fmt.Fprintf(&b.Builder, " AS %s", opts.SQLStatement)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a task in Snowflake.
@@ -292,7 +292,12 @@ func (t *TaskClient) Create(ctx context.Context, opts CreateTaskOptions) error {
 		return NewTerminalError(fmt.Errorf("invalid create task options: %w", err))
 	}
 
-	if _, err := t.client.Exec(ctx, buildCreateTaskSQL(opts)); err != nil {
+	sql, err := buildCreateTaskSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create task SQL: %w", err))
+	}
+
+	if _, err := t.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating task %s: %w", opts.Name, err)
 	}
 
@@ -491,58 +496,25 @@ func (t *TaskClient) Observe(ctx context.Context, name SchemaObjectIdentifier) (
 
 // scanTaskShowOutput scans SHOW TASKS results for a matching row.
 func scanTaskShowOutput(rows *sql.Rows, name string) (*TaskShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*TaskShowOutput, error) {
 		return &TaskShowOutput{
-			CreatedOn:                 colMap["created_on"],
-			Name:                      colMap["name"],
-			DatabaseName:              colMap["database_name"],
-			SchemaName:                colMap["schema_name"],
-			Owner:                     colMap["owner"],
-			Comment:                   colMap["comment"],
-			Warehouse:                 colMap["warehouse"],
-			Schedule:                  colMap["schedule"],
-			State:                     colMap["state"],
-			Definition:                colMap["definition"],
-			Condition:                 colMap["condition"],
-			Predecessors:              colMap["predecessors"],
-			ErrorIntegration:          colMap["error_integration"],
-			AllowOverlappingExecution: strings.EqualFold(colMap["allow_overlapping_execution"], "true"),
-			Config:                    colMap["config"],
+			CreatedOn:                 m["created_on"],
+			Name:                      m["name"],
+			DatabaseName:              m["database_name"],
+			SchemaName:                m["schema_name"],
+			Owner:                     m["owner"],
+			Comment:                   m["comment"],
+			Warehouse:                 m["warehouse"],
+			Schedule:                  m["schedule"],
+			State:                     m["state"],
+			Definition:                m["definition"],
+			Condition:                 m["condition"],
+			Predecessors:              m["predecessors"],
+			ErrorIntegration:          m["error_integration"],
+			AllowOverlappingExecution: strings.EqualFold(m["allow_overlapping_execution"], "true"),
+			Config:                    m["config"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }
 
 // buildShowTaskParametersSQL builds the SHOW PARAMETERS IN TASK SQL statement.
@@ -567,35 +539,7 @@ func (t *TaskClient) ShowParameters(ctx context.Context, name SchemaObjectIdenti
 
 // scanTaskParameters parses SHOW PARAMETERS results into TaskParameters.
 func scanTaskParameters(rows *sql.Rows) (*TaskParameters, error) {
-	params := &TaskParameters{}
-
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning parameter row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		key := strings.ToUpper(colMap["key"])
-		val := colMap["value"]
-
+	return ScanParameters(rows, func(params *TaskParameters, key, val string) {
 		switch key {
 		case "USER_TASK_TIMEOUT_MS":
 			if v, ok := parseInt32(val); ok {
@@ -619,12 +563,10 @@ func scanTaskParameters(rows *sql.Rows) (*TaskParameters, error) {
 			params.TargetCompletionInterval = &val
 		case "USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE":
 			params.UserTaskManagedInitialWarehouseSize = &val
+		case "SERVERLESS_TASK_MIN_STATEMENT_SIZE":
+			params.ServerlessTaskMinStatementSize = &val
+		case "SERVERLESS_TASK_MAX_STATEMENT_SIZE":
+			params.ServerlessTaskMaxStatementSize = &val
 		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating parameter rows: %w", err)
-	}
-
-	return params, nil
+	})
 }

@@ -19,7 +19,8 @@ func TestBuildCreateAccountRoleSQL(t *testing.T) {
 		opts := CreateAccountRoleOptions{
 			Name: NewAccountObjectIdentifier("DATA_ENGINEER"),
 		}
-		got := buildCreateAccountRoleSQL(opts)
+		got, err := buildCreateAccountRoleSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE ROLE IF NOT EXISTS "DATA_ENGINEER"`, got)
 	})
 
@@ -30,7 +31,8 @@ func TestBuildCreateAccountRoleSQL(t *testing.T) {
 			Name:    NewAccountObjectIdentifier("DATA_ENGINEER"),
 			Comment: &comment,
 		}
-		got := buildCreateAccountRoleSQL(opts)
+		got, err := buildCreateAccountRoleSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE ROLE IF NOT EXISTS "DATA_ENGINEER" COMMENT = 'Engineering team role'`, got)
 	})
 
@@ -41,7 +43,8 @@ func TestBuildCreateAccountRoleSQL(t *testing.T) {
 			Name:    NewAccountObjectIdentifier("BOBS_ROLE"),
 			Comment: &comment,
 		}
-		got := buildCreateAccountRoleSQL(opts)
+		got, err := buildCreateAccountRoleSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE ROLE IF NOT EXISTS "BOBS_ROLE" COMMENT = 'Bob''s role'`, got)
 	})
 }

@@ -5,7 +5,7 @@
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -10182,7 +10182,7 @@ func (in *TaskSpec) DeepCopyInto(out *TaskSpec) {
 	}
 	if in.LogLevel != nil {
 		in, out := &in.LogLevel, &out.LogLevel
-		*out = new(string)
+		*out = new(LogLevel)
 		**out = **in
 	}
 	if in.UserTaskMinimumTriggerIntervalInSeconds != nil {

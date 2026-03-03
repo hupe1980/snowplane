@@ -77,8 +77,8 @@ func newTestTag(name, namespace string) *snowplanev1alpha1.Tag {
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:         "COST_CENTER",
-			DatabaseName: testutil.PtrString("MY_DB"),
-			SchemaName:   testutil.PtrString("MY_SCHEMA"),
+			DatabaseName: testutil.Ptr("MY_DB"),
+			SchemaName:   testutil.Ptr("MY_SCHEMA"),
 		},
 	}
 }
@@ -195,7 +195,7 @@ func TestReconcile_CreateWithAllowedValues(t *testing.T) {
 	tag.Status.DatabaseName = "MY_DB"
 	tag.Status.SchemaName = "MY_SCHEMA"
 	tag.Spec.AllowedValues = []string{"engineering", "finance"}
-	tag.Spec.Comment = testutil.PtrString("department tag")
+	tag.Spec.Comment = testutil.Ptr("department tag")
 
 	var capturedOpts snowflake.CreateTagOptions
 
@@ -284,7 +284,7 @@ func TestReconcile_UpdateWithChanges(t *testing.T) {
 	tag.Finalizers = []string{finalizerName}
 	tag.Status.ObservedGeneration = 1
 	tag.Generation = 2
-	tag.Spec.Comment = testutil.PtrString("updated")
+	tag.Spec.Comment = testutil.Ptr("updated")
 	tag.Status.DatabaseName = "MY_DB"
 	tag.Status.SchemaName = "MY_SCHEMA"
 
@@ -377,7 +377,7 @@ func TestBuildCreateOptions(t *testing.T) {
 
 	tag := newTestTag("mytag", "default")
 	tag.Spec.AllowedValues = []string{"a", "b"}
-	tag.Spec.Comment = testutil.PtrString("test")
+	tag.Spec.Comment = testutil.Ptr("test")
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "COST_CENTER")
 
 	opts := buildCreateOptions(tag, id)
@@ -417,7 +417,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.TagSpec{
-		Comment:       testutil.PtrString("x"),
+		Comment:       testutil.Ptr("x"),
 		AllowedValues: []string{"a"},
 	}
 
@@ -455,7 +455,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 		Spec: snowplanev1alpha1.TagSpec{
 			Name:          "COST_CENTER",
 			AllowedValues: []string{"a", "b"},
-			Comment:       testutil.PtrString("test"),
+			Comment:       testutil.Ptr("test"),
 		},
 		Status: snowplanev1alpha1.TagStatus{
 			DatabaseName: "MY_DB",
@@ -483,7 +483,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	tag := &snowplanev1alpha1.Tag{
 		Spec: snowplanev1alpha1.TagSpec{
 			Name:    "COST_CENTER",
-			Comment: testutil.PtrString("desired"),
+			Comment: testutil.Ptr("desired"),
 		},
 		Status: snowplanev1alpha1.TagStatus{
 			DatabaseName: "MY_DB",

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,10 +84,13 @@ func newTestIntegration(name, namespace string) *snowplanev1alpha1.APIAuthentica
 				DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete,
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
-			Name:              "MY_ACG_AUTH",
-			Enabled:           true,
-			OAuthClientID:     "acg-client",
-			OAuthClientSecret: "acg-secret",
+			Name:          "MY_ACG_AUTH",
+			Enabled:       true,
+			OAuthClientID: "acg-client",
+			OAuthClientSecretRef: snowplanev1alpha1.SecretKeyReference{
+				Name: "oauth-secret",
+				Key:  "client-secret",
+			},
 		},
 	}
 }
@@ -130,6 +134,7 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 		Factory:  factory,
 		Recorder: rec,
 		Adapter: &adapter{
+			client: c,
 			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
 				return mock, nil, nil
 			},
@@ -191,7 +196,7 @@ func TestReconcile_Create(t *testing.T) {
 		},
 	}
 
-	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"), newOAuthSecret("default"))
 
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myint", "default"))
 	require.NoError(t, err)
@@ -222,7 +227,7 @@ func TestReconcile_CreateFails(t *testing.T) {
 		},
 	}
 
-	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"), newOAuthSecret("default"))
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myint", "default"))
 	require.Error(t, err)
@@ -244,7 +249,7 @@ func TestReconcile_CreateTerminalError(t *testing.T) {
 		},
 	}
 
-	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"), newOAuthSecret("default"))
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myint", "default"))
 	require.NoError(t, err)
@@ -269,7 +274,7 @@ func TestReconcile_UpdateNoChanges(t *testing.T) {
 		},
 	}
 
-	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"), newOAuthSecret("default"))
 
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myint", "default"))
 	require.NoError(t, err)
@@ -283,7 +288,7 @@ func TestReconcile_UpdateCommentChanged(t *testing.T) {
 	obj.Finalizers = []string{finalizerName}
 	obj.Status.ObservedGeneration = 1
 	obj.Generation = 2
-	obj.Spec.Comment = testutil.PtrString("updated")
+	obj.Spec.Comment = testutil.Ptr("updated")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -300,7 +305,7 @@ func TestReconcile_UpdateCommentChanged(t *testing.T) {
 		},
 	}
 
-	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"), newOAuthSecret("default"))
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myint", "default"))
 	require.NoError(t, err)
@@ -316,7 +321,7 @@ func TestReconcile_AlterFails(t *testing.T) {
 	obj.Finalizers = []string{finalizerName}
 	obj.Status.ObservedGeneration = 1
 	obj.Generation = 2
-	obj.Spec.Comment = testutil.PtrString("change")
+	obj.Spec.Comment = testutil.Ptr("change")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -330,7 +335,7 @@ func TestReconcile_AlterFails(t *testing.T) {
 		},
 	}
 
-	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"), newOAuthSecret("default"))
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myint", "default"))
 	require.Error(t, err)
@@ -359,7 +364,7 @@ func TestReconcile_Delete(t *testing.T) {
 		},
 	}
 
-	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"), newOAuthSecret("default"))
 
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myint", "default"))
 	require.NoError(t, err)
@@ -388,7 +393,7 @@ func TestReconcile_DeleteOrphanPolicy(t *testing.T) {
 		},
 	}
 
-	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"), newOAuthSecret("default"))
 
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myint", "default"))
 	require.NoError(t, err)
@@ -413,7 +418,7 @@ func TestReconcile_DeleteDropFails(t *testing.T) {
 		},
 	}
 
-	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"), newOAuthSecret("default"))
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myint", "default"))
 	require.Error(t, err)
@@ -432,7 +437,7 @@ func TestReconcile_ImmutableName(t *testing.T) {
 	obj.Status.ObservedGeneration = 1
 	obj.Spec.Name = "RENAMED_AUTH"
 	obj.Status.ShowOutput = &snowplanev1alpha1.APIAuthenticationIntegrationShowOutput{
-		Name: testutil.PtrString("MY_ACG_AUTH"),
+		Name: testutil.Ptr("MY_ACG_AUTH"),
 	}
 
 	obs := successfulObservation()
@@ -444,7 +449,7 @@ func TestReconcile_ImmutableName(t *testing.T) {
 		},
 	}
 
-	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"), newOAuthSecret("default"))
 
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myint", "default"))
 	require.NoError(t, err)
@@ -459,13 +464,29 @@ func TestReconcile_ImmutableName(t *testing.T) {
 // Tests: Unit tests for helpers
 // --------------------------------------------------------------------------
 
+func newOAuthSecret(namespace string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oauth-secret",
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			"client-secret": []byte("acg-secret"),
+		},
+	}
+}
+
 func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
 	obj := newTestIntegration("myint", "default")
 	id := snowflake.NewAccountObjectIdentifier("MY_ACG_AUTH")
 
-	opts := buildCreateOptions(obj, id)
+	scheme := testutil.TestScheme()
+	c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(newOAuthSecret("default")).Build()
+
+	opts, err := buildCreateOptions(context.Background(), c, obj, id)
+	require.NoError(t, err)
 	assert.Equal(t, "MY_ACG_AUTH", opts.Name.Name())
 	assert.Equal(t, snowflake.OAuthGrantTypeAuthorizationCode, opts.OAuthGrantType)
 	assert.Equal(t, "acg-client", opts.OAuthClientID)
@@ -517,7 +538,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 		Spec: snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrantSpec{
 			Name:    "MY_ACG_AUTH",
 			Enabled: true,
-			Comment: testutil.PtrString("desired"),
+			Comment: testutil.Ptr("desired"),
 		},
 	}
 
@@ -563,7 +584,7 @@ func TestReconcile_EventEmission_Create(t *testing.T) {
 		},
 	}
 
-	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r := newTestReconciler(mock, obj, testutil.NewTestPC("default"), testutil.NewTestSecret("default"), newOAuthSecret("default"))
 	rec := r.Recorder.(*record.FakeRecorder)
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myint", "default"))

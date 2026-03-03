@@ -8,16 +8,19 @@ import (
 type ExternalTableColumnDefinition struct {
 	// Name is the column identifier.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// Type is the Snowflake data type (e.g. VARCHAR, NUMBER, TIMESTAMP_NTZ).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Type string `json:"type"`
 
 	// As is the SQL expression for the column value.
 	// For regular columns, reference the VALUE variant (e.g. "value:col1::varchar").
 	// For partition columns, use METADATA$FILENAME or METADATA$EXTERNAL_TABLE_PARTITION.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	As string `json:"as"`
 }
 
@@ -49,6 +52,7 @@ type ExternalTableSpec struct {
 
 	// Name is the Snowflake external table name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -61,6 +65,7 @@ type ExternalTableSpec struct {
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -73,17 +78,20 @@ type ExternalTableSpec struct {
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// Location specifies the external stage and optional path (e.g. "@MYDB.MYSCHEMA.MYSTAGE/path/").
 	// Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Location string `json:"location"`
 
 	// FileFormat specifies the file format specification.
 	// Examples: "TYPE = PARQUET", "TYPE = CSV FIELD_DELIMITER = '|'", "FORMAT_NAME = 'my_format'".
 	// Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	FileFormat string `json:"fileFormat"`
 
 	// Columns defines the external table's virtual column definitions.

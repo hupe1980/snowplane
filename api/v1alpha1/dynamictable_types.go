@@ -48,6 +48,7 @@ type DynamicTableSpec struct {
 
 	// Name is the Snowflake dynamic table name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -59,6 +60,7 @@ type DynamicTableSpec struct {
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -70,16 +72,19 @@ type DynamicTableSpec struct {
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// Query is the SQL query that defines the dynamic table content.
 	// This is the AS clause of CREATE DYNAMIC TABLE. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Query string `json:"query"`
 
 	// TargetLag specifies the maximum acceptable staleness of the dynamic table.
 	// Examples: "1 minute", "5 minutes", "1 hour", "DOWNSTREAM".
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	TargetLag string `json:"targetLag"`
 
 	// WarehouseRef references a Warehouse CR in the same namespace.
@@ -91,6 +96,7 @@ type DynamicTableSpec struct {
 	// Mutually exclusive with WarehouseRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	WarehouseName *string `json:"warehouseName,omitempty"`
 
 	// RefreshMode specifies the refresh strategy (AUTO, FULL, INCREMENTAL).

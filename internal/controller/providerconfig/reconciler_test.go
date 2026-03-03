@@ -26,11 +26,10 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/provider"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/testutil"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 	"github.com/hupe1980/snowplane/internal/utils/finalizers"
 )
-
-func strPtr(s string) *string { return &s }
 
 func testScheme() *runtime.Scheme {
 	s := runtime.NewScheme()
@@ -682,7 +681,7 @@ func TestIsInUse_AllResourceTypes(t *testing.T) {
 		}},
 		{"AccountRoleGrant", &snowplanev1alpha1.AccountRoleGrant{
 			ObjectMeta: metav1.ObjectMeta{Name: "g", Namespace: "default"},
-			Spec:       snowplanev1alpha1.AccountRoleGrantSpec{CommonSpec: snowplanev1alpha1.CommonSpec{ProviderRef: snowplanev1alpha1.ProviderReference{Name: "my-pc"}, DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete}, Privilege: "USAGE", On: snowplanev1alpha1.GrantOn{Account: true}, AccountRole: strPtr("R")},
+			Spec:       snowplanev1alpha1.AccountRoleGrantSpec{CommonSpec: snowplanev1alpha1.CommonSpec{ProviderRef: snowplanev1alpha1.ProviderReference{Name: "my-pc"}, DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete}, Privilege: "USAGE", On: snowplanev1alpha1.GrantOn{Account: true}, AccountRole: testutil.Ptr("R")},
 		}},
 	}
 

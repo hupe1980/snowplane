@@ -242,6 +242,14 @@ func ({{ .Receiver }} *{{ .TypeName }}) SetLastAppliedSpecHash(val string) {
 	{{ .Receiver }}.Status.LastAppliedSpecHash = val
 }
 
+func ({{ .Receiver }} *{{ .TypeName }}) GetLastReconcileTime() *metav1.Time {
+	return {{ .Receiver }}.Status.LastReconcileTime
+}
+
+func ({{ .Receiver }} *{{ .TypeName }}) SetLastReconcileTime(val *metav1.Time) {
+	{{ .Receiver }}.Status.LastReconcileTime = val
+}
+
 func ({{ .Receiver }} *{{ .TypeName }}) ValidateSpec() error {
 	return {{ .Receiver }}.Spec.Validate()
 }

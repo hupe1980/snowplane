@@ -55,7 +55,6 @@ func (m *mockService) UnsetNetworkPolicy(ctx context.Context, opts snowflake.Uns
 // Helpers
 // --------------------------------------------------------------------------
 
-func ptrStr(s string) *string { return &s }
 
 func newTestNetworkPolicyAttachment(name, namespace string) *snowplanev1alpha1.NetworkPolicyAttachment {
 	return &snowplanev1alpha1.NetworkPolicyAttachment{
@@ -70,7 +69,7 @@ func newTestNetworkPolicyAttachment(name, namespace string) *snowplanev1alpha1.N
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			TargetType: "ACCOUNT",
-			PolicyName: ptrStr("MY_NETWORK_POLICY"),
+			PolicyName: testutil.Ptr("MY_NETWORK_POLICY"),
 		},
 	}
 }

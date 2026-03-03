@@ -84,16 +84,10 @@ func NewTagClient(c SQLExecutor) *TagClient {
 }
 
 // buildCreateTagSQL builds the CREATE TAG SQL statement.
-func buildCreateTagSQL(opts CreateTagOptions) string {
+func buildCreateTagSQL(opts CreateTagOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER TAG ")
-	} else {
-		b.WriteString("CREATE TAG IF NOT EXISTS ")
-	}
-
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "TAG", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 
 	// ALLOWED_VALUES must come before other parameters.
 	if len(opts.AllowedValues) > 0 {
@@ -112,7 +106,11 @@ func buildCreateTagSQL(opts CreateTagOptions) string {
 
 	b.SetString("COMMENT", opts.Comment)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a tag in Snowflake.
@@ -121,7 +119,12 @@ func (t *TagClient) Create(ctx context.Context, opts CreateTagOptions) error {
 		return NewTerminalError(fmt.Errorf("invalid create tag options: %w", err))
 	}
 
-	if _, err := t.client.Exec(ctx, buildCreateTagSQL(opts)); err != nil {
+	sql, err := buildCreateTagSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create tag SQL: %w", err))
+	}
+
+	if _, err := t.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating tag %s: %w", opts.Name, err)
 	}
 
@@ -245,48 +248,15 @@ func (t *TagClient) Observe(ctx context.Context, name SchemaObjectIdentifier) (*
 
 // scanTagShowOutput scans SHOW TAGS results for a matching row.
 func scanTagShowOutput(rows *sql.Rows, name string) (*TagShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*TagShowOutput, error) {
 		return &TagShowOutput{
-			CreatedOn:     colMap["created_on"],
-			Name:          colMap["name"],
-			DatabaseName:  colMap["database_name"],
-			SchemaName:    colMap["schema_name"],
-			Owner:         colMap["owner"],
-			Comment:       colMap["comment"],
-			AllowedValues: colMap["allowed_values"],
+			CreatedOn:     m["created_on"],
+			Name:          m["name"],
+			DatabaseName:  m["database_name"],
+			SchemaName:    m["schema_name"],
+			Owner:         m["owner"],
+			Comment:       m["comment"],
+			AllowedValues: m["allowed_values"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

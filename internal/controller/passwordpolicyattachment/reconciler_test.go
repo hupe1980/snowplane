@@ -55,7 +55,6 @@ func (m *mockService) UnsetPasswordPolicy(ctx context.Context, opts snowflake.Un
 // Helpers
 // --------------------------------------------------------------------------
 
-func ptrStr(s string) *string { return &s }
 
 func newTestPasswordPolicyAttachment(name, namespace string) *snowplanev1alpha1.PasswordPolicyAttachment {
 	return &snowplanev1alpha1.PasswordPolicyAttachment{
@@ -70,7 +69,7 @@ func newTestPasswordPolicyAttachment(name, namespace string) *snowplanev1alpha1.
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			TargetType: "ACCOUNT",
-			PolicyName: ptrStr(`"DB"."SCHEMA"."MY_PASSWORD_POLICY"`),
+			PolicyName: testutil.Ptr(`"DB"."SCHEMA"."MY_PASSWORD_POLICY"`),
 		},
 	}
 }

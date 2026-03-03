@@ -99,3 +99,96 @@ func scanDescribeKeyValue(rows *sql.Rows) (map[string]string, error) {
 
 	return result, nil
 }
+
+// ScanShowOutput is a generic helper that scans SHOW ... output rows for a
+// single matching row by name and maps it to the target type using mapFn.
+// It eliminates the repeated boilerplate of reading columns, scanning into
+// NullStrings, building a colMap, filtering by name, and handling row errors.
+//
+// The 30 standard scanXxxShowOutput functions all share this exact pattern.
+func ScanShowOutput[T any](rows *sql.Rows, name string, mapFn func(map[string]string) (*T, error)) (*T, error) {
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("reading columns: %w", err)
+	}
+
+	for rows.Next() {
+		values := make([]sql.NullString, len(cols))
+		ptrs := make([]any, len(cols))
+
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, fmt.Errorf("scanning row: %w", err)
+		}
+
+		colMap := make(map[string]string, len(cols))
+		for i, col := range cols {
+			if values[i].Valid {
+				colMap[col] = values[i].String
+			}
+		}
+
+		if !strings.EqualFold(colMap["name"], name) {
+			continue
+		}
+
+		return mapFn(colMap)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating rows: %w", err)
+	}
+
+	return nil, ErrObjectNotFound
+}
+
+// ScanParameters is a generic helper that scans SHOW PARAMETERS output rows
+// into a target struct. Each row represents a key/value parameter pair.
+// The processFn receives the target struct pointer along with the uppercase
+// key and string value, allowing resource-specific field assignments.
+//
+// This eliminates the repeated boilerplate of reading columns, scanning into
+// NullStrings, building a colMap, extracting key/value, and handling row errors
+// across the 4 scanXxxParameters functions (database, schema, warehouse, task).
+func ScanParameters[T any](rows *sql.Rows, processFn func(params *T, key, value string)) (*T, error) {
+	var params T
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("reading columns: %w", err)
+	}
+
+	for rows.Next() {
+		values := make([]sql.NullString, len(cols))
+		ptrs := make([]any, len(cols))
+
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, fmt.Errorf("scanning parameter row: %w", err)
+		}
+
+		colMap := make(map[string]string, len(cols))
+		for i, col := range cols {
+			if values[i].Valid {
+				colMap[col] = values[i].String
+			}
+		}
+
+		key := strings.ToUpper(colMap["key"])
+		val := colMap["value"]
+
+		processFn(&params, key, val)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating parameter rows: %w", err)
+	}
+
+	return &params, nil
+}

@@ -61,7 +61,6 @@ func (m *mockService) Revoke(ctx context.Context, opts snowflake.RevokeGrantOpti
 // Helpers
 // --------------------------------------------------------------------------
 
-func strPtr(s string) *string { return &s }
 
 func newTestAccountRoleGrant(name, namespace string) *snowplanev1alpha1.AccountRoleGrant {
 	return &snowplanev1alpha1.AccountRoleGrant{
@@ -82,7 +81,7 @@ func newTestAccountRoleGrant(name, namespace string) *snowplanev1alpha1.AccountR
 					ObjectName: "MY_DB",
 				},
 			},
-			AccountRole: strPtr("DATA_READER"),
+			AccountRole: testutil.Ptr("DATA_READER"),
 		},
 	}
 }
@@ -581,7 +580,7 @@ func TestOnToParams_SchemaName(t *testing.T) {
 	t.Parallel()
 
 	on := &snowplanev1alpha1.GrantOn{
-		Schema: &snowplanev1alpha1.GrantOnSchema{SchemaName: strPtr(`DB.SCH`)},
+		Schema: &snowplanev1alpha1.GrantOnSchema{SchemaName: testutil.Ptr(`DB.SCH`)},
 	}
 	p := onToParams(on)
 	assert.Equal(t, "DB.SCH", p.SchemaName)

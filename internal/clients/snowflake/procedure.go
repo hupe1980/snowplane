@@ -141,16 +141,10 @@ func buildArgClause(args []ProcedureArgument) string {
 }
 
 // buildCreateProcedureSQL builds the CREATE PROCEDURE SQL statement.
-func buildCreateProcedureSQL(opts CreateProcedureOptions) string {
+func buildCreateProcedureSQL(opts CreateProcedureOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER PROCEDURE ")
-	} else {
-		b.WriteString("CREATE PROCEDURE IF NOT EXISTS ")
-	}
-
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "PROCEDURE", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 	b.WriteString(buildArgClause(opts.Arguments))
 
 	b.WriteString(" RETURNS ")
@@ -222,7 +216,11 @@ func buildCreateProcedureSQL(opts CreateProcedureOptions) string {
 		b.WriteString("$$")
 	}
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a procedure in Snowflake.
@@ -231,7 +229,12 @@ func (p *ProcedureClient) Create(ctx context.Context, opts CreateProcedureOption
 		return NewTerminalError(fmt.Errorf("invalid create procedure options: %w", err))
 	}
 
-	if _, err := p.client.Exec(ctx, buildCreateProcedureSQL(opts)); err != nil {
+	sql, err := buildCreateProcedureSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create procedure SQL: %w", err))
+	}
+
+	if _, err := p.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating procedure %s: %w", opts.Name, err)
 	}
 

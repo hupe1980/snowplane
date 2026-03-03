@@ -62,6 +62,13 @@ type Options struct {
 	// Each consecutive half-open failure doubles the timeout, capped at
 	// this value. Default: 15m.
 	MaxResetTimeout time.Duration
+
+	// ProbeTimeout is the maximum duration a half-open probe is allowed
+	// to run before the breaker considers it stale and allows a new probe.
+	// This prevents the breaker from being stuck in half-open forever if a
+	// probe goroutine crashes without calling RecordSuccess/RecordFailure.
+	// Default: 30s.
+	ProbeTimeout time.Duration
 }
 
 // DefaultOptions returns sensible production defaults.
@@ -70,6 +77,7 @@ func DefaultOptions() Options {
 		FailureThreshold: 5,
 		ResetTimeout:     60 * time.Second,
 		MaxResetTimeout:  15 * time.Minute,
+		ProbeTimeout:     30 * time.Second,
 	}
 }
 
@@ -79,6 +87,7 @@ type providerBreaker struct {
 	consecutiveFailures int
 	lastFailureTime     time.Time
 	probing             bool          // true when a HalfOpen probe is in-flight
+	probeStartedAt      time.Time     // when the current probe began
 	currentResetTimeout time.Duration // current backoff duration (doubles on consecutive failures)
 }
 
@@ -110,6 +119,10 @@ func New(opts Options) *Breaker {
 		opts.MaxResetTimeout = opts.ResetTimeout
 	}
 
+	if opts.ProbeTimeout <= 0 {
+		opts.ProbeTimeout = 30 * time.Second
+	}
+
 	return &Breaker{
 		breakers:   make(map[string]*providerBreaker),
 		opts:       opts,
@@ -133,6 +146,7 @@ func (b *Breaker) Allow(provider string) error {
 		if b.now().Sub(pb.lastFailureTime) >= pb.currentResetTimeout {
 			pb.state = StateHalfOpen
 			pb.probing = true
+			pb.probeStartedAt = b.now()
 			metrics.SetCircuitBreakerState(provider, float64(StateHalfOpen))
 
 			return nil
@@ -142,10 +156,15 @@ func (b *Breaker) Allow(provider string) error {
 	case StateHalfOpen:
 		// Only one probe allowed at a time in HalfOpen.
 		if pb.probing {
-			return ErrCircuitOpen
+			// If the probe has been running longer than ProbeTimeout,
+			// treat it as stale and allow a new probe.
+			if b.now().Sub(pb.probeStartedAt) < b.opts.ProbeTimeout {
+				return ErrCircuitOpen
+			}
 		}
 
 		pb.probing = true
+		pb.probeStartedAt = b.now()
 
 		return nil
 	}

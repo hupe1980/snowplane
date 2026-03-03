@@ -20,14 +20,17 @@ const (
 type ExternalOAuthConfig struct {
 	// Type is the external OAuth type (e.g. CUSTOM, AZURE, OKTA, PING_FEDERATE).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Type string `json:"type"`
 
 	// Issuer is the OAuth 2.0 token issuer URL.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Issuer string `json:"issuer"`
 
 	// TokenUserMappingClaim is the claim in the access token that identifies the user.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	TokenUserMappingClaim string `json:"tokenUserMappingClaim" snowflake:"EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM,always,nounset"`
 
 	// SnowflakeUserMappingAttribute specifies how to map the claim to a Snowflake user
@@ -70,18 +73,22 @@ type ExternalOAuthConfig struct {
 type SAML2Config struct {
 	// Issuer is the SAML2 IdP entity ID / issuer.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Issuer string `json:"issuer"`
 
 	// SSOURL is the IdP SSO URL.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SSOURL string `json:"ssoURL"`
 
 	// Provider is the SAML IdP provider name (e.g. CUSTOM, OKTA, ADFS).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Provider string `json:"provider"`
 
 	// X509Cert is the Base64-encoded X.509 certificate from the IdP for signature validation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	X509Cert string `json:"x509Cert" snowflake:"SAML2_X509_CERT,always,nounset"`
 
 	// AllowedEmailPatterns is a list of email address patterns allowed for auto-provisioning.
@@ -122,6 +129,7 @@ type SCIMConfig struct {
 
 	// RunAsRole is the Snowflake role used to create users/groups via SCIM.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	RunAsRole string `json:"runAsRole"`
 
 	// NetworkPolicy is the optional network policy attached to the SCIM integration.
@@ -137,14 +145,15 @@ type SCIMConfig struct {
 type APIAuthenticationConfig struct {
 	// OAuthClientID is the OAuth 2.0 client ID.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	OAuthClientID string `json:"oauthClientID"`
 
-	// OAuthClientSecret is the OAuth 2.0 client secret.
-	// +kubebuilder:validation:MinLength=1
-	OAuthClientSecret string `json:"oauthClientSecret"`
+	// OAuthClientSecretRef references a Kubernetes Secret containing the OAuth 2.0 client secret.
+	OAuthClientSecretRef SecretKeyReference `json:"oauthClientSecretRef"`
 
 	// OAuthTokenEndpoint is the OAuth token endpoint.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	OAuthTokenEndpoint string `json:"oauthTokenEndpoint"`
 
 	// OAuthAllowedScopes is the list of allowed OAuth scopes.
@@ -167,6 +176,7 @@ type SecurityIntegrationSpec struct {
 
 	// Name is the Snowflake security integration name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// Type specifies the integration type (API_AUTHENTICATION, EXTERNAL_OAUTH, SAML2, SCIM).

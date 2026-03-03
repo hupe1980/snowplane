@@ -22,7 +22,8 @@ func TestBuildCreateDynamicTableSQL(t *testing.T) {
 			TargetLag: "5 minutes",
 			Warehouse: "MY_WH",
 		}
-		got := buildCreateDynamicTableSQL(opts)
+		got, err := buildCreateDynamicTableSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE DYNAMIC TABLE "DB"."SCH"."MY_DT"`)
 		assert.Contains(t, got, "TARGET_LAG = '5 minutes'")
 		assert.Contains(t, got, `WAREHOUSE = "MY_WH"`)
@@ -39,7 +40,8 @@ func TestBuildCreateDynamicTableSQL(t *testing.T) {
 			Warehouse:   "WH",
 			RefreshMode: &rm,
 		}
-		got := buildCreateDynamicTableSQL(opts)
+		got, err := buildCreateDynamicTableSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "REFRESH_MODE = FULL")
 	})
 
@@ -53,7 +55,8 @@ func TestBuildCreateDynamicTableSQL(t *testing.T) {
 			Warehouse:  "WH",
 			Initialize: &init,
 		}
-		got := buildCreateDynamicTableSQL(opts)
+		got, err := buildCreateDynamicTableSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "INITIALIZE = ON_SCHEDULE")
 	})
 
@@ -71,7 +74,8 @@ func TestBuildCreateDynamicTableSQL(t *testing.T) {
 			Initialize:  &init,
 			Comment:     &comment,
 		}
-		got := buildCreateDynamicTableSQL(opts)
+		got, err := buildCreateDynamicTableSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "TARGET_LAG = '10 minutes'")
 		assert.Contains(t, got, `WAREHOUSE = "COMPUTE_WH"`)
 		assert.Contains(t, got, "REFRESH_MODE = INCREMENTAL")
@@ -88,7 +92,8 @@ func TestBuildCreateDynamicTableSQL(t *testing.T) {
 			TargetLag: "DOWNSTREAM",
 			Warehouse: "WH",
 		}
-		got := buildCreateDynamicTableSQL(opts)
+		got, err := buildCreateDynamicTableSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "TARGET_LAG = 'DOWNSTREAM'")
 	})
 }

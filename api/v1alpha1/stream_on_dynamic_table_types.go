@@ -26,6 +26,7 @@ type StreamOnDynamicTableSpec struct {
 
 	// Name is the Snowflake stream name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -37,6 +38,7 @@ type StreamOnDynamicTableSpec struct {
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -48,6 +50,7 @@ type StreamOnDynamicTableSpec struct {
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// DynamicTableRef references a DynamicTable CR in the same namespace.
@@ -59,6 +62,7 @@ type StreamOnDynamicTableSpec struct {
 	// Mutually exclusive with DynamicTableRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DynamicTableName *string `json:"dynamicTableName,omitempty"`
 
 	// AppendOnly when true creates an append-only stream that tracks row inserts only.

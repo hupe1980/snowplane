@@ -14,9 +14,10 @@ import (
 func TestBuildCreateWarehouseSQL_Minimal(t *testing.T) {
 	t.Parallel()
 
-	sql := buildCreateWarehouseSQL(CreateWarehouseOptions{
+	sql, err := buildCreateWarehouseSQL(CreateWarehouseOptions{
 		Name: NewAccountObjectIdentifier("MY_WH"),
 	})
+	require.NoError(t, err)
 	assert.Equal(t, `CREATE WAREHOUSE IF NOT EXISTS "MY_WH"`, sql)
 }
 
@@ -28,32 +29,33 @@ func TestBuildCreateWarehouseSQL_AllOptions(t *testing.T) {
 	scalingPolicy := "ECONOMY"
 	resourceConstraint := "MEMORY"
 
-	sql := buildCreateWarehouseSQL(CreateWarehouseOptions{
+	sql, err := buildCreateWarehouseSQL(CreateWarehouseOptions{
 		Name:                            NewAccountObjectIdentifier("ANALYTICS_WH"),
 		WarehouseType:                   &whType,
 		WarehouseSize:                   &whSize,
-		MinClusterCount:                 ptrInt32(1),
-		MaxClusterCount:                 ptrInt32(3),
+		MinClusterCount:                 ptr(int32(1)),
+		MaxClusterCount:                 ptr(int32(3)),
 		ScalingPolicy:                   &scalingPolicy,
-		AutoSuspend:                     ptrInt32(300),
-		AutoResume:                      ptrBool(true),
+		AutoSuspend:                     ptr(int32(300)),
+		AutoResume:                      ptr(true),
 		InitiallySuspended:              true,
-		ResourceMonitor:                 ptrString("my_monitor"),
-		Comment:                         ptrString("analytics warehouse"),
-		EnableQueryAcceleration:         ptrBool(true),
-		QueryAccelerationMaxScaleFactor: ptrInt32(8),
-		MaxConcurrencyLevel:             ptrInt32(16),
-		StatementQueuedTimeoutInSeconds: ptrInt32(60),
-		StatementTimeoutInSeconds:       ptrInt32(3600),
+		ResourceMonitor:                 ptr("my_monitor"),
+		Comment:                         ptr("analytics warehouse"),
+		EnableQueryAcceleration:         ptr(true),
+		QueryAccelerationMaxScaleFactor: ptr(int32(8)),
+		MaxConcurrencyLevel:             ptr(int32(16)),
+		StatementQueuedTimeoutInSeconds: ptr(int32(60)),
+		StatementTimeoutInSeconds:       ptr(int32(3600)),
 		ResourceConstraint:              &resourceConstraint,
 	})
+	require.NoError(t, err)
 
 	expected := `CREATE WAREHOUSE IF NOT EXISTS "ANALYTICS_WH"` +
-		` WAREHOUSE_TYPE = 'STANDARD'` +
-		` WAREHOUSE_SIZE = 'LARGE'` +
+		` WAREHOUSE_TYPE = STANDARD` +
+		` WAREHOUSE_SIZE = LARGE` +
 		` MIN_CLUSTER_COUNT = 1` +
 		` MAX_CLUSTER_COUNT = 3` +
-		` SCALING_POLICY = 'ECONOMY'` +
+		` SCALING_POLICY = ECONOMY` +
 		` AUTO_SUSPEND = 300` +
 		` AUTO_RESUME = TRUE` +
 		` INITIALLY_SUSPENDED = TRUE` +
@@ -71,22 +73,36 @@ func TestBuildCreateWarehouseSQL_AllOptions(t *testing.T) {
 func TestBuildCreateWarehouseSQL_NotInitiallySuspended(t *testing.T) {
 	t.Parallel()
 
-	sql := buildCreateWarehouseSQL(CreateWarehouseOptions{
+	sql, err := buildCreateWarehouseSQL(CreateWarehouseOptions{
 		Name:               NewAccountObjectIdentifier("WH"),
 		InitiallySuspended: false,
 	})
+	require.NoError(t, err)
 	assert.NotContains(t, sql, "INITIALLY_SUSPENDED")
 }
 
 func TestBuildCreateWarehouseSQL_CreateOrAlter(t *testing.T) {
 	t.Parallel()
 
-	sql := buildCreateWarehouseSQL(CreateWarehouseOptions{
+	sql, err := buildCreateWarehouseSQL(CreateWarehouseOptions{
 		Name:             NewAccountObjectIdentifier("WH"),
-		Comment:          ptrString("managed"),
+		Comment:          ptr("managed"),
 		UseCreateOrAlter: true,
 	})
+	require.NoError(t, err)
 	assert.Equal(t, `CREATE OR ALTER WAREHOUSE "WH" COMMENT = 'managed'`, sql)
+}
+
+func TestBuildCreateWarehouseSQL_InvalidKeywordReturnsError(t *testing.T) {
+	t.Parallel()
+
+	injected := "'; DROP TABLE x --"
+	_, err := buildCreateWarehouseSQL(CreateWarehouseOptions{
+		Name:       NewAccountObjectIdentifier("WH"),
+		Generation: &injected,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid keyword value")
 }
 
 func TestBuildAlterWarehouseStatements_SetOnly(t *testing.T) {
@@ -96,12 +112,12 @@ func TestBuildAlterWarehouseStatements_SetOnly(t *testing.T) {
 	stmts, err := buildAlterWarehouseStatements(AlterWarehouseOptions{
 		Name:          NewAccountObjectIdentifier("MY_WH"),
 		WarehouseSize: &size,
-		AutoSuspend:   ptrInt32(600),
+		AutoSuspend:   ptr(int32(600)),
 	})
 	require.NoError(t, err)
 
 	require.Len(t, stmts, 1)
-	assert.Equal(t, `ALTER WAREHOUSE "MY_WH" SET WAREHOUSE_SIZE = 'XLARGE' AUTO_SUSPEND = 600`, stmts[0])
+	assert.Equal(t, `ALTER WAREHOUSE "MY_WH" SET WAREHOUSE_SIZE = XLARGE AUTO_SUSPEND = 600`, stmts[0])
 }
 
 func TestBuildAlterWarehouseStatements_WarehouseTypeChange(t *testing.T) {
@@ -115,7 +131,7 @@ func TestBuildAlterWarehouseStatements_WarehouseTypeChange(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, stmts, 1)
-	assert.Equal(t, `ALTER WAREHOUSE "MY_WH" SET WAREHOUSE_TYPE = 'SNOWPARK-OPTIMIZED'`, stmts[0])
+	assert.Equal(t, `ALTER WAREHOUSE "MY_WH" SET WAREHOUSE_TYPE = SNOWPARK-OPTIMIZED`, stmts[0])
 }
 
 func TestBuildAlterWarehouseStatements_UnsetOnly(t *testing.T) {
@@ -136,7 +152,7 @@ func TestBuildAlterWarehouseStatements_SetAndUnset(t *testing.T) {
 
 	stmts, err := buildAlterWarehouseStatements(AlterWarehouseOptions{
 		Name:        NewAccountObjectIdentifier("MY_WH"),
-		Comment:     ptrString("new comment"),
+		Comment:     ptr("new comment"),
 		UnsetFields: []string{"AUTO_SUSPEND"},
 	})
 	require.NoError(t, err)
@@ -169,29 +185,29 @@ func TestBuildAlterWarehouseStatements_AllSetOptions(t *testing.T) {
 		Name:                            NewAccountObjectIdentifier("WH"),
 		WarehouseType:                   &whType,
 		WarehouseSize:                   &size,
-		MinClusterCount:                 ptrInt32(2),
-		MaxClusterCount:                 ptrInt32(5),
+		MinClusterCount:                 ptr(int32(2)),
+		MaxClusterCount:                 ptr(int32(5)),
 		ScalingPolicy:                   &scalingPolicy,
-		AutoSuspend:                     ptrInt32(120),
-		AutoResume:                      ptrBool(false),
-		ResourceMonitor:                 ptrString("rm1"),
-		Comment:                         ptrString("test"),
-		EnableQueryAcceleration:         ptrBool(true),
-		QueryAccelerationMaxScaleFactor: ptrInt32(10),
-		MaxConcurrencyLevel:             ptrInt32(4),
-		StatementQueuedTimeoutInSeconds: ptrInt32(30),
-		StatementTimeoutInSeconds:       ptrInt32(1800),
+		AutoSuspend:                     ptr(int32(120)),
+		AutoResume:                      ptr(false),
+		ResourceMonitor:                 ptr("rm1"),
+		Comment:                         ptr("test"),
+		EnableQueryAcceleration:         ptr(true),
+		QueryAccelerationMaxScaleFactor: ptr(int32(10)),
+		MaxConcurrencyLevel:             ptr(int32(4)),
+		StatementQueuedTimeoutInSeconds: ptr(int32(30)),
+		StatementTimeoutInSeconds:       ptr(int32(1800)),
 		ResourceConstraint:              &constraint,
 	})
 	require.NoError(t, err)
 
 	require.Len(t, stmts, 1)
 	expected := `ALTER WAREHOUSE "WH" SET` +
-		` WAREHOUSE_TYPE = 'SNOWPARK-OPTIMIZED'` +
-		` WAREHOUSE_SIZE = 'MEDIUM'` +
+		` WAREHOUSE_TYPE = SNOWPARK-OPTIMIZED` +
+		` WAREHOUSE_SIZE = MEDIUM` +
 		` MIN_CLUSTER_COUNT = 2` +
 		` MAX_CLUSTER_COUNT = 5` +
-		` SCALING_POLICY = 'STANDARD'` +
+		` SCALING_POLICY = STANDARD` +
 		` AUTO_SUSPEND = 120` +
 		` AUTO_RESUME = FALSE` +
 		` RESOURCE_MONITOR = 'rm1'` +
@@ -259,7 +275,7 @@ func TestCreateWarehouseOptions_Validate_InvalidQAMaxScaleFactor(t *testing.T) {
 
 	err := (&CreateWarehouseOptions{
 		Name:                            NewAccountObjectIdentifier("WH"),
-		QueryAccelerationMaxScaleFactor: ptrInt32(101),
+		QueryAccelerationMaxScaleFactor: ptr(int32(101)),
 	}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "queryAccelerationMaxScaleFactor must be between 0 and 100")
@@ -270,8 +286,8 @@ func TestCreateWarehouseOptions_Validate_MinGTMax(t *testing.T) {
 
 	err := (&CreateWarehouseOptions{
 		Name:            NewAccountObjectIdentifier("WH"),
-		MinClusterCount: ptrInt32(5),
-		MaxClusterCount: ptrInt32(3),
+		MinClusterCount: ptr(int32(5)),
+		MaxClusterCount: ptr(int32(3)),
 	}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "minClusterCount (5) must be <= maxClusterCount (3)")
@@ -282,8 +298,8 @@ func TestCreateWarehouseOptions_Validate_Valid(t *testing.T) {
 
 	err := (&CreateWarehouseOptions{
 		Name:            NewAccountObjectIdentifier("WH"),
-		MinClusterCount: ptrInt32(1),
-		MaxClusterCount: ptrInt32(3),
+		MinClusterCount: ptr(int32(1)),
+		MaxClusterCount: ptr(int32(3)),
 	}).Validate()
 	require.NoError(t, err)
 }
@@ -361,7 +377,3 @@ func TestSqlString(t *testing.T) {
 	assert.Equal(t, "bytes", sqlString([]byte("bytes")))
 	assert.Equal(t, "42", sqlString(42))
 }
-
-func ptrString(s string) *string { return &s }
-func ptrInt32(i int32) *int32    { return &i }
-func ptrBool(b bool) *bool       { return &b }

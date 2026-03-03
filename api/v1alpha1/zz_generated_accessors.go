@@ -68,6 +68,14 @@ func (d *Database) SetLastAppliedSpecHash(val string) {
 	d.Status.LastAppliedSpecHash = val
 }
 
+func (d *Database) GetLastReconcileTime() *metav1.Time {
+	return d.Status.LastReconcileTime
+}
+
+func (d *Database) SetLastReconcileTime(val *metav1.Time) {
+	d.Status.LastReconcileTime = val
+}
+
 func (d *Database) ValidateSpec() error {
 	return d.Spec.Validate()
 }
@@ -154,6 +162,14 @@ func (s *Schema) GetLastAppliedSpecHash() string {
 
 func (s *Schema) SetLastAppliedSpecHash(val string) {
 	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *Schema) GetLastReconcileTime() *metav1.Time {
+	return s.Status.LastReconcileTime
+}
+
+func (s *Schema) SetLastReconcileTime(val *metav1.Time) {
+	s.Status.LastReconcileTime = val
 }
 
 func (s *Schema) ValidateSpec() error {
@@ -244,6 +260,14 @@ func (w *Warehouse) SetLastAppliedSpecHash(val string) {
 	w.Status.LastAppliedSpecHash = val
 }
 
+func (w *Warehouse) GetLastReconcileTime() *metav1.Time {
+	return w.Status.LastReconcileTime
+}
+
+func (w *Warehouse) SetLastReconcileTime(val *metav1.Time) {
+	w.Status.LastReconcileTime = val
+}
+
 func (w *Warehouse) ValidateSpec() error {
 	return w.Spec.Validate()
 }
@@ -330,6 +354,14 @@ func (u *User) GetLastAppliedSpecHash() string {
 
 func (u *User) SetLastAppliedSpecHash(val string) {
 	u.Status.LastAppliedSpecHash = val
+}
+
+func (u *User) GetLastReconcileTime() *metav1.Time {
+	return u.Status.LastReconcileTime
+}
+
+func (u *User) SetLastReconcileTime(val *metav1.Time) {
+	u.Status.LastReconcileTime = val
 }
 
 func (u *User) ValidateSpec() error {
@@ -420,6 +452,14 @@ func (r *AccountRole) SetLastAppliedSpecHash(val string) {
 	r.Status.LastAppliedSpecHash = val
 }
 
+func (r *AccountRole) GetLastReconcileTime() *metav1.Time {
+	return r.Status.LastReconcileTime
+}
+
+func (r *AccountRole) SetLastReconcileTime(val *metav1.Time) {
+	r.Status.LastReconcileTime = val
+}
+
 func (r *AccountRole) ValidateSpec() error {
 	return r.Spec.Validate()
 }
@@ -506,6 +546,14 @@ func (r *DatabaseRole) GetLastAppliedSpecHash() string {
 
 func (r *DatabaseRole) SetLastAppliedSpecHash(val string) {
 	r.Status.LastAppliedSpecHash = val
+}
+
+func (r *DatabaseRole) GetLastReconcileTime() *metav1.Time {
+	return r.Status.LastReconcileTime
+}
+
+func (r *DatabaseRole) SetLastReconcileTime(val *metav1.Time) {
+	r.Status.LastReconcileTime = val
 }
 
 func (r *DatabaseRole) ValidateSpec() error {
@@ -596,6 +644,14 @@ func (t *Tag) SetLastAppliedSpecHash(val string) {
 	t.Status.LastAppliedSpecHash = val
 }
 
+func (t *Tag) GetLastReconcileTime() *metav1.Time {
+	return t.Status.LastReconcileTime
+}
+
+func (t *Tag) SetLastReconcileTime(val *metav1.Time) {
+	t.Status.LastReconcileTime = val
+}
+
 func (t *Tag) ValidateSpec() error {
 	return t.Spec.Validate()
 }
@@ -682,6 +738,14 @@ func (mp *MaskingPolicy) GetLastAppliedSpecHash() string {
 
 func (mp *MaskingPolicy) SetLastAppliedSpecHash(val string) {
 	mp.Status.LastAppliedSpecHash = val
+}
+
+func (mp *MaskingPolicy) GetLastReconcileTime() *metav1.Time {
+	return mp.Status.LastReconcileTime
+}
+
+func (mp *MaskingPolicy) SetLastReconcileTime(val *metav1.Time) {
+	mp.Status.LastReconcileTime = val
 }
 
 func (mp *MaskingPolicy) ValidateSpec() error {
@@ -772,6 +836,14 @@ func (rap *RowAccessPolicy) SetLastAppliedSpecHash(val string) {
 	rap.Status.LastAppliedSpecHash = val
 }
 
+func (rap *RowAccessPolicy) GetLastReconcileTime() *metav1.Time {
+	return rap.Status.LastReconcileTime
+}
+
+func (rap *RowAccessPolicy) SetLastReconcileTime(val *metav1.Time) {
+	rap.Status.LastReconcileTime = val
+}
+
 func (rap *RowAccessPolicy) ValidateSpec() error {
 	return rap.Spec.Validate()
 }
@@ -858,6 +930,14 @@ func (s *Stage) GetLastAppliedSpecHash() string {
 
 func (s *Stage) SetLastAppliedSpecHash(val string) {
 	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *Stage) GetLastReconcileTime() *metav1.Time {
+	return s.Status.LastReconcileTime
+}
+
+func (s *Stage) SetLastReconcileTime(val *metav1.Time) {
+	s.Status.LastReconcileTime = val
 }
 
 func (s *Stage) ValidateSpec() error {
@@ -948,6 +1028,14 @@ func (s *StreamOnTable) SetLastAppliedSpecHash(val string) {
 	s.Status.LastAppliedSpecHash = val
 }
 
+func (s *StreamOnTable) GetLastReconcileTime() *metav1.Time {
+	return s.Status.LastReconcileTime
+}
+
+func (s *StreamOnTable) SetLastReconcileTime(val *metav1.Time) {
+	s.Status.LastReconcileTime = val
+}
+
 func (s *StreamOnTable) ValidateSpec() error {
 	return s.Spec.Validate()
 }
@@ -1034,6 +1122,14 @@ func (s *StreamOnView) GetLastAppliedSpecHash() string {
 
 func (s *StreamOnView) SetLastAppliedSpecHash(val string) {
 	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *StreamOnView) GetLastReconcileTime() *metav1.Time {
+	return s.Status.LastReconcileTime
+}
+
+func (s *StreamOnView) SetLastReconcileTime(val *metav1.Time) {
+	s.Status.LastReconcileTime = val
 }
 
 func (s *StreamOnView) ValidateSpec() error {
@@ -1124,6 +1220,14 @@ func (s *StreamOnExternalTable) SetLastAppliedSpecHash(val string) {
 	s.Status.LastAppliedSpecHash = val
 }
 
+func (s *StreamOnExternalTable) GetLastReconcileTime() *metav1.Time {
+	return s.Status.LastReconcileTime
+}
+
+func (s *StreamOnExternalTable) SetLastReconcileTime(val *metav1.Time) {
+	s.Status.LastReconcileTime = val
+}
+
 func (s *StreamOnExternalTable) ValidateSpec() error {
 	return s.Spec.Validate()
 }
@@ -1210,6 +1314,14 @@ func (s *StreamOnDirectoryTable) GetLastAppliedSpecHash() string {
 
 func (s *StreamOnDirectoryTable) SetLastAppliedSpecHash(val string) {
 	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *StreamOnDirectoryTable) GetLastReconcileTime() *metav1.Time {
+	return s.Status.LastReconcileTime
+}
+
+func (s *StreamOnDirectoryTable) SetLastReconcileTime(val *metav1.Time) {
+	s.Status.LastReconcileTime = val
 }
 
 func (s *StreamOnDirectoryTable) ValidateSpec() error {
@@ -1300,6 +1412,14 @@ func (s *StreamOnDynamicTable) SetLastAppliedSpecHash(val string) {
 	s.Status.LastAppliedSpecHash = val
 }
 
+func (s *StreamOnDynamicTable) GetLastReconcileTime() *metav1.Time {
+	return s.Status.LastReconcileTime
+}
+
+func (s *StreamOnDynamicTable) SetLastReconcileTime(val *metav1.Time) {
+	s.Status.LastReconcileTime = val
+}
+
 func (s *StreamOnDynamicTable) ValidateSpec() error {
 	return s.Spec.Validate()
 }
@@ -1386,6 +1506,14 @@ func (t *Task) GetLastAppliedSpecHash() string {
 
 func (t *Task) SetLastAppliedSpecHash(val string) {
 	t.Status.LastAppliedSpecHash = val
+}
+
+func (t *Task) GetLastReconcileTime() *metav1.Time {
+	return t.Status.LastReconcileTime
+}
+
+func (t *Task) SetLastReconcileTime(val *metav1.Time) {
+	t.Status.LastReconcileTime = val
 }
 
 func (t *Task) ValidateSpec() error {
@@ -1476,6 +1604,14 @@ func (a *Alert) SetLastAppliedSpecHash(val string) {
 	a.Status.LastAppliedSpecHash = val
 }
 
+func (a *Alert) GetLastReconcileTime() *metav1.Time {
+	return a.Status.LastReconcileTime
+}
+
+func (a *Alert) SetLastReconcileTime(val *metav1.Time) {
+	a.Status.LastReconcileTime = val
+}
+
 func (a *Alert) ValidateSpec() error {
 	return a.Spec.Validate()
 }
@@ -1562,6 +1698,14 @@ func (v *View) GetLastAppliedSpecHash() string {
 
 func (v *View) SetLastAppliedSpecHash(val string) {
 	v.Status.LastAppliedSpecHash = val
+}
+
+func (v *View) GetLastReconcileTime() *metav1.Time {
+	return v.Status.LastReconcileTime
+}
+
+func (v *View) SetLastReconcileTime(val *metav1.Time) {
+	v.Status.LastReconcileTime = val
 }
 
 func (v *View) ValidateSpec() error {
@@ -1652,6 +1796,14 @@ func (t *Table) SetLastAppliedSpecHash(val string) {
 	t.Status.LastAppliedSpecHash = val
 }
 
+func (t *Table) GetLastReconcileTime() *metav1.Time {
+	return t.Status.LastReconcileTime
+}
+
+func (t *Table) SetLastReconcileTime(val *metav1.Time) {
+	t.Status.LastReconcileTime = val
+}
+
 func (t *Table) ValidateSpec() error {
 	return t.Spec.Validate()
 }
@@ -1740,6 +1892,14 @@ func (np *NetworkPolicy) SetLastAppliedSpecHash(val string) {
 	np.Status.LastAppliedSpecHash = val
 }
 
+func (np *NetworkPolicy) GetLastReconcileTime() *metav1.Time {
+	return np.Status.LastReconcileTime
+}
+
+func (np *NetworkPolicy) SetLastReconcileTime(val *metav1.Time) {
+	np.Status.LastReconcileTime = val
+}
+
 func (np *NetworkPolicy) ValidateSpec() error {
 	return np.Spec.Validate()
 }
@@ -1823,6 +1983,14 @@ func (rm *ResourceMonitor) GetLastAppliedSpecHash() string {
 
 func (rm *ResourceMonitor) SetLastAppliedSpecHash(val string) {
 	rm.Status.LastAppliedSpecHash = val
+}
+
+func (rm *ResourceMonitor) GetLastReconcileTime() *metav1.Time {
+	return rm.Status.LastReconcileTime
+}
+
+func (rm *ResourceMonitor) SetLastReconcileTime(val *metav1.Time) {
+	rm.Status.LastReconcileTime = val
 }
 
 func (rm *ResourceMonitor) ValidateSpec() error {
@@ -1910,6 +2078,14 @@ func (si *StorageIntegration) SetLastAppliedSpecHash(val string) {
 	si.Status.LastAppliedSpecHash = val
 }
 
+func (si *StorageIntegration) GetLastReconcileTime() *metav1.Time {
+	return si.Status.LastReconcileTime
+}
+
+func (si *StorageIntegration) SetLastReconcileTime(val *metav1.Time) {
+	si.Status.LastReconcileTime = val
+}
+
 func (si *StorageIntegration) ValidateSpec() error {
 	return si.Spec.Validate()
 }
@@ -1993,6 +2169,14 @@ func (ff *FileFormat) GetLastAppliedSpecHash() string {
 
 func (ff *FileFormat) SetLastAppliedSpecHash(val string) {
 	ff.Status.LastAppliedSpecHash = val
+}
+
+func (ff *FileFormat) GetLastReconcileTime() *metav1.Time {
+	return ff.Status.LastReconcileTime
+}
+
+func (ff *FileFormat) SetLastReconcileTime(val *metav1.Time) {
+	ff.Status.LastReconcileTime = val
 }
 
 func (ff *FileFormat) ValidateSpec() error {
@@ -2083,6 +2267,14 @@ func (p *Pipe) SetLastAppliedSpecHash(val string) {
 	p.Status.LastAppliedSpecHash = val
 }
 
+func (p *Pipe) GetLastReconcileTime() *metav1.Time {
+	return p.Status.LastReconcileTime
+}
+
+func (p *Pipe) SetLastReconcileTime(val *metav1.Time) {
+	p.Status.LastReconcileTime = val
+}
+
 func (p *Pipe) ValidateSpec() error {
 	return p.Spec.Validate()
 }
@@ -2169,6 +2361,14 @@ func (dt *DynamicTable) GetLastAppliedSpecHash() string {
 
 func (dt *DynamicTable) SetLastAppliedSpecHash(val string) {
 	dt.Status.LastAppliedSpecHash = val
+}
+
+func (dt *DynamicTable) GetLastReconcileTime() *metav1.Time {
+	return dt.Status.LastReconcileTime
+}
+
+func (dt *DynamicTable) SetLastReconcileTime(val *metav1.Time) {
+	dt.Status.LastReconcileTime = val
 }
 
 func (dt *DynamicTable) ValidateSpec() error {
@@ -2259,6 +2459,14 @@ func (ni *NotificationIntegration) SetLastAppliedSpecHash(val string) {
 	ni.Status.LastAppliedSpecHash = val
 }
 
+func (ni *NotificationIntegration) GetLastReconcileTime() *metav1.Time {
+	return ni.Status.LastReconcileTime
+}
+
+func (ni *NotificationIntegration) SetLastReconcileTime(val *metav1.Time) {
+	ni.Status.LastReconcileTime = val
+}
+
 func (ni *NotificationIntegration) ValidateSpec() error {
 	return ni.Spec.Validate()
 }
@@ -2344,6 +2552,14 @@ func (si *SecurityIntegration) SetLastAppliedSpecHash(val string) {
 	si.Status.LastAppliedSpecHash = val
 }
 
+func (si *SecurityIntegration) GetLastReconcileTime() *metav1.Time {
+	return si.Status.LastReconcileTime
+}
+
+func (si *SecurityIntegration) SetLastReconcileTime(val *metav1.Time) {
+	si.Status.LastReconcileTime = val
+}
+
 func (si *SecurityIntegration) ValidateSpec() error {
 	return si.Spec.Validate()
 }
@@ -2427,6 +2643,14 @@ func (pp *PasswordPolicy) GetLastAppliedSpecHash() string {
 
 func (pp *PasswordPolicy) SetLastAppliedSpecHash(val string) {
 	pp.Status.LastAppliedSpecHash = val
+}
+
+func (pp *PasswordPolicy) GetLastReconcileTime() *metav1.Time {
+	return pp.Status.LastReconcileTime
+}
+
+func (pp *PasswordPolicy) SetLastReconcileTime(val *metav1.Time) {
+	pp.Status.LastReconcileTime = val
 }
 
 func (pp *PasswordPolicy) ValidateSpec() error {
@@ -2517,6 +2741,14 @@ func (ap *AuthenticationPolicy) SetLastAppliedSpecHash(val string) {
 	ap.Status.LastAppliedSpecHash = val
 }
 
+func (ap *AuthenticationPolicy) GetLastReconcileTime() *metav1.Time {
+	return ap.Status.LastReconcileTime
+}
+
+func (ap *AuthenticationPolicy) SetLastReconcileTime(val *metav1.Time) {
+	ap.Status.LastReconcileTime = val
+}
+
 func (ap *AuthenticationPolicy) ValidateSpec() error {
 	return ap.Spec.Validate()
 }
@@ -2603,6 +2835,14 @@ func (nr *NetworkRule) GetLastAppliedSpecHash() string {
 
 func (nr *NetworkRule) SetLastAppliedSpecHash(val string) {
 	nr.Status.LastAppliedSpecHash = val
+}
+
+func (nr *NetworkRule) GetLastReconcileTime() *metav1.Time {
+	return nr.Status.LastReconcileTime
+}
+
+func (nr *NetworkRule) SetLastReconcileTime(val *metav1.Time) {
+	nr.Status.LastReconcileTime = val
 }
 
 func (nr *NetworkRule) ValidateSpec() error {
@@ -2693,6 +2933,14 @@ func (seq *Sequence) SetLastAppliedSpecHash(val string) {
 	seq.Status.LastAppliedSpecHash = val
 }
 
+func (seq *Sequence) GetLastReconcileTime() *metav1.Time {
+	return seq.Status.LastReconcileTime
+}
+
+func (seq *Sequence) SetLastReconcileTime(val *metav1.Time) {
+	seq.Status.LastReconcileTime = val
+}
+
 func (seq *Sequence) ValidateSpec() error {
 	return seq.Spec.Validate()
 }
@@ -2779,6 +3027,14 @@ func (et *ExternalTable) GetLastAppliedSpecHash() string {
 
 func (et *ExternalTable) SetLastAppliedSpecHash(val string) {
 	et.Status.LastAppliedSpecHash = val
+}
+
+func (et *ExternalTable) GetLastReconcileTime() *metav1.Time {
+	return et.Status.LastReconcileTime
+}
+
+func (et *ExternalTable) SetLastReconcileTime(val *metav1.Time) {
+	et.Status.LastReconcileTime = val
 }
 
 func (et *ExternalTable) ValidateSpec() error {
@@ -2869,6 +3125,14 @@ func (mv *MaterializedView) SetLastAppliedSpecHash(val string) {
 	mv.Status.LastAppliedSpecHash = val
 }
 
+func (mv *MaterializedView) GetLastReconcileTime() *metav1.Time {
+	return mv.Status.LastReconcileTime
+}
+
+func (mv *MaterializedView) SetLastReconcileTime(val *metav1.Time) {
+	mv.Status.LastReconcileTime = val
+}
+
 func (mv *MaterializedView) ValidateSpec() error {
 	return mv.Spec.Validate()
 }
@@ -2955,6 +3219,14 @@ func (p *ProcedureSQL) GetLastAppliedSpecHash() string {
 
 func (p *ProcedureSQL) SetLastAppliedSpecHash(val string) {
 	p.Status.LastAppliedSpecHash = val
+}
+
+func (p *ProcedureSQL) GetLastReconcileTime() *metav1.Time {
+	return p.Status.LastReconcileTime
+}
+
+func (p *ProcedureSQL) SetLastReconcileTime(val *metav1.Time) {
+	p.Status.LastReconcileTime = val
 }
 
 func (p *ProcedureSQL) ValidateSpec() error {
@@ -3045,6 +3317,14 @@ func (p *ProcedureJavascript) SetLastAppliedSpecHash(val string) {
 	p.Status.LastAppliedSpecHash = val
 }
 
+func (p *ProcedureJavascript) GetLastReconcileTime() *metav1.Time {
+	return p.Status.LastReconcileTime
+}
+
+func (p *ProcedureJavascript) SetLastReconcileTime(val *metav1.Time) {
+	p.Status.LastReconcileTime = val
+}
+
 func (p *ProcedureJavascript) ValidateSpec() error {
 	return p.Spec.Validate()
 }
@@ -3131,6 +3411,14 @@ func (p *ProcedurePython) GetLastAppliedSpecHash() string {
 
 func (p *ProcedurePython) SetLastAppliedSpecHash(val string) {
 	p.Status.LastAppliedSpecHash = val
+}
+
+func (p *ProcedurePython) GetLastReconcileTime() *metav1.Time {
+	return p.Status.LastReconcileTime
+}
+
+func (p *ProcedurePython) SetLastReconcileTime(val *metav1.Time) {
+	p.Status.LastReconcileTime = val
 }
 
 func (p *ProcedurePython) ValidateSpec() error {
@@ -3221,6 +3509,14 @@ func (p *ProcedureJava) SetLastAppliedSpecHash(val string) {
 	p.Status.LastAppliedSpecHash = val
 }
 
+func (p *ProcedureJava) GetLastReconcileTime() *metav1.Time {
+	return p.Status.LastReconcileTime
+}
+
+func (p *ProcedureJava) SetLastReconcileTime(val *metav1.Time) {
+	p.Status.LastReconcileTime = val
+}
+
 func (p *ProcedureJava) ValidateSpec() error {
 	return p.Spec.Validate()
 }
@@ -3307,6 +3603,14 @@ func (p *ProcedureScala) GetLastAppliedSpecHash() string {
 
 func (p *ProcedureScala) SetLastAppliedSpecHash(val string) {
 	p.Status.LastAppliedSpecHash = val
+}
+
+func (p *ProcedureScala) GetLastReconcileTime() *metav1.Time {
+	return p.Status.LastReconcileTime
+}
+
+func (p *ProcedureScala) SetLastReconcileTime(val *metav1.Time) {
+	p.Status.LastReconcileTime = val
 }
 
 func (p *ProcedureScala) ValidateSpec() error {
@@ -3397,6 +3701,14 @@ func (f *FunctionSQL) SetLastAppliedSpecHash(val string) {
 	f.Status.LastAppliedSpecHash = val
 }
 
+func (f *FunctionSQL) GetLastReconcileTime() *metav1.Time {
+	return f.Status.LastReconcileTime
+}
+
+func (f *FunctionSQL) SetLastReconcileTime(val *metav1.Time) {
+	f.Status.LastReconcileTime = val
+}
+
 func (f *FunctionSQL) ValidateSpec() error {
 	return f.Spec.Validate()
 }
@@ -3483,6 +3795,14 @@ func (f *FunctionJavascript) GetLastAppliedSpecHash() string {
 
 func (f *FunctionJavascript) SetLastAppliedSpecHash(val string) {
 	f.Status.LastAppliedSpecHash = val
+}
+
+func (f *FunctionJavascript) GetLastReconcileTime() *metav1.Time {
+	return f.Status.LastReconcileTime
+}
+
+func (f *FunctionJavascript) SetLastReconcileTime(val *metav1.Time) {
+	f.Status.LastReconcileTime = val
 }
 
 func (f *FunctionJavascript) ValidateSpec() error {
@@ -3573,6 +3893,14 @@ func (f *FunctionPython) SetLastAppliedSpecHash(val string) {
 	f.Status.LastAppliedSpecHash = val
 }
 
+func (f *FunctionPython) GetLastReconcileTime() *metav1.Time {
+	return f.Status.LastReconcileTime
+}
+
+func (f *FunctionPython) SetLastReconcileTime(val *metav1.Time) {
+	f.Status.LastReconcileTime = val
+}
+
 func (f *FunctionPython) ValidateSpec() error {
 	return f.Spec.Validate()
 }
@@ -3659,6 +3987,14 @@ func (f *FunctionJava) GetLastAppliedSpecHash() string {
 
 func (f *FunctionJava) SetLastAppliedSpecHash(val string) {
 	f.Status.LastAppliedSpecHash = val
+}
+
+func (f *FunctionJava) GetLastReconcileTime() *metav1.Time {
+	return f.Status.LastReconcileTime
+}
+
+func (f *FunctionJava) SetLastReconcileTime(val *metav1.Time) {
+	f.Status.LastReconcileTime = val
 }
 
 func (f *FunctionJava) ValidateSpec() error {
@@ -3749,6 +4085,14 @@ func (f *FunctionScala) SetLastAppliedSpecHash(val string) {
 	f.Status.LastAppliedSpecHash = val
 }
 
+func (f *FunctionScala) GetLastReconcileTime() *metav1.Time {
+	return f.Status.LastReconcileTime
+}
+
+func (f *FunctionScala) SetLastReconcileTime(val *metav1.Time) {
+	f.Status.LastReconcileTime = val
+}
+
 func (f *FunctionScala) ValidateSpec() error {
 	return f.Spec.Validate()
 }
@@ -3835,6 +4179,14 @@ func (s *SecretWithClientCredentials) GetLastAppliedSpecHash() string {
 
 func (s *SecretWithClientCredentials) SetLastAppliedSpecHash(val string) {
 	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *SecretWithClientCredentials) GetLastReconcileTime() *metav1.Time {
+	return s.Status.LastReconcileTime
+}
+
+func (s *SecretWithClientCredentials) SetLastReconcileTime(val *metav1.Time) {
+	s.Status.LastReconcileTime = val
 }
 
 func (s *SecretWithClientCredentials) ValidateSpec() error {
@@ -3925,6 +4277,14 @@ func (s *SecretWithAuthorizationCodeGrant) SetLastAppliedSpecHash(val string) {
 	s.Status.LastAppliedSpecHash = val
 }
 
+func (s *SecretWithAuthorizationCodeGrant) GetLastReconcileTime() *metav1.Time {
+	return s.Status.LastReconcileTime
+}
+
+func (s *SecretWithAuthorizationCodeGrant) SetLastReconcileTime(val *metav1.Time) {
+	s.Status.LastReconcileTime = val
+}
+
 func (s *SecretWithAuthorizationCodeGrant) ValidateSpec() error {
 	return s.Spec.Validate()
 }
@@ -4011,6 +4371,14 @@ func (s *SecretWithBasicAuthentication) GetLastAppliedSpecHash() string {
 
 func (s *SecretWithBasicAuthentication) SetLastAppliedSpecHash(val string) {
 	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *SecretWithBasicAuthentication) GetLastReconcileTime() *metav1.Time {
+	return s.Status.LastReconcileTime
+}
+
+func (s *SecretWithBasicAuthentication) SetLastReconcileTime(val *metav1.Time) {
+	s.Status.LastReconcileTime = val
 }
 
 func (s *SecretWithBasicAuthentication) ValidateSpec() error {
@@ -4101,6 +4469,14 @@ func (s *SecretWithGenericString) SetLastAppliedSpecHash(val string) {
 	s.Status.LastAppliedSpecHash = val
 }
 
+func (s *SecretWithGenericString) GetLastReconcileTime() *metav1.Time {
+	return s.Status.LastReconcileTime
+}
+
+func (s *SecretWithGenericString) SetLastReconcileTime(val *metav1.Time) {
+	s.Status.LastReconcileTime = val
+}
+
 func (s *SecretWithGenericString) ValidateSpec() error {
 	return s.Spec.Validate()
 }
@@ -4189,6 +4565,14 @@ func (a *APIAuthenticationIntegrationWithClientCredentials) SetLastAppliedSpecHa
 	a.Status.LastAppliedSpecHash = val
 }
 
+func (a *APIAuthenticationIntegrationWithClientCredentials) GetLastReconcileTime() *metav1.Time {
+	return a.Status.LastReconcileTime
+}
+
+func (a *APIAuthenticationIntegrationWithClientCredentials) SetLastReconcileTime(val *metav1.Time) {
+	a.Status.LastReconcileTime = val
+}
+
 func (a *APIAuthenticationIntegrationWithClientCredentials) ValidateSpec() error {
 	return a.Spec.Validate()
 }
@@ -4272,6 +4656,14 @@ func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetLastAppliedS
 
 func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) SetLastAppliedSpecHash(val string) {
 	a.Status.LastAppliedSpecHash = val
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) GetLastReconcileTime() *metav1.Time {
+	return a.Status.LastReconcileTime
+}
+
+func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) SetLastReconcileTime(val *metav1.Time) {
+	a.Status.LastReconcileTime = val
 }
 
 func (a *APIAuthenticationIntegrationWithAuthorizationCodeGrant) ValidateSpec() error {
@@ -4359,6 +4751,14 @@ func (a *APIAuthenticationIntegrationWithJWTBearer) SetLastAppliedSpecHash(val s
 	a.Status.LastAppliedSpecHash = val
 }
 
+func (a *APIAuthenticationIntegrationWithJWTBearer) GetLastReconcileTime() *metav1.Time {
+	return a.Status.LastReconcileTime
+}
+
+func (a *APIAuthenticationIntegrationWithJWTBearer) SetLastReconcileTime(val *metav1.Time) {
+	a.Status.LastReconcileTime = val
+}
+
 func (a *APIAuthenticationIntegrationWithJWTBearer) ValidateSpec() error {
 	return a.Spec.Validate()
 }
@@ -4438,6 +4838,14 @@ func (r *AccountRoleGrant) GetLastAppliedSpecHash() string {
 
 func (r *AccountRoleGrant) SetLastAppliedSpecHash(val string) {
 	r.Status.LastAppliedSpecHash = val
+}
+
+func (r *AccountRoleGrant) GetLastReconcileTime() *metav1.Time {
+	return r.Status.LastReconcileTime
+}
+
+func (r *AccountRoleGrant) SetLastReconcileTime(val *metav1.Time) {
+	r.Status.LastReconcileTime = val
 }
 
 func (r *AccountRoleGrant) ValidateSpec() error {
@@ -4520,6 +4928,14 @@ func (r *DatabaseRoleGrant) SetLastAppliedSpecHash(val string) {
 	r.Status.LastAppliedSpecHash = val
 }
 
+func (r *DatabaseRoleGrant) GetLastReconcileTime() *metav1.Time {
+	return r.Status.LastReconcileTime
+}
+
+func (r *DatabaseRoleGrant) SetLastReconcileTime(val *metav1.Time) {
+	r.Status.LastReconcileTime = val
+}
+
 func (r *DatabaseRoleGrant) ValidateSpec() error {
 	return r.Spec.Validate()
 }
@@ -4598,6 +5014,14 @@ func (r *ShareGrant) GetLastAppliedSpecHash() string {
 
 func (r *ShareGrant) SetLastAppliedSpecHash(val string) {
 	r.Status.LastAppliedSpecHash = val
+}
+
+func (r *ShareGrant) GetLastReconcileTime() *metav1.Time {
+	return r.Status.LastReconcileTime
+}
+
+func (r *ShareGrant) SetLastReconcileTime(val *metav1.Time) {
+	r.Status.LastReconcileTime = val
 }
 
 func (r *ShareGrant) ValidateSpec() error {
@@ -4680,6 +5104,14 @@ func (g *GrantOwnership) SetLastAppliedSpecHash(val string) {
 	g.Status.LastAppliedSpecHash = val
 }
 
+func (g *GrantOwnership) GetLastReconcileTime() *metav1.Time {
+	return g.Status.LastReconcileTime
+}
+
+func (g *GrantOwnership) SetLastReconcileTime(val *metav1.Time) {
+	g.Status.LastReconcileTime = val
+}
+
 func (g *GrantOwnership) ValidateSpec() error {
 	return g.Spec.Validate()
 }
@@ -4754,6 +5186,14 @@ func (a *AccountRoleAssignment) GetLastAppliedSpecHash() string {
 
 func (a *AccountRoleAssignment) SetLastAppliedSpecHash(val string) {
 	a.Status.LastAppliedSpecHash = val
+}
+
+func (a *AccountRoleAssignment) GetLastReconcileTime() *metav1.Time {
+	return a.Status.LastReconcileTime
+}
+
+func (a *AccountRoleAssignment) SetLastReconcileTime(val *metav1.Time) {
+	a.Status.LastReconcileTime = val
 }
 
 func (a *AccountRoleAssignment) ValidateSpec() error {
@@ -4836,6 +5276,14 @@ func (d *DatabaseRoleAssignment) SetLastAppliedSpecHash(val string) {
 	d.Status.LastAppliedSpecHash = val
 }
 
+func (d *DatabaseRoleAssignment) GetLastReconcileTime() *metav1.Time {
+	return d.Status.LastReconcileTime
+}
+
+func (d *DatabaseRoleAssignment) SetLastReconcileTime(val *metav1.Time) {
+	d.Status.LastReconcileTime = val
+}
+
 func (d *DatabaseRoleAssignment) ValidateSpec() error {
 	return d.Spec.Validate()
 }
@@ -4916,6 +5364,14 @@ func (ta *TagAssociation) SetLastAppliedSpecHash(val string) {
 	ta.Status.LastAppliedSpecHash = val
 }
 
+func (ta *TagAssociation) GetLastReconcileTime() *metav1.Time {
+	return ta.Status.LastReconcileTime
+}
+
+func (ta *TagAssociation) SetLastReconcileTime(val *metav1.Time) {
+	ta.Status.LastReconcileTime = val
+}
+
 func (ta *TagAssociation) ValidateSpec() error {
 	return ta.Spec.Validate()
 }
@@ -4991,6 +5447,14 @@ func (npa *NetworkPolicyAttachment) GetLastAppliedSpecHash() string {
 
 func (npa *NetworkPolicyAttachment) SetLastAppliedSpecHash(val string) {
 	npa.Status.LastAppliedSpecHash = val
+}
+
+func (npa *NetworkPolicyAttachment) GetLastReconcileTime() *metav1.Time {
+	return npa.Status.LastReconcileTime
+}
+
+func (npa *NetworkPolicyAttachment) SetLastReconcileTime(val *metav1.Time) {
+	npa.Status.LastReconcileTime = val
 }
 
 func (npa *NetworkPolicyAttachment) ValidateSpec() error {
@@ -5070,6 +5534,14 @@ func (ppa *PasswordPolicyAttachment) SetLastAppliedSpecHash(val string) {
 	ppa.Status.LastAppliedSpecHash = val
 }
 
+func (ppa *PasswordPolicyAttachment) GetLastReconcileTime() *metav1.Time {
+	return ppa.Status.LastReconcileTime
+}
+
+func (ppa *PasswordPolicyAttachment) SetLastReconcileTime(val *metav1.Time) {
+	ppa.Status.LastReconcileTime = val
+}
+
 func (ppa *PasswordPolicyAttachment) ValidateSpec() error {
 	return ppa.Spec.Validate()
 }
@@ -5147,6 +5619,14 @@ func (mpa *MaskingPolicyApplication) SetLastAppliedSpecHash(val string) {
 	mpa.Status.LastAppliedSpecHash = val
 }
 
+func (mpa *MaskingPolicyApplication) GetLastReconcileTime() *metav1.Time {
+	return mpa.Status.LastReconcileTime
+}
+
+func (mpa *MaskingPolicyApplication) SetLastReconcileTime(val *metav1.Time) {
+	mpa.Status.LastReconcileTime = val
+}
+
 func (mpa *MaskingPolicyApplication) ValidateSpec() error {
 	return mpa.Spec.Validate()
 }
@@ -5222,6 +5702,14 @@ func (tc *TableConstraint) GetLastAppliedSpecHash() string {
 
 func (tc *TableConstraint) SetLastAppliedSpecHash(val string) {
 	tc.Status.LastAppliedSpecHash = val
+}
+
+func (tc *TableConstraint) GetLastReconcileTime() *metav1.Time {
+	return tc.Status.LastReconcileTime
+}
+
+func (tc *TableConstraint) SetLastReconcileTime(val *metav1.Time) {
+	tc.Status.LastReconcileTime = val
 }
 
 func (tc *TableConstraint) ValidateSpec() error {

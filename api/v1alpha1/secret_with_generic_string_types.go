@@ -8,19 +8,21 @@ import (
 // with a generic string value.
 //
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
-// +kubebuilder:validation:XValidation:rule="!has(self.databaseRef) || self.databaseRef == oldSelf.databaseRef",message="spec.databaseRef is immutable"
-// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || self.databaseName == oldSelf.databaseName",message="spec.databaseName is immutable"
-// +kubebuilder:validation:XValidation:rule="!has(self.schemaRef) || self.schemaRef == oldSelf.schemaRef",message="spec.schemaRef is immutable"
-// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || self.schemaName == oldSelf.schemaName",message="spec.schemaName is immutable"
-// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must not contain dots — use a simple Snowflake identifier (e.g. 'ANALYTICS')"
-// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must not contain dots — use a simple Snowflake identifier (e.g. 'PUBLIC')"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRef) == has(self.databaseRef) && (!has(self.databaseRef) || self.databaseRef == oldSelf.databaseRef)",message="spec.databaseRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName) || self.databaseName == oldSelf.databaseName)",message="spec.databaseName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef) || self.schemaRef == oldSelf.schemaRef)",message="spec.schemaRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName) || self.schemaName == oldSelf.schemaName)",message="spec.schemaName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
+// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
 type SecretWithGenericStringSpec struct {
 	CommonSpec `json:",inline"`
 
 	// Snowflake secret identifier (e.g. 'MY_SECRET').
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// Reference to a Database CR in the same namespace.
@@ -31,6 +33,7 @@ type SecretWithGenericStringSpec struct {
 	// Snowflake database identifier (e.g. 'ANALYTICS').
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.databaseName is immutable"
 	DatabaseName *string `json:"databaseName,omitempty"`
 
@@ -42,11 +45,13 @@ type SecretWithGenericStringSpec struct {
 	// Snowflake schema identifier (e.g. 'PUBLIC').
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.schemaName is immutable"
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// The secret string value (e.g. API token).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SecretString string `json:"secretString"`
 
 	// Comment for the secret.

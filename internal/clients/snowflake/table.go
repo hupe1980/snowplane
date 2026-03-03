@@ -275,23 +275,7 @@ func NewTableClient(c SQLExecutor) *TableClient {
 func buildCreateTableSQL(opts CreateTableOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER")
-	} else {
-		b.WriteString("CREATE")
-	}
-
-	if opts.Transient {
-		b.WriteString(" TRANSIENT")
-	}
-
-	if opts.UseCreateOrAlter {
-		b.WriteString(" TABLE ")
-	} else {
-		b.WriteString(" TABLE IF NOT EXISTS ")
-	}
-
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "TABLE", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, opts.Transient)
 	b.WriteString(" (")
 
 	for i, col := range opts.Columns {
@@ -655,54 +639,21 @@ func (t *TableClient) Observe(ctx context.Context, name SchemaObjectIdentifier) 
 
 // scanTableShowOutput scans SHOW TABLES results for a matching row.
 func scanTableShowOutput(rows *sql.Rows, name string) (*TableShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
-		rt, _ := parseInt32(colMap["retention_time"])
+	return ScanShowOutput(rows, name, func(m map[string]string) (*TableShowOutput, error) {
+		rt, _ := parseInt32(m["retention_time"])
 
 		return &TableShowOutput{
-			CreatedOn:             colMap["created_on"],
-			Name:                  colMap["name"],
-			DatabaseName:          colMap["database_name"],
-			SchemaName:            colMap["schema_name"],
-			Kind:                  colMap["kind"],
-			Comment:               colMap["comment"],
-			Owner:                 colMap["owner"],
+			CreatedOn:             m["created_on"],
+			Name:                  m["name"],
+			DatabaseName:          m["database_name"],
+			SchemaName:            m["schema_name"],
+			Kind:                  m["kind"],
+			Comment:               m["comment"],
+			Owner:                 m["owner"],
 			RetentionTime:         rt,
-			ClusterBy:             colMap["cluster_by"],
-			ChangeTracking:        strings.EqualFold(colMap["change_tracking"], "ON"),
-			EnableSchemaEvolution: strings.EqualFold(colMap["enable_schema_evolution"], "Y"),
+			ClusterBy:             m["cluster_by"],
+			ChangeTracking:        strings.EqualFold(m["change_tracking"], "ON"),
+			EnableSchemaEvolution: strings.EqualFold(m["enable_schema_evolution"], "Y"),
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

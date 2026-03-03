@@ -171,11 +171,10 @@ func NewAPIAuthenticationIntegrationClient(c SQLExecutor) *APIAuthenticationInte
 
 // buildCreateAPIAuthIntegrationSQL builds the CREATE SECURITY INTEGRATION SQL
 // for an API authentication integration.
-func buildCreateAPIAuthIntegrationSQL(opts CreateAPIAuthenticationIntegrationOptions) string {
+func buildCreateAPIAuthIntegrationSQL(opts CreateAPIAuthenticationIntegrationOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	b.WriteString("CREATE SECURITY INTEGRATION IF NOT EXISTS ")
-	b.WriteString(sqlbuilder.QuoteIdentifier(opts.Name.Name()))
+	sqlbuilder.BuildCreatePreamble(&b, "SECURITY INTEGRATION", sqlbuilder.QuoteIdentifier(opts.Name.Name()), false, false)
 	b.WriteString(" TYPE = API_AUTHENTICATION AUTH_TYPE = OAUTH2")
 	fmt.Fprintf(&b.Builder, " OAUTH_GRANT = %s", string(opts.OAuthGrantType))
 
@@ -218,7 +217,11 @@ func buildCreateAPIAuthIntegrationSQL(opts CreateAPIAuthenticationIntegrationOpt
 
 	b.SetString("COMMENT", opts.Comment)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates an API authentication security integration in Snowflake.
@@ -227,7 +230,12 @@ func (c *APIAuthenticationIntegrationClient) Create(ctx context.Context, opts Cr
 		return NewTerminalError(fmt.Errorf("invalid create API authentication integration options: %w", err))
 	}
 
-	if _, err := c.client.Exec(ctx, buildCreateAPIAuthIntegrationSQL(opts)); err != nil {
+	sql, err := buildCreateAPIAuthIntegrationSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create API authentication integration SQL: %w", err))
+	}
+
+	if _, err := c.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating API authentication integration %s: %w", opts.Name, err)
 	}
 

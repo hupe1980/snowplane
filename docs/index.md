@@ -49,7 +49,7 @@ Full lifecycle management for every resource — create, alter, drop, drift dete
 : Schemas reference Databases; Tables, Views, MaterializedViews, and Stages reference Schemas. Dependency resolution and backoff are automatic.
 
 **Resource Adoption**
-: Adopt pre-existing Snowflake objects via a single annotation — no data migration needed.
+: Adopt pre-existing Snowflake objects via `spec.managementPolicies.adoptionPolicy: adopt` — no data migration needed. Spec fields are automatically late-initialized from observed Snowflake state.
 
 **Immutable Field Enforcement**
 : Two layers of protection — CRD-level CEL validation and reconciler-level error reporting.

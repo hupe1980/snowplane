@@ -19,12 +19,13 @@ func TestBuildCreateSecurityIntegrationSQL(t *testing.T) {
 		opts := CreateSecurityIntegrationOptions{
 			Name:          NewAccountObjectIdentifier("MY_SAML"),
 			Type:          "SAML2",
-			SAML2Issuer:   strPtr("https://idp.example.com"),
-			SAML2SSOURL:   strPtr("https://idp.example.com/sso"),
-			SAML2Provider: strPtr("CUSTOM"),
-			SAML2X509Cert: strPtr("MIIBxDCCAW..."),
+			SAML2Issuer:   ptr("https://idp.example.com"),
+			SAML2SSOURL:   ptr("https://idp.example.com/sso"),
+			SAML2Provider: ptr("CUSTOM"),
+			SAML2X509Cert: ptr("MIIBxDCCAW..."),
 		}
-		got := buildCreateSecurityIntegrationSQL(opts)
+		got, err := buildCreateSecurityIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE SECURITY INTEGRATION IF NOT EXISTS "MY_SAML"`)
 		assert.Contains(t, got, "TYPE = SAML2")
 		assert.Contains(t, got, "SAML2_ISSUER = 'https://idp.example.com'")
@@ -38,13 +39,14 @@ func TestBuildCreateSecurityIntegrationSQL(t *testing.T) {
 		opts := CreateSecurityIntegrationOptions{
 			Name:                      NewAccountObjectIdentifier("MY_SAML"),
 			Type:                      "SAML2",
-			SAML2Issuer:               strPtr("https://idp.example.com"),
-			SAML2SSOURL:               strPtr("https://idp.example.com/sso"),
-			SAML2Provider:             strPtr("CUSTOM"),
-			SAML2X509Cert:             strPtr("cert"),
+			SAML2Issuer:               ptr("https://idp.example.com"),
+			SAML2SSOURL:               ptr("https://idp.example.com/sso"),
+			SAML2Provider:             ptr("CUSTOM"),
+			SAML2X509Cert:             ptr("cert"),
 			SAML2AllowedEmailPatterns: []string{"*@example.com", "*@corp.com"},
 		}
-		got := buildCreateSecurityIntegrationSQL(opts)
+		got, err := buildCreateSecurityIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "ALLOWED_EMAIL_PATTERNS")
 		assert.NotContains(t, got, "SAML2_SNOWFLAKE_ACS_URL")
 	})
@@ -54,13 +56,14 @@ func TestBuildCreateSecurityIntegrationSQL(t *testing.T) {
 		opts := CreateSecurityIntegrationOptions{
 			Name:                                  NewAccountObjectIdentifier("MY_OAUTH"),
 			Type:                                  "EXTERNAL_OAUTH",
-			ExternalOAuthType:                     strPtr("AZURE"),
-			ExternalOAuthIssuer:                   strPtr("https://login.microsoftonline.com/tenant/v2.0"),
-			ExternalOAuthTokenUserMappingClaim:    strPtr("upn"),
-			ExternalOAuthSnowflakeUserMappingAttr: strPtr("login_name"),
-			ExternalOAuthJWSKeysURL:               strPtr("https://login.microsoftonline.com/tenant/discovery/v2.0/keys"),
+			ExternalOAuthType:                     ptr("AZURE"),
+			ExternalOAuthIssuer:                   ptr("https://login.microsoftonline.com/tenant/v2.0"),
+			ExternalOAuthTokenUserMappingClaim:    ptr("upn"),
+			ExternalOAuthSnowflakeUserMappingAttr: ptr("login_name"),
+			ExternalOAuthJWSKeysURL:               ptr("https://login.microsoftonline.com/tenant/discovery/v2.0/keys"),
 		}
-		got := buildCreateSecurityIntegrationSQL(opts)
+		got, err := buildCreateSecurityIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "TYPE = EXTERNAL_OAUTH")
 		assert.Contains(t, got, "EXTERNAL_OAUTH_TYPE = AZURE")
 		assert.Contains(t, got, "EXTERNAL_OAUTH_ISSUER = 'https://login.microsoftonline.com/tenant/v2.0'")
@@ -74,10 +77,11 @@ func TestBuildCreateSecurityIntegrationSQL(t *testing.T) {
 			Name:          NewAccountObjectIdentifier("MY_SCIM"),
 			Type:          "SCIM",
 			Enabled:       &enabled,
-			SCIMClient:    strPtr("AZURE"),
-			SCIMRunAsRole: strPtr("AAD_PROVISIONER"),
+			SCIMClient:    ptr("AZURE"),
+			SCIMRunAsRole: ptr("AAD_PROVISIONER"),
 		}
-		got := buildCreateSecurityIntegrationSQL(opts)
+		got, err := buildCreateSecurityIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "TYPE = SCIM")
 		assert.Contains(t, got, "SCIM_CLIENT = 'AZURE'")
 		assert.Contains(t, got, "RUN_AS_ROLE = 'AAD_PROVISIONER'")
@@ -89,13 +93,14 @@ func TestBuildCreateSecurityIntegrationSQL(t *testing.T) {
 		opts := CreateSecurityIntegrationOptions{
 			Name:               NewAccountObjectIdentifier("MY_API"),
 			Type:               "API_AUTHENTICATION",
-			OAuthClientID:      strPtr("client-id"),
-			OAuthClientSecret:  strPtr("client-secret"),
-			OAuthTokenEndpoint: strPtr("https://example.com/token"),
-			OAuthGrantType:     strPtr("CLIENT_CREDENTIALS"),
+			OAuthClientID:      ptr("client-id"),
+			OAuthClientSecret:  ptr("client-secret"),
+			OAuthTokenEndpoint: ptr("https://example.com/token"),
+			OAuthGrantType:     ptr("CLIENT_CREDENTIALS"),
 			OAuthAllowedScopes: []string{"scope1", "scope2"},
 		}
-		got := buildCreateSecurityIntegrationSQL(opts)
+		got, err := buildCreateSecurityIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "TYPE = API_AUTHENTICATION")
 		assert.Contains(t, got, "AUTH_TYPE = OAUTH2")
 		assert.Contains(t, got, "OAUTH_CLIENT_ID = 'client-id'")
@@ -108,11 +113,12 @@ func TestBuildCreateSecurityIntegrationSQL(t *testing.T) {
 		opts := CreateSecurityIntegrationOptions{
 			Name:          NewAccountObjectIdentifier("MY_INT"),
 			Type:          "SCIM",
-			SCIMClient:    strPtr("AZURE"),
-			SCIMRunAsRole: strPtr("ROLE"),
-			Comment:       strPtr("test comment"),
+			SCIMClient:    ptr("AZURE"),
+			SCIMRunAsRole: ptr("ROLE"),
+			Comment:       ptr("test comment"),
 		}
-		got := buildCreateSecurityIntegrationSQL(opts)
+		got, err := buildCreateSecurityIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "COMMENT = 'test comment'")
 	})
 
@@ -121,10 +127,11 @@ func TestBuildCreateSecurityIntegrationSQL(t *testing.T) {
 		opts := CreateSecurityIntegrationOptions{
 			Name:          NewAccountObjectIdentifier("INT"),
 			Type:          "SCIM",
-			SCIMClient:    strPtr("O'BRIEN"),
-			SCIMRunAsRole: strPtr("ROLE'S"),
+			SCIMClient:    ptr("O'BRIEN"),
+			SCIMRunAsRole: ptr("ROLE'S"),
 		}
-		got := buildCreateSecurityIntegrationSQL(opts)
+		got, err := buildCreateSecurityIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "SCIM_CLIENT = 'O''BRIEN'")
 		assert.Contains(t, got, "RUN_AS_ROLE = 'ROLE''S'")
 	})
@@ -134,12 +141,13 @@ func TestBuildCreateSecurityIntegrationSQL(t *testing.T) {
 		opts := CreateSecurityIntegrationOptions{
 			Name:                                  NewAccountObjectIdentifier("INT"),
 			Type:                                  "EXTERNAL_OAUTH",
-			ExternalOAuthType:                     strPtr("CUSTOM"),
-			ExternalOAuthIssuer:                   strPtr("https://issuer"),
-			ExternalOAuthTokenUserMappingClaim:    strPtr("upn"),
-			ExternalOAuthSnowflakeUserMappingAttr: strPtr("user'name"),
+			ExternalOAuthType:                     ptr("CUSTOM"),
+			ExternalOAuthIssuer:                   ptr("https://issuer"),
+			ExternalOAuthTokenUserMappingClaim:    ptr("upn"),
+			ExternalOAuthSnowflakeUserMappingAttr: ptr("user'name"),
 		}
-		got := buildCreateSecurityIntegrationSQL(opts)
+		got, err := buildCreateSecurityIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "EXTERNAL_OAUTH_SNOWFLAKE_USER_MAPPING_ATTRIBUTE = 'user''name'")
 	})
 }
@@ -177,7 +185,7 @@ func TestBuildAlterSecurityIntegrationStatements(t *testing.T) {
 		opts := AlterSecurityIntegrationOptions{
 			Name:    NewAccountObjectIdentifier("INT"),
 			Type:    "SCIM",
-			Comment: strPtr("new comment"),
+			Comment: ptr("new comment"),
 		}
 		stmts, err := buildAlterSecurityIntegrationStatements(opts)
 		require.NoError(t, err)
@@ -203,7 +211,7 @@ func TestBuildAlterSecurityIntegrationStatements(t *testing.T) {
 		opts := AlterSecurityIntegrationOptions{
 			Name:              NewAccountObjectIdentifier("INT"),
 			Type:              "SCIM",
-			SCIMNetworkPolicy: strPtr("MY_POLICY"),
+			SCIMNetworkPolicy: ptr("MY_POLICY"),
 		}
 		stmts, err := buildAlterSecurityIntegrationStatements(opts)
 		require.NoError(t, err)
@@ -226,8 +234,8 @@ func TestCreateSecurityIntegrationOptions_Validate(t *testing.T) {
 		opts := CreateSecurityIntegrationOptions{
 			Name:          NewAccountObjectIdentifier("INT"),
 			Type:          "SCIM",
-			SCIMClient:    strPtr("AZURE"),
-			SCIMRunAsRole: strPtr("AAD_PROVISIONER"),
+			SCIMClient:    ptr("AZURE"),
+			SCIMRunAsRole: ptr("AAD_PROVISIONER"),
 		}
 		require.NoError(t, opts.Validate())
 	})
@@ -272,10 +280,10 @@ func TestCreateSecurityIntegrationOptions_Validate(t *testing.T) {
 		opts := CreateSecurityIntegrationOptions{
 			Name:                                  NewAccountObjectIdentifier("INT"),
 			Type:                                  "EXTERNAL_OAUTH",
-			ExternalOAuthType:                     strPtr("INVALID_TYPE"),
-			ExternalOAuthIssuer:                   strPtr("https://issuer"),
-			ExternalOAuthTokenUserMappingClaim:    strPtr("upn"),
-			ExternalOAuthSnowflakeUserMappingAttr: strPtr("login_name"),
+			ExternalOAuthType:                     ptr("INVALID_TYPE"),
+			ExternalOAuthIssuer:                   ptr("https://issuer"),
+			ExternalOAuthTokenUserMappingClaim:    ptr("upn"),
+			ExternalOAuthSnowflakeUserMappingAttr: ptr("login_name"),
 		}
 		err := opts.Validate()
 		require.Error(t, err)
@@ -287,10 +295,10 @@ func TestCreateSecurityIntegrationOptions_Validate(t *testing.T) {
 		opts := CreateSecurityIntegrationOptions{
 			Name:                                  NewAccountObjectIdentifier("INT"),
 			Type:                                  "EXTERNAL_OAUTH",
-			ExternalOAuthType:                     strPtr("AZURE"),
-			ExternalOAuthIssuer:                   strPtr("https://issuer"),
-			ExternalOAuthTokenUserMappingClaim:    strPtr("upn"),
-			ExternalOAuthSnowflakeUserMappingAttr: strPtr("login_name"),
+			ExternalOAuthType:                     ptr("AZURE"),
+			ExternalOAuthIssuer:                   ptr("https://issuer"),
+			ExternalOAuthTokenUserMappingClaim:    ptr("upn"),
+			ExternalOAuthSnowflakeUserMappingAttr: ptr("login_name"),
 		}
 		require.NoError(t, opts.Validate())
 	})
@@ -338,10 +346,10 @@ func TestCreateSecurityIntegrationOptions_Validate(t *testing.T) {
 		opts := CreateSecurityIntegrationOptions{
 			Name:               NewAccountObjectIdentifier("INT"),
 			Type:               "API_AUTHENTICATION",
-			OAuthClientID:      strPtr("id"),
-			OAuthClientSecret:  strPtr("secret"),
-			OAuthTokenEndpoint: strPtr("https://endpoint"),
-			OAuthGrantType:     strPtr("INVALID_GRANT"),
+			OAuthClientID:      ptr("id"),
+			OAuthClientSecret:  ptr("secret"),
+			OAuthTokenEndpoint: ptr("https://endpoint"),
+			OAuthGrantType:     ptr("INVALID_GRANT"),
 		}
 		require.Error(t, opts.Validate())
 	})
@@ -381,7 +389,7 @@ func TestAlterSecurityIntegrationOptions_HasChanges(t *testing.T) {
 
 	t.Run("WithComment", func(t *testing.T) {
 		t.Parallel()
-		opts := AlterSecurityIntegrationOptions{Name: NewAccountObjectIdentifier("I"), Comment: strPtr("c")}
+		opts := AlterSecurityIntegrationOptions{Name: NewAccountObjectIdentifier("I"), Comment: ptr("c")}
 		assert.True(t, opts.HasChanges())
 	})
 
@@ -393,7 +401,7 @@ func TestAlterSecurityIntegrationOptions_HasChanges(t *testing.T) {
 
 	t.Run("WithSCIMNetworkPolicy", func(t *testing.T) {
 		t.Parallel()
-		opts := AlterSecurityIntegrationOptions{Name: NewAccountObjectIdentifier("I"), SCIMNetworkPolicy: strPtr("p")}
+		opts := AlterSecurityIntegrationOptions{Name: NewAccountObjectIdentifier("I"), SCIMNetworkPolicy: ptr("p")}
 		assert.True(t, opts.HasChanges())
 	})
 }

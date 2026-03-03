@@ -100,6 +100,8 @@ func (o *CreateExternalTableOptions) Validate() error {
 
 	if o.Location == "" {
 		errs = append(errs, fmt.Errorf("location is required"))
+	} else if err := sqlbuilder.ValidateStageLocation(o.Location); err != nil {
+		errs = append(errs, err)
 	}
 
 	if o.FileFormat == "" {
@@ -157,11 +159,10 @@ func NewExternalTableClient(c SQLExecutor) *ExternalTableClient {
 }
 
 // buildCreateExternalTableSQL builds the CREATE EXTERNAL TABLE SQL statement.
-func buildCreateExternalTableSQL(opts CreateExternalTableOptions) string {
+func buildCreateExternalTableSQL(opts CreateExternalTableOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	b.WriteString("CREATE EXTERNAL TABLE IF NOT EXISTS ")
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "EXTERNAL TABLE", opts.Name.FullyQualifiedName(), false, false)
 
 	// Column definitions.
 	if len(opts.Columns) > 0 {
@@ -201,7 +202,7 @@ func buildCreateExternalTableSQL(opts CreateExternalTableOptions) string {
 
 	// Partition type.
 	if opts.PartitionType != nil {
-		fmt.Fprintf(&b.Builder, " PARTITION_TYPE = %s", *opts.PartitionType)
+		b.SetKeyword("PARTITION_TYPE", opts.PartitionType)
 	}
 
 	// Refresh on create.
@@ -243,7 +244,11 @@ func buildCreateExternalTableSQL(opts CreateExternalTableOptions) string {
 	// Comment.
 	b.SetString("COMMENT", opts.Comment)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates an external table in Snowflake.
@@ -252,7 +257,10 @@ func (c *ExternalTableClient) Create(ctx context.Context, opts CreateExternalTab
 		return NewTerminalError(fmt.Errorf("invalid create external table options: %w", err))
 	}
 
-	stmt := buildCreateExternalTableSQL(opts)
+	stmt, err := buildCreateExternalTableSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create external table SQL: %w", err))
+	}
 
 	if _, err := c.client.Exec(ctx, stmt); err != nil {
 		return fmt.Errorf("creating external table %s: %w", opts.Name, err)
@@ -353,60 +361,27 @@ func (c *ExternalTableClient) Observe(ctx context.Context, name SchemaObjectIden
 
 // scanExternalTableShowOutput scans SHOW EXTERNAL TABLES results for a matching row.
 func scanExternalTableShowOutput(rows *sql.Rows, name string) (*ExternalTableShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*ExternalTableShowOutput, error) {
 		return &ExternalTableShowOutput{
-			CreatedOn:           colMap["created_on"],
-			Name:                colMap["name"],
-			DatabaseName:        colMap["database_name"],
-			SchemaName:          colMap["schema_name"],
-			Invalid:             colMap["invalid"],
-			InvalidReason:       colMap["invalid_reason"],
-			Owner:               colMap["owner"],
-			Comment:             colMap["comment"],
-			Stage:               colMap["stage"],
-			Location:            colMap["location"],
-			FileFormatName:      colMap["file_format_name"],
-			FileFormatType:      colMap["file_format_type"],
-			Cloud:               colMap["cloud"],
-			Region:              colMap["region"],
-			NotificationChannel: colMap["notification_channel"],
-			LastRefreshedOn:     colMap["last_refreshed_on"],
-			TableFormat:         colMap["table_format"],
-			LastRefreshDetails:  colMap["last_refresh_details"],
-			OwnerRoleType:       colMap["owner_role_type"],
+			CreatedOn:           m["created_on"],
+			Name:                m["name"],
+			DatabaseName:        m["database_name"],
+			SchemaName:          m["schema_name"],
+			Invalid:             m["invalid"],
+			InvalidReason:       m["invalid_reason"],
+			Owner:               m["owner"],
+			Comment:             m["comment"],
+			Stage:               m["stage"],
+			Location:            m["location"],
+			FileFormatName:      m["file_format_name"],
+			FileFormatType:      m["file_format_type"],
+			Cloud:               m["cloud"],
+			Region:              m["region"],
+			NotificationChannel: m["notification_channel"],
+			LastRefreshedOn:     m["last_refreshed_on"],
+			TableFormat:         m["table_format"],
+			LastRefreshDetails:  m["last_refresh_details"],
+			OwnerRoleType:       m["owner_role_type"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

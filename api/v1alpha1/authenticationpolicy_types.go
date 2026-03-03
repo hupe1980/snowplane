@@ -8,6 +8,7 @@ import (
 type AuthenticationPolicyMfaPolicy struct {
 	// AllowedMethods is the list of MFA methods allowed (e.g. "TOTP").
 	// +optional
+	// +kubebuilder:validation:items:Enum=TOTP
 	AllowedMethods []string `json:"allowedMethods,omitempty"`
 
 	// EnforceMfaOnExternalAuthentication controls MFA for external auth.
@@ -44,6 +45,7 @@ type AuthenticationPolicyPatPolicy struct {
 type AuthenticationPolicyWorkloadIdentityPolicy struct {
 	// AllowedProviders is the list of identity providers allowed (e.g. "AWS", "AZURE", "GCP").
 	// +optional
+	// +kubebuilder:validation:items:Enum=AWS;AZURE;GCP
 	AllowedProviders []string `json:"allowedProviders,omitempty"`
 
 	// AllowedAwsAccounts is the list of AWS account IDs allowed for workload identity.
@@ -65,10 +67,10 @@ type AuthenticationPolicyWorkloadIdentityPolicy struct {
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
-// +kubebuilder:validation:XValidation:rule="!has(self.databaseRef) || !has(oldSelf.databaseRef) || self.databaseRef == oldSelf.databaseRef",message="spec.databaseRef is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !has(oldSelf.databaseName) || self.databaseName == oldSelf.databaseName",message="spec.databaseName is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="!has(self.schemaRef) || !has(oldSelf.schemaRef) || self.schemaRef == oldSelf.schemaRef",message="spec.schemaRef is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !has(oldSelf.schemaName) || self.schemaName == oldSelf.schemaName",message="spec.schemaName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRef) == has(self.databaseRef) && (!has(self.databaseRef) || self.databaseRef == oldSelf.databaseRef)",message="spec.databaseRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName) || self.databaseName == oldSelf.databaseName)",message="spec.databaseName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef) || self.schemaRef == oldSelf.schemaRef)",message="spec.schemaRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName) || self.schemaName == oldSelf.schemaName)",message="spec.schemaName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
 // +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !self.schemaName.contains('.')",message="spec.schemaName must be a simple identifier, not a fully-qualified name; use spec.databaseName for the database part"
 type AuthenticationPolicySpec struct {
@@ -76,6 +78,7 @@ type AuthenticationPolicySpec struct {
 
 	// Name is the Snowflake authentication policy name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a managed Database resource for the parent database.
@@ -88,6 +91,7 @@ type AuthenticationPolicySpec struct {
 	// Mutually exclusive with DatabaseRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.databaseName is immutable"
 	DatabaseName *string `json:"databaseName,omitempty"`
 
@@ -102,17 +106,20 @@ type AuthenticationPolicySpec struct {
 	// Mutually exclusive with SchemaRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.schemaName is immutable"
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// AuthenticationMethods is the list of authentication methods allowed.
 	// Valid values include: ALL, SAML, PASSWORD, OAUTH, KEYPAIR, PROGRAMMATIC_ACCESS_TOKEN, WORKLOAD_IDENTITY.
 	// +optional
+	// +kubebuilder:validation:items:Enum=ALL;SAML;PASSWORD;OAUTH;KEYPAIR;PROGRAMMATIC_ACCESS_TOKEN;WORKLOAD_IDENTITY
 	AuthenticationMethods []string `json:"authenticationMethods,omitempty" snowflake:"AUTHENTICATION_METHODS"`
 
 	// ClientTypes is the list of client types allowed.
 	// Valid values include: ALL, SNOWFLAKE_UI, DRIVERS, SNOWFLAKE_CLI, SNOWSQL.
 	// +optional
+	// +kubebuilder:validation:items:Enum=ALL;SNOWFLAKE_UI;DRIVERS;SNOWFLAKE_CLI;SNOWSQL
 	ClientTypes []string `json:"clientTypes,omitempty" snowflake:"CLIENT_TYPES"`
 
 	// SecurityIntegrations is the list of security integration names

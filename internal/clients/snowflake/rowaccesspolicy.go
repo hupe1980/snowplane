@@ -124,15 +124,10 @@ func buildRAPSignatureClause(args []RowAccessPolicyArgument) string {
 }
 
 // buildCreateRowAccessPolicySQL builds the CREATE ROW ACCESS POLICY SQL statement.
-func buildCreateRowAccessPolicySQL(opts CreateRowAccessPolicyOptions) string {
+func buildCreateRowAccessPolicySQL(opts CreateRowAccessPolicyOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER ROW ACCESS POLICY ")
-	} else {
-		b.WriteString("CREATE ROW ACCESS POLICY IF NOT EXISTS ")
-	}
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "ROW ACCESS POLICY", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 	b.WriteString(" ")
 	b.WriteString(buildRAPSignatureClause(opts.Signature))
 	b.WriteString(" -> ")
@@ -142,7 +137,11 @@ func buildCreateRowAccessPolicySQL(opts CreateRowAccessPolicyOptions) string {
 		b.SetString("COMMENT", opts.Comment)
 	}
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a row access policy in Snowflake.
@@ -151,7 +150,12 @@ func (rap *RowAccessPolicyClient) Create(ctx context.Context, opts CreateRowAcce
 		return NewTerminalError(fmt.Errorf("invalid create row access policy options: %w", err))
 	}
 
-	if _, err := rap.client.Exec(ctx, buildCreateRowAccessPolicySQL(opts)); err != nil {
+	sql, err := buildCreateRowAccessPolicySQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create row access policy SQL: %w", err))
+	}
+
+	if _, err := rap.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating row access policy %s: %w", opts.Name, err)
 	}
 
@@ -261,48 +265,15 @@ func (rap *RowAccessPolicyClient) Observe(ctx context.Context, name SchemaObject
 
 // scanRowAccessPolicyShowOutput scans SHOW ROW ACCESS POLICIES results for a matching row.
 func scanRowAccessPolicyShowOutput(rows *sql.Rows, name string) (*RowAccessPolicyShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*RowAccessPolicyShowOutput, error) {
 		return &RowAccessPolicyShowOutput{
-			CreatedOn:    colMap["created_on"],
-			Name:         colMap["name"],
-			DatabaseName: colMap["database_name"],
-			SchemaName:   colMap["schema_name"],
-			Kind:         colMap["kind"],
-			Owner:        colMap["owner"],
-			Comment:      colMap["comment"],
+			CreatedOn:    m["created_on"],
+			Name:         m["name"],
+			DatabaseName: m["database_name"],
+			SchemaName:   m["schema_name"],
+			Kind:         m["kind"],
+			Owner:        m["owner"],
+			Comment:      m["comment"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

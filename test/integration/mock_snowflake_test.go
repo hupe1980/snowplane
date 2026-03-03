@@ -87,11 +87,12 @@ func (m *mockSnowflakeClient) WithRole(_ context.Context, _ string) (*snowflake.
 // ---------------------------------------------------------------------------
 
 type mockDatabaseService struct {
-	mu        sync.Mutex
-	observeFn func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.DatabaseObservation, error)
-	createFn  func(ctx context.Context, opts snowflake.CreateDatabaseOptions) error
-	alterFn   func(ctx context.Context, opts snowflake.AlterDatabaseOptions) error
-	dropFn    func(ctx context.Context, name snowflake.AccountObjectIdentifier) error
+	mu            sync.Mutex
+	observeFn     func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.DatabaseObservation, error)
+	createFn      func(ctx context.Context, opts snowflake.CreateDatabaseOptions) error
+	alterFn       func(ctx context.Context, opts snowflake.AlterDatabaseOptions) error
+	dropFn        func(ctx context.Context, name snowflake.AccountObjectIdentifier) error
+	dropCascadeFn func(ctx context.Context, name snowflake.AccountObjectIdentifier) error
 }
 
 func (m *mockDatabaseService) Observe(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.DatabaseObservation, error) {
@@ -142,6 +143,18 @@ func (m *mockDatabaseService) Drop(ctx context.Context, name snowflake.AccountOb
 	return nil
 }
 
+func (m *mockDatabaseService) DropCascade(ctx context.Context, name snowflake.AccountObjectIdentifier) error {
+	m.mu.Lock()
+	fn := m.dropCascadeFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, name)
+	}
+
+	return nil
+}
+
 func (m *mockDatabaseService) SetObserve(fn func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.DatabaseObservation, error)) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -170,6 +183,13 @@ func (m *mockDatabaseService) SetDrop(fn func(ctx context.Context, name snowflak
 	m.dropFn = fn
 }
 
+func (m *mockDatabaseService) SetDropCascade(fn func(ctx context.Context, name snowflake.AccountObjectIdentifier) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.dropCascadeFn = fn
+}
+
 // Reset clears all mock functions to their nil defaults.
 func (m *mockDatabaseService) Reset() {
 	m.mu.Lock()
@@ -179,6 +199,7 @@ func (m *mockDatabaseService) Reset() {
 	m.createFn = nil
 	m.alterFn = nil
 	m.dropFn = nil
+	m.dropCascadeFn = nil
 }
 
 // ---------------------------------------------------------------------------
@@ -186,11 +207,12 @@ func (m *mockDatabaseService) Reset() {
 // ---------------------------------------------------------------------------
 
 type mockSchemaService struct {
-	mu        sync.Mutex
-	observeFn func(ctx context.Context, name snowflake.DatabaseObjectIdentifier) (*snowflake.SchemaObservation, error)
-	createFn  func(ctx context.Context, opts snowflake.CreateSchemaOptions) error
-	alterFn   func(ctx context.Context, opts snowflake.AlterSchemaOptions) error
-	dropFn    func(ctx context.Context, name snowflake.DatabaseObjectIdentifier) error
+	mu            sync.Mutex
+	observeFn     func(ctx context.Context, name snowflake.DatabaseObjectIdentifier) (*snowflake.SchemaObservation, error)
+	createFn      func(ctx context.Context, opts snowflake.CreateSchemaOptions) error
+	alterFn       func(ctx context.Context, opts snowflake.AlterSchemaOptions) error
+	dropFn        func(ctx context.Context, name snowflake.DatabaseObjectIdentifier) error
+	dropCascadeFn func(ctx context.Context, name snowflake.DatabaseObjectIdentifier) error
 }
 
 func (m *mockSchemaService) Observe(ctx context.Context, name snowflake.DatabaseObjectIdentifier) (*snowflake.SchemaObservation, error) {
@@ -241,6 +263,18 @@ func (m *mockSchemaService) Drop(ctx context.Context, name snowflake.DatabaseObj
 	return nil
 }
 
+func (m *mockSchemaService) DropCascade(ctx context.Context, name snowflake.DatabaseObjectIdentifier) error {
+	m.mu.Lock()
+	fn := m.dropCascadeFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, name)
+	}
+
+	return nil
+}
+
 func (m *mockSchemaService) SetObserve(fn func(ctx context.Context, name snowflake.DatabaseObjectIdentifier) (*snowflake.SchemaObservation, error)) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -269,6 +303,13 @@ func (m *mockSchemaService) SetDrop(fn func(ctx context.Context, name snowflake.
 	m.dropFn = fn
 }
 
+func (m *mockSchemaService) SetDropCascade(fn func(ctx context.Context, name snowflake.DatabaseObjectIdentifier) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.dropCascadeFn = fn
+}
+
 // Reset clears all mock functions to their nil defaults.
 func (m *mockSchemaService) Reset() {
 	m.mu.Lock()
@@ -278,6 +319,7 @@ func (m *mockSchemaService) Reset() {
 	m.createFn = nil
 	m.alterFn = nil
 	m.dropFn = nil
+	m.dropCascadeFn = nil
 }
 
 // ---------------------------------------------------------------------------

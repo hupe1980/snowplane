@@ -48,7 +48,7 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.Netwo
 	if ref := obj.Spec.PolicyRef; ref != nil {
 		logger := log.FromContext(ctx)
 
-		fqn, err := refresolver.ResolveLocalRef(ctx, a.client, obj.Namespace, ref.Name, func() refresolver.ReferableObject {
+		fqn, err := refresolver.ResolveLocalRef(ctx, a.client, obj.Namespace, ref.Name, ref.Namespace, func() refresolver.ReferableObject {
 			np := &snowplanev1alpha1.NetworkPolicy{}
 			np.SetGroupVersionKind(schema.GroupVersionKind{
 				Group:   snowplanev1alpha1.GroupVersion.Group,

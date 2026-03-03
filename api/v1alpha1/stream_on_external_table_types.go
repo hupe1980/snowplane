@@ -25,6 +25,7 @@ type StreamOnExternalTableSpec struct {
 
 	// Name is the Snowflake stream name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -36,6 +37,7 @@ type StreamOnExternalTableSpec struct {
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -47,6 +49,7 @@ type StreamOnExternalTableSpec struct {
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// ExternalTableRef references an ExternalTable CR in the same namespace.
@@ -58,6 +61,7 @@ type StreamOnExternalTableSpec struct {
 	// Mutually exclusive with ExternalTableRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	ExternalTableName *string `json:"externalTableName,omitempty"`
 
 	// InsertOnly when true creates an insert-only stream (the only mode for external tables).

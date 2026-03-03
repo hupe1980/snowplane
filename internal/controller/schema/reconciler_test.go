@@ -31,10 +31,11 @@ import (
 // --------------------------------------------------------------------------
 
 type mockService struct {
-	observeFn func(ctx context.Context, name snowflake.DatabaseObjectIdentifier) (*snowflake.SchemaObservation, error)
-	createFn  func(ctx context.Context, opts snowflake.CreateSchemaOptions) error
-	alterFn   func(ctx context.Context, opts snowflake.AlterSchemaOptions) error
-	dropFn    func(ctx context.Context, name snowflake.DatabaseObjectIdentifier) error
+	observeFn     func(ctx context.Context, name snowflake.DatabaseObjectIdentifier) (*snowflake.SchemaObservation, error)
+	createFn      func(ctx context.Context, opts snowflake.CreateSchemaOptions) error
+	alterFn       func(ctx context.Context, opts snowflake.AlterSchemaOptions) error
+	dropFn        func(ctx context.Context, name snowflake.DatabaseObjectIdentifier) error
+	dropCascadeFn func(ctx context.Context, name snowflake.DatabaseObjectIdentifier) error
 }
 
 func (m *mockService) Observe(ctx context.Context, name snowflake.DatabaseObjectIdentifier) (*snowflake.SchemaObservation, error) {
@@ -61,6 +62,13 @@ func (m *mockService) Alter(ctx context.Context, opts snowflake.AlterSchemaOptio
 func (m *mockService) Drop(ctx context.Context, name snowflake.DatabaseObjectIdentifier) error {
 	if m.dropFn != nil {
 		return m.dropFn(ctx, name)
+	}
+	return nil
+}
+
+func (m *mockService) DropCascade(ctx context.Context, name snowflake.DatabaseObjectIdentifier) error {
+	if m.dropCascadeFn != nil {
+		return m.dropCascadeFn(ctx, name)
 	}
 	return nil
 }
@@ -123,10 +131,10 @@ func successfulObservation() *snowflake.SchemaObservation {
 			RetentionTime: 1,
 		},
 		Parameters: &snowflake.SchemaParameters{
-			DataRetentionTimeInDays:    testutil.PtrInt32(1),
-			MaxDataExtensionTimeInDays: testutil.PtrInt32(14),
+			DataRetentionTimeInDays:    testutil.Ptr(int32(1)),
+			MaxDataExtensionTimeInDays: testutil.Ptr(int32(14)),
 			DefaultDDLCollation:        "",
-			ReplaceInvalidCharacters:   testutil.PtrBool(false),
+			ReplaceInvalidCharacters:   testutil.Ptr(false),
 			StorageSerializationPolicy: "COMPATIBLE",
 			LogLevel:                   "OFF",
 			MetricLevel:                "NONE",
@@ -388,9 +396,9 @@ func TestReconcile_UpdateSchema(t *testing.T) {
 	t.Parallel()
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
-	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	schema.Status.ObservedGeneration = 1
-	schema.Spec.Comment = testutil.PtrString("updated comment")
+	schema.Spec.Comment = testutil.Ptr("updated comment")
 	db := newTestDB("analytics-db", "default")
 	obs := successfulObservation()
 	var capturedAlter snowflake.AlterSchemaOptions
@@ -442,9 +450,9 @@ func TestReconcile_AlterFails(t *testing.T) {
 	t.Parallel()
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
-	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	schema.Status.ObservedGeneration = 1
-	schema.Spec.Comment = testutil.PtrString("boom")
+	schema.Spec.Comment = testutil.Ptr("boom")
 	db := newTestDB("analytics-db", "default")
 	obs := successfulObservation()
 	mock := &mockService{
@@ -536,6 +544,81 @@ func TestReconcile_DeleteDropFails(t *testing.T) {
 	assert.Contains(t, err.Error(), "drop failed")
 }
 
+func TestReconcile_DeleteCascadeWithForceDestroy(t *testing.T) {
+	t.Parallel()
+	schema := newTestSchema("myschema", "default")
+	schema.Finalizers = []string{finalizerName}
+	schema.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationForceDestroy: "true",
+	}
+	now := metav1.Now()
+	schema.DeletionTimestamp = &now
+	db := newTestDB("analytics-db", "default")
+	cascadeCalled := false
+	mock := &mockService{
+		dropCascadeFn: func(_ context.Context, id snowflake.DatabaseObjectIdentifier) error {
+			cascadeCalled = true
+			assert.Equal(t, "ANALYTICS", id.DatabaseName())
+			assert.Equal(t, "PUBLIC", id.Name())
+			return nil
+		},
+	}
+	r := newTestReconciler(mock, schema, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+	assert.True(t, cascadeCalled, "should use cascade drop with force-destroy annotation")
+}
+
+func TestReconcile_DeleteCascadeDropFails(t *testing.T) {
+	t.Parallel()
+	schema := newTestSchema("myschema", "default")
+	schema.Finalizers = []string{finalizerName}
+	schema.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationForceDestroy: "true",
+	}
+	now := metav1.Now()
+	schema.DeletionTimestamp = &now
+	db := newTestDB("analytics-db", "default")
+	mock := &mockService{
+		dropCascadeFn: func(_ context.Context, _ snowflake.DatabaseObjectIdentifier) error {
+			return fmt.Errorf("cascade drop failed")
+		},
+	}
+	r := newTestReconciler(mock, schema, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cascade drop failed")
+}
+
+func TestReconcile_DeleteWithoutForceDestroyUsesRegularDrop(t *testing.T) {
+	t.Parallel()
+	schema := newTestSchema("myschema", "default")
+	schema.Finalizers = []string{finalizerName}
+	// No force-destroy annotation
+	now := metav1.Now()
+	schema.DeletionTimestamp = &now
+	db := newTestDB("analytics-db", "default")
+	dropCalled := false
+	cascadeCalled := false
+	mock := &mockService{
+		dropFn: func(_ context.Context, _ snowflake.DatabaseObjectIdentifier) error {
+			dropCalled = true
+			return nil
+		},
+		dropCascadeFn: func(_ context.Context, _ snowflake.DatabaseObjectIdentifier) error {
+			cascadeCalled = true
+			return nil
+		},
+	}
+	r := newTestReconciler(mock, schema, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+	assert.True(t, dropCalled, "should use regular drop without force-destroy annotation")
+	assert.False(t, cascadeCalled, "should NOT use cascade drop without force-destroy annotation")
+}
+
 // --------------------------------------------------------------------------
 // Tests: Immutable field validation
 // --------------------------------------------------------------------------
@@ -573,11 +656,11 @@ func TestBuildCreateOptions(t *testing.T) {
 	schema := newTestSchema("myschema", "default")
 	schema.Spec.Transient = true
 	schema.Spec.ManagedAccess = true
-	schema.Spec.Comment = testutil.PtrString("test")
-	schema.Spec.DataRetentionTimeInDays = testutil.PtrInt32(7)
-	schema.Spec.MaxDataExtensionTimeInDays = testutil.PtrInt32(28)
-	schema.Spec.ReplaceInvalidCharacters = testutil.PtrBool(true)
-	schema.Spec.DefaultDDLCollation = testutil.PtrString("en-ci")
+	schema.Spec.Comment = testutil.Ptr("test")
+	schema.Spec.DataRetentionTimeInDays = testutil.Ptr(int32(7))
+	schema.Spec.MaxDataExtensionTimeInDays = testutil.Ptr(int32(28))
+	schema.Spec.ReplaceInvalidCharacters = testutil.Ptr(true)
+	schema.Spec.DefaultDDLCollation = testutil.Ptr("en-ci")
 	schema.Spec.StorageSerializationPolicy = &ssp
 	schema.Spec.LogLevel = &ll
 	schema.Spec.MetricLevel = &ml
@@ -613,7 +696,7 @@ func TestBuildAlterOptions_NoDiff(t *testing.T) {
 func TestBuildAlterOptions_CommentDiff(t *testing.T) {
 	t.Parallel()
 	schema := newTestSchema("myschema", "default")
-	schema.Spec.Comment = testutil.PtrString("new comment")
+	schema.Spec.Comment = testutil.Ptr("new comment")
 	id := snowflake.NewDatabaseObjectIdentifier("ANALYTICS", "PUBLIC")
 	obs := successfulObservation()
 	opts := buildAlterOptions(schema, id, obs)
@@ -624,7 +707,7 @@ func TestBuildAlterOptions_CommentDiff(t *testing.T) {
 func TestBuildAlterOptions_RetentionDiff(t *testing.T) {
 	t.Parallel()
 	schema := newTestSchema("myschema", "default")
-	schema.Spec.DataRetentionTimeInDays = testutil.PtrInt32(30)
+	schema.Spec.DataRetentionTimeInDays = testutil.Ptr(int32(30))
 	id := snowflake.NewDatabaseObjectIdentifier("ANALYTICS", "PUBLIC")
 	obs := successfulObservation()
 	opts := buildAlterOptions(schema, id, obs)
@@ -641,11 +724,11 @@ func TestBuildAlterOptions_AllDiffs(t *testing.T) {
 	tl := snowplanev1alpha1.TraceLevelAlways
 
 	schema := newTestSchema("myschema", "default")
-	schema.Spec.Comment = testutil.PtrString("new")
-	schema.Spec.DataRetentionTimeInDays = testutil.PtrInt32(30)
-	schema.Spec.MaxDataExtensionTimeInDays = testutil.PtrInt32(28)
-	schema.Spec.DefaultDDLCollation = testutil.PtrString("en-ci")
-	schema.Spec.ReplaceInvalidCharacters = testutil.PtrBool(true)
+	schema.Spec.Comment = testutil.Ptr("new")
+	schema.Spec.DataRetentionTimeInDays = testutil.Ptr(int32(30))
+	schema.Spec.MaxDataExtensionTimeInDays = testutil.Ptr(int32(28))
+	schema.Spec.DefaultDDLCollation = testutil.Ptr("en-ci")
+	schema.Spec.ReplaceInvalidCharacters = testutil.Ptr(true)
 	schema.Spec.StorageSerializationPolicy = &ssp
 	schema.Spec.LogLevel = &ll
 	schema.Spec.MetricLevel = &ml
@@ -758,7 +841,7 @@ func TestBuildAlterOptions_NoUnsetWhenFieldStillSet(t *testing.T) {
 	t.Parallel()
 
 	schema := newTestSchema("myschema", "default")
-	schema.Spec.Comment = testutil.PtrString("still here")
+	schema.Spec.Comment = testutil.Ptr("still here")
 	schema.Status.TrackedParameters = []string{"COMMENT"}
 
 	obs := successfulObservation()
@@ -772,8 +855,8 @@ func TestComputeSchemaTrackedParameters(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.SchemaSpec{
-		Comment:                 testutil.PtrString("x"),
-		DataRetentionTimeInDays: testutil.PtrInt32(7),
+		Comment:                 testutil.Ptr("x"),
+		DataRetentionTimeInDays: testutil.Ptr(int32(7)),
 	}
 
 	fields := tracked.ComputeTracked(spec)
@@ -785,13 +868,13 @@ func TestReconcile_TrackedParametersPersistedOnCreate(t *testing.T) {
 
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
-	schema.Spec.Comment = testutil.PtrString("hello")
-	schema.Spec.DataRetentionTimeInDays = testutil.PtrInt32(7)
+	schema.Spec.Comment = testutil.Ptr("hello")
+	schema.Spec.DataRetentionTimeInDays = testutil.Ptr(int32(7))
 
 	db := newTestDB("analytics-db", "default")
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "hello"
-	obs.Parameters.DataRetentionTimeInDays = testutil.PtrInt32(7)
+	obs.Parameters.DataRetentionTimeInDays = testutil.Ptr(int32(7))
 
 	mock := &mockService{
 		observeFn: func() func(ctx context.Context, name snowflake.DatabaseObjectIdentifier) (*snowflake.SchemaObservation, error) {
@@ -825,7 +908,7 @@ func TestReconcile_UnsetTriggered(t *testing.T) {
 
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
-	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	schema.Generation = 2
 	schema.Status.ObservedGeneration = 1
 	schema.Status.TrackedParameters = []string{"COMMENT"}
@@ -1048,9 +1131,9 @@ func TestReconcile_AlterTerminalError(t *testing.T) {
 
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
-	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	schema.Status.ObservedGeneration = 1
-	schema.Spec.Comment = testutil.PtrString("bad")
+	schema.Spec.Comment = testutil.Ptr("bad")
 
 	db := newTestDB("analytics-db", "default")
 	obs := successfulObservation()
@@ -1126,10 +1209,10 @@ func TestReconcile_DriftCorrection(t *testing.T) {
 	// ObservedGeneration == Generation, but observed state differs → drift.
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
-	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	schema.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	schema.Generation = 1
 	schema.Status.ObservedGeneration = 1 // same generation → drift path
-	schema.Spec.Comment = testutil.PtrString("desired comment")
+	schema.Spec.Comment = testutil.Ptr("desired comment")
 
 	db := newTestDB("analytics-db", "default")
 	obs := successfulObservation()
@@ -1264,7 +1347,7 @@ func TestReconcile_EventEmission_Update(t *testing.T) {
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
 	schema.Generation = 2
-	schema.Spec.Comment = testutil.PtrString("new comment")
+	schema.Spec.Comment = testutil.Ptr("new comment")
 	schema.Status.ObservedGeneration = 1
 
 	db := newTestDB("analytics-db", "default")
@@ -1443,11 +1526,11 @@ func TestReconcile_DriftCorrection_SetsDriftDetectedCondition(t *testing.T) {
 
 	s := newTestSchema("myschema", "default")
 	s.Finalizers = []string{finalizerName}
-	s.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	s.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	s.Generation = 1
 	s.Status.ObservedGeneration = 1 // drift path
 	s.Status.DatabaseName = `"ANALYTICS"`
-	s.Spec.Comment = testutil.PtrString("desired")
+	s.Spec.Comment = testutil.Ptr("desired")
 	hash, err := snowplanev1alpha1.ComputeSpecHash(s.Spec)
 	require.NoError(t, err)
 	s.Status.LastAppliedSpecHash = hash
@@ -1500,7 +1583,7 @@ func TestReconcile_DriftDetectOnlyPolicy(t *testing.T) {
 	s.Status.ObservedGeneration = 1 // drift path
 	s.Status.DatabaseName = `"ANALYTICS"`
 	s.Spec.ManagementPolicies.DriftPolicy = snowplanev1alpha1.DriftPolicyDetectOnly
-	s.Spec.Comment = testutil.PtrString("desired")
+	s.Spec.Comment = testutil.Ptr("desired")
 	hash, err := snowplanev1alpha1.ComputeSpecHash(s.Spec)
 	require.NoError(t, err)
 	s.Status.LastAppliedSpecHash = hash
@@ -1550,15 +1633,15 @@ func TestDetectSchemaDrift_NoDrift(t *testing.T) {
 
 	s := &snowplanev1alpha1.Schema{
 		Spec: snowplanev1alpha1.SchemaSpec{
-			Comment:                 testutil.PtrString("test"),
-			DataRetentionTimeInDays: testutil.PtrInt32(1),
+			Comment:                 testutil.Ptr("test"),
+			DataRetentionTimeInDays: testutil.Ptr(int32(1)),
 		},
 	}
 
 	obs := &snowflake.SchemaObservation{
 		ShowOutput: &snowflake.SchemaShowOutput{Comment: "test"},
 		Parameters: &snowflake.SchemaParameters{
-			DataRetentionTimeInDays: testutil.PtrInt32(1),
+			DataRetentionTimeInDays: testutil.Ptr(int32(1)),
 		},
 	}
 
@@ -1572,15 +1655,15 @@ func TestDetectSchemaDrift_WithDrift(t *testing.T) {
 
 	s := &snowplanev1alpha1.Schema{
 		Spec: snowplanev1alpha1.SchemaSpec{
-			Comment:                 testutil.PtrString("desired"),
-			DataRetentionTimeInDays: testutil.PtrInt32(30),
+			Comment:                 testutil.Ptr("desired"),
+			DataRetentionTimeInDays: testutil.Ptr(int32(30)),
 		},
 	}
 
 	obs := &snowflake.SchemaObservation{
 		ShowOutput: &snowflake.SchemaShowOutput{Comment: "drifted"},
 		Parameters: &snowflake.SchemaParameters{
-			DataRetentionTimeInDays: testutil.PtrInt32(1),
+			DataRetentionTimeInDays: testutil.Ptr(int32(1)),
 		},
 	}
 
@@ -1603,7 +1686,7 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 	schema.Generation = 1
 	schema.Status.ObservedGeneration = 1
 	schema.Status.DatabaseName = "ANALYTICS"
-	schema.Spec.UseRole = testutil.PtrString("DATA_ADMIN")
+	schema.Spec.UseRole = testutil.Ptr("DATA_ADMIN")
 
 	db := newTestDB("analytics-db", "default")
 	db.Status.FullyQualifiedName = "ANALYTICS"

@@ -26,6 +26,7 @@ type ForeignKeyProperties struct {
 	// ReferencesTableName is the fully qualified Snowflake table name that
 	// the foreign key references (e.g. "MY_DB"."MY_SCHEMA"."MY_TABLE").
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	ReferencesTableName string `json:"referencesTableName"`
 
 	// ReferencesColumns is the list of columns in the referenced table.
@@ -101,6 +102,7 @@ type TableConstraintSpec struct {
 	// Name is the constraint name in Snowflake.
 	// Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// Type is the constraint type.
@@ -111,6 +113,7 @@ type TableConstraintSpec struct {
 	// (e.g. "MY_DB"."MY_SCHEMA"."MY_TABLE").
 	// Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	TableName string `json:"tableName"`
 
 	// Columns is the list of column names that make up the constraint key.

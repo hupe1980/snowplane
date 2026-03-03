@@ -13,6 +13,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/tracked"
@@ -38,7 +39,7 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 
 // NewReconciler returns a new APIAuthenticationIntegrationWithAuthorizationCodeGrant reconciler.
 func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, Service, *snowflake.APIAuthenticationIntegrationObservation] {
-	a := &adapter{newService: defaultServiceFactory}
+	a := &adapter{client: c, newService: defaultServiceFactory}
 
 	return &reconciler.GenericReconciler[*snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, Service, *snowflake.APIAuthenticationIntegrationObservation]{
 		Client:      c,
@@ -52,7 +53,7 @@ func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, record
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
 // supply a custom ServiceFactory for testing.
 func NewReconcilerWithServiceFactory(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter, sf ServiceFactory) *reconciler.GenericReconciler[*snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, Service, *snowflake.APIAuthenticationIntegrationObservation] {
-	a := &adapter{newService: sf}
+	a := &adapter{client: c, newService: sf}
 
 	return &reconciler.GenericReconciler[*snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, Service, *snowflake.APIAuthenticationIntegrationObservation]{
 		Client:      c,
@@ -105,14 +106,19 @@ func applyObservation(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithAut
 	}
 }
 
-func buildCreateOptions(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, id snowflake.AccountObjectIdentifier) snowflake.CreateAPIAuthenticationIntegrationOptions {
+func buildCreateOptions(ctx context.Context, c client.Client, obj *snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, id snowflake.AccountObjectIdentifier) (snowflake.CreateAPIAuthenticationIntegrationOptions, error) {
+	clientSecret, err := refresolver.ResolveSecretKeyRef(ctx, c, obj.Namespace, obj.Spec.OAuthClientSecretRef)
+	if err != nil {
+		return snowflake.CreateAPIAuthenticationIntegrationOptions{}, fmt.Errorf("resolving oauthClientSecretRef: %w", err)
+	}
+
 	enabled := obj.Spec.Enabled
 
 	opts := snowflake.CreateAPIAuthenticationIntegrationOptions{
 		Name:              id,
 		OAuthGrantType:    snowflake.OAuthGrantTypeAuthorizationCode,
 		OAuthClientID:     obj.Spec.OAuthClientID,
-		OAuthClientSecret: obj.Spec.OAuthClientSecret,
+		OAuthClientSecret: clientSecret,
 		Comment:           obj.Spec.Comment,
 	}
 
@@ -137,7 +143,7 @@ func buildCreateOptions(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithA
 
 	opts.OAuthAllowedScopes = obj.Spec.OAuthAllowedScopes
 
-	return opts
+	return opts, nil
 }
 
 func buildAlterOptions(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, id snowflake.AccountObjectIdentifier, obs *snowflake.APIAuthenticationIntegrationObservation) snowflake.AlterAPIAuthenticationIntegrationOptions {

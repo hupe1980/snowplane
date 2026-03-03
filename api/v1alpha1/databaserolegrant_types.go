@@ -22,6 +22,7 @@ type DatabaseRoleGrantSpec struct {
 
 	// Privilege is the Snowflake privilege to grant (e.g. USAGE, SELECT, CREATE TABLE).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Privilege string `json:"privilege"`
 
 	// On defines what the privilege is granted on.
@@ -32,6 +33,7 @@ type DatabaseRoleGrantSpec struct {
 	// Mutually exclusive with DatabaseRoleRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseRole *string `json:"databaseRole,omitempty"`
 
 	// DatabaseRoleRef references a DatabaseRole CR in the same namespace.

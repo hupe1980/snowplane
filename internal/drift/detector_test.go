@@ -5,19 +5,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-)
 
-func ptrString(s string) *string { return &s }
-func ptrInt32(i int32) *int32    { return &i }
-func ptrBool(b bool) *bool       { return &b }
+	"github.com/hupe1980/snowplane/internal/testutil"
+)
 
 func TestDetector_NoDrift(t *testing.T) {
 	t.Parallel()
 
 	r := New().
-		CompareString("COMMENT", ptrString("hello"), "hello", false).
-		CompareInt32("MAX_CONCURRENCY_LEVEL", ptrInt32(8), ptrInt32(8), false).
-		CompareBool("AUTO_RESUME", ptrBool(true), ptrBool(true), false).
+		CompareString("COMMENT", testutil.Ptr("hello"), "hello", false).
+		CompareInt32("MAX_CONCURRENCY_LEVEL", testutil.Ptr(int32(8)), testutil.Ptr(int32(8)), false).
+		CompareBool("AUTO_RESUME", testutil.Ptr(true), testutil.Ptr(true), false).
 		Result()
 
 	assert.False(t, r.HasDrift)
@@ -30,7 +28,7 @@ func TestDetector_StringDrift(t *testing.T) {
 	t.Parallel()
 
 	r := New().
-		CompareString("COMMENT", ptrString("new"), "old", false).
+		CompareString("COMMENT", testutil.Ptr("new"), "old", false).
 		Result()
 
 	require.True(t, r.HasDrift)
@@ -46,8 +44,8 @@ func TestDetector_NilSpecSkipped(t *testing.T) {
 
 	r := New().
 		CompareString("COMMENT", nil, "something", false).
-		CompareInt32("SIZE", nil, ptrInt32(42), false).
-		CompareBool("FLAG", nil, ptrBool(true), false).
+		CompareInt32("SIZE", nil, testutil.Ptr(int32(42)), false).
+		CompareBool("FLAG", nil, testutil.Ptr(true), false).
 		Result()
 
 	assert.False(t, r.HasDrift, "nil spec fields should be skipped")
@@ -58,7 +56,7 @@ func TestDetector_Int32Drift(t *testing.T) {
 	t.Parallel()
 
 	r := New().
-		CompareInt32("MAX_CONCURRENCY_LEVEL", ptrInt32(16), ptrInt32(8), false).
+		CompareInt32("MAX_CONCURRENCY_LEVEL", testutil.Ptr(int32(16)), testutil.Ptr(int32(8)), false).
 		Result()
 
 	require.True(t, r.HasDrift)
@@ -72,7 +70,7 @@ func TestDetector_Int32Drift_ActualNil(t *testing.T) {
 	t.Parallel()
 
 	r := New().
-		CompareInt32("TIMEOUT", ptrInt32(30), nil, false).
+		CompareInt32("TIMEOUT", testutil.Ptr(int32(30)), nil, false).
 		Result()
 
 	require.True(t, r.HasDrift)
@@ -83,7 +81,7 @@ func TestDetector_BoolDrift(t *testing.T) {
 	t.Parallel()
 
 	r := New().
-		CompareBool("AUTO_RESUME", ptrBool(true), ptrBool(false), false).
+		CompareBool("AUTO_RESUME", testutil.Ptr(true), testutil.Ptr(false), false).
 		Result()
 
 	require.True(t, r.HasDrift)
@@ -97,7 +95,7 @@ func TestDetector_BoolDrift_ActualNil(t *testing.T) {
 	t.Parallel()
 
 	r := New().
-		CompareBool("FLAG", ptrBool(true), nil, false).
+		CompareBool("FLAG", testutil.Ptr(true), nil, false).
 		Result()
 
 	require.True(t, r.HasDrift)
@@ -122,7 +120,7 @@ func TestDetector_MixedDriftAndImmutable(t *testing.T) {
 
 	r := New().
 		CompareStringValue("NAME", "WH1", "WH2", true).
-		CompareString("COMMENT", ptrString("new"), "old", false).
+		CompareString("COMMENT", testutil.Ptr("new"), "old", false).
 		Result()
 
 	assert.True(t, r.HasDrift)
@@ -170,8 +168,8 @@ func TestResult_Summary_MultipleChanges(t *testing.T) {
 	t.Parallel()
 
 	r := New().
-		CompareString("COMMENT", ptrString("new"), "old", false).
-		CompareInt32("SIZE", ptrInt32(10), ptrInt32(5), false).
+		CompareString("COMMENT", testutil.Ptr("new"), "old", false).
+		CompareInt32("SIZE", testutil.Ptr(int32(10)), testutil.Ptr(int32(5)), false).
 		Result()
 
 	summary := r.Summary()
@@ -184,8 +182,8 @@ func TestResult_FieldDiffs_ExcludesImmutable(t *testing.T) {
 
 	r := New().
 		CompareStringValue("NAME", "A", "B", true).
-		CompareString("COMMENT", ptrString("x"), "y", false).
-		CompareString("SIZE", ptrString("L"), "M", false).
+		CompareString("COMMENT", testutil.Ptr("x"), "y", false).
+		CompareString("SIZE", testutil.Ptr("L"), "M", false).
 		Result()
 
 	diffs := r.FieldDiffs()
@@ -199,7 +197,7 @@ func TestResult_ImmutableDiffs_IncludesOnlyImmutable(t *testing.T) {
 
 	r := New().
 		CompareStringValue("NAME", "A", "B", true).
-		CompareString("COMMENT", ptrString("x"), "y", false).
+		CompareString("COMMENT", testutil.Ptr("x"), "y", false).
 		CompareStringValue("OWNER", "ROLE_A", "ROLE_B", true).
 		Result()
 
@@ -213,7 +211,7 @@ func TestResult_ImmutableDiffs_EmptyWhenNoImmutable(t *testing.T) {
 	t.Parallel()
 
 	r := New().
-		CompareString("COMMENT", ptrString("x"), "y", false).
+		CompareString("COMMENT", testutil.Ptr("x"), "y", false).
 		Result()
 
 	assert.Empty(t, r.ImmutableDiffs())
@@ -224,7 +222,7 @@ func TestResult_ImmutableSummary(t *testing.T) {
 
 	r := New().
 		CompareStringValue("NAME", "WH1", "WH2", true).
-		CompareString("COMMENT", ptrString("new"), "old", false).
+		CompareString("COMMENT", testutil.Ptr("new"), "old", false).
 		CompareStringValue("OWNER", "SYSADMIN", "ACCOUNTADMIN", true).
 		Result()
 
@@ -238,7 +236,7 @@ func TestResult_ImmutableSummary_NoViolations(t *testing.T) {
 	t.Parallel()
 
 	r := New().
-		CompareString("COMMENT", ptrString("new"), "old", false).
+		CompareString("COMMENT", testutil.Ptr("new"), "old", false).
 		Result()
 
 	assert.Equal(t, "no immutable violations", r.ImmutableSummary())
@@ -330,7 +328,7 @@ func TestResult_SafeSummary_NoDrift(t *testing.T) {
 func TestResult_SafeSummary_SingleField(t *testing.T) {
 	t.Parallel()
 	r := New().
-		CompareString("COMMENT", ptrString("secret-value"), "old-secret", false).
+		CompareString("COMMENT", testutil.Ptr("secret-value"), "old-secret", false).
 		Result()
 
 	safe := r.SafeSummary()
@@ -342,8 +340,8 @@ func TestResult_SafeSummary_SingleField(t *testing.T) {
 func TestResult_SafeSummary_MultipleFields(t *testing.T) {
 	t.Parallel()
 	r := New().
-		CompareString("COMMENT", ptrString("a"), "b", false).
-		CompareString("WAREHOUSE", ptrString("WH_NEW"), "WH_OLD", false).
+		CompareString("COMMENT", testutil.Ptr("a"), "b", false).
+		CompareString("WAREHOUSE", testutil.Ptr("WH_NEW"), "WH_OLD", false).
 		Result()
 
 	safe := r.SafeSummary()
@@ -355,7 +353,7 @@ func TestResult_SafeSummary_MultipleFields(t *testing.T) {
 func TestResult_SafeSummary_VsSummary(t *testing.T) {
 	t.Parallel()
 	r := New().
-		CompareString("SCIM_TOKEN", ptrString("secret-token"), "old-token", false).
+		CompareString("SCIM_TOKEN", testutil.Ptr("secret-token"), "old-token", false).
 		Result()
 
 	// Summary includes values (for debug logs).

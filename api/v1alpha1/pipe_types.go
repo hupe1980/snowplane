@@ -30,6 +30,7 @@ type PipeSpec struct {
 
 	// Name is the Snowflake pipe name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -41,6 +42,7 @@ type PipeSpec struct {
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -52,12 +54,14 @@ type PipeSpec struct {
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// CopyStatement is the COPY INTO statement that defines the pipe behavior.
 	// This is the core of the pipe — it specifies source stage, target table,
 	// file format, and any transformation logic. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	CopyStatement string `json:"copyStatement"`
 
 	// AutoIngest enables automatic data loading when new files arrive in the stage
@@ -76,6 +80,7 @@ type PipeSpec struct {
 	// Required when autoIngest is true.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	IntegrationName *string `json:"integrationName,omitempty"`
 
 	// AwsSnsTopic specifies the Amazon SNS topic ARN for S3 auto-ingest.

@@ -6,8 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func ptrBool(b bool) *bool { return &b }
-
 func TestIsForceNew(t *testing.T) {
 	t.Parallel()
 
@@ -23,8 +21,8 @@ func TestIsCreateOrAlter_ManagementPolicies(t *testing.T) {
 
 	// Defaults to true when nil.
 	assert.True(t, ManagementPolicies{}.IsCreateOrAlter())
-	assert.True(t, ManagementPolicies{CreateOrAlter: ptrBool(true)}.IsCreateOrAlter())
-	assert.False(t, ManagementPolicies{CreateOrAlter: ptrBool(false)}.IsCreateOrAlter())
+	assert.True(t, ManagementPolicies{CreateOrAlter: ptr(true)}.IsCreateOrAlter())
+	assert.False(t, ManagementPolicies{CreateOrAlter: ptr(false)}.IsCreateOrAlter())
 }
 
 func TestIsDetectOnly_ManagementPolicies(t *testing.T) {

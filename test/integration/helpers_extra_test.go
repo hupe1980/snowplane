@@ -67,7 +67,7 @@ func newTestDynamicTable(name, sfName, dbRefName, schemaRefName string) *snowpla
 			SchemaRef:     &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
 			Query:         "SELECT 1 AS id",
 			TargetLag:     "1 minute",
-			WarehouseName: strPtr("MY_WH"),
+			WarehouseName: ptr("MY_WH"),
 		},
 	}
 }

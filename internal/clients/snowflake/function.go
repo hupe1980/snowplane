@@ -135,16 +135,10 @@ func buildFuncArgClause(args []FunctionArgument) string {
 }
 
 // buildCreateFunctionSQL builds the CREATE FUNCTION SQL statement.
-func buildCreateFunctionSQL(opts CreateFunctionOptions) string {
+func buildCreateFunctionSQL(opts CreateFunctionOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER FUNCTION ")
-	} else {
-		b.WriteString("CREATE FUNCTION IF NOT EXISTS ")
-	}
-
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "FUNCTION", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 	b.WriteString(buildFuncArgClause(opts.Arguments))
 
 	b.WriteString(" RETURNS ")
@@ -216,7 +210,11 @@ func buildCreateFunctionSQL(opts CreateFunctionOptions) string {
 		b.WriteString("$$")
 	}
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a function in Snowflake.
@@ -225,7 +223,12 @@ func (f *FunctionClient) Create(ctx context.Context, opts CreateFunctionOptions)
 		return NewTerminalError(fmt.Errorf("invalid create function options: %w", err))
 	}
 
-	if _, err := f.client.Exec(ctx, buildCreateFunctionSQL(opts)); err != nil {
+	sql, err := buildCreateFunctionSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create function SQL: %w", err))
+	}
+
+	if _, err := f.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating function %s: %w", opts.Name, err)
 	}
 

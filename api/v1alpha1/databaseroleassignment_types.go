@@ -33,6 +33,7 @@ type DatabaseRoleAssignmentSpec struct {
 	// Mutually exclusive with DatabaseRoleRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseRoleName *string `json:"databaseRoleName,omitempty"`
 
 	// DatabaseRoleRef references a DatabaseRole CR in the same namespace.
@@ -45,6 +46,7 @@ type DatabaseRoleAssignmentSpec struct {
 	// Mutually exclusive with ToRoleRef, ToDatabaseRole, ToDatabaseRoleRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	ToRole *string `json:"toRole,omitempty"`
 
 	// ToRoleRef references an AccountRole CR in the same namespace.
@@ -57,6 +59,7 @@ type DatabaseRoleAssignmentSpec struct {
 	// Mutually exclusive with ToDatabaseRoleRef, ToRole, ToRoleRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	ToDatabaseRole *string `json:"toDatabaseRole,omitempty"`
 
 	// ToDatabaseRoleRef references a DatabaseRole CR in the same namespace.

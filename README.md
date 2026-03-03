@@ -21,19 +21,20 @@
 | Category | Resources |
 |----------|-----------|
 | 🗄️ **Core Infrastructure** | Database, Schema, Warehouse |
-| 📊 **Data Objects** | Table, View, MaterializedView, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, ExternalTable, FileFormat, Pipe, Sequence |
+| 📊 **Data Objects** | Table, TableConstraint, View, MaterializedView, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, ExternalTable, FileFormat, Pipe, Sequence |
 | 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
 | ⏰ **Orchestration** | Task (DAG scheduling, serverless or warehouse-backed), Alert (condition-based monitoring & notification) |
 | 🔧 **Programmability** | ProcedureSQL, ProcedureJavascript, ProcedurePython, ProcedureJava, ProcedureScala, FunctionSQL, FunctionJavascript, FunctionPython, FunctionJava, FunctionScala |
-| 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
-| 🛡️ **Security & Governance** | NetworkPolicy, NetworkPolicyAttachment, NetworkRule, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
-| 📤 **Utilities** | FieldExport (copy status fields into ConfigMaps/Secrets) |
+| 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration, APIAuthenticationIntegrationWithAuthorizationCodeGrant, APIAuthenticationIntegrationWithClientCredentials, APIAuthenticationIntegrationWithJWTBearer |
+| 🔒 **Secrets** | SecretWithAuthorizationCodeGrant, SecretWithBasicAuthentication, SecretWithClientCredentials, SecretWithGenericString |
+| 🛡️ **Security & Governance** | NetworkPolicy, NetworkPolicyAttachment, NetworkRule, AuthenticationPolicy, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
+| 📤 **Utilities** | FieldExport (copy status fields into ConfigMaps/Secrets), ProviderConfig |
 
 Every resource supports full lifecycle management (create, alter, drop), drift detection, adoption of pre-existing objects, and deletion policies. See the [API Reference](#-api-reference) below for detailed field documentation.
 
 ### 🔧 Operator Capabilities
 
-- 🔗 **Cross-Resource References** — Ref/Name XOR pattern: every cross-resource field supports either a Kubernetes object reference (`fooRef`) or a plain Snowflake identifier (`fooName`), mutually exclusive via CEL. Covers database, schema, warehouse, policy, tag, and integration references with automatic dependency resolution and backoff
+- 🔗 **Cross-Resource References** — Ref/Name XOR pattern: every cross-resource field supports either a Kubernetes object reference (`fooRef`) or a plain Snowflake identifier (`fooName`), mutually exclusive via CEL. Covers database, schema, warehouse, policy, tag, and integration references with automatic dependency resolution and backoff. All `ObjectReference` fields support an optional `namespace` for cross-namespace references — enabling platform teams to manage shared infrastructure in a central namespace while project teams reference it from their own namespaces
 - 🔄 **Observe-Diff-Apply Reconciliation** — Only altered fields are pushed to Snowflake, minimizing API calls
 - 🔍 **Drift Detection & Correction** — Field-level drift detection with structured reporting, detect-only policy option
 - 🏷️ **Resource Adoption** — Adopt pre-existing Snowflake resources via `spec.managementPolicies.adoptionPolicy: adopt`

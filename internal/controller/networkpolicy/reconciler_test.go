@@ -179,7 +179,7 @@ func TestReconcile_CreateWithAllFields(t *testing.T) {
 	np.Spec.BlockedIPList = []string{"10.0.0.1"}
 	np.Spec.AllowedNetworkRuleList = []string{"rule1"}
 	np.Spec.BlockedNetworkRuleList = []string{"rule2"}
-	np.Spec.Comment = testutil.PtrString("test policy")
+	np.Spec.Comment = testutil.Ptr("test policy")
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "test policy"
 	var capturedOpts snowflake.CreateNetworkPolicyOptions
@@ -277,7 +277,7 @@ func TestReconcile_UpdateWithChanges(t *testing.T) {
 	np.Finalizers = []string{finalizerName}
 	np.Status.ObservedGeneration = 1
 	np.Generation = 2
-	np.Spec.Comment = testutil.PtrString("new comment")
+	np.Spec.Comment = testutil.Ptr("new comment")
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old comment"
 	var capturedAlterOpts snowflake.AlterNetworkPolicyOptions
@@ -303,7 +303,7 @@ func TestReconcile_AlterFails(t *testing.T) {
 	np := newTestNetworkPolicy("mynp", "default")
 	np.Finalizers = []string{finalizerName}
 	np.Status.ObservedGeneration = 1
-	np.Spec.Comment = testutil.PtrString("changed")
+	np.Spec.Comment = testutil.Ptr("changed")
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "original"
 	mock := &mockService{
@@ -445,7 +445,7 @@ func TestReconcile_ImmutableName(t *testing.T) {
 func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 	np := newTestNetworkPolicy("mynp", "default")
-	np.Spec.Comment = testutil.PtrString("my policy")
+	np.Spec.Comment = testutil.Ptr("my policy")
 	np.Spec.BlockedIPList = []string{"10.0.0.1"}
 	id := snowflake.NewAccountObjectIdentifier("MY_POLICY")
 	opts := buildCreateOptions(np, id)
@@ -458,7 +458,7 @@ func TestBuildCreateOptions(t *testing.T) {
 func TestBuildAlterOptions_CommentChanged(t *testing.T) {
 	t.Parallel()
 	np := newTestNetworkPolicy("mynp", "default")
-	np.Spec.Comment = testutil.PtrString("new")
+	np.Spec.Comment = testutil.Ptr("new")
 	id := snowflake.NewAccountObjectIdentifier("MY_POLICY")
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -493,7 +493,7 @@ func TestBuildAlterOptions_UnsetComment(t *testing.T) {
 func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
 	spec := &snowplanev1alpha1.NetworkPolicySpec{
-		Comment:                testutil.PtrString("x"),
+		Comment:                testutil.Ptr("x"),
 		AllowedIPList:          []string{"1.2.3.4"},
 		BlockedIPList:          []string{"5.6.7.8"},
 		AllowedNetworkRuleList: []string{"rule1"},
@@ -526,7 +526,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 		Spec: snowplanev1alpha1.NetworkPolicySpec{
 			Name:          "MY_POLICY",
 			AllowedIPList: []string{"192.168.1.0/24"},
-			Comment:       testutil.PtrString("test"),
+			Comment:       testutil.Ptr("test"),
 		},
 	}
 	obs := &snowflake.NetworkPolicyObservation{
@@ -546,7 +546,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	np := &snowplanev1alpha1.NetworkPolicy{
 		Spec: snowplanev1alpha1.NetworkPolicySpec{
 			Name:    "MY_POLICY",
-			Comment: testutil.PtrString("desired"),
+			Comment: testutil.Ptr("desired"),
 		},
 	}
 	obs := &snowflake.NetworkPolicyObservation{
@@ -564,7 +564,7 @@ func TestReconcile_TrackedParametersPersistedOnCreate(t *testing.T) {
 	t.Parallel()
 	np := newTestNetworkPolicy("mynp", "default")
 	np.Finalizers = []string{finalizerName}
-	np.Spec.Comment = testutil.PtrString("hello")
+	np.Spec.Comment = testutil.Ptr("hello")
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "hello"
 	mock := &mockService{

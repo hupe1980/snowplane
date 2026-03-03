@@ -26,7 +26,8 @@ func TestBuildCreateStorageIntegrationSQL(t *testing.T) {
 			StorageAWSRoleARN:       &roleARN,
 			StorageAllowedLocations: []string{"s3://mybucket/"},
 		}
-		got := buildCreateStorageIntegrationSQL(opts)
+		got, err := buildCreateStorageIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE STORAGE INTEGRATION IF NOT EXISTS "MY_INT"`)
 		assert.Contains(t, got, "TYPE = 'EXTERNAL_STAGE'")
 		assert.Contains(t, got, "STORAGE_PROVIDER = 'S3'")
@@ -47,7 +48,8 @@ func TestBuildCreateStorageIntegrationSQL(t *testing.T) {
 			Enabled:                 &enabled,
 			Comment:                 &comment,
 		}
-		got := buildCreateStorageIntegrationSQL(opts)
+		got, err := buildCreateStorageIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "STORAGE_PROVIDER = 'GCS'")
 		assert.Contains(t, got, "ENABLED = FALSE")
 		assert.Contains(t, got, "COMMENT = 'test integration'")
@@ -64,7 +66,8 @@ func TestBuildCreateStorageIntegrationSQL(t *testing.T) {
 			AzureTenantID:           &tenantID,
 			StorageAllowedLocations: []string{"azure://myaccount.blob.core.windows.net/mycontainer/"},
 		}
-		got := buildCreateStorageIntegrationSQL(opts)
+		got, err := buildCreateStorageIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "STORAGE_PROVIDER = 'AZURE'")
 		assert.Contains(t, got, "AZURE_TENANT_ID = 'my-tenant-id'")
 	})
@@ -81,7 +84,8 @@ func TestBuildCreateStorageIntegrationSQL(t *testing.T) {
 			StorageAWSExternalID:    &extID,
 			StorageAllowedLocations: []string{"s3://mybucket/"},
 		}
-		got := buildCreateStorageIntegrationSQL(opts)
+		got, err := buildCreateStorageIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "STORAGE_AWS_EXTERNAL_ID = 'my-custom-external-id'")
 		assert.Contains(t, got, "STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::123456789012:role/myrole'")
 	})

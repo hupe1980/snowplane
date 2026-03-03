@@ -21,6 +21,7 @@ type ShareGrantSpec struct {
 	// Privilege is the Snowflake privilege to grant.
 	// Shares only support a limited set: USAGE, SELECT, REFERENCE_USAGE, READ, EVOLVE SCHEMA.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Privilege string `json:"privilege"`
 
 	// ObjectType is the type of object the privilege is granted on.
@@ -30,10 +31,12 @@ type ShareGrantSpec struct {
 	// ObjectName is the fully qualified name of the object
 	// (e.g. MY_DB, MY_DB.PUBLIC, MY_DB.PUBLIC.MY_TABLE).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	ObjectName string `json:"objectName"`
 
 	// Share is the name of the share to grant the privilege to.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Share string `json:"share"`
 }
 

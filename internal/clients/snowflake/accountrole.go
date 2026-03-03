@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
@@ -77,15 +76,18 @@ func NewAccountRoleClient(c SQLExecutor) *AccountRoleClient {
 }
 
 // buildCreateAccountRoleSQL builds the CREATE ROLE SQL statement.
-func buildCreateAccountRoleSQL(opts CreateAccountRoleOptions) string {
+func buildCreateAccountRoleSQL(opts CreateAccountRoleOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	b.WriteString("CREATE ROLE IF NOT EXISTS ")
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "ROLE", opts.Name.FullyQualifiedName(), false, false)
 
 	b.SetString("COMMENT", opts.Comment)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a role in Snowflake.
@@ -94,7 +96,12 @@ func (r *AccountRoleClient) Create(ctx context.Context, opts CreateAccountRoleOp
 		return NewTerminalError(fmt.Errorf("invalid create account role options: %w", err))
 	}
 
-	if _, err := r.client.Exec(ctx, buildCreateAccountRoleSQL(opts)); err != nil {
+	sql, err := buildCreateAccountRoleSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create account role SQL: %w", err))
+	}
+
+	if _, err := r.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating role %s: %w", opts.Name, err)
 	}
 
@@ -187,56 +194,17 @@ func (r *AccountRoleClient) Observe(ctx context.Context, name AccountObjectIdent
 
 // scanAccountRoleShowOutput scans SHOW ROLES results for a matching row.
 func scanAccountRoleShowOutput(rows *sql.Rows, name string) (*AccountRoleShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
-		var grantedToRoles, grantedRoles int32
-		if v, ok := parseInt32(colMap["granted_to_roles"]); ok {
-			grantedToRoles = v
-		}
-
-		if v, ok := parseInt32(colMap["granted_roles"]); ok {
-			grantedRoles = v
-		}
+	return ScanShowOutput(rows, name, func(m map[string]string) (*AccountRoleShowOutput, error) {
+		grantedToRoles, _ := parseInt32(m["granted_to_roles"])
+		grantedRoles, _ := parseInt32(m["granted_roles"])
 
 		return &AccountRoleShowOutput{
-			CreatedOn:      colMap["created_on"],
-			Name:           colMap["name"],
-			Comment:        colMap["comment"],
-			Owner:          colMap["owner"],
+			CreatedOn:      m["created_on"],
+			Name:           m["name"],
+			Comment:        m["comment"],
+			Owner:          m["owner"],
 			GrantedToRoles: grantedToRoles,
 			GrantedRoles:   grantedRoles,
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

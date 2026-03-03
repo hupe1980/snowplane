@@ -21,7 +21,8 @@ func TestBuildCreateExternalTableSQL(t *testing.T) {
 			Location:   "@DB.SCH.MY_STAGE/path/",
 			FileFormat: "TYPE = PARQUET",
 		}
-		got := buildCreateExternalTableSQL(opts)
+		got, err := buildCreateExternalTableSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE EXTERNAL TABLE IF NOT EXISTS "DB"."SCH"."MY_EXT"`)
 		assert.Contains(t, got, `LOCATION = @DB.SCH.MY_STAGE/path/`)
 		assert.Contains(t, got, `FILE_FORMAT = (TYPE = PARQUET)`)
@@ -38,7 +39,8 @@ func TestBuildCreateExternalTableSQL(t *testing.T) {
 				{Name: "col2", Type: "NUMBER", As: "value:col2::number"},
 			},
 		}
-		got := buildCreateExternalTableSQL(opts)
+		got, err := buildCreateExternalTableSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `"col1" VARCHAR AS (value:col1::varchar)`)
 		assert.Contains(t, got, `"col2" NUMBER AS (value:col2::number)`)
 	})
@@ -53,7 +55,8 @@ func TestBuildCreateExternalTableSQL(t *testing.T) {
 			PartitionBy:   []string{"date_part", "region"},
 			PartitionType: &partType,
 		}
-		got := buildCreateExternalTableSQL(opts)
+		got, err := buildCreateExternalTableSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `PARTITION BY ("date_part", "region")`)
 		assert.Contains(t, got, `PARTITION_TYPE = USER_SPECIFIED`)
 	})
@@ -79,7 +82,8 @@ func TestBuildCreateExternalTableSQL(t *testing.T) {
 			Integration:     &integration,
 			Comment:         &comment,
 		}
-		got := buildCreateExternalTableSQL(opts)
+		got, err := buildCreateExternalTableSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `INTEGRATION = 'my_integration'`)
 		assert.Contains(t, got, `LOCATION = @DB.SCH.MY_STAGE/data/`)
 		assert.Contains(t, got, `REFRESH_ON_CREATE = FALSE`)
@@ -98,7 +102,8 @@ func TestBuildCreateExternalTableSQL(t *testing.T) {
 			Location:   "@DB.SCH.MY_STAGE/",
 			FileFormat: "FORMAT_NAME = 'DB.SCH.MY_FORMAT'",
 		}
-		got := buildCreateExternalTableSQL(opts)
+		got, err := buildCreateExternalTableSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `FILE_FORMAT = (FORMAT_NAME = 'DB.SCH.MY_FORMAT')`)
 	})
 }

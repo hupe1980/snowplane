@@ -394,8 +394,8 @@ func TestReconcile_UpdateComment(t *testing.T) {
 
 	table := newTestTable("mytable", "default")
 	table.Finalizers = []string{finalizerName}
-	table.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
-	table.Spec.Comment = testutil.PtrString("updated comment")
+	table.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
+	table.Spec.Comment = testutil.Ptr("updated comment")
 	table.Status.ObservedGeneration = 1
 	db := newTestDB("analytics-db", "default")
 	schema := newTestSchema("public-schema", "default")
@@ -550,8 +550,8 @@ func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
 	table := newTestTable("mytable", "default")
-	table.Spec.Comment = testutil.PtrString("test table")
-	table.Spec.ChangeTracking = testutil.PtrBool(true)
+	table.Spec.Comment = testutil.Ptr("test table")
+	table.Spec.ChangeTracking = testutil.Ptr(true)
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "EVENTS")
 
 	opts := buildCreateOptions(table, id)
@@ -601,7 +601,7 @@ func TestBuildAlterOptions_CommentChanged(t *testing.T) {
 	t.Parallel()
 
 	table := newTestTable("mytable", "default")
-	table.Spec.Comment = testutil.PtrString("new comment")
+	table.Spec.Comment = testutil.Ptr("new comment")
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "EVENTS")
 	obs := successfulObservation()
 
@@ -614,9 +614,9 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.TableSpec{
-		Comment:                 testutil.PtrString("test"),
-		ChangeTracking:          testutil.PtrBool(true),
-		DataRetentionTimeInDays: testutil.PtrInt32(7),
+		Comment:                 testutil.Ptr("test"),
+		ChangeTracking:          testutil.Ptr(true),
+		DataRetentionTimeInDays: testutil.Ptr(int32(7)),
 	}
 
 	fields := tracked.ComputeTracked(spec)
@@ -641,7 +641,7 @@ func TestDetectDrift_CommentDrift(t *testing.T) {
 	t.Parallel()
 
 	table := newTestTable("mytable", "default")
-	table.Spec.Comment = testutil.PtrString("expected")
+	table.Spec.Comment = testutil.Ptr("expected")
 
 	obs := &snowflake.TableObservation{
 		Exists: true,
@@ -775,7 +775,7 @@ func TestComputeColumnChanges_AddColumn(t *testing.T) {
 
 	specCols := []snowplanev1alpha1.ColumnDefinition{
 		{Name: "ID", Type: "NUMBER(38,0)"},
-		{Name: "NEW_COL", Type: "VARCHAR(200)", Comment: testutil.PtrString("added")},
+		{Name: "NEW_COL", Type: "VARCHAR(200)", Comment: testutil.Ptr("added")},
 	}
 	obsCols := []snowflake.ColumnInfo{
 		{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
@@ -810,7 +810,7 @@ func TestComputeColumnChanges_AlterComment(t *testing.T) {
 	t.Parallel()
 
 	specCols := []snowplanev1alpha1.ColumnDefinition{
-		{Name: "ID", Type: "NUMBER(38,0)", Comment: testutil.PtrString("primary key")},
+		{Name: "ID", Type: "NUMBER(38,0)", Comment: testutil.Ptr("primary key")},
 	}
 	obsCols := []snowflake.ColumnInfo{
 		{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y", Comment: "old comment"},

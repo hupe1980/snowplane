@@ -114,11 +114,10 @@ func NewAlertClient(c SQLExecutor) *AlertClient {
 }
 
 // buildCreateAlertSQL builds the CREATE ALERT SQL statement.
-func buildCreateAlertSQL(opts CreateAlertOptions) string {
+func buildCreateAlertSQL(opts CreateAlertOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	b.WriteString("CREATE ALERT IF NOT EXISTS ")
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "ALERT", opts.Name.FullyQualifiedName(), false, false)
 
 	if opts.Warehouse != nil {
 		fmt.Fprintf(&b.Builder, " WAREHOUSE = %s", sqlbuilder.QuoteIdentifier(*opts.Warehouse))
@@ -132,7 +131,11 @@ func buildCreateAlertSQL(opts CreateAlertOptions) string {
 
 	fmt.Fprintf(&b.Builder, " IF( EXISTS( %s )) THEN %s", opts.Condition, opts.Action)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates an alert in Snowflake.
@@ -141,7 +144,12 @@ func (a *AlertClient) Create(ctx context.Context, opts CreateAlertOptions) error
 		return NewTerminalError(fmt.Errorf("invalid create alert options: %w", err))
 	}
 
-	if _, err := a.client.Exec(ctx, buildCreateAlertSQL(opts)); err != nil {
+	sql, err := buildCreateAlertSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create alert SQL: %w", err))
+	}
+
+	if _, err := a.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating alert %s: %w", opts.Name, err)
 	}
 
@@ -282,52 +290,19 @@ func (a *AlertClient) Observe(ctx context.Context, name SchemaObjectIdentifier) 
 
 // scanAlertShowOutput scans SHOW ALERTS results for a matching row.
 func scanAlertShowOutput(rows *sql.Rows, name string) (*AlertShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*AlertShowOutput, error) {
 		return &AlertShowOutput{
-			CreatedOn:    colMap["created_on"],
-			Name:         colMap["name"],
-			DatabaseName: colMap["database_name"],
-			SchemaName:   colMap["schema_name"],
-			Owner:        colMap["owner"],
-			Comment:      colMap["comment"],
-			Warehouse:    colMap["warehouse"],
-			Schedule:     colMap["schedule"],
-			State:        colMap["state"],
-			Condition:    colMap["condition"],
-			Action:       colMap["action"],
+			CreatedOn:    m["created_on"],
+			Name:         m["name"],
+			DatabaseName: m["database_name"],
+			SchemaName:   m["schema_name"],
+			Owner:        m["owner"],
+			Comment:      m["comment"],
+			Warehouse:    m["warehouse"],
+			Schedule:     m["schedule"],
+			State:        m["state"],
+			Condition:    m["condition"],
+			Action:       m["action"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

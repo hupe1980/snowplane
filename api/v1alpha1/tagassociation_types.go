@@ -30,6 +30,7 @@ type TagAssociationSpec struct {
 	// Mutually exclusive with TagRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	TagName *string `json:"tagName,omitempty"`
 
 	// TagRef references a Tag CR in the same namespace.
@@ -42,12 +43,14 @@ type TagAssociationSpec struct {
 	// This is the only mutable field — changing it triggers an ALTER SET TAG
 	// with the new value.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:MaxLength=256
 	TagValue string `json:"tagValue"`
 
 	// ObjectType is the Snowflake object type to tag (e.g. "TABLE", "WAREHOUSE", "DATABASE").
 	// Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:Enum=ACCOUNT;DATABASE;SCHEMA;TABLE;VIEW;COLUMN;WAREHOUSE;ROLE;USER;STAGE;STREAM;TASK;ALERT;PIPE;FUNCTION;PROCEDURE;INTEGRATION;"NETWORK POLICY";"DATABASE ROLE"
 	ObjectType string `json:"objectType"`
 
@@ -55,6 +58,7 @@ type TagAssociationSpec struct {
 	// (e.g. "MY_DB"."MY_SCHEMA"."MY_TABLE").
 	// Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	ObjectName string `json:"objectName"`
 }
 

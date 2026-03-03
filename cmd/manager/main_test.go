@@ -7,25 +7,29 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testControllerNames is a representative set of valid controller names for tests.
+var testControllerNames = []string{
+	"alert", "authenticationpolicy", "database", "schema", "warehouse",
+	"accountrole", "databaserole", "accountrolegrant", "databaserolegrant",
+	"sharegrant", "user", "table", "view", "stage", "task", "fieldexport",
+}
+
 func TestParseDisabledControllers_Empty(t *testing.T) {
 	t.Parallel()
-	result, err := parseDisabledControllers("")
-	require.NoError(t, err)
+	result := parseDisabledControllers("")
 	assert.Empty(t, result)
 }
 
 func TestParseDisabledControllers_Single(t *testing.T) {
 	t.Parallel()
-	result, err := parseDisabledControllers("accountrolegrant")
-	require.NoError(t, err)
+	result := parseDisabledControllers("accountrolegrant")
 	assert.True(t, result["accountrolegrant"])
 	assert.False(t, result["database"])
 }
 
 func TestParseDisabledControllers_Multiple(t *testing.T) {
 	t.Parallel()
-	result, err := parseDisabledControllers("accountrolegrant,stage,view")
-	require.NoError(t, err)
+	result := parseDisabledControllers("accountrolegrant,stage,view")
 	assert.True(t, result["accountrolegrant"])
 	assert.True(t, result["stage"])
 	assert.True(t, result["view"])
@@ -34,8 +38,7 @@ func TestParseDisabledControllers_Multiple(t *testing.T) {
 
 func TestParseDisabledControllers_WithSpaces(t *testing.T) {
 	t.Parallel()
-	result, err := parseDisabledControllers(" accountrolegrant , stage , view ")
-	require.NoError(t, err)
+	result := parseDisabledControllers(" accountrolegrant , stage , view ")
 	assert.True(t, result["accountrolegrant"])
 	assert.True(t, result["stage"])
 	assert.True(t, result["view"])
@@ -43,24 +46,25 @@ func TestParseDisabledControllers_WithSpaces(t *testing.T) {
 
 func TestParseDisabledControllers_TrailingComma(t *testing.T) {
 	t.Parallel()
-	result, err := parseDisabledControllers("accountrolegrant,")
-	require.NoError(t, err)
+	result := parseDisabledControllers("accountrolegrant,")
 	assert.True(t, result["accountrolegrant"])
 	assert.Equal(t, 1, len(result))
 }
 
-func TestParseDisabledControllers_InvalidName(t *testing.T) {
+func TestValidateDisabledControllers_InvalidName(t *testing.T) {
 	t.Parallel()
-	_, err := parseDisabledControllers("accountrolegrant,foobar")
+	disabled := parseDisabledControllers("accountrolegrant,foobar")
+	err := validateDisabledControllers(disabled, testControllerNames)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown controller name \"foobar\"")
 }
 
-func TestParseDisabledControllers_AllValid(t *testing.T) {
+func TestValidateDisabledControllers_AllValid(t *testing.T) {
 	t.Parallel()
-	result, err := parseDisabledControllers("database,schema,warehouse,accountrole,databaserole,accountrolegrant,databaserolegrant,sharegrant,user,table,view,stage,fieldexport")
+	disabled := parseDisabledControllers("database,schema,warehouse,accountrole,databaserole,accountrolegrant,databaserolegrant,sharegrant,user,table,view,stage,fieldexport")
+	err := validateDisabledControllers(disabled, testControllerNames)
 	require.NoError(t, err)
-	assert.Equal(t, 13, len(result))
+	assert.Equal(t, 13, len(disabled))
 }
 
 // --------------------------------------------------------------------------
@@ -124,97 +128,7 @@ func TestParseAllowedRoles_OnlyCommasAndSpaces(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Tests: validControllerNames completeness (L-19)
+// Tests: validateDisabledControllers — completeness is now guaranteed by
+// design since valid names are derived from the controllers registration
+// table rather than a manually maintained map (M-5).
 // --------------------------------------------------------------------------
-
-// controllerRegistrationNames returns the set of controller names that appear
-// in the registration table (controllers slice) plus the standalone
-// "fieldexport" controller.  This duplicates the names from main() so that the
-// test below can catch any drift between the two lists.
-//
-// Keep this list in sync with the controllers slice in main().
-var controllerRegistrationNames = map[string]bool{
-	"alert":                            true,
-	"database":                         true,
-	"schema":                           true,
-	"warehouse":                        true,
-	"accountrole":                      true,
-	"databaserole":                     true,
-	"accountrolegrant":                 true,
-	"databaserolegrant":                true,
-	"sharegrant":                       true,
-	"user":                             true,
-	"table":                            true,
-	"view":                             true,
-	"stage":                            true,
-	"task":                             true,
-	"streamontable":                    true,
-	"streamonview":                     true,
-	"streamonexternaltable":            true,
-	"streamondirectorytable":           true,
-	"streamondynamictable":             true,
-	"tag":                              true,
-	"networkpolicy":                    true,
-	"resourcemonitor":                  true,
-	"maskingpolicy":                    true,
-	"rowaccesspolicy":                  true,
-	"grantownership":                   true,
-	"storageintegration":               true,
-	"fileformat":                       true,
-	"pipe":                             true,
-	"dynamictable":                     true,
-	"notificationintegration":          true,
-	"securityintegration":              true,
-	"passwordpolicy":                   true,
-	"networkrule":                      true,
-	"accountroleassignment":            true,
-	"databaseroleassignment":           true,
-	"tagassociation":                   true,
-	"networkpolicyattachment":          true,
-	"passwordpolicyattachment":         true,
-	"maskingpolicyapplication":         true,
-	"tableconstraint":                  true,
-	"sequence":                         true,
-	"externaltable":                    true,
-	"materializedview":                 true,
-	"proceduresql":                     true,
-	"procedurejavascript":              true,
-	"procedurepython":                  true,
-	"procedurejava":                    true,
-	"procedurescala":                   true,
-	"functionsql":                      true,
-	"functionjavascript":               true,
-	"functionpython":                   true,
-	"functionjava":                     true,
-	"functionscala":                    true,
-	"secretwithclientcredentials":      true,
-	"secretwithauthorizationcodegrant": true,
-	"secretwithbasicauthentication":    true,
-	"secretwithgenericstring":          true,
-	"apiauthenticationintegrationwithclientcredentials":      true,
-	"apiauthenticationintegrationwithauthorizationcodegrant": true,
-	"apiauthenticationintegrationwithjwtbearer":              true,
-	"authenticationpolicy":                                   true,
-	// standalone controller (not in GenericReconciler registration loop)
-	"fieldexport": true,
-}
-
-func TestValidControllerNames_MatchesRegistrationTable(t *testing.T) {
-	t.Parallel()
-
-	// Every name that can be disabled must appear in the registration table.
-	for name := range validControllerNames {
-		assert.True(t, controllerRegistrationNames[name],
-			"validControllerNames contains %q which is not in the controller registration table", name)
-	}
-
-	// Every registered controller must be disableable.
-	for name := range controllerRegistrationNames {
-		assert.True(t, validControllerNames[name],
-			"controller %q is registered but missing from validControllerNames", name)
-	}
-
-	// Counts must match (belt-and-suspenders).
-	assert.Equal(t, len(validControllerNames), len(controllerRegistrationNames),
-		"validControllerNames and controllerRegistrationNames have different lengths")
-}

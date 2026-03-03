@@ -23,6 +23,7 @@ type UserSpec struct {
 
 	// Name is the Snowflake user name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// LoginName is the name that the user enters to log into the system.

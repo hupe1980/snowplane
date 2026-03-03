@@ -45,6 +45,7 @@ const (
 type ProviderConfigSpec struct {
 	// Account is the Snowflake account identifier (e.g. "xy12345" or "orgname-accountname").
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Account string `json:"account"`
 
 	// Region is the Snowflake cloud region (e.g. "us-east-1", "eu-west-1").
@@ -56,6 +57,7 @@ type ProviderConfigSpec struct {
 
 	// User is the Snowflake user for authentication.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	User string `json:"user"`
 
 	// Role is the Snowflake role to assume. Defaults to the user's default role.

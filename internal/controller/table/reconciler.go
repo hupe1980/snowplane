@@ -279,7 +279,8 @@ func computeColumnChanges(
 		observedNullable := oc.Null == "Y"
 
 		if desiredNullable != observedNullable {
-			action.SetNotNull = ptrBool(!desiredNullable)
+			notNull := !desiredNullable
+			action.SetNotNull = &notNull
 			hasChange = true
 		}
 
@@ -326,8 +327,6 @@ func computeColumnChanges(
 
 	return addCols, dropCols, alterCols
 }
-
-func ptrBool(b bool) *bool { return &b }
 
 func detectDrift(table *snowplanev1alpha1.Table, obs *snowflake.TableObservation) *drift.Result {
 	d := drift.New()

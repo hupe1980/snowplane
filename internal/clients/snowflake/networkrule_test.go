@@ -38,7 +38,8 @@ func TestBuildCreateNetworkRuleSQL(t *testing.T) {
 			Mode:      "INGRESS",
 			ValueList: []string{"1.2.3.4", "10.0.0.0/24"},
 		}
-		got := buildCreateNetworkRuleSQL(opts)
+		got, err := buildCreateNetworkRuleSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE NETWORK RULE IF NOT EXISTS "DB"."SCH"."MY_RULE"`)
 		assert.Contains(t, got, "TYPE = IPV4")
 		assert.Contains(t, got, "MODE = INGRESS")
@@ -53,7 +54,8 @@ func TestBuildCreateNetworkRuleSQL(t *testing.T) {
 			Mode:      "EGRESS",
 			ValueList: []string{"example.com:443", "api.example.com:8080"},
 		}
-		got := buildCreateNetworkRuleSQL(opts)
+		got, err := buildCreateNetworkRuleSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "TYPE = HOST_PORT")
 		assert.Contains(t, got, "MODE = EGRESS")
 		assert.Contains(t, got, "example.com:443")
@@ -69,7 +71,8 @@ func TestBuildCreateNetworkRuleSQL(t *testing.T) {
 			ValueList: []string{"10.0.0.1"},
 			Comment:   &comment,
 		}
-		got := buildCreateNetworkRuleSQL(opts)
+		got, err := buildCreateNetworkRuleSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "COMMENT = 'allow office IPs'")
 	})
 
@@ -81,7 +84,8 @@ func TestBuildCreateNetworkRuleSQL(t *testing.T) {
 			Mode:      "INTERNAL_STAGE",
 			ValueList: []string{"vpce-01234567890abcdef"},
 		}
-		got := buildCreateNetworkRuleSQL(opts)
+		got, err := buildCreateNetworkRuleSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "TYPE = AWSVPCEID")
 		assert.Contains(t, got, "MODE = INTERNAL_STAGE")
 		assert.Contains(t, got, "vpce-01234567890abcdef")
@@ -98,7 +102,8 @@ func TestBuildCreateNetworkRuleSQL_CreateOrAlter(t *testing.T) {
 		ValueList:        []string{"1.2.3.4"},
 		UseCreateOrAlter: true,
 	}
-	got := buildCreateNetworkRuleSQL(opts)
+	got, err := buildCreateNetworkRuleSQL(opts)
+		require.NoError(t, err)
 	assert.Contains(t, got, `CREATE OR ALTER NETWORK RULE "DB"."SCH"."MY_RULE"`)
 	assert.NotContains(t, got, "IF NOT EXISTS")
 	assert.Contains(t, got, "TYPE = IPV4")

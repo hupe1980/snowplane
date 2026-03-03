@@ -354,3 +354,44 @@ func TestBreaker_JitterApplied(t *testing.T) {
 	cb2.now = func() time.Time { return now.Add(11*time.Second + 17*time.Second) }
 	require.NoError(t, cb2.Allow(provider2))
 }
+
+func TestBreaker_HalfOpen_StaleProbeAllowsNewProbe(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	cb := New(Options{
+		FailureThreshold: 2,
+		ResetTimeout:     10 * time.Second,
+		ProbeTimeout:     5 * time.Second,
+	})
+	cb.now = func() time.Time { return now }
+
+	provider := "probe-timeout"
+
+	// Trip the breaker.
+	cb.RecordFailure(provider)
+	cb.RecordFailure(provider)
+
+	// Advance past reset timeout → HalfOpen, first probe allowed.
+	cb.now = func() time.Time { return now.Add(11 * time.Second) }
+	require.NoError(t, cb.Allow(provider))
+
+	// Second call while probe is in-flight and within timeout → rejected.
+	cb.now = func() time.Time { return now.Add(14 * time.Second) } // 3s after probe started
+	assert.ErrorIs(t, cb.Allow(provider), ErrCircuitOpen)
+
+	// Advance past probe timeout → stale probe, new probe allowed.
+	cb.now = func() time.Time { return now.Add(17 * time.Second) } // 6s after probe started (>5s ProbeTimeout)
+	require.NoError(t, cb.Allow(provider))
+
+	// Success from the new probe resets to Closed.
+	cb.RecordSuccess(provider)
+	assert.Equal(t, StateClosed, cb.State(provider))
+}
+
+func TestBreaker_ProbeTimeout_DefaultsTo30s(t *testing.T) {
+	t.Parallel()
+
+	cb := New(Options{FailureThreshold: 5})
+	assert.Equal(t, 30*time.Second, cb.opts.ProbeTimeout)
+}

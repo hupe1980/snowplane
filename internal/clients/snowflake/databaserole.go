@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
@@ -78,15 +77,18 @@ func NewDatabaseRoleClient(c SQLExecutor) *DatabaseRoleClient {
 }
 
 // buildCreateDatabaseRoleSQL builds the CREATE DATABASE ROLE SQL statement.
-func buildCreateDatabaseRoleSQL(opts CreateDatabaseRoleOptions) string {
+func buildCreateDatabaseRoleSQL(opts CreateDatabaseRoleOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	b.WriteString("CREATE DATABASE ROLE IF NOT EXISTS ")
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "DATABASE ROLE", opts.Name.FullyQualifiedName(), false, false)
 
 	b.SetString("COMMENT", opts.Comment)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a database role in Snowflake.
@@ -95,7 +97,12 @@ func (r *DatabaseRoleClient) Create(ctx context.Context, opts CreateDatabaseRole
 		return NewTerminalError(fmt.Errorf("invalid create database role options: %w", err))
 	}
 
-	if _, err := r.client.Exec(ctx, buildCreateDatabaseRoleSQL(opts)); err != nil {
+	sql, err := buildCreateDatabaseRoleSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create database role SQL: %w", err))
+	}
+
+	if _, err := r.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating database role %s: %w", opts.Name, err)
 	}
 
@@ -188,57 +195,18 @@ func (r *DatabaseRoleClient) Observe(ctx context.Context, name DatabaseObjectIde
 
 // scanDatabaseRoleShowOutput scans SHOW DATABASE ROLES results for a matching row.
 func scanDatabaseRoleShowOutput(rows *sql.Rows, name string) (*DatabaseRoleShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
-		var grantedToRoles, grantedRoles int32
-		if v, ok := parseInt32(colMap["granted_to_roles"]); ok {
-			grantedToRoles = v
-		}
-
-		if v, ok := parseInt32(colMap["granted_database_roles"]); ok {
-			grantedRoles = v
-		}
+	return ScanShowOutput(rows, name, func(m map[string]string) (*DatabaseRoleShowOutput, error) {
+		grantedToRoles, _ := parseInt32(m["granted_to_roles"])
+		grantedRoles, _ := parseInt32(m["granted_database_roles"])
 
 		return &DatabaseRoleShowOutput{
-			CreatedOn:      colMap["created_on"],
-			Name:           colMap["name"],
-			DatabaseName:   colMap["database_name"],
-			Comment:        colMap["comment"],
-			Owner:          colMap["owner"],
+			CreatedOn:      m["created_on"],
+			Name:           m["name"],
+			DatabaseName:   m["database_name"],
+			Comment:        m["comment"],
+			Owner:          m["owner"],
 			GrantedToRoles: grantedToRoles,
 			GrantedRoles:   grantedRoles,
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

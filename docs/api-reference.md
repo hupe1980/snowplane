@@ -9,7 +9,23 @@ Complete field-level documentation for all Snowplane CRDs. Each resource support
 
 > 💡 **Nil-means-unmanaged convention:** Pointer fields (`*string`, `*int32`, `*bool`) use `nil` to mean "not managed by Snowplane." When nil, the controller skips the parameter in CREATE/ALTER, leaving Snowflake's server-side default intact.
 
-> 🏷️ **Common fields:** Every managed resource (except ProviderConfig and FieldExport) includes `spec.providerRef.name` (ProviderConfig reference), `spec.deletionPolicy` (`Delete` / `Orphan`), and `spec.useRole` (optional Snowflake role for `USE ROLE`).
+> 🏷️ **Common fields:** Every managed resource (except ProviderConfig and FieldExport) embeds `CommonSpec` which provides:
+> - `spec.providerRef.name` — ProviderConfig reference (default: `"default"`)
+> - `spec.providerRef.namespace` — Optional cross-namespace ProviderConfig reference
+> - `spec.deletionPolicy` — `Delete` (default) / `Orphan`
+> - `spec.useRole` — Optional Snowflake role activated via `USE ROLE` before SQL operations
+> - `spec.paused` — Suspend reconciliation (`bool`, default: `false`)
+> - `spec.managementPolicies.adoptionPolicy` — `fail-if-exists` (default) / `adopt` — controls whether pre-existing Snowflake objects are adopted
+> - `spec.managementPolicies.driftPolicy` — `correct` (default) / `detect-only` — controls whether detected drift is auto-corrected
+> - `spec.managementPolicies.createOrAlter` — Use CREATE OR ALTER flow (`*bool`, default: `true`)
+
+> 🔗 **Cross-namespace references:** All `ObjectReference` fields (e.g., `databaseRef`, `schemaRef`, `accountRoleRef`) support an optional `namespace` field. When omitted, the reference resolves within the same namespace as the referencing resource. When set, the reference resolves in the specified namespace — enabling platform teams to manage shared infrastructure (Databases, Warehouses, Roles) in a central namespace while project teams reference them from their own namespaces.
+
+> 🏷️ **Annotations:** `snowplane.hupe1980.github.io/force-destroy` enables CASCADE DROP for databases and schemas. `snowplane.hupe1980.github.io/force-new` triggers delete-and-recreate for immutable field changes. `snowplane.hupe1980.github.io/late-initialized` is set to `"true"` after adoption, indicating spec fields were populated from observed state.
+
+> 🔄 **Late-initialization:** When `adoptionPolicy: adopt` is used, nil spec fields are automatically populated from the existing Snowflake resource state (ShowOutput, DescribeOutput, Parameters). This ensures the adopted CR's spec accurately represents the managed state. Supports 20 adapters: Database, Schema, Warehouse, User, Task, PasswordPolicy, Table, Alert, DynamicTable, Sequence, View, Tag, AccountRole, DatabaseRole, StorageIntegration, Stage, Pipe, NetworkPolicy, NotificationIntegration, ResourceMonitor.
+
+> ⏱️ **LastReconcileTime:** Every resource's `status.lastReconcileTime` is stamped on each successful reconcile (create, update, adoption, and post-crash recovery) via `finalizeSpec()`. Use this for SLO dashboards, staleness alerting, and diagnosing whether reconciliation is running for a specific resource.
 
 ---
 
@@ -162,7 +178,7 @@ Complete field-level documentation for all Snowplane CRDs. Each resource support
 | `spec.privilege` | `string` | Snowflake privilege (e.g. USAGE, SELECT) *(immutable)* |
 | `spec.on` | `GrantOn` | Grant target — exactly one of `account`, `accountObject`, `schema`, `schemaObject` *(immutable)* |
 | `spec.accountRole` | `string` | Account role name *(immutable, mutually exclusive with accountRoleRef)* |
-| `spec.accountRoleRef` | `LocalObjectReference` | AccountRole CR reference *(immutable, mutually exclusive with accountRole)* |
+| `spec.accountRoleRef` | `ObjectReference` | AccountRole CR reference *(immutable, mutually exclusive with accountRole)* |
 | `spec.withGrantOption` | `bool` | Allow grantee to re-grant *(immutable)* |
 
 > ⚠️ **Grant Immutability:** All spec fields are immutable after creation. Changing any field requires deleting and recreating the CR (or using the `force-new` annotation).
@@ -177,7 +193,7 @@ Complete field-level documentation for all Snowplane CRDs. Each resource support
 | `spec.privilege` | `string` | Snowflake privilege (e.g. USAGE, SELECT) *(immutable)* |
 | `spec.on` | `GrantOn` | Grant target — exactly one of `account`, `accountObject`, `schema`, `schemaObject` *(immutable)* |
 | `spec.databaseRole` | `string` | Fully qualified database role name *(immutable, mutually exclusive with databaseRoleRef)* |
-| `spec.databaseRoleRef` | `LocalObjectReference` | DatabaseRole CR reference *(immutable, mutually exclusive with databaseRole)* |
+| `spec.databaseRoleRef` | `ObjectReference` | DatabaseRole CR reference *(immutable, mutually exclusive with databaseRole)* |
 | `spec.withGrantOption` | `bool` | Allow grantee to re-grant *(immutable)* |
 
 > ⚠️ **Grant Immutability:** All spec fields are immutable after creation. Changing any field requires deleting and recreating the CR (or using the `force-new` annotation).
@@ -192,11 +208,11 @@ Assigns an account role to another role or user: `GRANT ROLE <role> TO ROLE|USER
 | Field | Type | Description |
 |-------|------|-------------|
 | `spec.roleName` | `string` | Account role to assign *(immutable, mutually exclusive with roleRef)* |
-| `spec.roleRef` | `LocalObjectReference` | AccountRole CR reference *(immutable, mutually exclusive with roleName)* |
+| `spec.roleRef` | `ObjectReference` | AccountRole CR reference *(immutable, mutually exclusive with roleName)* |
 | `spec.toRole` | `string` | Target account role *(immutable, mutually exclusive with toRoleRef, toUser, toUserRef)* |
-| `spec.toRoleRef` | `LocalObjectReference` | AccountRole CR reference for the target *(immutable)* |
+| `spec.toRoleRef` | `ObjectReference` | AccountRole CR reference for the target *(immutable)* |
 | `spec.toUser` | `string` | Target user *(immutable, mutually exclusive with toUserRef, toRole, toRoleRef)* |
-| `spec.toUserRef` | `LocalObjectReference` | User CR reference for the target *(immutable)* |
+| `spec.toUserRef` | `ObjectReference` | User CR reference for the target *(immutable)* |
 
 > ⚠️ **Assignment Immutability:** All spec fields are immutable after creation. Changing any field requires deleting and recreating the CR (or using the `force-new` annotation).
 
@@ -210,11 +226,11 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | Field | Type | Description |
 |-------|------|-------------|
 | `spec.databaseRoleName` | `string` | Fully qualified database role *(immutable, mutually exclusive with databaseRoleRef)* |
-| `spec.databaseRoleRef` | `LocalObjectReference` | DatabaseRole CR reference *(immutable, mutually exclusive with databaseRoleName)* |
+| `spec.databaseRoleRef` | `ObjectReference` | DatabaseRole CR reference *(immutable, mutually exclusive with databaseRoleName)* |
 | `spec.toRole` | `string` | Target account role *(immutable, mutually exclusive with toRoleRef, toDatabaseRole, toDatabaseRoleRef)* |
-| `spec.toRoleRef` | `LocalObjectReference` | AccountRole CR reference for the target *(immutable)* |
+| `spec.toRoleRef` | `ObjectReference` | AccountRole CR reference for the target *(immutable)* |
 | `spec.toDatabaseRole` | `string` | Fully qualified target database role *(immutable, mutually exclusive with toDatabaseRoleRef, toRole, toRoleRef)* |
-| `spec.toDatabaseRoleRef` | `LocalObjectReference` | DatabaseRole CR reference for the target *(immutable)* |
+| `spec.toDatabaseRoleRef` | `ObjectReference` | DatabaseRole CR reference for the target *(immutable)* |
 
 > ⚠️ **Assignment Immutability:** All spec fields are immutable after creation. Changing any field requires deleting and recreating the CR (or using the `force-new` annotation).
 
@@ -770,11 +786,541 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.objectType` | `string` | Object type (e.g. DATABASE, TABLE, SCHEMA) *(immutable)* |
 | `spec.objectName` | `string` | Fully qualified object name *(immutable)* |
 | `spec.accountRole` | `string` | Target account role *(immutable, mutually exclusive with refs)* |
-| `spec.accountRoleRef` | `LocalObjectReference` | AccountRole CR reference *(immutable)* |
+| `spec.accountRoleRef` | `ObjectReference` | AccountRole CR reference *(immutable)* |
 | `spec.databaseRole` | `string` | Target database role *(immutable, mutually exclusive with refs)* |
-| `spec.databaseRoleRef` | `LocalObjectReference` | DatabaseRole CR reference *(immutable)* |
+| `spec.databaseRoleRef` | `ObjectReference` | DatabaseRole CR reference *(immutable)* |
 | `spec.currentGrantsBehavior` | `*enum` | `COPY` / `REVOKE` — how existing privileges are handled |
 
 > ⚠️ **Ownership Immutability:** All spec fields are immutable after creation. Ownership cannot be revoked — deleting the CR leaves ownership intact (no-op on delete).
+
+</details>
+
+---
+
+## UDFs & Stored Procedures
+
+<details>
+<summary>☕ <strong>FunctionJava</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Function name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.arguments` | `[]CallableArgument` | Function arguments (name, type, defaultValue) *(immutable)* |
+| `spec.returns` | `string` | Return type *(immutable)* |
+| `spec.handler` | `string` | Fully qualified Java handler method |
+| `spec.runtimeVersion` | `string` | Java runtime version (e.g. `"11"`, `"17"`) |
+| `spec.snowparkPackage` | `string` | Snowpark package spec |
+| `spec.body` | `*string` | Inline Java source code |
+| `spec.packages` | `[]string` | Additional packages |
+| `spec.imports` | `[]string` | Stage file paths to import |
+| `spec.targetPath` | `*string` | Stage location for compiled artifacts |
+| `spec.externalAccessIntegrations` | `[]string` | External access integration names |
+| `spec.secrets` | `[]SecretBinding` | Snowflake secret bindings (`secretName` + `variableName`) |
+| `spec.nullInputBehavior` | `*enum` | `CALLED ON NULL INPUT` / `RETURNS NULL ON NULL INPUT` / `STRICT` |
+| `spec.volatility` | `*enum` | `VOLATILE` / `IMMUTABLE` |
+| `spec.secure` | `bool` | Mark as secure function |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+<details>
+<summary>📜 <strong>FunctionJavascript</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Function name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.arguments` | `[]CallableArgument` | Function arguments (name, type, defaultValue) *(immutable)* |
+| `spec.returns` | `string` | Return type *(immutable)* |
+| `spec.body` | `string` | JavaScript function body (AS clause) |
+| `spec.nullInputBehavior` | `*enum` | `CALLED ON NULL INPUT` / `RETURNS NULL ON NULL INPUT` / `STRICT` |
+| `spec.volatility` | `*enum` | `VOLATILE` / `IMMUTABLE` |
+| `spec.secure` | `bool` | Mark as secure function |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+<details>
+<summary>🐍 <strong>FunctionPython</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Function name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.arguments` | `[]CallableArgument` | Function arguments (name, type, defaultValue) *(immutable)* |
+| `spec.returns` | `string` | Return type *(immutable)* |
+| `spec.handler` | `string` | Python handler function |
+| `spec.runtimeVersion` | `string` | Python runtime version (e.g. `"3.8"`, `"3.11"`) |
+| `spec.snowparkPackage` | `string` | Snowpark package spec |
+| `spec.body` | `*string` | Inline Python source code |
+| `spec.packages` | `[]string` | Additional packages (e.g. `"numpy"`) |
+| `spec.imports` | `[]string` | Stage file paths to import |
+| `spec.externalAccessIntegrations` | `[]string` | External access integration names |
+| `spec.secrets` | `[]SecretBinding` | Snowflake secret bindings (`secretName` + `variableName`) |
+| `spec.nullInputBehavior` | `*enum` | `CALLED ON NULL INPUT` / `RETURNS NULL ON NULL INPUT` / `STRICT` |
+| `spec.volatility` | `*enum` | `VOLATILE` / `IMMUTABLE` |
+| `spec.secure` | `bool` | Mark as secure function |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+<details>
+<summary>⚙️ <strong>FunctionScala</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Function name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.arguments` | `[]CallableArgument` | Function arguments (name, type, defaultValue) *(immutable)* |
+| `spec.returns` | `string` | Return type *(immutable)* |
+| `spec.handler` | `string` | Fully qualified Scala handler method |
+| `spec.runtimeVersion` | `string` | Scala runtime version (e.g. `"2.12"`) |
+| `spec.snowparkPackage` | `string` | Snowpark package spec |
+| `spec.body` | `*string` | Inline Scala source code |
+| `spec.packages` | `[]string` | Additional packages |
+| `spec.imports` | `[]string` | Stage file paths to import |
+| `spec.targetPath` | `*string` | Stage location for compiled artifacts |
+| `spec.externalAccessIntegrations` | `[]string` | External access integration names |
+| `spec.secrets` | `[]SecretBinding` | Snowflake secret bindings (`secretName` + `variableName`) |
+| `spec.nullInputBehavior` | `*enum` | `CALLED ON NULL INPUT` / `RETURNS NULL ON NULL INPUT` / `STRICT` |
+| `spec.volatility` | `*enum` | `VOLATILE` / `IMMUTABLE` |
+| `spec.secure` | `bool` | Mark as secure function |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+<details>
+<summary>🗃️ <strong>FunctionSQL</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Function name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.arguments` | `[]CallableArgument` | Function arguments (name, type, defaultValue) *(immutable)* |
+| `spec.returns` | `string` | Return type *(immutable)* |
+| `spec.body` | `string` | SQL function body (AS clause) |
+| `spec.nullInputBehavior` | `*enum` | `CALLED ON NULL INPUT` / `RETURNS NULL ON NULL INPUT` / `STRICT` |
+| `spec.volatility` | `*enum` | `VOLATILE` / `IMMUTABLE` |
+| `spec.secure` | `bool` | Mark as secure function |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+> 💡 **Function Language Support:** Functions are split by handler language. Java and Scala support `targetPath` for compiled artifacts. Python supports `packages` for PyPI dependencies. JavaScript and SQL embed the body directly. All languages support `nullInputBehavior`, `volatility`, `secure`, and `comment`.
+
+> ⚠️ **Security:** The `body` field is embedded into SQL statements. Ensure RBAC restricts Function CR access to trusted principals.
+
+<details>
+<summary>☕ <strong>ProcedureJava</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Procedure name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.arguments` | `[]CallableArgument` | Procedure arguments (name, type, defaultValue) *(immutable)* |
+| `spec.returns` | `string` | Return type *(immutable)* |
+| `spec.handler` | `string` | Fully qualified Java handler method |
+| `spec.runtimeVersion` | `string` | Java runtime version (e.g. `"11"`, `"17"`) |
+| `spec.snowparkPackage` | `string` | Snowpark package spec |
+| `spec.body` | `*string` | Inline Java source code |
+| `spec.packages` | `[]string` | Additional packages |
+| `spec.imports` | `[]string` | Stage file paths to import |
+| `spec.targetPath` | `*string` | Stage location for compiled artifacts |
+| `spec.externalAccessIntegrations` | `[]string` | External access integration names |
+| `spec.secrets` | `[]SecretBinding` | Snowflake secret bindings |
+| `spec.executeAs` | `*enum` | `OWNER` / `CALLER` |
+| `spec.nullInputBehavior` | `*enum` | `CALLED ON NULL INPUT` / `RETURNS NULL ON NULL INPUT` / `STRICT` |
+| `spec.secure` | `bool` | Mark as secure procedure |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+<details>
+<summary>📜 <strong>ProcedureJavascript</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Procedure name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.arguments` | `[]CallableArgument` | Procedure arguments (name, type, defaultValue) *(immutable)* |
+| `spec.returns` | `string` | Return type *(immutable)* |
+| `spec.body` | `string` | JavaScript procedure body (AS clause) |
+| `spec.executeAs` | `*enum` | `OWNER` / `CALLER` |
+| `spec.nullInputBehavior` | `*enum` | `CALLED ON NULL INPUT` / `RETURNS NULL ON NULL INPUT` / `STRICT` |
+| `spec.secure` | `bool` | Mark as secure procedure |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+<details>
+<summary>🐍 <strong>ProcedurePython</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Procedure name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.arguments` | `[]CallableArgument` | Procedure arguments (name, type, defaultValue) *(immutable)* |
+| `spec.returns` | `string` | Return type *(immutable)* |
+| `spec.handler` | `string` | Python handler function |
+| `spec.runtimeVersion` | `string` | Python runtime version (e.g. `"3.8"`, `"3.11"`) |
+| `spec.snowparkPackage` | `string` | Snowpark package spec |
+| `spec.body` | `*string` | Inline Python source code |
+| `spec.packages` | `[]string` | Additional packages |
+| `spec.imports` | `[]string` | Stage file paths to import |
+| `spec.externalAccessIntegrations` | `[]string` | External access integration names |
+| `spec.secrets` | `[]SecretBinding` | Snowflake secret bindings |
+| `spec.executeAs` | `*enum` | `OWNER` / `CALLER` |
+| `spec.nullInputBehavior` | `*enum` | `CALLED ON NULL INPUT` / `RETURNS NULL ON NULL INPUT` / `STRICT` |
+| `spec.secure` | `bool` | Mark as secure procedure |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+<details>
+<summary>⚙️ <strong>ProcedureScala</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Procedure name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.arguments` | `[]CallableArgument` | Procedure arguments (name, type, defaultValue) *(immutable)* |
+| `spec.returns` | `string` | Return type *(immutable)* |
+| `spec.handler` | `string` | Fully qualified Scala handler method |
+| `spec.runtimeVersion` | `string` | Scala runtime version (e.g. `"2.12"`) |
+| `spec.snowparkPackage` | `string` | Snowpark package spec |
+| `spec.body` | `*string` | Inline Scala source code |
+| `spec.packages` | `[]string` | Additional packages |
+| `spec.imports` | `[]string` | Stage file paths to import |
+| `spec.targetPath` | `*string` | Stage location for compiled artifacts |
+| `spec.externalAccessIntegrations` | `[]string` | External access integration names |
+| `spec.secrets` | `[]SecretBinding` | Snowflake secret bindings |
+| `spec.executeAs` | `*enum` | `OWNER` / `CALLER` |
+| `spec.nullInputBehavior` | `*enum` | `CALLED ON NULL INPUT` / `RETURNS NULL ON NULL INPUT` / `STRICT` |
+| `spec.secure` | `bool` | Mark as secure procedure |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+<details>
+<summary>🗃️ <strong>ProcedureSQL</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Procedure name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.arguments` | `[]CallableArgument` | Procedure arguments (name, type, defaultValue) *(immutable)* |
+| `spec.returns` | `string` | Return type *(immutable)* |
+| `spec.body` | `string` | SQL procedure body (AS clause) |
+| `spec.executeAs` | `*enum` | `OWNER` / `CALLER` |
+| `spec.nullInputBehavior` | `*enum` | `CALLED ON NULL INPUT` / `RETURNS NULL ON NULL INPUT` / `STRICT` |
+| `spec.secure` | `bool` | Mark as secure procedure |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+> 💡 **Procedure vs Function:** Procedures support `executeAs` (`OWNER`/`CALLER`) but NOT `volatility`. Functions support `volatility` (`VOLATILE`/`IMMUTABLE`) but NOT `executeAs`. Both share `nullInputBehavior`, `secure`, and `comment`.
+
+---
+
+## API Authentication Integrations
+
+<details>
+<summary>🔐 <strong>APIAuthenticationIntegrationWithAuthorizationCodeGrant</strong> (shortName: <code>aaiwacg</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Integration name *(immutable)* |
+| `spec.enabled` | `bool` | Whether the integration is enabled |
+| `spec.oauthClientId` | `string` | OAuth client ID |
+| `spec.oauthClientSecretRef` | `SecretKeyReference` | K8s Secret reference for OAuth client secret |
+| `spec.oauthTokenEndpoint` | `*string` | Token endpoint URL |
+| `spec.oauthAuthorizationEndpoint` | `*string` | Authorization endpoint URL |
+| `spec.oauthClientAuthMethod` | `*enum` | `CLIENT_SECRET_BASIC` / `CLIENT_SECRET_POST` |
+| `spec.oauthAccessTokenValidity` | `*int` | Access token lifetime (seconds) |
+| `spec.oauthRefreshTokenValidity` | `*int` | Refresh token validity (seconds) |
+| `spec.oauthAllowedScopes` | `[]string` | Allowed OAuth scopes |
+| `spec.comment` | `*string` | Optional description |
+
+> 🔐 **OAuth Authorization Code:** For interactive flows where a user grants consent. The integration stores the client credentials and endpoint configuration.
+
+</details>
+
+<details>
+<summary>🔐 <strong>APIAuthenticationIntegrationWithClientCredentials</strong> (shortName: <code>aaiwcc</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Integration name *(immutable)* |
+| `spec.enabled` | `bool` | Whether the integration is enabled |
+| `spec.oauthClientId` | `string` | OAuth client ID |
+| `spec.oauthClientSecretRef` | `SecretKeyReference` | K8s Secret reference for OAuth client secret |
+| `spec.oauthTokenEndpoint` | `*string` | Token endpoint URL |
+| `spec.oauthClientAuthMethod` | `*enum` | `CLIENT_SECRET_BASIC` / `CLIENT_SECRET_POST` |
+| `spec.oauthAccessTokenValidity` | `*int` | Access token lifetime (seconds) |
+| `spec.oauthAllowedScopes` | `[]string` | Allowed OAuth scopes |
+| `spec.comment` | `*string` | Optional description |
+
+> 🔐 **OAuth Client Credentials:** For service-to-service authentication without user interaction. Simpler than authorization code grant — no refresh token or authorization endpoint needed.
+
+</details>
+
+<details>
+<summary>🔐 <strong>APIAuthenticationIntegrationWithJWTBearer</strong> (shortName: <code>aaiwjb</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Integration name *(immutable)* |
+| `spec.enabled` | `bool` | Whether the integration is enabled |
+| `spec.oauthClientId` | `string` | OAuth client ID |
+| `spec.oauthClientSecretRef` | `SecretKeyReference` | K8s Secret reference for OAuth client secret |
+| `spec.oauthAssertionIssuer` | `string` | Assertion issuer for JWT bearer flow |
+| `spec.oauthTokenEndpoint` | `*string` | Token endpoint URL |
+| `spec.oauthAuthorizationEndpoint` | `*string` | Authorization endpoint URL |
+| `spec.oauthClientAuthMethod` | `*enum` | `CLIENT_SECRET_BASIC` / `CLIENT_SECRET_POST` |
+| `spec.oauthAccessTokenValidity` | `*int` | Access token lifetime (seconds) |
+| `spec.oauthRefreshTokenValidity` | `*int` | Refresh token validity (seconds) |
+| `spec.comment` | `*string` | Optional description |
+
+> 🔐 **JWT Bearer:** For server-side applications using signed JWTs for authentication. Requires `oauthAssertionIssuer` to identify the JWT issuer.
+
+</details>
+
+---
+
+## Snowflake Secrets
+
+<details>
+<summary>🔒 <strong>SecretWithAuthorizationCodeGrant</strong> (shortName: <code>swacg</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Secret name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.apiAuthentication` | `string` | Security integration name *(immutable)* |
+| `spec.oauthRefreshToken` | `string` | OAuth refresh token |
+| `spec.oauthRefreshTokenExpiryTime` | `string` | Refresh token expiry timestamp (e.g. `'2025-01-06 20:00:00'`) |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+<details>
+<summary>🔒 <strong>SecretWithBasicAuthentication</strong> (shortName: <code>swba</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Secret name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.username` | `string` | Username for basic authentication |
+| `spec.password` | `string` | Password for basic authentication |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+<details>
+<summary>🔒 <strong>SecretWithClientCredentials</strong> (shortName: <code>swcc</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Secret name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.apiAuthentication` | `string` | Security integration name *(immutable)* |
+| `spec.oauthScopes` | `[]string` | OAuth scopes (min 1) |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+<details>
+<summary>🔒 <strong>SecretWithGenericString</strong> (shortName: <code>swgs</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Secret name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.secretString` | `string` | The generic string value (e.g. API token) |
+| `spec.comment` | `*string` | Optional description |
+
+</details>
+
+> 🔒 **Snowflake Secrets:** Secrets are Snowflake-managed credential objects used by external access integrations and UDFs. They are NOT Kubernetes Secrets — they store credentials inside Snowflake for use by functions and procedures. Each variant maps to a different `TYPE` in `CREATE SECRET`.
+
+---
+
+## Additional Schema Objects
+
+<details>
+<summary>🔢 <strong>Sequence</strong> (shortName: <code>seq</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Sequence name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.start` | `*int64` | Initial value *(immutable, default: 1)* |
+| `spec.increment` | `*int64` | Step interval *(default: 1)* |
+| `spec.ordering` | `*enum` | `ORDER` / `NOORDER` — note: `NOORDER→ORDER` not allowed by Snowflake |
+| `spec.comment` | `*string` | Optional description |
+
+> 🔢 **Auto-Incrementing:** Sequences generate unique numbers for use as primary keys or surrogate keys. Use `ORDER` for guaranteed ordering (slower) or `NOORDER` for higher throughput.
+
+</details>
+
+<details>
+<summary>📋 <strong>ExternalTable</strong> (shortName: <code>exttbl</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | External table name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.location` | `string` | External stage + path (e.g. `@MYDB.MYSCHEMA.MYSTAGE/path/`) *(immutable)* |
+| `spec.fileFormat` | `string` | File format spec (e.g. `TYPE = PARQUET`) *(immutable)* |
+| `spec.columns` | `[]ExternalTableColumn` | Virtual column definitions: `name`, `type`, `as` (SQL expression) *(immutable)* |
+| `spec.partitionBy` | `[]string` | Partition column names *(immutable)* |
+| `spec.partitionType` | `*string` | Partition type: `USER_SPECIFIED` *(immutable)* |
+| `spec.pattern` | `*string` | Regex for matching filenames *(immutable)* |
+| `spec.refreshOnCreate` | `*bool` | Auto-refresh on creation *(immutable)* |
+| `spec.autoRefresh` | `*bool` | Auto-refresh on new data *(only mutable field)* |
+| `spec.awsSnsTopic` | `*string` | SNS topic ARN for S3 auto-refresh *(immutable)* |
+| `spec.tableFormat` | `*string` | Table format: `DELTA` *(immutable)* |
+| `spec.integration` | `*string` | Notification integration for GCS/Azure auto-refresh *(immutable)* |
+| `spec.comment` | `*string` | Optional description *(immutable)* |
+
+> 📋 **External Data:** External tables provide read-only access to data stored in cloud storage. Most fields are immutable — only `autoRefresh` can be altered after creation.
+
+</details>
+
+<details>
+<summary>🔗 <strong>TableConstraint</strong> (shortName: <code>tc</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Constraint name *(immutable)* |
+| `spec.type` | `enum` | `PRIMARY KEY` / `UNIQUE` / `FOREIGN KEY` *(immutable)* |
+| `spec.tableName` | `string` | Fully qualified table name *(immutable)* |
+| `spec.columns` | `[]string` | Column names (min 1) *(immutable)* |
+| `spec.foreignKeyProperties` | `*ForeignKeyProperties` | Required when type=`FOREIGN KEY` *(immutable)* |
+| `spec.foreignKeyProperties.referencesTableName` | `string` | Fully qualified referenced table |
+| `spec.foreignKeyProperties.referencesColumns` | `[]string` | Referenced columns (min 1) |
+| `spec.foreignKeyProperties.match` | `*enum` | `FULL` / `PARTIAL` / `SIMPLE` |
+| `spec.foreignKeyProperties.onUpdate` | `*enum` | `CASCADE` / `SET NULL` / `SET DEFAULT` / `RESTRICT` / `NO ACTION` |
+| `spec.foreignKeyProperties.onDelete` | `*enum` | `CASCADE` / `SET NULL` / `SET DEFAULT` / `RESTRICT` / `NO ACTION` |
+| `spec.properties` | `*ConstraintProperties` | Optional mutable constraint properties |
+| `spec.properties.enforced` | `*bool` | Whether constraint is enforced |
+| `spec.properties.deferrable` | `*bool` | Whether constraint is deferrable |
+| `spec.properties.initially` | `*enum` | `DEFERRED` / `IMMEDIATE` |
+| `spec.properties.rely` | `*bool` | Constraint used in query optimization |
+| `spec.properties.validate` | `*bool` | Validate existing data on creation |
+| `spec.comment` | `*string` | Optional description |
+
+> 🔗 **Referential Integrity:** TableConstraint manages standalone table constraints (PRIMARY KEY, UNIQUE, FOREIGN KEY) as independent CRs. Use instead of inline `spec.constraints` in the Table CR for more granular lifecycle control.
+
+</details>
+
+---
+
+## Policy & Tag Attachments
+
+<details>
+<summary>🏷️ <strong>TagAssociation</strong> (shortName: <code>ta</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.tagName` | `string` | Fully qualified tag name *(immutable, XOR with tagRef)* |
+| `spec.tagRef.name` | `string` | Tag CR reference *(immutable, XOR with tagName)* |
+| `spec.tagValue` | `string` | Tag value to assign *(mutable)* |
+| `spec.objectType` | `enum` | Target object type *(immutable)* — `ACCOUNT` / `DATABASE` / `SCHEMA` / `TABLE` / `VIEW` / `COLUMN` / `WAREHOUSE` / `ROLE` / `USER` / `STAGE` / `STREAM` / `TASK` / `ALERT` / `PIPE` / `FUNCTION` / `PROCEDURE` / `INTEGRATION` / `NETWORK POLICY` / `DATABASE ROLE` |
+| `spec.objectName` | `string` | Fully qualified Snowflake object name *(immutable)* |
+
+> 🏷️ **Metadata Tagging:** TagAssociation applies a tag with a value to any Snowflake object. The `tagValue` is the only mutable field — changing the value issues `ALTER ... SET TAG`.
+
+</details>
+
+<details>
+<summary>🎭 <strong>MaskingPolicyApplication</strong> (shortName: <code>mpa</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.policyName` | `string` | Fully qualified masking policy name *(immutable, XOR with policyRef)* |
+| `spec.policyRef.name` | `string` | MaskingPolicy CR reference *(immutable, XOR with policyName)* |
+| `spec.tableName` | `string` | Fully qualified table name *(immutable)* |
+| `spec.columnName` | `string` | Column to apply policy to *(immutable)* |
+| `spec.usingColumns` | `[]string` | Conditional masking policy columns *(immutable)* |
+
+> 🎭 **Column-Level Masking:** Applies a masking policy to a specific column. All fields are immutable — to change the column or policy, delete and recreate the CR.
+
+</details>
+
+<details>
+<summary>🛡️ <strong>NetworkPolicyAttachment</strong> (shortName: <code>npa</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.policyName` | `string` | Snowflake network policy name *(immutable, XOR with policyRef)* |
+| `spec.policyRef.name` | `string` | NetworkPolicy CR reference *(immutable, XOR with policyName)* |
+| `spec.targetType` | `enum` | `ACCOUNT` / `USER` *(immutable)* |
+| `spec.targetName` | `string` | User name — required when targetType=`USER` *(immutable)* |
+
+> 🛡️ **Policy Attachment:** Attaches a network policy to an account or specific user. Account-level policies affect all users; user-level policies override account-level.
+
+</details>
+
+<details>
+<summary>🔒 <strong>PasswordPolicyAttachment</strong> (shortName: <code>ppa</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.policyName` | `string` | Fully qualified password policy name *(immutable, XOR with policyRef)* |
+| `spec.policyRef.name` | `string` | PasswordPolicy CR reference *(immutable, XOR with policyName)* |
+| `spec.targetType` | `enum` | `ACCOUNT` / `USER` *(immutable)* |
+| `spec.targetName` | `string` | User name — required when targetType=`USER` *(immutable)* |
+
+> 🔒 **Policy Attachment:** Attaches a password policy to an account or specific user. Account-level policies apply to all users who don't have a user-level override.
 
 </details>

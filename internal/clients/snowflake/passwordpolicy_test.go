@@ -19,7 +19,8 @@ func TestBuildCreatePasswordPolicySQL(t *testing.T) {
 		opts := CreatePasswordPolicyOptions{
 			Name: NewSchemaObjectIdentifier("DB", "SCH", "MY_POLICY"),
 		}
-		got := buildCreatePasswordPolicySQL(opts)
+		got, err := buildCreatePasswordPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE PASSWORD POLICY IF NOT EXISTS "DB"."SCH"."MY_POLICY"`)
 	})
 
@@ -28,20 +29,21 @@ func TestBuildCreatePasswordPolicySQL(t *testing.T) {
 		comment := "test password policy"
 		opts := CreatePasswordPolicyOptions{
 			Name:                    NewSchemaObjectIdentifier("DB", "SCH", "FULL_POLICY"),
-			PasswordMinLength:       int32Ptr(10),
-			PasswordMaxLength:       int32Ptr(256),
-			PasswordMinUpperCase:    int32Ptr(2),
-			PasswordMinLowerCase:    int32Ptr(2),
-			PasswordMinNumeric:      int32Ptr(1),
-			PasswordMinSpecial:      int32Ptr(1),
-			PasswordMinAgeDays:      int32Ptr(1),
-			PasswordMaxAgeDays:      int32Ptr(90),
-			PasswordMaxRetries:      int32Ptr(5),
-			PasswordLockoutTimeMins: int32Ptr(30),
-			PasswordHistory:         int32Ptr(10),
+			PasswordMinLength:       ptr(int32(10)),
+			PasswordMaxLength:       ptr(int32(256)),
+			PasswordMinUpperCase:    ptr(int32(2)),
+			PasswordMinLowerCase:    ptr(int32(2)),
+			PasswordMinNumeric:      ptr(int32(1)),
+			PasswordMinSpecial:      ptr(int32(1)),
+			PasswordMinAgeDays:      ptr(int32(1)),
+			PasswordMaxAgeDays:      ptr(int32(90)),
+			PasswordMaxRetries:      ptr(int32(5)),
+			PasswordLockoutTimeMins: ptr(int32(30)),
+			PasswordHistory:         ptr(int32(10)),
 			Comment:                 &comment,
 		}
-		got := buildCreatePasswordPolicySQL(opts)
+		got, err := buildCreatePasswordPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "PASSWORD_MIN_LENGTH = 10")
 		assert.Contains(t, got, "PASSWORD_MAX_LENGTH = 256")
 		assert.Contains(t, got, "PASSWORD_MIN_UPPER_CASE_CHARS = 2")
@@ -63,7 +65,8 @@ func TestBuildCreatePasswordPolicySQL(t *testing.T) {
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "P"),
 			Comment: &comment,
 		}
-		got := buildCreatePasswordPolicySQL(opts)
+		got, err := buildCreatePasswordPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "COMMENT = 'my policy'")
 	})
 }
@@ -73,10 +76,11 @@ func TestBuildCreatePasswordPolicySQL_CreateOrAlter(t *testing.T) {
 
 	opts := CreatePasswordPolicyOptions{
 		Name:              NewSchemaObjectIdentifier("DB", "SCH", "MY_POLICY"),
-		PasswordMinLength: int32Ptr(10),
+		PasswordMinLength: ptr(int32(10)),
 		UseCreateOrAlter:  true,
 	}
-	got := buildCreatePasswordPolicySQL(opts)
+	got, err := buildCreatePasswordPolicySQL(opts)
+		require.NoError(t, err)
 	assert.Contains(t, got, `CREATE OR ALTER PASSWORD POLICY "DB"."SCH"."MY_POLICY"`)
 	assert.NotContains(t, got, "IF NOT EXISTS")
 	assert.Contains(t, got, "PASSWORD_MIN_LENGTH = 10")
@@ -99,7 +103,7 @@ func TestBuildAlterPasswordPolicyStatements(t *testing.T) {
 		t.Parallel()
 		opts := AlterPasswordPolicyOptions{
 			Name:              NewSchemaObjectIdentifier("DB", "SCH", "P"),
-			PasswordMinLength: int32Ptr(12),
+			PasswordMinLength: ptr(int32(12)),
 		}
 		stmts, err := buildAlterPasswordPolicyStatements(opts)
 		require.NoError(t, err)
@@ -137,8 +141,8 @@ func TestBuildAlterPasswordPolicyStatements(t *testing.T) {
 		comment := "c"
 		opts := AlterPasswordPolicyOptions{
 			Name:               NewSchemaObjectIdentifier("DB", "SCH", "P"),
-			PasswordMinLength:  int32Ptr(10),
-			PasswordMaxRetries: int32Ptr(3),
+			PasswordMinLength:  ptr(int32(10)),
+			PasswordMaxRetries: ptr(int32(3)),
 			Comment:            &comment,
 		}
 		stmts, err := buildAlterPasswordPolicyStatements(opts)
@@ -204,7 +208,7 @@ func TestAlterPasswordPolicyOptions_HasChanges(t *testing.T) {
 
 	t.Run("WithMinLength", func(t *testing.T) {
 		t.Parallel()
-		opts := AlterPasswordPolicyOptions{Name: NewSchemaObjectIdentifier("DB", "SCH", "P"), PasswordMinLength: int32Ptr(10)}
+		opts := AlterPasswordPolicyOptions{Name: NewSchemaObjectIdentifier("DB", "SCH", "P"), PasswordMinLength: ptr(int32(10))}
 		assert.True(t, opts.HasChanges())
 	})
 

@@ -189,12 +189,7 @@ func NewUserClient(c SQLExecutor) *UserClient {
 func buildCreateUserSQL(opts CreateUserOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER USER ")
-	} else {
-		b.WriteString("CREATE USER IF NOT EXISTS ")
-	}
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "USER", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 
 	b.SetString("PASSWORD", opts.Password)
 	b.SetString("LOGIN_NAME", opts.LoginName)
@@ -394,65 +389,32 @@ func (u *UserClient) Observe(ctx context.Context, name AccountObjectIdentifier) 
 
 // scanUserShowOutput scans SHOW USERS results for a matching row.
 func scanUserShowOutput(rows *sql.Rows, name string) (*UserShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*UserShowOutput, error) {
 		return &UserShowOutput{
-			CreatedOn:             colMap["created_on"],
-			Name:                  colMap["name"],
-			LoginName:             colMap["login_name"],
-			DisplayName:           colMap["display_name"],
-			Email:                 colMap["email"],
-			FirstName:             colMap["first_name"],
-			LastName:              colMap["last_name"],
-			MiddleName:            colMap["middle_name"],
-			Comment:               colMap["comment"],
-			DefaultRole:           colMap["default_role"],
-			DefaultSecondaryRoles: colMap["default_secondary_roles"],
-			DefaultWarehouse:      colMap["default_warehouse"],
-			DefaultNamespace:      colMap["default_namespace"],
-			Owner:                 colMap["owner"],
-			Disabled:              strings.EqualFold(colMap["disabled"], "true"),
-			MustChangePassword:    strings.EqualFold(colMap["must_change_password"], "true"),
-			HasRSAPublicKey:       strings.EqualFold(colMap["has_rsa_public_key"], "true"),
-			Type:                  colMap["type"],
-			DaysToExpiry:          colMap["days_to_expiry"],
-			MinsToUnlock:          colMap["mins_to_unlock"],
-			MinsToBypassMFA:       colMap["mins_to_bypass_mfa"],
-			DisableMFA:            strings.EqualFold(colMap["disable_mfa"], "true"),
+			CreatedOn:             m["created_on"],
+			Name:                  m["name"],
+			LoginName:             m["login_name"],
+			DisplayName:           m["display_name"],
+			Email:                 m["email"],
+			FirstName:             m["first_name"],
+			LastName:              m["last_name"],
+			MiddleName:            m["middle_name"],
+			Comment:               m["comment"],
+			DefaultRole:           m["default_role"],
+			DefaultSecondaryRoles: m["default_secondary_roles"],
+			DefaultWarehouse:      m["default_warehouse"],
+			DefaultNamespace:      m["default_namespace"],
+			Owner:                 m["owner"],
+			Disabled:              strings.EqualFold(m["disabled"], "true"),
+			MustChangePassword:    strings.EqualFold(m["must_change_password"], "true"),
+			HasRSAPublicKey:       strings.EqualFold(m["has_rsa_public_key"], "true"),
+			Type:                  m["type"],
+			DaysToExpiry:          m["days_to_expiry"],
+			MinsToUnlock:          m["mins_to_unlock"],
+			MinsToBypassMFA:       m["mins_to_bypass_mfa"],
+			DisableMFA:            strings.EqualFold(m["disable_mfa"], "true"),
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }
 
 // scanUserDescribeOutput scans DESCRIBE USER results.

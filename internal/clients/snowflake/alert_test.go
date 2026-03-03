@@ -25,7 +25,8 @@ func TestBuildCreateAlertSQL(t *testing.T) {
 			Condition: "SELECT COUNT(*) FROM my_table WHERE status = 'ERROR'",
 			Action:    "CALL SYSTEM$SEND_EMAIL('alerts@example.com', 'Alert', 'Errors detected')",
 		}
-		got := buildCreateAlertSQL(opts)
+		got, err := buildCreateAlertSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t,
 			`CREATE ALERT IF NOT EXISTS "MY_DB"."MY_SCHEMA"."MY_ALERT" WAREHOUSE = "MY_WH" SCHEDULE = '5 MINUTE' IF( EXISTS( SELECT COUNT(*) FROM my_table WHERE status = 'ERROR' )) THEN CALL SYSTEM$SEND_EMAIL('alerts@example.com', 'Alert', 'Errors detected')`,
 			got)
@@ -40,7 +41,8 @@ func TestBuildCreateAlertSQL(t *testing.T) {
 			Condition: "SELECT 1 FROM t WHERE c > 0",
 			Action:    "INSERT INTO log VALUES(CURRENT_TIMESTAMP())",
 		}
-		got := buildCreateAlertSQL(opts)
+		got, err := buildCreateAlertSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "COMMENT = 'monitoring alert'")
 		assert.Contains(t, got, "IF( EXISTS( SELECT 1 FROM t WHERE c > 0 ))")
 		assert.Contains(t, got, "THEN INSERT INTO log VALUES(CURRENT_TIMESTAMP())")
@@ -55,7 +57,8 @@ func TestBuildCreateAlertSQL(t *testing.T) {
 			Condition: "SELECT 1",
 			Action:    "SELECT 1",
 		}
-		got := buildCreateAlertSQL(opts)
+		got, err := buildCreateAlertSQL(opts)
+		require.NoError(t, err)
 		assert.NotContains(t, got, "WAREHOUSE =")
 		assert.Contains(t, got, "SCHEDULE = 'USING CRON 0 * * * * UTC'")
 	})
@@ -67,7 +70,8 @@ func TestBuildCreateAlertSQL(t *testing.T) {
 			Condition: "SELECT 1",
 			Action:    "SELECT 2",
 		}
-		got := buildCreateAlertSQL(opts)
+		got, err := buildCreateAlertSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t,
 			`CREATE ALERT IF NOT EXISTS "DB"."SCH"."A" IF( EXISTS( SELECT 1 )) THEN SELECT 2`,
 			got)
@@ -91,7 +95,7 @@ func TestBuildAlterAlertStatements(t *testing.T) {
 		t.Parallel()
 		opts := AlterAlertOptions{
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "A"),
-			Suspend: boolPtr(true),
+			Suspend: ptr(true),
 		}
 		stmts, err := buildAlterAlertStatements(opts)
 		require.NoError(t, err)
@@ -103,7 +107,7 @@ func TestBuildAlterAlertStatements(t *testing.T) {
 		t.Parallel()
 		opts := AlterAlertOptions{
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "A"),
-			Suspend: boolPtr(false),
+			Suspend: ptr(false),
 		}
 		stmts, err := buildAlterAlertStatements(opts)
 		require.NoError(t, err)
@@ -194,7 +198,7 @@ func TestBuildAlterAlertStatements(t *testing.T) {
 		comment := "c"
 		opts := AlterAlertOptions{
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "A"),
-			Suspend: boolPtr(false),
+			Suspend: ptr(false),
 			Comment: &comment,
 		}
 		stmts, err := buildAlterAlertStatements(opts)
@@ -213,7 +217,7 @@ func TestBuildAlterAlertStatements(t *testing.T) {
 			Condition: &cond,
 			Action:    &action,
 			Comment:   &comment,
-			Suspend:   boolPtr(false),
+			Suspend:   ptr(false),
 		}
 		stmts, err := buildAlterAlertStatements(opts)
 		require.NoError(t, err)
@@ -306,7 +310,7 @@ func TestBuildAlterAlertStatements(t *testing.T) {
 		opts := AlterAlertOptions{
 			Name:         NewSchemaObjectIdentifier("DB", "SCH", "A"),
 			Condition:    &cond,
-			Suspend:      boolPtr(true),
+			Suspend:      ptr(true),
 			CurrentState: "started",
 		}
 		stmts, err := buildAlterAlertStatements(opts)
@@ -432,7 +436,7 @@ func TestAlterAlertOptions_HasChanges(t *testing.T) {
 		t.Parallel()
 		opts := AlterAlertOptions{
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "A"),
-			Suspend: boolPtr(true),
+			Suspend: ptr(true),
 		}
 		assert.True(t, opts.HasChanges())
 	})

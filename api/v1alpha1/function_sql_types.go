@@ -26,6 +26,7 @@ type FunctionSQLSpec struct {
 
 	// Name is the Snowflake function name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -35,6 +36,7 @@ type FunctionSQLSpec struct {
 	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -44,6 +46,7 @@ type FunctionSQLSpec struct {
 	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// Arguments defines the function arguments. Immutable after creation.
@@ -52,10 +55,12 @@ type FunctionSQLSpec struct {
 
 	// Returns is the return type (e.g. "VARCHAR", "TABLE(col1 VARCHAR, col2 NUMBER)").
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Returns string `json:"returns"`
 
 	// Body is the SQL function body (the AS clause content). Required for SQL functions.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Body string `json:"body"`
 
 	// NullInputBehavior specifies how the function handles NULL arguments.

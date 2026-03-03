@@ -3,7 +3,6 @@ package snowflake
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -73,37 +72,20 @@ type CreateSchemaOptions struct {
 
 // Validate checks the CreateSchemaOptions for validity.
 func (o *CreateSchemaOptions) Validate() error {
-	var errs []error
-
-	if !ValidObjectIdentifier(o.Name) {
-		errs = append(errs, fmt.Errorf("schema name is required"))
-	}
-
-	if err := validateDataRetention(o.DataRetentionTimeInDays); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateMaxDataExtension(o.MaxDataExtensionTimeInDays); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateStorageSerializationPolicy(o.StorageSerializationPolicy); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateLogLevel(o.LogLevel); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateMetricLevel(o.MetricLevel); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateTraceLevel(o.TraceLevel); err != nil {
-		errs = append(errs, err)
-	}
-
-	return errors.Join(errs...)
+	return CollectErrors(
+		func() error {
+			if !ValidObjectIdentifier(o.Name) {
+				return fmt.Errorf("schema name is required")
+			}
+			return nil
+		},
+		func() error { return validateDataRetention(o.DataRetentionTimeInDays) },
+		func() error { return validateMaxDataExtension(o.MaxDataExtensionTimeInDays) },
+		func() error { return validateStorageSerializationPolicy(o.StorageSerializationPolicy) },
+		func() error { return validateLogLevel(o.LogLevel) },
+		func() error { return validateMetricLevel(o.MetricLevel) },
+		func() error { return validateTraceLevel(o.TraceLevel) },
+	)
 }
 
 // AlterSchemaOptions holds the parameters for altering a schema.
@@ -132,37 +114,20 @@ type AlterSchemaOptions struct {
 
 // Validate checks the AlterSchemaOptions for validity.
 func (o *AlterSchemaOptions) Validate() error {
-	var errs []error
-
-	if !ValidObjectIdentifier(o.Name) {
-		errs = append(errs, fmt.Errorf("schema name is required"))
-	}
-
-	if err := validateDataRetention(o.DataRetentionTimeInDays); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateMaxDataExtension(o.MaxDataExtensionTimeInDays); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateStorageSerializationPolicy(o.StorageSerializationPolicy); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateLogLevel(o.LogLevel); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateMetricLevel(o.MetricLevel); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateTraceLevel(o.TraceLevel); err != nil {
-		errs = append(errs, err)
-	}
-
-	return errors.Join(errs...)
+	return CollectErrors(
+		func() error {
+			if !ValidObjectIdentifier(o.Name) {
+				return fmt.Errorf("schema name is required")
+			}
+			return nil
+		},
+		func() error { return validateDataRetention(o.DataRetentionTimeInDays) },
+		func() error { return validateMaxDataExtension(o.MaxDataExtensionTimeInDays) },
+		func() error { return validateStorageSerializationPolicy(o.StorageSerializationPolicy) },
+		func() error { return validateLogLevel(o.LogLevel) },
+		func() error { return validateMetricLevel(o.MetricLevel) },
+		func() error { return validateTraceLevel(o.TraceLevel) },
+	)
 }
 
 // HasChanges reports whether any fields are set for alteration.
@@ -194,23 +159,7 @@ func NewSchemaClient(c SQLExecutor) *SchemaClient {
 func buildCreateSchemaSQL(opts CreateSchemaOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER")
-	} else {
-		b.WriteString("CREATE")
-	}
-
-	if opts.Transient {
-		b.WriteString(" TRANSIENT")
-	}
-
-	if opts.UseCreateOrAlter {
-		b.WriteString(" SCHEMA ")
-	} else {
-		b.WriteString(" SCHEMA IF NOT EXISTS ")
-	}
-
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "SCHEMA", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, opts.Transient)
 
 	if opts.ManagedAccess {
 		b.WriteString(" WITH MANAGED ACCESS")
@@ -316,6 +265,11 @@ func buildDropSchemaSQL(name DatabaseObjectIdentifier) string {
 	return sqlbuilder.DropIfExists("SCHEMA", name.FullyQualifiedName())
 }
 
+// buildDropSchemaCascadeSQL builds the DROP SCHEMA … CASCADE SQL statement.
+func buildDropSchemaCascadeSQL(name DatabaseObjectIdentifier) string {
+	return sqlbuilder.DropIfExistsCascade("SCHEMA", name.FullyQualifiedName())
+}
+
 // Drop drops a schema from Snowflake.
 func (s *SchemaClient) Drop(ctx context.Context, name DatabaseObjectIdentifier) error {
 	if !ValidObjectIdentifier(name) {
@@ -324,6 +278,19 @@ func (s *SchemaClient) Drop(ctx context.Context, name DatabaseObjectIdentifier) 
 
 	if _, err := s.client.Exec(ctx, buildDropSchemaSQL(name)); err != nil {
 		return fmt.Errorf("dropping schema %s: %w", name, err)
+	}
+
+	return nil
+}
+
+// DropCascade drops a schema and all its child objects from Snowflake.
+func (s *SchemaClient) DropCascade(ctx context.Context, name DatabaseObjectIdentifier) error {
+	if !ValidObjectIdentifier(name) {
+		return NewTerminalError(fmt.Errorf("schema name is required"))
+	}
+
+	if _, err := s.client.Exec(ctx, buildDropSchemaCascadeSQL(name)); err != nil {
+		return fmt.Errorf("cascade dropping schema %s: %w", name, err)
 	}
 
 	return nil
@@ -394,86 +361,25 @@ func (s *SchemaClient) Observe(ctx context.Context, name DatabaseObjectIdentifie
 
 // scanSchemaShowOutput scans SHOW SCHEMAS results for a matching row.
 func scanSchemaShowOutput(rows *sql.Rows, name string) (*SchemaShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
-		rt, _ := parseInt32(colMap["retention_time"])
+	return ScanShowOutput(rows, name, func(m map[string]string) (*SchemaShowOutput, error) {
+		rt, _ := parseInt32(m["retention_time"])
 
 		return &SchemaShowOutput{
-			CreatedOn:     colMap["created_on"],
-			Name:          colMap["name"],
-			DatabaseName:  colMap["database_name"],
-			Kind:          colMap["kind"],
-			Comment:       colMap["comment"],
-			Owner:         colMap["owner"],
+			CreatedOn:     m["created_on"],
+			Name:          m["name"],
+			DatabaseName:  m["database_name"],
+			Kind:          m["kind"],
+			Comment:       m["comment"],
+			Owner:         m["owner"],
 			RetentionTime: rt,
-			Options:       colMap["options"],
+			Options:       m["options"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }
 
 // scanSchemaParameters parses SHOW PARAMETERS results into SchemaParameters.
 func scanSchemaParameters(rows *sql.Rows) (*SchemaParameters, error) {
-	params := &SchemaParameters{}
-
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning parameter row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		key := strings.ToUpper(colMap["key"])
-		val := colMap["value"]
-
+	return ScanParameters(rows, func(params *SchemaParameters, key, val string) {
 		switch key {
 		case "DATA_RETENTION_TIME_IN_DAYS":
 			if v, ok := parseInt32(val); ok {
@@ -497,11 +403,5 @@ func scanSchemaParameters(rows *sql.Rows) (*SchemaParameters, error) {
 		case "TRACE_LEVEL":
 			params.TraceLevel = val
 		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating parameter rows: %w", err)
-	}
-
-	return params, nil
+	})
 }

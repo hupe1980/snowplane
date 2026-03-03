@@ -109,7 +109,7 @@ func applyObservation(task *snowplanev1alpha1.Task, obs *snowflake.TaskObservati
 			UserTaskTimeoutMs:                       obs.Parameters.UserTaskTimeoutMs,
 			SuspendTaskAfterNumFailures:             obs.Parameters.SuspendTaskAfterNumFailures,
 			TaskAutoRetryAttempts:                   obs.Parameters.TaskAutoRetryAttempts,
-			LogLevel:                                obs.Parameters.LogLevel,
+			LogLevel:                                snowplanev1alpha1.LogLevel(obs.Parameters.LogLevel),
 			UserTaskMinimumTriggerIntervalInSeconds: obs.Parameters.UserTaskMinimumTriggerIntervalInSeconds,
 			TargetCompletionInterval:                obs.Parameters.TargetCompletionInterval,
 			UserTaskManagedInitialWarehouseSize:     obs.Parameters.UserTaskManagedInitialWarehouseSize,
@@ -131,7 +131,7 @@ func buildCreateOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectI
 		SuspendTaskAfterNumFailures:             task.Spec.SuspendTaskAfterNumFailures,
 		TaskAutoRetryAttempts:                   task.Spec.TaskAutoRetryAttempts,
 		Config:                                  task.Spec.Config,
-		LogLevel:                                task.Spec.LogLevel,
+		LogLevel:                                (*string)(task.Spec.LogLevel),
 		UserTaskMinimumTriggerIntervalInSeconds: task.Spec.UserTaskMinimumTriggerIntervalInSeconds,
 		TargetCompletionInterval:                task.Spec.TargetCompletionInterval,
 		ServerlessTaskMinStatementSize:          task.Spec.ServerlessTaskMinStatementSize,
@@ -260,8 +260,8 @@ func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectId
 	}
 
 	if task.Spec.LogLevel != nil {
-		if obs.Parameters == nil || *task.Spec.LogLevel != obs.Parameters.LogLevel {
-			opts.LogLevel = task.Spec.LogLevel
+		if obs.Parameters == nil || string(*task.Spec.LogLevel) != obs.Parameters.LogLevel {
+			opts.LogLevel = (*string)(task.Spec.LogLevel)
 		}
 	}
 
@@ -278,11 +278,15 @@ func buildAlterOptions(task *snowplanev1alpha1.Task, id snowflake.SchemaObjectId
 	}
 
 	if task.Spec.ServerlessTaskMinStatementSize != nil {
-		opts.ServerlessTaskMinStatementSize = task.Spec.ServerlessTaskMinStatementSize
+		if obs.Parameters == nil || obs.Parameters.ServerlessTaskMinStatementSize == nil || *task.Spec.ServerlessTaskMinStatementSize != *obs.Parameters.ServerlessTaskMinStatementSize {
+			opts.ServerlessTaskMinStatementSize = task.Spec.ServerlessTaskMinStatementSize
+		}
 	}
 
 	if task.Spec.ServerlessTaskMaxStatementSize != nil {
-		opts.ServerlessTaskMaxStatementSize = task.Spec.ServerlessTaskMaxStatementSize
+		if obs.Parameters == nil || obs.Parameters.ServerlessTaskMaxStatementSize == nil || *task.Spec.ServerlessTaskMaxStatementSize != *obs.Parameters.ServerlessTaskMaxStatementSize {
+			opts.ServerlessTaskMaxStatementSize = task.Spec.ServerlessTaskMaxStatementSize
+		}
 	}
 
 	if task.Spec.UserTaskManagedInitialWarehouseSize != nil {
@@ -338,7 +342,7 @@ func detectDrift(task *snowplanev1alpha1.Task, obs *snowflake.TaskObservation) *
 		d.CompareInt32("USER_TASK_TIMEOUT_MS", task.Spec.UserTaskTimeoutMs, obs.Parameters.UserTaskTimeoutMs, false)
 		d.CompareInt32("SUSPEND_TASK_AFTER_NUM_FAILURES", task.Spec.SuspendTaskAfterNumFailures, obs.Parameters.SuspendTaskAfterNumFailures, false)
 		d.CompareInt32("TASK_AUTO_RETRY_ATTEMPTS", task.Spec.TaskAutoRetryAttempts, obs.Parameters.TaskAutoRetryAttempts, false)
-		d.CompareString("LOG_LEVEL", task.Spec.LogLevel, obs.Parameters.LogLevel, false)
+		d.CompareString("LOG_LEVEL", (*string)(task.Spec.LogLevel), obs.Parameters.LogLevel, false)
 		d.CompareInt32("USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS", task.Spec.UserTaskMinimumTriggerIntervalInSeconds, obs.Parameters.UserTaskMinimumTriggerIntervalInSeconds, false)
 	}
 

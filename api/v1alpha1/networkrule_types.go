@@ -35,10 +35,10 @@ const (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="(has(self.databaseRef) && !has(self.databaseName)) || (!has(self.databaseRef) && has(self.databaseName))",message="exactly one of spec.databaseRef or spec.databaseName must be set"
 // +kubebuilder:validation:XValidation:rule="(has(self.schemaRef) && !has(self.schemaName)) || (!has(self.schemaRef) && has(self.schemaName))",message="exactly one of spec.schemaRef or spec.schemaName must be set"
-// +kubebuilder:validation:XValidation:rule="!has(self.databaseRef) || !has(oldSelf.databaseRef) || self.databaseRef == oldSelf.databaseRef",message="spec.databaseRef is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !has(oldSelf.databaseName) || self.databaseName == oldSelf.databaseName",message="spec.databaseName is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="!has(self.schemaRef) || !has(oldSelf.schemaRef) || self.schemaRef == oldSelf.schemaRef",message="spec.schemaRef is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="!has(self.schemaName) || !has(oldSelf.schemaName) || self.schemaName == oldSelf.schemaName",message="spec.schemaName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseRef) == has(self.databaseRef) && (!has(self.databaseRef) || self.databaseRef == oldSelf.databaseRef)",message="spec.databaseRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName) || self.databaseName == oldSelf.databaseName)",message="spec.databaseName is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef) || self.schemaRef == oldSelf.schemaRef)",message="spec.schemaRef is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName) || self.schemaName == oldSelf.schemaName)",message="spec.schemaName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.type == oldSelf.type",message="spec.type is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.mode == oldSelf.mode",message="spec.mode is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="!has(self.databaseName) || !self.databaseName.contains('.')",message="spec.databaseName must be a simple identifier, not a fully-qualified name"
@@ -48,6 +48,7 @@ type NetworkRuleSpec struct {
 
 	// Name is the Snowflake network rule name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a managed Database resource for the parent database.
@@ -60,6 +61,7 @@ type NetworkRuleSpec struct {
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.databaseName is immutable"
 	DatabaseName *string `json:"databaseName,omitempty"`
 
@@ -74,6 +76,7 @@ type NetworkRuleSpec struct {
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.schemaName is immutable"
 	SchemaName *string `json:"schemaName,omitempty"`
 

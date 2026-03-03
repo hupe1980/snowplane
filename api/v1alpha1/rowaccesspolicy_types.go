@@ -11,10 +11,12 @@ import (
 type RowAccessPolicyArgument struct {
 	// Name is the argument name.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// Type is the Snowflake data type (e.g. VARCHAR, NUMBER).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Type string `json:"type"`
 }
 
@@ -37,6 +39,7 @@ type RowAccessPolicySpec struct {
 
 	// Name is the Snowflake row access policy name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -48,6 +51,7 @@ type RowAccessPolicySpec struct {
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -59,6 +63,7 @@ type RowAccessPolicySpec struct {
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// Signature defines the arguments for the row access policy.
@@ -68,6 +73,7 @@ type RowAccessPolicySpec struct {
 
 	// Body is the SQL expression that returns BOOLEAN to determine row visibility.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:MaxLength=65536
 	Body string `json:"body" snowflake:"BODY,always"`
 

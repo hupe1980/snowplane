@@ -73,9 +73,9 @@ func newTestStreamOnExternalTable(name, namespace string) *snowplanev1alpha1.Str
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:              "MY_STREAM",
-			DatabaseName:      testutil.PtrString("MY_DB"),
-			SchemaName:        testutil.PtrString("MY_SCHEMA"),
-			ExternalTableName: testutil.PtrString("MY_EXT_TABLE"),
+			DatabaseName:      testutil.Ptr("MY_DB"),
+			SchemaName:        testutil.Ptr("MY_SCHEMA"),
+			ExternalTableName: testutil.Ptr("MY_EXT_TABLE"),
 		},
 	}
 }
@@ -232,8 +232,8 @@ func TestReconcile_Delete(t *testing.T) {
 func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 	s := newTestStreamOnExternalTable("mys", "default")
-	s.Spec.InsertOnly = testutil.PtrBool(true)
-	s.Spec.Comment = testutil.PtrString("test")
+	s.Spec.InsertOnly = testutil.Ptr(true)
+	s.Spec.Comment = testutil.Ptr("test")
 	s.Status.ExternalTableName = "MY_EXT_TABLE"
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_STREAM")
 	opts := buildCreateOptions(s, id)
@@ -255,7 +255,7 @@ func TestBuildAlterOptions_NoChanges(t *testing.T) {
 
 func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
-	spec := &snowplanev1alpha1.StreamOnExternalTableSpec{Comment: testutil.PtrString("x")}
+	spec := &snowplanev1alpha1.StreamOnExternalTableSpec{Comment: testutil.Ptr("x")}
 	fields := tracked.ComputeTracked(spec)
 	assert.ElementsMatch(t, []string{"COMMENT"}, fields)
 }
@@ -289,7 +289,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 func TestDetectDrift_WithDrift(t *testing.T) {
 	t.Parallel()
 	s := &snowplanev1alpha1.StreamOnExternalTable{
-		Spec:   snowplanev1alpha1.StreamOnExternalTableSpec{Name: "MY_STREAM", Comment: testutil.PtrString("desired")},
+		Spec:   snowplanev1alpha1.StreamOnExternalTableSpec{Name: "MY_STREAM", Comment: testutil.Ptr("desired")},
 		Status: snowplanev1alpha1.StreamOnExternalTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", ExternalTableName: "MY_EXT_TABLE"},
 	}
 	obs := &snowflake.StreamObservation{

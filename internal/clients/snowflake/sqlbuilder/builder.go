@@ -204,11 +204,11 @@ func ValidateObjectType(ty string) error {
 }
 
 // ValidateKeywordValue asserts that s matches the pattern for SQL keyword values
-// (uppercase letters, digits, underscores, and spaces only).
+// (uppercase letters, digits, underscores, hyphens, and spaces only).
 // Use this as a defense-in-depth check for enum-like SetKeyword values.
 func ValidateKeywordValue(s string) error {
 	for _, c := range s {
-		if (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '_' && c != ' ' {
+		if (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '_' && c != ' ' && c != '-' {
 			return fmt.Errorf("invalid keyword value character %q in %q", string(c), s)
 		}
 	}
@@ -377,6 +377,30 @@ func ValidatePolicyBody(body string) error {
 	return nil
 }
 
+// stageLocationRe validates Snowflake stage reference locations.
+// Valid formats: @db.schema.stage, @db.schema.stage/path/, @~, @~/path/.
+// Only allows alphanumeric, underscores, dots, forward slashes, tildes, @, and hyphens.
+var stageLocationRe = regexp.MustCompile(`^@[A-Za-z0-9_.~][A-Za-z0-9_./~-]*$`)
+
+// ValidateStageLocation validates a Snowflake stage location reference.
+// Stage locations use @-prefixed syntax (e.g. "@DB.SCHEMA.STAGE/path/")
+// and must not contain SQL metacharacters.
+func ValidateStageLocation(loc string) error {
+	if loc == "" {
+		return fmt.Errorf("stage location must not be empty")
+	}
+
+	if len(loc) > 1024 {
+		return fmt.Errorf("stage location too long (%d chars, max 1024)", len(loc))
+	}
+
+	if !stageLocationRe.MatchString(loc) {
+		return fmt.Errorf("invalid stage location %q: must start with @ and contain only alphanumeric, underscores, dots, forward slashes, tildes, and hyphens", loc)
+	}
+
+	return nil
+}
+
 // ValidateUnsetField validates a field name used in UNSET clauses.
 // Only allows uppercase letters, digits, and underscores — the format used
 // by Snowflake session and object parameter names.
@@ -385,8 +409,10 @@ func ValidateUnsetField(field string) error {
 		return fmt.Errorf("unset field name must not be empty")
 	}
 
-	if err := ValidateKeywordValue(field); err != nil {
-		return fmt.Errorf("invalid unset field %q: %w", field, err)
+	for _, c := range field {
+		if (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '_' {
+			return fmt.Errorf("invalid unset field %q: invalid character %q", field, string(c))
+		}
 	}
 
 	return nil
@@ -471,6 +497,57 @@ func (b *Builder) SetQuotedKeyword(key string, value *string) {
 	}
 }
 
+// BuildKeywordListClause formats a validated keyword list like
+// AUTHENTICATION_METHODS = (PASSWORD, SAML).
+// Every value is validated against ValidateKeywordValue to prevent injection.
+func BuildKeywordListClause(key string, vals []string) (string, error) {
+	for _, v := range vals {
+		if err := ValidateKeywordValue(v); err != nil {
+			return "", fmt.Errorf("BuildKeywordListClause(%q): value %q: %w", key, v, err)
+		}
+	}
+
+	return fmt.Sprintf("%s = (%s)", key, strings.Join(vals, ", ")), nil
+}
+
+// BuildEscapedListClause formats an escaped quoted list like
+// SECURITY_INTEGRATIONS = ('INT1', 'INT2') or ALLOWED_IP_LIST = ('1.2.3.4').
+// Each value is single-quoted with EscapeString applied.
+func BuildEscapedListClause(key string, vals []string) string {
+	quoted := make([]string, len(vals))
+	for i, v := range vals {
+		quoted[i] = fmt.Sprintf("'%s'", EscapeString(v))
+	}
+
+	return fmt.Sprintf("%s = (%s)", key, strings.Join(quoted, ", "))
+}
+
+// SetKeywordList writes a validated keyword list like KEY = (VAL1, VAL2) to the
+// builder when vals is non-empty.  Each value passes ValidateKeywordValue.
+func (b *Builder) SetKeywordList(key string, vals []string) {
+	if len(vals) == 0 {
+		return
+	}
+
+	clause, err := BuildKeywordListClause(key, vals)
+	if err != nil {
+		b.err = errors.Join(b.err, err)
+		return
+	}
+
+	fmt.Fprintf(&b.Builder, " %s", clause)
+}
+
+// SetEscapedList writes an escaped quoted list like KEY = ('V1', 'V2') to the
+// builder when vals is non-empty.  Each value is escaped with EscapeString.
+func (b *Builder) SetEscapedList(key string, vals []string) {
+	if len(vals) == 0 {
+		return
+	}
+
+	fmt.Fprintf(&b.Builder, " %s", BuildEscapedListClause(key, vals))
+}
+
 // SetClauses collects individual SET clauses for ALTER statements and
 // provides methods to emit them as a single ALTER ... SET statement.
 //
@@ -535,6 +612,32 @@ func (sc *SetClauses) QuotedKeyword(key string, value *string) {
 
 		sc.clauses = append(sc.clauses, fmt.Sprintf("%s = '%s'", key, *value))
 	}
+}
+
+// KeywordList appends a keyword list clause like KEY = (VAL1, VAL2) when vals
+// is non-empty.  Each value is validated with ValidateKeywordValue.
+func (sc *SetClauses) KeywordList(key string, vals []string) {
+	if len(vals) == 0 {
+		return
+	}
+
+	clause, err := BuildKeywordListClause(key, vals)
+	if err != nil {
+		sc.err = errors.Join(sc.err, err)
+		return
+	}
+
+	sc.clauses = append(sc.clauses, clause)
+}
+
+// EscapedList appends a quoted-escaped list clause like KEY = ('V1', 'V2')
+// when vals is non-empty.  Each value is escaped with EscapeString.
+func (sc *SetClauses) EscapedList(key string, vals []string) {
+	if len(vals) == 0 {
+		return
+	}
+
+	sc.clauses = append(sc.clauses, BuildEscapedListClause(key, vals))
 }
 
 // UnsafeRaw appends a pre-formatted clause string directly.
@@ -626,7 +729,42 @@ func DropIfExists(objectType, identifier string) string {
 	return fmt.Sprintf("DROP %s IF EXISTS %s", objectType, identifier)
 }
 
+// DropIfExistsCascade builds a DROP <objectType> IF EXISTS <identifier> CASCADE statement.
+// This drops the object and all dependent objects (e.g., all schemas inside a database).
+func DropIfExistsCascade(objectType, identifier string) string {
+	return fmt.Sprintf("DROP %s IF EXISTS %s CASCADE", objectType, identifier)
+}
+
 // ShowParameters builds a SHOW PARAMETERS IN <objectType> <identifier> statement.
 func ShowParameters(objectType, identifier string) string {
 	return fmt.Sprintf("SHOW PARAMETERS IN %s %s", objectType, identifier)
+}
+
+// BuildCreatePreamble writes the CREATE preamble to b.
+//
+// When useCreateOrAlter is true the preamble is:
+//
+//	CREATE OR ALTER [TRANSIENT] <objectType> <fqn>
+//
+// Otherwise:
+//
+//	CREATE [TRANSIENT] <objectType> IF NOT EXISTS <fqn>
+//
+// This covers ~25 buildCreateXxxSQL functions that share the same pattern.
+func BuildCreatePreamble(b *Builder, objectType string, fqn string, useCreateOrAlter bool, transient bool) {
+	if useCreateOrAlter {
+		b.WriteString("CREATE OR ALTER")
+	} else {
+		b.WriteString("CREATE")
+	}
+
+	if transient {
+		b.WriteString(" TRANSIENT")
+	}
+
+	if useCreateOrAlter {
+		b.WriteString(fmt.Sprintf(" %s %s", objectType, fqn))
+	} else {
+		b.WriteString(fmt.Sprintf(" %s IF NOT EXISTS %s", objectType, fqn))
+	}
 }

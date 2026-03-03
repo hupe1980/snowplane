@@ -133,8 +133,8 @@ func TestStage_CreateExternalLifecycle(t *testing.T) {
 	})
 
 	stage := newTestStage(stageK8s, sfStage, dbK8s, schemaK8s)
-	stage.Spec.URL = ptrString("s3://my-bucket/path/")
-	stage.Spec.StorageIntegration = ptrString("MY_INTEGRATION")
+	stage.Spec.URL = ptr("s3://my-bucket/path/")
+	stage.Spec.StorageIntegration = ptr("MY_INTEGRATION")
 	require.NoError(t, k8sClient.Create(ctx, stage))
 
 	key := types.NamespacedName{Name: stageK8s, Namespace: testNamespace}

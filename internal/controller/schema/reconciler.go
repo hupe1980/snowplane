@@ -29,6 +29,7 @@ type Service interface {
 	Create(ctx context.Context, opts snowflake.CreateSchemaOptions) error
 	Alter(ctx context.Context, opts snowflake.AlterSchemaOptions) error
 	Drop(ctx context.Context, name snowflake.DatabaseObjectIdentifier) error
+	DropCascade(ctx context.Context, name snowflake.DatabaseObjectIdentifier) error
 }
 
 // ServiceFactory creates a Service from a Snowflake client.

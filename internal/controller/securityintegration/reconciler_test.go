@@ -129,6 +129,7 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 		Factory:  factory,
 		Recorder: rec,
 		Adapter: &adapter{
+			client: c,
 			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
 				return mock, nil, nil
 			},
@@ -318,7 +319,11 @@ func TestBuildCreateOptions(t *testing.T) {
 	si := newTestSecurityIntegration("mysi", "default")
 	id := snowflake.NewAccountObjectIdentifier("MY_SCIM")
 
-	opts := buildCreateOptions(si, id)
+	scheme := testutil.TestScheme()
+	c := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	opts, err := buildCreateOptions(context.Background(), c, si, id)
+	require.NoError(t, err)
 	assert.Equal(t, "MY_SCIM", opts.Name.Name())
 	assert.Equal(t, "SCIM", opts.Type)
 	assert.NotNil(t, opts.SCIMClient)
@@ -348,7 +353,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 			SCIM: &snowplanev1alpha1.SCIMConfig{
 				SCIMClient:    "AZURE",
 				RunAsRole:     "AAD_PROVISIONER",
-				NetworkPolicy: testutil.PtrString("MY_POLICY"),
+				NetworkPolicy: testutil.Ptr("MY_POLICY"),
 			},
 		}
 		fields := tracked.ComputeTracked(spec)
@@ -379,7 +384,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 				Issuer:                        "https://issuer",
 				TokenUserMappingClaim:         "upn",
 				SnowflakeUserMappingAttribute: "LOGIN_NAME",
-				NetworkPolicy:                 testutil.PtrString("MY_POLICY"),
+				NetworkPolicy:                 testutil.Ptr("MY_POLICY"),
 			},
 		}
 		fields := tracked.ComputeTracked(spec)
@@ -390,7 +395,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 		t.Parallel()
 		spec := &snowplanev1alpha1.SecurityIntegrationSpec{
 			Type:    snowplanev1alpha1.SecurityIntegrationTypeSCIM,
-			Comment: testutil.PtrString("test"),
+			Comment: testutil.Ptr("test"),
 		}
 		assert.Contains(t, tracked.ComputeTracked(spec), "COMMENT")
 	})
@@ -435,7 +440,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	si := &snowplanev1alpha1.SecurityIntegration{
 		Spec: snowplanev1alpha1.SecurityIntegrationSpec{
 			Name:    "MY_SCIM",
-			Comment: testutil.PtrString("desired"),
+			Comment: testutil.Ptr("desired"),
 		},
 	}
 

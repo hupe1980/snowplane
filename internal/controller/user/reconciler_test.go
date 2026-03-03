@@ -199,10 +199,10 @@ func TestReconcile_CreateWithAllFields(t *testing.T) {
 
 	user := newTestUser("test-user", "default")
 	user.Finalizers = []string{finalizerName}
-	user.Spec.LoginName = testutil.PtrString("alice_login")
-	user.Spec.DisplayName = testutil.PtrString("Alice")
-	user.Spec.Email = testutil.PtrString("alice@example.com")
-	user.Spec.Comment = testutil.PtrString("Test user")
+	user.Spec.LoginName = testutil.Ptr("alice_login")
+	user.Spec.DisplayName = testutil.Ptr("Alice")
+	user.Spec.Email = testutil.Ptr("alice@example.com")
+	user.Spec.Comment = testutil.Ptr("Test user")
 
 	var capturedOpts snowflake.CreateUserOptions
 	call := 0
@@ -326,8 +326,8 @@ func TestReconcile_UpdateWithChanges(t *testing.T) {
 	user.Finalizers = []string{finalizerName}
 	user.Status.ObservedGeneration = 1
 	user.Generation = 2
-	user.Spec.Email = testutil.PtrString("alice@newdomain.com")
-	user.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	user.Spec.Email = testutil.Ptr("alice@newdomain.com")
+	user.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 
 	var capturedAlterOpts snowflake.AlterUserOptions
 	mock := &mockService{
@@ -354,8 +354,8 @@ func TestReconcile_AlterFails(t *testing.T) {
 	user := newTestUser("test-user", "default")
 	user.Finalizers = []string{finalizerName}
 	user.Status.ObservedGeneration = 1
-	user.Spec.Email = testutil.PtrString("alice@example.com")
-	user.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	user.Spec.Email = testutil.Ptr("alice@example.com")
+	user.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.UserObservation, error) {
@@ -377,8 +377,8 @@ func TestReconcile_AlterTerminalError(t *testing.T) {
 	user := newTestUser("test-user", "default")
 	user.Finalizers = []string{finalizerName}
 	user.Status.ObservedGeneration = 1
-	user.Spec.Email = testutil.PtrString("alice@example.com")
-	user.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	user.Spec.Email = testutil.Ptr("alice@example.com")
+	user.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.UserObservation, error) {
@@ -630,8 +630,8 @@ func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
 	user := newTestUser("test-user", "default")
-	user.Spec.Email = testutil.PtrString("alice@example.com")
-	user.Spec.Comment = testutil.PtrString("Test")
+	user.Spec.Email = testutil.Ptr("alice@example.com")
+	user.Spec.Comment = testutil.Ptr("Test")
 
 	r := newTestReconciler(&mockService{})
 	opts, err := buildCreateOptions(context.Background(), r.Client, user, snowflake.NewAccountObjectIdentifier("ALICE"))
@@ -680,7 +680,7 @@ func TestBuildAlterOptions_EmailChanged(t *testing.T) {
 	t.Parallel()
 
 	user := newTestUser("test-user", "default")
-	user.Spec.Email = testutil.PtrString("alice@new.com")
+	user.Spec.Email = testutil.Ptr("alice@new.com")
 
 	obs := successfulObservation()
 	r := newTestReconciler(&mockService{})
@@ -900,8 +900,8 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.UserSpec{
-		Email:   testutil.PtrString("alice@example.com"),
-		Comment: testutil.PtrString("test"),
+		Email:   testutil.Ptr("alice@example.com"),
+		Comment: testutil.Ptr("test"),
 	}
 
 	fields := tracked.ComputeTracked(spec)
@@ -918,11 +918,11 @@ func TestComputeTrackedParameters_NewFields(t *testing.T) {
 	disableMFA := true
 
 	spec := &snowplanev1alpha1.UserSpec{
-		MiddleName:      testutil.PtrString("Marie"),
+		MiddleName:      testutil.Ptr("Marie"),
 		DaysToExpiry:    &days,
 		MinsToUnlock:    &minsUnlock,
 		MinsToBypassMFA: &minsBypass,
-		NetworkPolicy:   testutil.PtrString("MY_POLICY"),
+		NetworkPolicy:   testutil.Ptr("MY_POLICY"),
 		DisableMFA:      &disableMFA,
 	}
 
@@ -983,7 +983,7 @@ func TestComputeUnsetFields(t *testing.T) {
 	user := newTestUser("test-user", "default")
 	user.Spec.Email = nil
 	user.Spec.Comment = nil
-	user.Spec.LoginName = testutil.PtrString("alice_login")
+	user.Spec.LoginName = testutil.Ptr("alice_login")
 	user.Status.TrackedParameters = []string{"EMAIL", "COMMENT", "LOGIN_NAME"}
 
 	unset := tracked.ComputeUnset(&user.Spec, user.Status.TrackedParameters)
@@ -1043,7 +1043,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	t.Parallel()
 
 	user := newTestUser("test-user", "default")
-	user.Spec.Email = testutil.PtrString("alice@expected.com")
+	user.Spec.Email = testutil.Ptr("alice@expected.com")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Email = "alice@actual.com"
@@ -1060,8 +1060,8 @@ func TestReconcile_DriftCorrection(t *testing.T) {
 	user.Finalizers = []string{finalizerName}
 	user.Status.ObservedGeneration = 1
 	user.Generation = 1
-	user.Spec.Email = testutil.PtrString("correct@example.com")
-	user.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	user.Spec.Email = testutil.Ptr("correct@example.com")
+	user.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	hash, err := snowplanev1alpha1.ComputeSpecHash(user.Spec)
 	require.NoError(t, err)
 	user.Status.LastAppliedSpecHash = hash
@@ -1098,7 +1098,7 @@ func TestReconcile_DriftDetectOnlyPolicy(t *testing.T) {
 	user.Status.ObservedGeneration = 1
 	user.Generation = 1
 	user.Spec.ManagementPolicies.DriftPolicy = snowplanev1alpha1.DriftPolicyDetectOnly
-	user.Spec.Email = testutil.PtrString("correct@example.com")
+	user.Spec.Email = testutil.Ptr("correct@example.com")
 	hash, err := snowplanev1alpha1.ComputeSpecHash(user.Spec)
 	require.NoError(t, err)
 	user.Status.LastAppliedSpecHash = hash
@@ -1230,7 +1230,7 @@ func TestReconcile_TrackedParametersPersistedOnCreate(t *testing.T) {
 
 	user := newTestUser("test-user", "default")
 	user.Finalizers = []string{finalizerName}
-	user.Spec.Email = testutil.PtrString("alice@example.com")
+	user.Spec.Email = testutil.Ptr("alice@example.com")
 
 	call := 0
 	mock := &mockService{
@@ -1259,7 +1259,7 @@ func TestReconcile_UnsetTriggered(t *testing.T) {
 	user.Finalizers = []string{finalizerName}
 	user.Status.ObservedGeneration = 1
 	user.Status.TrackedParameters = []string{"COMMENT"}
-	user.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	user.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -1290,7 +1290,7 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 
 	user := newTestUser("test-user", "default")
 	user.Finalizers = []string{finalizerName}
-	user.Spec.UseRole = testutil.PtrString("USERADMIN")
+	user.Spec.UseRole = testutil.Ptr("USERADMIN")
 
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.UserObservation, error) {

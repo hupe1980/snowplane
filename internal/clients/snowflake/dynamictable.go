@@ -156,7 +156,7 @@ func NewDynamicTableClient(c SQLExecutor) *DynamicTableClient {
 // EXISTS, so a plain CREATE will fail loudly if the table already exists — this
 // is preferable to silently replacing it. The reconciler guards calls to Create
 // by first checking Observe to confirm the object does not exist.
-func buildCreateDynamicTableSQL(opts CreateDynamicTableOptions) string {
+func buildCreateDynamicTableSQL(opts CreateDynamicTableOptions) (string, error) {
 	var b sqlbuilder.Builder
 
 	if opts.Transient {
@@ -203,7 +203,11 @@ func buildCreateDynamicTableSQL(opts CreateDynamicTableOptions) string {
 	b.WriteString(" AS ")
 	b.WriteString(opts.Query)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a dynamic table in Snowflake.
@@ -212,7 +216,12 @@ func (d *DynamicTableClient) Create(ctx context.Context, opts CreateDynamicTable
 		return NewTerminalError(fmt.Errorf("invalid create dynamic table options: %w", err))
 	}
 
-	if _, err := d.client.Exec(ctx, buildCreateDynamicTableSQL(opts)); err != nil {
+	sql, err := buildCreateDynamicTableSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create dynamic table SQL: %w", err))
+	}
+
+	if _, err := d.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating dynamic table %s: %w", opts.Name, err)
 	}
 
@@ -359,54 +368,21 @@ func (d *DynamicTableClient) Observe(ctx context.Context, name SchemaObjectIdent
 
 // scanDynamicTableShowOutput scans SHOW DYNAMIC TABLES results for a matching row.
 func scanDynamicTableShowOutput(rows *sql.Rows, name string) (*DynamicTableShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*DynamicTableShowOutput, error) {
 		return &DynamicTableShowOutput{
-			CreatedOn:       colMap["created_on"],
-			Name:            colMap["name"],
-			DatabaseName:    colMap["database_name"],
-			SchemaName:      colMap["schema_name"],
-			Owner:           colMap["owner"],
-			Comment:         colMap["comment"],
-			TargetLag:       colMap["target_lag"],
-			Warehouse:       colMap["warehouse"],
-			RefreshMode:     colMap["refresh_mode"],
-			Text:            colMap["text"],
-			SchedulingState: colMap["scheduling_state"],
-			ClusterBy:       colMap["cluster_by"],
-			DataTimestamp:   colMap["data_timestamp"],
+			CreatedOn:       m["created_on"],
+			Name:            m["name"],
+			DatabaseName:    m["database_name"],
+			SchemaName:      m["schema_name"],
+			Owner:           m["owner"],
+			Comment:         m["comment"],
+			TargetLag:       m["target_lag"],
+			Warehouse:       m["warehouse"],
+			RefreshMode:     m["refresh_mode"],
+			Text:            m["text"],
+			SchedulingState: m["scheduling_state"],
+			ClusterBy:       m["cluster_by"],
+			DataTimestamp:   m["data_timestamp"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

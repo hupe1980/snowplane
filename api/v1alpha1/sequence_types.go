@@ -22,6 +22,7 @@ type SequenceSpec struct {
 
 	// Name is the Snowflake identifier for the sequence.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef is a reference to a Database resource in the same namespace.

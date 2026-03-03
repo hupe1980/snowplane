@@ -279,11 +279,10 @@ func buildStringListClause(keyword string, vals []string) string {
 }
 
 // buildCreateSecurityIntegrationSQL builds the CREATE SECURITY INTEGRATION SQL statement.
-func buildCreateSecurityIntegrationSQL(opts CreateSecurityIntegrationOptions) string {
+func buildCreateSecurityIntegrationSQL(opts CreateSecurityIntegrationOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	b.WriteString("CREATE SECURITY INTEGRATION IF NOT EXISTS ")
-	b.WriteString(sqlbuilder.QuoteIdentifier(opts.Name.Name()))
+	sqlbuilder.BuildCreatePreamble(&b, "SECURITY INTEGRATION", sqlbuilder.QuoteIdentifier(opts.Name.Name()), false, false)
 	fmt.Fprintf(&b.Builder, " TYPE = %s", opts.Type)
 
 	switch opts.Type {
@@ -399,7 +398,11 @@ func buildCreateSecurityIntegrationSQL(opts CreateSecurityIntegrationOptions) st
 
 	b.SetString("COMMENT", opts.Comment)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a security integration in Snowflake.
@@ -408,7 +411,12 @@ func (si *SecurityIntegrationClient) Create(ctx context.Context, opts CreateSecu
 		return NewTerminalError(fmt.Errorf("invalid create security integration options: %w", err))
 	}
 
-	if _, err := si.client.Exec(ctx, buildCreateSecurityIntegrationSQL(opts)); err != nil {
+	sql, err := buildCreateSecurityIntegrationSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create security integration SQL: %w", err))
+	}
+
+	if _, err := si.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating security integration %s: %w", opts.Name, err)
 	}
 
@@ -595,47 +603,14 @@ func (si *SecurityIntegrationClient) Observe(ctx context.Context, name AccountOb
 
 // scanSecurityIntegrationShowOutput scans SHOW SECURITY INTEGRATIONS results.
 func scanSecurityIntegrationShowOutput(rows *sql.Rows, name string) (*SecurityIntegrationShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*SecurityIntegrationShowOutput, error) {
 		return &SecurityIntegrationShowOutput{
-			CreatedOn: colMap["created_on"],
-			Name:      colMap["name"],
-			Type:      colMap["type"],
-			Category:  colMap["category"],
-			Enabled:   strings.EqualFold(colMap["enabled"], "true"),
-			Comment:   colMap["comment"],
+			CreatedOn: m["created_on"],
+			Name:      m["name"],
+			Type:      m["type"],
+			Category:  m["category"],
+			Enabled:   strings.EqualFold(m["enabled"], "true"),
+			Comment:   m["comment"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

@@ -24,7 +24,8 @@ func TestBuildCreateTaskSQL(t *testing.T) {
 			Schedule:     &sched,
 			SQLStatement: "SELECT 1",
 		}
-		got := buildCreateTaskSQL(opts)
+		got, err := buildCreateTaskSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE TASK IF NOT EXISTS "MY_DB"."MY_SCHEMA"."MY_TASK" WAREHOUSE = "MY_WH" SCHEDULE = '5 MINUTE' AS SELECT 1`, got)
 	})
 
@@ -35,7 +36,8 @@ func TestBuildCreateTaskSQL(t *testing.T) {
 			SQLStatement:     "CALL my_proc()",
 			UseCreateOrAlter: true,
 		}
-		got := buildCreateTaskSQL(opts)
+		got, err := buildCreateTaskSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "CREATE OR ALTER TASK ")
 		assert.Contains(t, got, `AS CALL my_proc()`)
 	})
@@ -48,7 +50,8 @@ func TestBuildCreateTaskSQL(t *testing.T) {
 			UserTaskManagedInitialWarehouseSize: &size,
 			SQLStatement:                        "SELECT 1",
 		}
-		got := buildCreateTaskSQL(opts)
+		got, err := buildCreateTaskSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE = 'SMALL'")
 		assert.NotContains(t, got, "WAREHOUSE =")
 	})
@@ -69,14 +72,15 @@ func TestBuildCreateTaskSQL(t *testing.T) {
 			After:                       []string{"PARENT_TASK1", "PARENT_TASK2"},
 			When:                        &when,
 			Comment:                     &comment,
-			AllowOverlappingExecution:   boolPtr(true),
-			UserTaskTimeoutMs:           int32Ptr(60000),
-			SuspendTaskAfterNumFailures: int32Ptr(3),
+			AllowOverlappingExecution:   ptr(true),
+			UserTaskTimeoutMs:           ptr(int32(60000)),
+			SuspendTaskAfterNumFailures: ptr(int32(3)),
 			ErrorIntegration:            &errInt,
 			SuccessIntegration:          &succInt,
-			TaskAutoRetryAttempts:       int32Ptr(2),
+			TaskAutoRetryAttempts:       ptr(int32(2)),
 		}
-		got := buildCreateTaskSQL(opts)
+		got, err := buildCreateTaskSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `WAREHOUSE = "WH"`)
 		assert.Contains(t, got, `SCHEDULE = 'USING CRON 0 * * * * UTC'`)
 		assert.Contains(t, got, "ALLOW_OVERLAPPING_EXECUTION = TRUE")
@@ -109,7 +113,7 @@ func TestBuildAlterTaskStatements(t *testing.T) {
 		t.Parallel()
 		opts := AlterTaskOptions{
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "T"),
-			Suspend: boolPtr(true),
+			Suspend: ptr(true),
 		}
 		stmts, err := buildAlterTaskStatements(opts)
 		require.NoError(t, err)
@@ -121,7 +125,7 @@ func TestBuildAlterTaskStatements(t *testing.T) {
 		t.Parallel()
 		opts := AlterTaskOptions{
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "T"),
-			Suspend: boolPtr(false),
+			Suspend: ptr(false),
 		}
 		stmts, err := buildAlterTaskStatements(opts)
 		require.NoError(t, err)
@@ -223,7 +227,7 @@ func TestBuildAlterTaskStatements(t *testing.T) {
 		comment := "c"
 		opts := AlterTaskOptions{
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "T"),
-			Suspend: boolPtr(false),
+			Suspend: ptr(false),
 			Comment: &comment,
 		}
 		stmts, err := buildAlterTaskStatements(opts)
@@ -297,7 +301,7 @@ func TestCreateTaskOptions_Validate(t *testing.T) {
 		opts := CreateTaskOptions{
 			Name:              NewSchemaObjectIdentifier("DB", "SCH", "T"),
 			SQLStatement:      "SELECT 1",
-			UserTaskTimeoutMs: int32Ptr(-1),
+			UserTaskTimeoutMs: ptr(int32(-1)),
 		}
 		assert.Error(t, opts.Validate())
 	})
@@ -307,7 +311,7 @@ func TestCreateTaskOptions_Validate(t *testing.T) {
 		opts := CreateTaskOptions{
 			Name:                  NewSchemaObjectIdentifier("DB", "SCH", "T"),
 			SQLStatement:          "SELECT 1",
-			TaskAutoRetryAttempts: int32Ptr(31),
+			TaskAutoRetryAttempts: ptr(int32(31)),
 		}
 		assert.Error(t, opts.Validate())
 	})
@@ -403,7 +407,7 @@ func TestAlterTaskOptions_HasChanges(t *testing.T) {
 		t.Parallel()
 		opts := AlterTaskOptions{
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "T"),
-			Suspend: boolPtr(true),
+			Suspend: ptr(true),
 		}
 		assert.True(t, opts.HasChanges())
 	})

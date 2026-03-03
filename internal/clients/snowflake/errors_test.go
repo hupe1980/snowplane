@@ -66,9 +66,7 @@ func TestSentinelErrors(t *testing.T) {
 		{"ErrInsufficientPrivileges", ErrInsufficientPrivileges},
 		{"ErrReferenceNotReady", ErrReferenceNotReady},
 		{"ErrConnectionFailed", ErrConnectionFailed},
-		{"ErrObjectInUse", ErrObjectInUse},
 		{"ErrAccountLocked", ErrAccountLocked},
-		{"ErrInvalidValue", ErrInvalidValue},
 		{"ErrRoleSwitchFailed", ErrRoleSwitchFailed},
 		{"ErrQuotaExceeded", ErrQuotaExceeded},
 		{"ErrStatementTimeout", ErrStatementTimeout},
@@ -90,30 +88,6 @@ func TestIsObjectNotFound(t *testing.T) {
 	assert.True(t, IsObjectNotFound(fmt.Errorf("wrap: %w", ErrObjectNotFound)))
 	assert.False(t, IsObjectNotFound(errors.New("other")))
 	assert.False(t, IsObjectNotFound(nil))
-}
-
-func TestIsObjectAlreadyExists(t *testing.T) {
-	t.Parallel()
-
-	assert.True(t, IsObjectAlreadyExists(ErrObjectAlreadyExists))
-	assert.True(t, IsObjectAlreadyExists(fmt.Errorf("wrap: %w", ErrObjectAlreadyExists)))
-	assert.False(t, IsObjectAlreadyExists(errors.New("other")))
-}
-
-func TestIsInsufficientPrivileges(t *testing.T) {
-	t.Parallel()
-
-	assert.True(t, IsInsufficientPrivileges(ErrInsufficientPrivileges))
-	assert.False(t, IsInsufficientPrivileges(errors.New("other")))
-}
-
-func TestIsObjectInUse(t *testing.T) {
-	t.Parallel()
-
-	assert.True(t, IsObjectInUse(ErrObjectInUse))
-	assert.True(t, IsObjectInUse(fmt.Errorf("wrap: %w", ErrObjectInUse)))
-	assert.False(t, IsObjectInUse(errors.New("other")))
-	assert.False(t, IsObjectInUse(nil))
 }
 
 func TestIsRoleSwitchFailed(t *testing.T) {
@@ -208,23 +182,6 @@ func TestMapSnowflakeError_WrappedSnowflakeError(t *testing.T) {
 	assert.True(t, errors.Is(mapped, ErrInsufficientPrivileges))
 }
 
-func TestMapSnowflakeError_IsCheckers(t *testing.T) {
-	t.Parallel()
-
-	// Verify the Is* helper functions work with mapped errors.
-	t.Run("IsObjectAlreadyExists", func(t *testing.T) {
-		t.Parallel()
-		sfErr := &gosnowflake.SnowflakeError{Number: ErrCodeObjectAlreadyExists, Message: "already exists"}
-		assert.True(t, IsObjectAlreadyExists(MapSnowflakeError(sfErr)))
-	})
-
-	t.Run("IsInsufficientPrivileges", func(t *testing.T) {
-		t.Parallel()
-		sfErr := &gosnowflake.SnowflakeError{Number: ErrCodeInsufficientPrivileges, Message: "no access"}
-		assert.True(t, IsInsufficientPrivileges(MapSnowflakeError(sfErr)))
-	})
-}
-
 // ---------------------------------------------------------------------------
 // Tests: IsCreateOrAlterUnsupported
 // ---------------------------------------------------------------------------
@@ -243,7 +200,7 @@ func TestIsCreateOrAlterUnsupported(t *testing.T) {
 		{"string match unsupported", errors.New("SQL compilation error: UNSUPPORTED feature"), true},
 		{"string match unexpected OR", errors.New("SQL compilation error: unexpected 'OR'"), true},
 		{"string match syntax error", errors.New("SQL compilation error: syntax error"), true},
-		{"string match 002032", errors.New("002032 (42601): SQL compilation error"), true},
+		{"string match 002032 no longer matches", errors.New("002032 (42601): SQL compilation error"), false},
 		{"wrapped snowflake error 2032", fmt.Errorf("exec failed: %w", &gosnowflake.SnowflakeError{Number: ErrCodeCreateOrAlterUnsupported}), true},
 		{"different snowflake error code", &gosnowflake.SnowflakeError{Number: 9999, Message: "other"}, false},
 	}

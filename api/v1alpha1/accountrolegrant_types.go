@@ -22,6 +22,7 @@ type AccountRoleGrantSpec struct {
 
 	// Privilege is the Snowflake privilege to grant (e.g. USAGE, SELECT, CREATE SCHEMA).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Privilege string `json:"privilege"`
 
 	// On defines what the privilege is granted on.
@@ -32,6 +33,7 @@ type AccountRoleGrantSpec struct {
 	// Mutually exclusive with AccountRoleRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	AccountRole *string `json:"accountRole,omitempty"`
 
 	// AccountRoleRef references an AccountRole CR in the same namespace.

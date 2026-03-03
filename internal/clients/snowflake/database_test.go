@@ -9,21 +9,19 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
-func strPtr(s string) *string { return &s }
-func int32Ptr(v int32) *int32 { return &v }
-func boolPtr(b bool) *bool    { return &b }
+func ptr[T any](v T) *T { return &v }
 
 func TestCreateDatabaseOptions_Validate_Valid(t *testing.T) {
 	t.Parallel()
 
 	opts := CreateDatabaseOptions{
 		Name:                       NewAccountObjectIdentifier("MY_DB"),
-		Comment:                    strPtr("test db"),
-		DataRetentionTimeInDays:    int32Ptr(30),
-		StorageSerializationPolicy: strPtr("COMPATIBLE"),
-		LogLevel:                   strPtr("INFO"),
-		MetricLevel:                strPtr("ALL"),
-		TraceLevel:                 strPtr("ON_EVENT"),
+		Comment:                    ptr("test db"),
+		DataRetentionTimeInDays:    ptr(int32(30)),
+		StorageSerializationPolicy: ptr("COMPATIBLE"),
+		LogLevel:                   ptr("INFO"),
+		MetricLevel:                ptr("ALL"),
+		TraceLevel:                 ptr("ON_EVENT"),
 	}
 	require.NoError(t, opts.Validate())
 }
@@ -44,7 +42,7 @@ func TestCreateDatabaseOptions_Validate_RetentionOutOfRange(t *testing.T) {
 
 	opts := CreateDatabaseOptions{
 		Name:                    NewAccountObjectIdentifier("DB"),
-		DataRetentionTimeInDays: int32Ptr(100),
+		DataRetentionTimeInDays: ptr(int32(100)),
 	}
 	err := opts.Validate()
 	require.Error(t, err)
@@ -56,7 +54,7 @@ func TestCreateDatabaseOptions_Validate_NegativeRetention(t *testing.T) {
 
 	opts := CreateDatabaseOptions{
 		Name:                    NewAccountObjectIdentifier("DB"),
-		DataRetentionTimeInDays: int32Ptr(-1),
+		DataRetentionTimeInDays: ptr(int32(-1)),
 	}
 	err := opts.Validate()
 	require.Error(t, err)
@@ -68,7 +66,7 @@ func TestCreateDatabaseOptions_Validate_InvalidStoragePolicy(t *testing.T) {
 
 	opts := CreateDatabaseOptions{
 		Name:                       NewAccountObjectIdentifier("DB"),
-		StorageSerializationPolicy: strPtr("INVALID"),
+		StorageSerializationPolicy: ptr("INVALID"),
 	}
 	err := opts.Validate()
 	require.Error(t, err)
@@ -80,7 +78,7 @@ func TestCreateDatabaseOptions_Validate_InvalidLogLevel(t *testing.T) {
 
 	opts := CreateDatabaseOptions{
 		Name:     NewAccountObjectIdentifier("DB"),
-		LogLevel: strPtr("VERBOSE"),
+		LogLevel: ptr("VERBOSE"),
 	}
 	err := opts.Validate()
 	require.Error(t, err)
@@ -92,7 +90,7 @@ func TestCreateDatabaseOptions_Validate_InvalidMetricLevel(t *testing.T) {
 
 	opts := CreateDatabaseOptions{
 		Name:        NewAccountObjectIdentifier("DB"),
-		MetricLevel: strPtr("SOME"),
+		MetricLevel: ptr("SOME"),
 	}
 	err := opts.Validate()
 	require.Error(t, err)
@@ -104,7 +102,7 @@ func TestCreateDatabaseOptions_Validate_InvalidTraceLevel(t *testing.T) {
 
 	opts := CreateDatabaseOptions{
 		Name:       NewAccountObjectIdentifier("DB"),
-		TraceLevel: strPtr("MAYBE"),
+		TraceLevel: ptr("MAYBE"),
 	}
 	err := opts.Validate()
 	require.Error(t, err)
@@ -116,8 +114,8 @@ func TestCreateDatabaseOptions_Validate_MultipleErrors(t *testing.T) {
 
 	opts := CreateDatabaseOptions{
 		Name:                    NewAccountObjectIdentifier(""),
-		DataRetentionTimeInDays: int32Ptr(200),
-		LogLevel:                strPtr("BAD"),
+		DataRetentionTimeInDays: ptr(int32(200)),
+		LogLevel:                ptr("BAD"),
 	}
 	err := opts.Validate()
 	require.Error(t, err)
@@ -134,7 +132,7 @@ func TestAlterDatabaseOptions_HasChanges(t *testing.T) {
 	}
 	assert.False(t, opts.HasChanges())
 
-	opts.Comment = strPtr("new comment")
+	opts.Comment = ptr("new comment")
 	assert.True(t, opts.HasChanges())
 }
 
@@ -145,17 +143,17 @@ func TestAlterDatabaseOptions_HasChanges_AllFields(t *testing.T) {
 		name string
 		set  func(o *AlterDatabaseOptions)
 	}{
-		{"Comment", func(o *AlterDatabaseOptions) { o.Comment = strPtr("c") }},
-		{"DataRetention", func(o *AlterDatabaseOptions) { o.DataRetentionTimeInDays = int32Ptr(1) }},
-		{"MaxDataExtension", func(o *AlterDatabaseOptions) { o.MaxDataExtensionTimeInDays = int32Ptr(1) }},
-		{"Catalog", func(o *AlterDatabaseOptions) { o.Catalog = strPtr("c") }},
-		{"ExternalVolume", func(o *AlterDatabaseOptions) { o.ExternalVolume = strPtr("v") }},
-		{"ReplaceInvalidChars", func(o *AlterDatabaseOptions) { o.ReplaceInvalidCharacters = boolPtr(true) }},
-		{"DefaultDDLCollation", func(o *AlterDatabaseOptions) { o.DefaultDDLCollation = strPtr("utf8") }},
-		{"StoragePolicy", func(o *AlterDatabaseOptions) { o.StorageSerializationPolicy = strPtr("OPTIMIZED") }},
-		{"LogLevel", func(o *AlterDatabaseOptions) { o.LogLevel = strPtr("INFO") }},
-		{"MetricLevel", func(o *AlterDatabaseOptions) { o.MetricLevel = strPtr("ALL") }},
-		{"TraceLevel", func(o *AlterDatabaseOptions) { o.TraceLevel = strPtr("OFF") }},
+		{"Comment", func(o *AlterDatabaseOptions) { o.Comment = ptr("c") }},
+		{"DataRetention", func(o *AlterDatabaseOptions) { o.DataRetentionTimeInDays = ptr(int32(1)) }},
+		{"MaxDataExtension", func(o *AlterDatabaseOptions) { o.MaxDataExtensionTimeInDays = ptr(int32(1)) }},
+		{"Catalog", func(o *AlterDatabaseOptions) { o.Catalog = ptr("c") }},
+		{"ExternalVolume", func(o *AlterDatabaseOptions) { o.ExternalVolume = ptr("v") }},
+		{"ReplaceInvalidChars", func(o *AlterDatabaseOptions) { o.ReplaceInvalidCharacters = ptr(true) }},
+		{"DefaultDDLCollation", func(o *AlterDatabaseOptions) { o.DefaultDDLCollation = ptr("utf8") }},
+		{"StoragePolicy", func(o *AlterDatabaseOptions) { o.StorageSerializationPolicy = ptr("OPTIMIZED") }},
+		{"LogLevel", func(o *AlterDatabaseOptions) { o.LogLevel = ptr("INFO") }},
+		{"MetricLevel", func(o *AlterDatabaseOptions) { o.MetricLevel = ptr("ALL") }},
+		{"TraceLevel", func(o *AlterDatabaseOptions) { o.TraceLevel = ptr("OFF") }},
 	}
 
 	for _, tc := range testCases {
@@ -300,18 +298,18 @@ func TestBuildCreateSQL_AllOptions(t *testing.T) {
 
 	sql, err := buildCreateSQL(CreateDatabaseOptions{
 		Name:                       NewAccountObjectIdentifier("FULL_DB"),
-		Comment:                    strPtr("my comment"),
-		DataRetentionTimeInDays:    int32Ptr(7),
-		MaxDataExtensionTimeInDays: int32Ptr(14),
+		Comment:                    ptr("my comment"),
+		DataRetentionTimeInDays:    ptr(int32(7)),
+		MaxDataExtensionTimeInDays: ptr(int32(14)),
 		Transient:                  true,
-		Catalog:                    strPtr("my_catalog"),
-		ExternalVolume:             strPtr("my_volume"),
-		ReplaceInvalidCharacters:   boolPtr(true),
-		DefaultDDLCollation:        strPtr("en-ci"),
-		StorageSerializationPolicy: strPtr("OPTIMIZED"),
-		LogLevel:                   strPtr("INFO"),
-		MetricLevel:                strPtr("ALL"),
-		TraceLevel:                 strPtr("ON_EVENT"),
+		Catalog:                    ptr("my_catalog"),
+		ExternalVolume:             ptr("my_volume"),
+		ReplaceInvalidCharacters:   ptr(true),
+		DefaultDDLCollation:        ptr("en-ci"),
+		StorageSerializationPolicy: ptr("OPTIMIZED"),
+		LogLevel:                   ptr("INFO"),
+		MetricLevel:                ptr("ALL"),
+		TraceLevel:                 ptr("ON_EVENT"),
 	})
 	require.NoError(t, err)
 
@@ -335,7 +333,7 @@ func TestBuildCreateSQL_SpecialCharactersInComment(t *testing.T) {
 
 	sql, err := buildCreateSQL(CreateDatabaseOptions{
 		Name:    NewAccountObjectIdentifier("DB"),
-		Comment: strPtr("it's a 'test'"),
+		Comment: ptr("it's a 'test'"),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, `CREATE DATABASE IF NOT EXISTS "DB" COMMENT = 'it''s a ''test'''`, sql)
@@ -346,7 +344,7 @@ func TestBuildCreateSQL_CreateOrAlter(t *testing.T) {
 
 	sql, err := buildCreateSQL(CreateDatabaseOptions{
 		Name:             NewAccountObjectIdentifier("MY_DB"),
-		Comment:          strPtr("managed"),
+		Comment:          ptr("managed"),
 		UseCreateOrAlter: true,
 	})
 	require.NoError(t, err)
@@ -380,7 +378,7 @@ func TestBuildAlterStatements_SingleField(t *testing.T) {
 
 	stmts, err := buildAlterStatements(AlterDatabaseOptions{
 		Name:    NewAccountObjectIdentifier("DB"),
-		Comment: strPtr("updated"),
+		Comment: ptr("updated"),
 	})
 	require.NoError(t, err)
 	require.Len(t, stmts, 1)
@@ -392,8 +390,8 @@ func TestBuildAlterStatements_MultipleFields(t *testing.T) {
 
 	stmts, err := buildAlterStatements(AlterDatabaseOptions{
 		Name:                    NewAccountObjectIdentifier("MY_DB"),
-		DataRetentionTimeInDays: int32Ptr(30),
-		LogLevel:                strPtr("WARN"),
+		DataRetentionTimeInDays: ptr(int32(30)),
+		LogLevel:                ptr("WARN"),
 	})
 	require.NoError(t, err)
 	require.Len(t, stmts, 1)
@@ -405,17 +403,17 @@ func TestBuildAlterStatements_AllFields(t *testing.T) {
 
 	stmts, err := buildAlterStatements(AlterDatabaseOptions{
 		Name:                       NewAccountObjectIdentifier("X"),
-		Comment:                    strPtr("c"),
-		DataRetentionTimeInDays:    int32Ptr(1),
-		MaxDataExtensionTimeInDays: int32Ptr(2),
-		Catalog:                    strPtr("cat"),
-		ExternalVolume:             strPtr("vol"),
-		ReplaceInvalidCharacters:   boolPtr(false),
-		DefaultDDLCollation:        strPtr("utf8"),
-		StorageSerializationPolicy: strPtr("COMPATIBLE"),
-		LogLevel:                   strPtr("DEBUG"),
-		MetricLevel:                strPtr("NONE"),
-		TraceLevel:                 strPtr("OFF"),
+		Comment:                    ptr("c"),
+		DataRetentionTimeInDays:    ptr(int32(1)),
+		MaxDataExtensionTimeInDays: ptr(int32(2)),
+		Catalog:                    ptr("cat"),
+		ExternalVolume:             ptr("vol"),
+		ReplaceInvalidCharacters:   ptr(false),
+		DefaultDDLCollation:        ptr("utf8"),
+		StorageSerializationPolicy: ptr("COMPATIBLE"),
+		LogLevel:                   ptr("DEBUG"),
+		MetricLevel:                ptr("NONE"),
+		TraceLevel:                 ptr("OFF"),
 	})
 	require.NoError(t, err)
 
@@ -521,7 +519,7 @@ func TestBuildAlterStatements_SetAndUnset(t *testing.T) {
 
 	stmts, err := buildAlterStatements(AlterDatabaseOptions{
 		Name:        NewAccountObjectIdentifier("DB"),
-		Comment:     strPtr("new"),
+		Comment:     ptr("new"),
 		UnsetFields: []string{"LOG_LEVEL"},
 	})
 	require.NoError(t, err)
@@ -536,7 +534,7 @@ func TestBuildAlterStatements_OnlySet(t *testing.T) {
 
 	stmts, err := buildAlterStatements(AlterDatabaseOptions{
 		Name:    NewAccountObjectIdentifier("DB"),
-		Comment: strPtr("hello"),
+		Comment: ptr("hello"),
 	})
 	require.NoError(t, err)
 

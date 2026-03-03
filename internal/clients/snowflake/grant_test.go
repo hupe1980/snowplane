@@ -314,25 +314,6 @@ func TestBuildToClause(t *testing.T) {
 	})
 }
 
-func TestBuildFromClause(t *testing.T) {
-	t.Parallel()
-
-	t.Run("AccountRole", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, `FROM ROLE "ANALYST"`, BuildFromClause("ANALYST", "", ""))
-	})
-
-	t.Run("DatabaseRole", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, `FROM DATABASE ROLE "MY_DB"."DR1"`, BuildFromClause("", "MY_DB.DR1", ""))
-	})
-
-	t.Run("Share", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, `FROM SHARE "my_share"`, BuildFromClause("", "", "my_share"))
-	})
-}
-
 // --------------------------------------------------------------------------
 // BuildShowGrantsTarget tests
 // --------------------------------------------------------------------------

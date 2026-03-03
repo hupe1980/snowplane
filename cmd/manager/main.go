@@ -99,96 +99,43 @@ func init() {
 	utilruntime.Must(snowplanev1alpha1.AddToScheme(scheme))
 }
 
-// validControllerNames is the set of controller names accepted by --disable-controllers.
-var validControllerNames = map[string]bool{
-	"alert":                            true,
-	"authenticationpolicy":             true,
-	"database":                         true,
-	"schema":                           true,
-	"warehouse":                        true,
-	"accountrole":                      true,
-	"databaserole":                     true,
-	"accountrolegrant":                 true,
-	"databaserolegrant":                true,
-	"sharegrant":                       true,
-	"user":                             true,
-	"table":                            true,
-	"view":                             true,
-	"stage":                            true,
-	"task":                             true,
-	"streamontable":                    true,
-	"streamonview":                     true,
-	"streamonexternaltable":            true,
-	"streamondirectorytable":           true,
-	"streamondynamictable":             true,
-	"tag":                              true,
-	"networkpolicy":                    true,
-	"resourcemonitor":                  true,
-	"maskingpolicy":                    true,
-	"rowaccesspolicy":                  true,
-	"grantownership":                   true,
-	"fieldexport":                      true,
-	"storageintegration":               true,
-	"fileformat":                       true,
-	"pipe":                             true,
-	"dynamictable":                     true,
-	"notificationintegration":          true,
-	"securityintegration":              true,
-	"passwordpolicy":                   true,
-	"networkrule":                      true,
-	"accountroleassignment":            true,
-	"databaseroleassignment":           true,
-	"tagassociation":                   true,
-	"networkpolicyattachment":          true,
-	"passwordpolicyattachment":         true,
-	"maskingpolicyapplication":         true,
-	"sequence":                         true,
-	"externaltable":                    true,
-	"materializedview":                 true,
-	"proceduresql":                     true,
-	"procedurejavascript":              true,
-	"procedurepython":                  true,
-	"procedurejava":                    true,
-	"procedurescala":                   true,
-	"functionsql":                      true,
-	"functionjavascript":               true,
-	"functionpython":                   true,
-	"functionjava":                     true,
-	"functionscala":                    true,
-	"tableconstraint":                  true,
-	"secretwithclientcredentials":      true,
-	"secretwithauthorizationcodegrant": true,
-	"secretwithbasicauthentication":    true,
-	"secretwithgenericstring":          true,
-	"apiauthenticationintegrationwithclientcredentials":      true,
-	"apiauthenticationintegrationwithauthorizationcodegrant": true,
-	"apiauthenticationintegrationwithjwtbearer":              true,
-}
-
 // parseDisabledControllers parses a comma-separated list of controller names
-// into a set for O(1) lookup. It returns an error if any name is not recognized.
-func parseDisabledControllers(s string) (map[string]bool, error) {
+// into a set for O(1) lookup. Validation is deferred to
+// validateDisabledControllers which checks against the registration table.
+func parseDisabledControllers(s string) map[string]bool {
 	disabled := make(map[string]bool)
 
 	if s == "" {
-		return disabled, nil
+		return disabled
 	}
 
 	for _, name := range strings.Split(s, ",") {
 		name = strings.TrimSpace(name)
 		if name != "" {
-			if !validControllerNames[name] {
-				valid := make([]string, 0, len(validControllerNames))
-				for k := range validControllerNames {
-					valid = append(valid, k)
-				}
-				return nil, fmt.Errorf("unknown controller name %q in --disable-controllers; valid names: %s", name, strings.Join(valid, ", "))
-			}
 			disabled[name] = true
 		}
 	}
 
-	return disabled, nil
+	return disabled
+}
+
+// validateDisabledControllers checks that every name in disabled is a known
+// controller name from the registration table. This is auto-derived — no
+// manual map to keep in sync.
+func validateDisabledControllers(disabled map[string]bool, controllerNames []string) error {
+	valid := make(map[string]bool, len(controllerNames))
+	for _, n := range controllerNames {
+		valid[n] = true
+	}
+
+	for name := range disabled {
+		if !valid[name] {
+			return fmt.Errorf("unknown controller name %q in --disable-controllers; valid names: %s",
+				name, strings.Join(controllerNames, ", "))
+		}
+	}
+
+	return nil
 }
 
 // parseAllowedRoles parses a comma-separated list of Snowflake role names into
@@ -334,12 +281,8 @@ func main() {
 		ResetTimeout:     cbResetTimeout,
 	})
 
-	// Parse per-controller disable set.
-	disabled, err := parseDisabledControllers(disableControllers)
-	if err != nil {
-		setupLog.Error(err, "invalid --disable-controllers flag")
-		os.Exit(1)
-	}
+	// Parse per-controller disable set (validated after registration table is built).
+	disabled := parseDisabledControllers(disableControllers)
 
 	// Parse role allowlist.
 	allowedRolesSet := parseAllowedRoles(allowedRoles)
@@ -445,6 +388,20 @@ func main() {
 		{"apiauthenticationintegrationwithclientcredentials", apiauthccctl.NewReconciler(kc, factory, controllerRec("apiauthenticationintegrationwithclientcredentials"), rl)},
 		{"apiauthenticationintegrationwithauthorizationcodegrant", apiauthacgctl.NewReconciler(kc, factory, controllerRec("apiauthenticationintegrationwithauthorizationcodegrant"), rl)},
 		{"apiauthenticationintegrationwithjwtbearer", apiauthjwtctl.NewReconciler(kc, factory, controllerRec("apiauthenticationintegrationwithjwtbearer"), rl)},
+	}
+
+	// Validate --disable-controllers against the registration table (single
+	// source of truth — no hand-maintained map to keep in sync).
+	controllerNames := make([]string, 0, len(controllers)+1)
+	for _, c := range controllers {
+		controllerNames = append(controllerNames, c.name)
+	}
+
+	controllerNames = append(controllerNames, "fieldexport") // registered standalone below
+
+	if err := validateDisabledControllers(disabled, controllerNames); err != nil {
+		setupLog.Error(err, "invalid --disable-controllers flag")
+		os.Exit(1)
 	}
 
 	for _, entry := range controllers {

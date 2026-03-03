@@ -180,4 +180,14 @@ func (a *adapter) DetectDrift(obj *snowplanev1alpha1.Schema, obs *reconciler.Obs
 
 func (a *adapter) SupportsCreateOrAlter() bool { return true }
 
+func (a *adapter) DropCascade(ctx context.Context, svc Service, id reconciler.Identifier) error {
+	did, err := reconciler.AssertIdentifier[snowflake.DatabaseObjectIdentifier](id)
+	if err != nil {
+		return err
+	}
+
+	return svc.DropCascade(ctx, did)
+}
+
 var _ reconciler.ResourceAdapter[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation] = (*adapter)(nil)
+var _ reconciler.CascadeDropper[*snowplanev1alpha1.Schema, Service] = (*adapter)(nil)

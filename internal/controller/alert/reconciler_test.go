@@ -81,8 +81,8 @@ func newTestAlert(name, namespace string) *snowplanev1alpha1.Alert {
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:         "MY_ALERT",
-			DatabaseName: testutil.PtrString("MY_DB"),
-			SchemaName:   testutil.PtrString("MY_SCHEMA"),
+			DatabaseName: testutil.Ptr("MY_DB"),
+			SchemaName:   testutil.Ptr("MY_SCHEMA"),
 			Condition:    "SELECT 1 FROM my_table WHERE status = 'ERROR'",
 			Action:       "CALL my_procedure()",
 		},
@@ -213,9 +213,9 @@ func TestReconcile_CreateWithAllFields(t *testing.T) {
 	alert.Status.DatabaseName = "MY_DB"
 	alert.Status.SchemaName = "MY_SCHEMA"
 	alert.Status.WarehouseName = "COMPUTE_WH"
-	alert.Spec.Schedule = testutil.PtrString("10 MINUTE")
-	alert.Spec.WarehouseName = testutil.PtrString("COMPUTE_WH")
-	alert.Spec.Comment = testutil.PtrString("my alert comment")
+	alert.Spec.Schedule = testutil.Ptr("10 MINUTE")
+	alert.Spec.WarehouseName = testutil.Ptr("COMPUTE_WH")
+	alert.Spec.Comment = testutil.Ptr("my alert comment")
 
 	var capturedOpts snowflake.CreateAlertOptions
 	obs := successfulObservation()
@@ -309,7 +309,7 @@ func TestReconcile_UpdateCommentChanged(t *testing.T) {
 	alert.Generation = 2
 	alert.Status.DatabaseName = "MY_DB"
 	alert.Status.SchemaName = "MY_SCHEMA"
-	alert.Spec.Comment = testutil.PtrString("updated comment")
+	alert.Spec.Comment = testutil.Ptr("updated comment")
 
 	obs := successfulObservation()
 
@@ -539,10 +539,10 @@ func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
 	alert := newTestAlert("myalert", "default")
-	alert.Spec.WarehouseName = testutil.PtrString("COMPUTE_WH")
+	alert.Spec.WarehouseName = testutil.Ptr("COMPUTE_WH")
 	alert.Status.WarehouseName = "COMPUTE_WH"
-	alert.Spec.Schedule = testutil.PtrString("USING CRON 0 9 * * * America/New_York")
-	alert.Spec.Comment = testutil.PtrString("my comment")
+	alert.Spec.Schedule = testutil.Ptr("USING CRON 0 9 * * * America/New_York")
+	alert.Spec.Comment = testutil.Ptr("my comment")
 
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_ALERT")
 	opts := buildCreateOptions(alert, id)
@@ -569,7 +569,7 @@ func TestBuildAlterOptions(t *testing.T) {
 
 	t.Run("CommentChanged", func(t *testing.T) {
 		alert := newTestAlert("myalert", "default")
-		alert.Spec.Comment = testutil.PtrString("new comment")
+		alert.Spec.Comment = testutil.Ptr("new comment")
 		obs := successfulObservation()
 		opts := buildAlterOptions(alert, id, obs)
 		assert.True(t, opts.HasChanges())
@@ -579,7 +579,7 @@ func TestBuildAlterOptions(t *testing.T) {
 
 	t.Run("ScheduleChanged", func(t *testing.T) {
 		alert := newTestAlert("myalert", "default")
-		alert.Spec.Schedule = testutil.PtrString("5 MINUTE")
+		alert.Spec.Schedule = testutil.Ptr("5 MINUTE")
 		obs := successfulObservation()
 		opts := buildAlterOptions(alert, id, obs)
 		assert.True(t, opts.HasChanges())
@@ -609,7 +609,7 @@ func TestBuildAlterOptions(t *testing.T) {
 
 	t.Run("SuspendChanged", func(t *testing.T) {
 		alert := newTestAlert("myalert", "default")
-		alert.Spec.Suspend = testutil.PtrBool(false)
+		alert.Spec.Suspend = testutil.Ptr(false)
 		obs := successfulObservation()
 		opts := buildAlterOptions(alert, id, obs)
 		assert.True(t, opts.HasChanges())
@@ -637,7 +637,7 @@ func TestComputeUnsetFields(t *testing.T) {
 	t.Run("CommentTracked_StillSet", func(t *testing.T) {
 		alert := newTestAlert("myalert", "default")
 		alert.Status.TrackedParameters = []string{"COMMENT"}
-		alert.Spec.Comment = testutil.PtrString("still here")
+		alert.Spec.Comment = testutil.Ptr("still here")
 		result := tracked.ComputeUnset(&alert.Spec, alert.Status.TrackedParameters)
 		assert.Empty(t, result)
 	})
@@ -654,9 +654,9 @@ func TestComputeTrackedParameters(t *testing.T) {
 
 	t.Run("AllSet", func(t *testing.T) {
 		spec := &snowplanev1alpha1.AlertSpec{
-			Comment:       testutil.PtrString("c"),
-			Schedule:      testutil.PtrString("s"),
-			WarehouseName: testutil.PtrString("w"),
+			Comment:       testutil.Ptr("c"),
+			Schedule:      testutil.Ptr("s"),
+			WarehouseName: testutil.Ptr("w"),
 		}
 		result := tracked.ComputeTracked(spec)
 		assert.Contains(t, result, "COMMENT")
@@ -706,7 +706,7 @@ func TestDetectDrift(t *testing.T) {
 		alert := newTestAlert("myalert", "default")
 		alert.Status.DatabaseName = "MY_DB"
 		alert.Status.SchemaName = "MY_SCHEMA"
-		alert.Spec.Comment = testutil.PtrString("desired-comment")
+		alert.Spec.Comment = testutil.Ptr("desired-comment")
 
 		obs := successfulObservation()
 		obs.ShowOutput.Comment = "actual-comment"

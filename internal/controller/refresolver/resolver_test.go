@@ -275,3 +275,54 @@ func TestResolveSchemaSource_RawName(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, `"ANALYTICS"."PUBLIC"`, fqn)
 }
+
+// --------------------------------------------------------------------------
+// Tests: Cross-namespace ObjectReference (T-1)
+// --------------------------------------------------------------------------
+
+func TestResolveDatabaseRef_CrossNamespace(t *testing.T) {
+	t.Parallel()
+
+	// Database lives in "infra" namespace, resource in "team-a"
+	db := readyDB("shared-db", "infra", `"SHARED_DB"`)
+	c := fake.NewClientBuilder().WithScheme(testScheme()).
+		WithRuntimeObjects(db).
+		WithStatusSubresource(&snowplanev1alpha1.Database{}).
+		Build()
+
+	// Cross-namespace ref: resource in team-a references DB in infra
+	fqn, err := ResolveDatabaseRef(context.Background(), c, "team-a",
+		snowplanev1alpha1.ObjectReference{Name: "shared-db", Namespace: "infra"})
+	require.NoError(t, err)
+	assert.Equal(t, `"SHARED_DB"`, fqn)
+}
+
+func TestResolveDatabaseRef_CrossNamespace_NotFound(t *testing.T) {
+	t.Parallel()
+
+	c := fake.NewClientBuilder().WithScheme(testScheme()).Build()
+
+	// Cross-namespace ref to non-existent DB
+	_, err := ResolveDatabaseRef(context.Background(), c, "team-a",
+		snowplanev1alpha1.ObjectReference{Name: "missing-db", Namespace: "infra"})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrReferenceNotFound)
+	// Error message should reference the infra namespace, not team-a
+	assert.Contains(t, err.Error(), "infra")
+}
+
+func TestResolveDatabaseRef_SameNamespace_FallsBack(t *testing.T) {
+	t.Parallel()
+
+	// When Namespace is empty, falls back to the resource's own namespace
+	db := readyDB("local-db", "team-a", `"LOCAL_DB"`)
+	c := fake.NewClientBuilder().WithScheme(testScheme()).
+		WithRuntimeObjects(db).
+		WithStatusSubresource(&snowplanev1alpha1.Database{}).
+		Build()
+
+	fqn, err := ResolveDatabaseRef(context.Background(), c, "team-a",
+		snowplanev1alpha1.ObjectReference{Name: "local-db"}) // No Namespace set
+	require.NoError(t, err)
+	assert.Equal(t, `"LOCAL_DB"`, fqn)
+}

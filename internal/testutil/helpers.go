@@ -20,14 +20,8 @@ import (
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
-// PtrString returns a pointer to the given string.
-func PtrString(s string) *string { return &s }
-
-// PtrInt32 returns a pointer to the given int32.
-func PtrInt32(i int32) *int32 { return &i }
-
-// PtrBool returns a pointer to the given bool.
-func PtrBool(b bool) *bool { return &b }
+// Ptr returns a pointer to the given value.
+func Ptr[T any](v T) *T { return &v }
 
 // TestScheme returns a runtime.Scheme with core and Snowplane types registered.
 // Panics on registration failure — test setup errors must be loud.
@@ -147,20 +141,20 @@ func AssertNotSynced(t *testing.T, obj conditions.ConditionedObject, reason stri
 	AssertCondition(t, obj, snowplanev1alpha1.TypeSynced, metav1.ConditionFalse, reason)
 }
 
-// AssertTerminal asserts that the resource is in a terminal state
+// assertTerminal asserts that the resource is in a terminal state
 // (Ready=False with the given terminal reason).
-func AssertTerminal(t *testing.T, obj conditions.ConditionedObject, reason string) {
+func assertTerminal(t *testing.T, obj conditions.ConditionedObject, reason string) {
 	t.Helper()
 	AssertCondition(t, obj, snowplanev1alpha1.TypeReady, metav1.ConditionFalse, reason)
 }
 
-// AssertNoCondition asserts that the given condition does not exist.
-func AssertNoCondition(t *testing.T, obj conditions.ConditionedObject, condType string) {
+// assertNoCondition asserts that the given condition does not exist.
+func assertNoCondition(t *testing.T, obj conditions.ConditionedObject, condType string) {
 	t.Helper()
 	assert.Nilf(t, conditions.Get(obj, condType), "expected condition %q to not exist", condType)
 }
 
-// NewTestRecorder returns a FakeRecorder with a 100-event buffer.
-func NewTestRecorder() *record.FakeRecorder {
+// newTestRecorder returns a FakeRecorder with a 100-event buffer.
+func newTestRecorder() *record.FakeRecorder {
 	return record.NewFakeRecorder(100)
 }

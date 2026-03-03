@@ -24,6 +24,7 @@ type StorageIntegrationSpec struct {
 
 	// Name is the Snowflake storage integration name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// Type specifies the integration type (currently only EXTERNAL_STAGE).

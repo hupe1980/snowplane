@@ -26,6 +26,7 @@ type ProcedureScalaSpec struct {
 
 	// Name is the Snowflake procedure name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -35,6 +36,7 @@ type ProcedureScalaSpec struct {
 	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -44,6 +46,7 @@ type ProcedureScalaSpec struct {
 	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// Arguments defines the procedure arguments. Immutable after creation.
@@ -52,18 +55,22 @@ type ProcedureScalaSpec struct {
 
 	// Returns is the return type (e.g. "VARCHAR", "TABLE(col1 VARCHAR, col2 NUMBER)").
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Returns string `json:"returns"`
 
 	// Handler is the fully qualified Scala handler method (e.g. "com.example.MyClass.myMethod").
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Handler string `json:"handler"`
 
 	// RuntimeVersion is the Scala runtime version (e.g. "2.12").
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	RuntimeVersion string `json:"runtimeVersion"`
 
 	// SnowparkPackage is the Snowpark package spec (e.g. "com.snowflake:snowpark:latest").
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SnowparkPackage string `json:"snowparkPackage"`
 
 	// Body is the inline Scala source code.

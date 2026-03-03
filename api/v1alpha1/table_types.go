@@ -18,10 +18,12 @@ const (
 type ColumnDefinition struct {
 	// Name is the column name.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// Type is the Snowflake data type (e.g. VARCHAR, NUMBER(38,0), TIMESTAMP_NTZ).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Type string `json:"type"`
 
 	// Nullable indicates whether the column allows NULL values. Defaults to true.
@@ -52,6 +54,7 @@ const (
 type ForeignKeyReference struct {
 	// Table is the fully qualified name of the referenced table (e.g. "ANALYTICS"."PUBLIC"."ORDERS").
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Table string `json:"table"`
 
 	// Columns lists the column names in the referenced table.
@@ -98,6 +101,7 @@ type TableSpec struct {
 
 	// Name is the Snowflake table name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -110,6 +114,7 @@ type TableSpec struct {
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -123,6 +128,7 @@ type TableSpec struct {
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// Columns defines the table's column structure.

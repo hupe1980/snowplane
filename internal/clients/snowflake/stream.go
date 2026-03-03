@@ -122,10 +122,9 @@ func sourceTypeKeyword(st StreamSourceType) string {
 }
 
 // buildCreateStreamSQL builds the CREATE STREAM SQL statement.
-func buildCreateStreamSQL(opts CreateStreamOptions) string {
+func buildCreateStreamSQL(opts CreateStreamOptions) (string, error) {
 	var b sqlbuilder.Builder
-	b.WriteString("CREATE STREAM IF NOT EXISTS ")
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "STREAM", opts.Name.FullyQualifiedName(), false, false)
 
 	b.WriteString(" ON ")
 	b.WriteString(sourceTypeKeyword(opts.SourceType))
@@ -147,7 +146,11 @@ func buildCreateStreamSQL(opts CreateStreamOptions) string {
 	// COMMENT must appear after ON <source> and mode options per Snowflake syntax.
 	b.SetString("COMMENT", opts.Comment)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a stream in Snowflake.
@@ -156,7 +159,12 @@ func (s *StreamClient) Create(ctx context.Context, opts CreateStreamOptions) err
 		return NewTerminalError(fmt.Errorf("invalid create stream options: %w", err))
 	}
 
-	if _, err := s.client.Exec(ctx, buildCreateStreamSQL(opts)); err != nil {
+	sql, err := buildCreateStreamSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create stream SQL: %w", err))
+	}
+
+	if _, err := s.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating stream %s: %w", opts.Name, err)
 	}
 
@@ -253,52 +261,19 @@ func (s *StreamClient) Observe(ctx context.Context, name SchemaObjectIdentifier)
 
 // scanStreamShowOutput scans SHOW STREAMS results for a matching row.
 func scanStreamShowOutput(rows *sql.Rows, name string) (*StreamShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*StreamShowOutput, error) {
 		return &StreamShowOutput{
-			CreatedOn:    colMap["created_on"],
-			Name:         colMap["name"],
-			DatabaseName: colMap["database_name"],
-			SchemaName:   colMap["schema_name"],
-			Owner:        colMap["owner"],
-			Comment:      colMap["comment"],
-			TableName:    colMap["table_name"],
-			SourceType:   colMap["source_type"],
-			Mode:         colMap["mode"],
-			Stale:        strings.EqualFold(colMap["stale"], "true"),
-			StaleAfter:   colMap["stale_after"],
+			CreatedOn:    m["created_on"],
+			Name:         m["name"],
+			DatabaseName: m["database_name"],
+			SchemaName:   m["schema_name"],
+			Owner:        m["owner"],
+			Comment:      m["comment"],
+			TableName:    m["table_name"],
+			SourceType:   m["source_type"],
+			Mode:         m["mode"],
+			Stale:        strings.EqualFold(m["stale"], "true"),
+			StaleAfter:   m["stale_after"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

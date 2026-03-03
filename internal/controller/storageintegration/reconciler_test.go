@@ -223,7 +223,7 @@ func TestReconcile_UpdateComment(t *testing.T) {
 	s.Finalizers = []string{finalizerName}
 	s.Status.ObservedGeneration = 1
 	s.Generation = 2
-	s.Spec.Comment = testutil.PtrString("new comment")
+	s.Spec.Comment = testutil.Ptr("new comment")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old comment"

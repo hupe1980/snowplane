@@ -70,14 +70,8 @@ var (
 	// ErrConnectionFailed indicates the Snowflake connection could not be established.
 	ErrConnectionFailed = errors.New("snowflake: connection failed")
 
-	// ErrObjectInUse indicates a resource cannot be dropped because it is in use.
-	ErrObjectInUse = errors.New("snowflake: object in use")
-
 	// ErrAccountLocked indicates the Snowflake account is locked.
 	ErrAccountLocked = errors.New("snowflake: account locked")
-
-	// ErrInvalidValue indicates a parameter value was rejected by Snowflake.
-	ErrInvalidValue = errors.New("snowflake: invalid parameter value")
 
 	// ErrRoleSwitchFailed indicates USE ROLE failed (role does not exist or not granted).
 	ErrRoleSwitchFailed = errors.New("snowflake: role switch failed")
@@ -136,21 +130,6 @@ func IsObjectNotExistOrNotAuthorized(err error) bool {
 	return err != nil && errors.Is(err, ErrObjectNotExistOrNotAuthorized)
 }
 
-// IsObjectAlreadyExists reports whether err (or any error in its chain) is ErrObjectAlreadyExists.
-func IsObjectAlreadyExists(err error) bool {
-	return err != nil && errors.Is(err, ErrObjectAlreadyExists)
-}
-
-// IsInsufficientPrivileges reports whether err (or any error in its chain) is ErrInsufficientPrivileges.
-func IsInsufficientPrivileges(err error) bool {
-	return err != nil && errors.Is(err, ErrInsufficientPrivileges)
-}
-
-// IsObjectInUse reports whether err (or any error in its chain) is ErrObjectInUse.
-func IsObjectInUse(err error) bool {
-	return err != nil && errors.Is(err, ErrObjectInUse)
-}
-
 // IsRoleSwitchFailed reports whether err (or any error in its chain) is ErrRoleSwitchFailed.
 func IsRoleSwitchFailed(err error) bool {
 	return err != nil && errors.Is(err, ErrRoleSwitchFailed)
@@ -176,13 +155,13 @@ func IsCreateOrAlterUnsupported(err error) bool {
 		return true
 	}
 
-	// Fallback: string matching for non-structured errors.
+	// Fallback: string matching for non-structured errors (e.g. wrapped or
+	// non-driver errors that don't produce gosnowflake.SnowflakeError).
 	msg := strings.ToUpper(err.Error())
 
 	return strings.Contains(msg, "UNSUPPORTED") ||
 		strings.Contains(msg, "UNEXPECTED 'OR'") ||
-		strings.Contains(msg, "SYNTAX ERROR") ||
-		strings.Contains(msg, "002032")
+		strings.Contains(msg, "SYNTAX ERROR")
 }
 
 // MapSnowflakeError wraps err with the matching sentinel error from errorCodeMap.

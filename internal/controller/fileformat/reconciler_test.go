@@ -84,8 +84,8 @@ func newTestFileFormat(name, namespace string) *snowplanev1alpha1.FileFormat {
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:         "MY_FF",
-			DatabaseName: testutil.PtrString("MY_DB"),
-			SchemaName:   testutil.PtrString("MY_SCHEMA"),
+			DatabaseName: testutil.Ptr("MY_DB"),
+			SchemaName:   testutil.Ptr("MY_SCHEMA"),
 			Type:         snowplanev1alpha1.FileFormatTypeCSV,
 		},
 	}
@@ -222,11 +222,11 @@ func TestReconcile_UpdateComment(t *testing.T) {
 	ff.Finalizers = []string{finalizerName}
 	ff.Status.ObservedGeneration = 1
 	ff.Generation = 2
-	ff.Spec.Comment = testutil.PtrString("new comment")
+	ff.Spec.Comment = testutil.Ptr("new comment")
 	ff.Status.DatabaseName = "MY_DB"
 	ff.Status.SchemaName = "MY_SCHEMA"
 
-	ff.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	ff.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old comment"

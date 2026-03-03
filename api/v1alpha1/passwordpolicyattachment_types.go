@@ -33,6 +33,7 @@ type PasswordPolicyAttachmentSpec struct {
 	// Mutually exclusive with PolicyRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	PolicyName *string `json:"policyName,omitempty"`
 
 	// PolicyRef references a PasswordPolicy CR in the same namespace.

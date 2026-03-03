@@ -21,10 +21,11 @@ func TestBuildCreateSecretSQL(t *testing.T) {
 			SecretType:        SecretTypeOAuth2,
 			APIAuthentication: "MY_AUTH",
 			OAuthScopes:       []string{"session:scope:read", "session:scope:write"},
-			Comment:           strPtr("test secret"),
+			Comment:           ptr("test secret"),
 		}
 
-		got := buildCreateSecretSQL(opts)
+		got, err := buildCreateSecretSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE SECRET IF NOT EXISTS "DB"."SCH"."MY_SECRET"`)
 		assert.Contains(t, got, "TYPE = OAUTH2")
 		assert.Contains(t, got, `API_AUTHENTICATION = "MY_AUTH"`)
@@ -44,7 +45,8 @@ func TestBuildCreateSecretSQL(t *testing.T) {
 			OAuthRefreshTokenExpiryTime: "2025-01-06 20:00:00",
 		}
 
-		got := buildCreateSecretSQL(opts)
+		got, err := buildCreateSecretSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE SECRET IF NOT EXISTS "DB"."SCH"."ACG_SECRET"`)
 		assert.Contains(t, got, "TYPE = OAUTH2")
 		assert.Contains(t, got, "OAUTH_REFRESH_TOKEN = 'abc123'")
@@ -60,7 +62,8 @@ func TestBuildCreateSecretSQL(t *testing.T) {
 			Password:   "mypass",
 		}
 
-		got := buildCreateSecretSQL(opts)
+		got, err := buildCreateSecretSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE SECRET IF NOT EXISTS "DB"."SCH"."BA_SECRET"`)
 		assert.Contains(t, got, "TYPE = PASSWORD")
 		assert.Contains(t, got, "USERNAME = 'myuser'")
@@ -75,7 +78,8 @@ func TestBuildCreateSecretSQL(t *testing.T) {
 			SecretString: "my-api-token",
 		}
 
-		got := buildCreateSecretSQL(opts)
+		got, err := buildCreateSecretSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE SECRET IF NOT EXISTS "DB"."SCH"."GS_SECRET"`)
 		assert.Contains(t, got, "TYPE = GENERIC_STRING")
 		assert.Contains(t, got, "SECRET_STRING = 'my-api-token'")
@@ -93,7 +97,7 @@ func TestBuildAlterSecretStatements(t *testing.T) {
 		t.Parallel()
 		opts := AlterSecretOptions{
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "MY_SECRET"),
-			Comment: strPtr("updated comment"),
+			Comment: ptr("updated comment"),
 		}
 
 		stmts, err := buildAlterSecretStatements(opts)
@@ -322,7 +326,7 @@ func TestAlterSecretOptions_Validate(t *testing.T) {
 		t.Parallel()
 		opts := AlterSecretOptions{
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "S"),
-			Comment: strPtr("updated"),
+			Comment: ptr("updated"),
 		}
 		assert.NoError(t, opts.Validate())
 	})
@@ -330,7 +334,7 @@ func TestAlterSecretOptions_Validate(t *testing.T) {
 	t.Run("MissingName", func(t *testing.T) {
 		t.Parallel()
 		opts := AlterSecretOptions{
-			Comment: strPtr("updated"),
+			Comment: ptr("updated"),
 		}
 		assert.Error(t, opts.Validate())
 	})
@@ -351,7 +355,7 @@ func TestAlterSecretOptions_HasChanges(t *testing.T) {
 		t.Parallel()
 		opts := AlterSecretOptions{
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "S"),
-			Comment: strPtr("hi"),
+			Comment: ptr("hi"),
 		}
 		assert.True(t, opts.HasChanges())
 	})

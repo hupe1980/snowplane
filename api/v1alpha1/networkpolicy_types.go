@@ -12,6 +12,7 @@ type NetworkPolicySpec struct {
 
 	// Name is the Snowflake network policy name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// AllowedIPList specifies IPv4 addresses (or CIDR ranges) allowed access.

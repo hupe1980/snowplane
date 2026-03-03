@@ -83,8 +83,8 @@ func newTestSecret(name, namespace string) *snowplanev1alpha1.SecretWithClientCr
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:              "MY_SECRET",
-			DatabaseName:      testutil.PtrString("MY_DB"),
-			SchemaName:        testutil.PtrString("MY_SCHEMA"),
+			DatabaseName:      testutil.Ptr("MY_DB"),
+			SchemaName:        testutil.Ptr("MY_SCHEMA"),
 			APIAuthentication: "my_integration",
 			OAuthScopes:       []string{"session:role:analyst"},
 		},
@@ -298,7 +298,7 @@ func TestReconcile_UpdateCommentChanged(t *testing.T) {
 	obj.Generation = 2
 	obj.Status.DatabaseName = "MY_DB"
 	obj.Status.SchemaName = "MY_SCHEMA"
-	obj.Spec.Comment = testutil.PtrString("updated")
+	obj.Spec.Comment = testutil.Ptr("updated")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -333,7 +333,7 @@ func TestReconcile_AlterFails(t *testing.T) {
 	obj.Generation = 2
 	obj.Status.DatabaseName = "MY_DB"
 	obj.Status.SchemaName = "MY_SCHEMA"
-	obj.Spec.Comment = testutil.PtrString("change")
+	obj.Spec.Comment = testutil.Ptr("change")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -455,9 +455,9 @@ func TestReconcile_ImmutableName(t *testing.T) {
 	obj.Status.SchemaName = "MY_SCHEMA"
 	obj.Spec.Name = "RENAMED_SECRET"
 	obj.Status.ShowOutput = &snowplanev1alpha1.SecretShowOutput{
-		Name:         testutil.PtrString("MY_SECRET"),
-		DatabaseName: testutil.PtrString("MY_DB"),
-		SchemaName:   testutil.PtrString("MY_SCHEMA"),
+		Name:         testutil.Ptr("MY_SECRET"),
+		DatabaseName: testutil.Ptr("MY_DB"),
+		SchemaName:   testutil.Ptr("MY_SCHEMA"),
 	}
 
 	obs := successfulObservation()
@@ -501,7 +501,7 @@ func TestBuildCreateOptions_WithComment(t *testing.T) {
 	t.Parallel()
 
 	obj := newTestSecret("mysecret", "default")
-	obj.Spec.Comment = testutil.PtrString("my comment")
+	obj.Spec.Comment = testutil.Ptr("my comment")
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_SECRET")
 
 	opts := buildCreateOptions(obj, id)
@@ -577,7 +577,7 @@ func TestDetectDrift_CommentChanged(t *testing.T) {
 	obj := &snowplanev1alpha1.SecretWithClientCredentials{
 		Spec: snowplanev1alpha1.SecretWithClientCredentialsSpec{
 			Name:    "MY_SECRET",
-			Comment: testutil.PtrString("new comment"),
+			Comment: testutil.Ptr("new comment"),
 		},
 	}
 

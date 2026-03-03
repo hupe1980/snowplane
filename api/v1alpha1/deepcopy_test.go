@@ -8,10 +8,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// deepCopyPtr helpers for constructing test values.
-func strPtr(s string) *string { return &s }
-func int32Ptr(v int32) *int32 { return &v }
-func boolPtr(v bool) *bool    { return &v }
+// ptr returns a pointer to the given value.
+func ptr[T any](v T) *T { return &v }
 
 // TestDeepCopy_DatabaseSpec_PointerIsolation proves that mutating a deep-copied
 // DatabaseSpec does not affect the original (all pointer fields are independent).
@@ -19,15 +17,15 @@ func TestDeepCopy_DatabaseSpec_PointerIsolation(t *testing.T) {
 	t.Parallel()
 
 	orig := DatabaseSpec{
-		CommonSpec:                 CommonSpec{UseRole: strPtr("SYSADMIN")},
+		CommonSpec:                 CommonSpec{UseRole: ptr("SYSADMIN")},
 		Name:                       "DB1",
-		Comment:                    strPtr("original"),
-		DataRetentionTimeInDays:    int32Ptr(10),
-		MaxDataExtensionTimeInDays: int32Ptr(20),
-		Catalog:                    strPtr("cat"),
-		ExternalVolume:             strPtr("vol"),
-		ReplaceInvalidCharacters:   boolPtr(true),
-		DefaultDDLCollation:        strPtr("en-ci"),
+		Comment:                    ptr("original"),
+		DataRetentionTimeInDays:    ptr(int32(10)),
+		MaxDataExtensionTimeInDays: ptr(int32(20)),
+		Catalog:                    ptr("cat"),
+		ExternalVolume:             ptr("vol"),
+		ReplaceInvalidCharacters:   ptr(true),
+		DefaultDDLCollation:        ptr("en-ci"),
 	}
 
 	copied := orig.DeepCopy()
@@ -59,13 +57,13 @@ func TestDeepCopy_SchemaSpec_PointerIsolation(t *testing.T) {
 	t.Parallel()
 
 	orig := SchemaSpec{
-		CommonSpec:                 CommonSpec{UseRole: strPtr("SYSADMIN")},
+		CommonSpec:                 CommonSpec{UseRole: ptr("SYSADMIN")},
 		Name:                       "SCH",
-		Comment:                    strPtr("original"),
-		DataRetentionTimeInDays:    int32Ptr(5),
-		MaxDataExtensionTimeInDays: int32Ptr(10),
-		DefaultDDLCollation:        strPtr("en"),
-		ReplaceInvalidCharacters:   boolPtr(false),
+		Comment:                    ptr("original"),
+		DataRetentionTimeInDays:    ptr(int32(5)),
+		MaxDataExtensionTimeInDays: ptr(int32(10)),
+		DefaultDDLCollation:        ptr("en"),
+		ReplaceInvalidCharacters:   ptr(false),
 	}
 
 	copied := orig.DeepCopy()
@@ -88,17 +86,17 @@ func TestDeepCopy_WarehouseSpec_PointerIsolation(t *testing.T) {
 
 	orig := WarehouseSpec{
 		Name:                            "WH",
-		MinClusterCount:                 int32Ptr(1),
-		MaxClusterCount:                 int32Ptr(3),
-		AutoSuspend:                     int32Ptr(300),
-		AutoResume:                      boolPtr(true),
-		ResourceMonitor:                 strPtr("monitor"),
-		Comment:                         strPtr("original"),
-		EnableQueryAcceleration:         boolPtr(true),
-		QueryAccelerationMaxScaleFactor: int32Ptr(8),
-		MaxConcurrencyLevel:             int32Ptr(10),
-		StatementQueuedTimeoutInSeconds: int32Ptr(60),
-		StatementTimeoutInSeconds:       int32Ptr(120),
+		MinClusterCount:                 ptr(int32(1)),
+		MaxClusterCount:                 ptr(int32(3)),
+		AutoSuspend:                     ptr(int32(300)),
+		AutoResume:                      ptr(true),
+		ResourceMonitor:                 ptr("monitor"),
+		Comment:                         ptr("original"),
+		EnableQueryAcceleration:         ptr(true),
+		QueryAccelerationMaxScaleFactor: ptr(int32(8)),
+		MaxConcurrencyLevel:             ptr(int32(10)),
+		StatementQueuedTimeoutInSeconds: ptr(int32(60)),
+		StatementTimeoutInSeconds:       ptr(int32(120)),
 	}
 
 	copied := orig.DeepCopy()
@@ -133,18 +131,18 @@ func TestDeepCopy_UserSpec_PointerIsolation(t *testing.T) {
 
 	orig := UserSpec{
 		Name:                  "USER1",
-		LoginName:             strPtr("login"),
-		DisplayName:           strPtr("display"),
-		Email:                 strPtr("a@b.com"),
-		FirstName:             strPtr("first"),
-		LastName:              strPtr("last"),
-		Comment:               strPtr("original"),
-		DefaultRole:           strPtr("ROLE1"),
-		DefaultSecondaryRoles: strPtr("ALL"),
-		DefaultWarehouse:      strPtr("WH"),
-		DefaultNamespace:      strPtr("NS"),
-		MustChangePassword:    boolPtr(false),
-		Disabled:              boolPtr(false),
+		LoginName:             ptr("login"),
+		DisplayName:           ptr("display"),
+		Email:                 ptr("a@b.com"),
+		FirstName:             ptr("first"),
+		LastName:              ptr("last"),
+		Comment:               ptr("original"),
+		DefaultRole:           ptr("ROLE1"),
+		DefaultSecondaryRoles: ptr("ALL"),
+		DefaultWarehouse:      ptr("WH"),
+		DefaultNamespace:      ptr("NS"),
+		MustChangePassword:    ptr(false),
+		Disabled:              ptr(false),
 		Password: &SecretKeyReference{
 			Name: "secret",
 			Key:  "password",
@@ -209,16 +207,16 @@ func TestDeepCopy_GrantOn_NestedPointerIsolation(t *testing.T) {
 			ObjectName: "DB1",
 		},
 		Schema: &GrantOnSchema{
-			SchemaName: strPtr("DB1.PUBLIC"),
+			SchemaName: ptr("DB1.PUBLIC"),
 		},
 		SchemaObject: &GrantOnSchemaObject{
 			ObjectType: "TABLE",
 			ObjectName: "DB1.PUBLIC.T1",
 			All: &GrantOnBulk{
-				InDatabase: strPtr("DB1"),
+				InDatabase: ptr("DB1"),
 			},
 			Future: &GrantOnBulk{
-				InSchema: strPtr("DB1.PUBLIC"),
+				InSchema: ptr("DB1.PUBLIC"),
 			},
 		},
 	}
@@ -228,12 +226,12 @@ func TestDeepCopy_GrantOn_NestedPointerIsolation(t *testing.T) {
 
 	// Mutate level 1 struct pointers.
 	copied.AccountObject.ObjectName = "MUTATED"
-	copied.Schema.SchemaName = strPtr("MUTATED")
+	copied.Schema.SchemaName = ptr("MUTATED")
 	copied.SchemaObject.ObjectName = "MUTATED"
 
 	// Mutate level 2 nested pointers (GrantOnBulk).
-	copied.SchemaObject.All.InDatabase = strPtr("MUTATED")
-	copied.SchemaObject.Future.InSchema = strPtr("MUTATED")
+	copied.SchemaObject.All.InDatabase = ptr("MUTATED")
+	copied.SchemaObject.Future.InSchema = ptr("MUTATED")
 
 	// Original level 1 unchanged.
 	assert.Equal(t, "DB1", orig.AccountObject.ObjectName)
@@ -257,18 +255,18 @@ func TestDeepCopy_AccountRoleGrantSpec_FullIsolation(t *testing.T) {
 				ObjectType: "TABLE",
 				ObjectName: "DB.SCH.T",
 				All: &GrantOnBulk{
-					InSchema: strPtr("DB.SCH"),
+					InSchema: ptr("DB.SCH"),
 				},
 			},
 		},
-		AccountRole:     strPtr("ANALYST"),
+		AccountRole:     ptr("ANALYST"),
 		WithGrantOption: true,
 	}
 
 	copied := orig.DeepCopy()
 	copied.On.SchemaObject.ObjectName = "MUTATED"
-	copied.On.SchemaObject.All.InSchema = strPtr("MUTATED")
-	copied.AccountRole = strPtr("MUTATED")
+	copied.On.SchemaObject.All.InSchema = ptr("MUTATED")
+	copied.AccountRole = ptr("MUTATED")
 
 	assert.Equal(t, "DB.SCH.T", orig.On.SchemaObject.ObjectName)
 	assert.Equal(t, "DB.SCH", *orig.On.SchemaObject.All.InSchema)
@@ -283,15 +281,15 @@ func TestDeepCopy_TableSpec_ColumnPointerIsolation(t *testing.T) {
 	orig := TableSpec{
 		Name: "T1",
 		Columns: []ColumnDefinition{
-			{Name: "id", Type: "NUMBER", Nullable: boolPtr(false), Default: strPtr("0"), Comment: strPtr("pk")},
-			{Name: "name", Type: "VARCHAR", Nullable: boolPtr(true), Comment: strPtr("label")},
+			{Name: "id", Type: "NUMBER", Nullable: ptr(false), Default: ptr("0"), Comment: ptr("pk")},
+			{Name: "name", Type: "VARCHAR", Nullable: ptr(true), Comment: ptr("label")},
 		},
-		Comment:                    strPtr("table comment"),
-		DataRetentionTimeInDays:    int32Ptr(30),
-		MaxDataExtensionTimeInDays: int32Ptr(60),
-		ChangeTracking:             boolPtr(false),
-		DefaultDDLCollation:        strPtr("en"),
-		EnableSchemaEvolution:      boolPtr(true),
+		Comment:                    ptr("table comment"),
+		DataRetentionTimeInDays:    ptr(int32(30)),
+		MaxDataExtensionTimeInDays: ptr(int32(60)),
+		ChangeTracking:             ptr(false),
+		DefaultDDLCollation:        ptr("en"),
+		EnableSchemaEvolution:      ptr(true),
 	}
 
 	copied := orig.DeepCopy()
@@ -328,16 +326,16 @@ func TestDeepCopy_StageSpec_PointerIsolation(t *testing.T) {
 
 	orig := StageSpec{
 		Name:               "STG",
-		URL:                strPtr("s3://bucket/path"),
-		StorageIntegration: strPtr("MY_INT"),
-		FileFormat:         strPtr("CSV"),
-		Comment:            strPtr("original"),
+		URL:                ptr("s3://bucket/path"),
+		StorageIntegration: ptr("MY_INT"),
+		FileFormat:         ptr("CSV"),
+		Comment:            ptr("original"),
 		Encryption: &StageEncryption{
 			Type: "AWS_SSE_S3",
 		},
 		Directory: &StageDirectoryOptions{
 			Enable:      true,
-			AutoRefresh: boolPtr(false),
+			AutoRefresh: ptr(false),
 		},
 	}
 
@@ -371,8 +369,8 @@ func TestDeepCopy_ViewSpec_PointerIsolation(t *testing.T) {
 	orig := ViewSpec{
 		Name:           "V1",
 		Statement:      "SELECT 1",
-		Comment:        strPtr("original"),
-		ChangeTracking: boolPtr(false),
+		Comment:        ptr("original"),
+		ChangeTracking: ptr(false),
 	}
 
 	copied := orig.DeepCopy()
@@ -421,9 +419,9 @@ func TestDeepCopy_Database_FullObject(t *testing.T) {
 			Annotations: map[string]string{"key": "value"},
 		},
 		Spec: DatabaseSpec{
-			CommonSpec: CommonSpec{UseRole: strPtr("SYSADMIN")},
+			CommonSpec: CommonSpec{UseRole: ptr("SYSADMIN")},
 			Name:       "DB1",
-			Comment:    strPtr("original"),
+			Comment:    ptr("original"),
 		},
 		Status: DatabaseStatus{
 			CommonStatus: CommonStatus{
@@ -455,8 +453,8 @@ func TestDeepCopy_DatabaseList_ItemsIsolation(t *testing.T) {
 
 	orig := &DatabaseList{
 		Items: []Database{
-			{Spec: DatabaseSpec{Name: "DB1", Comment: strPtr("one")}},
-			{Spec: DatabaseSpec{Name: "DB2", Comment: strPtr("two")}},
+			{Spec: DatabaseSpec{Name: "DB1", Comment: ptr("one")}},
+			{Spec: DatabaseSpec{Name: "DB2", Comment: ptr("two")}},
 		},
 	}
 
@@ -526,7 +524,7 @@ func TestDeepCopy_AccountRoleSpec_PointerIsolation(t *testing.T) {
 
 	orig := AccountRoleSpec{
 		Name:    "ROLE1",
-		Comment: strPtr("original"),
+		Comment: ptr("original"),
 	}
 
 	copied := orig.DeepCopy()
@@ -541,7 +539,7 @@ func TestDeepCopy_DatabaseRoleSpec_PointerIsolation(t *testing.T) {
 
 	orig := DatabaseRoleSpec{
 		Name:    "DBROLE1",
-		Comment: strPtr("original"),
+		Comment: ptr("original"),
 	}
 
 	copied := orig.DeepCopy()

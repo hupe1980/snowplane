@@ -32,6 +32,7 @@ type NetworkPolicyAttachmentSpec struct {
 	// Mutually exclusive with PolicyRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	PolicyName *string `json:"policyName,omitempty"`
 
 	// PolicyRef references a NetworkPolicy CR in the same namespace.

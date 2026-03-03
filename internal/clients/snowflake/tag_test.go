@@ -19,7 +19,8 @@ func TestBuildCreateTagSQL(t *testing.T) {
 		opts := CreateTagOptions{
 			Name: NewSchemaObjectIdentifier("DB", "SCH", "MY_TAG"),
 		}
-		got := buildCreateTagSQL(opts)
+		got, err := buildCreateTagSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE TAG IF NOT EXISTS "DB"."SCH"."MY_TAG"`, got)
 	})
 
@@ -29,7 +30,8 @@ func TestBuildCreateTagSQL(t *testing.T) {
 			Name:             NewSchemaObjectIdentifier("DB", "SCH", "MY_TAG"),
 			UseCreateOrAlter: true,
 		}
-		got := buildCreateTagSQL(opts)
+		got, err := buildCreateTagSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE OR ALTER TAG "DB"."SCH"."MY_TAG"`, got)
 	})
 
@@ -39,7 +41,8 @@ func TestBuildCreateTagSQL(t *testing.T) {
 			Name:          NewSchemaObjectIdentifier("DB", "SCH", "ENV_TAG"),
 			AllowedValues: []string{"dev", "staging", "prod"},
 		}
-		got := buildCreateTagSQL(opts)
+		got, err := buildCreateTagSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "ALLOWED_VALUES 'dev', 'staging', 'prod'")
 	})
 
@@ -50,7 +53,8 @@ func TestBuildCreateTagSQL(t *testing.T) {
 			Name:    NewSchemaObjectIdentifier("DB", "SCH", "T"),
 			Comment: &comment,
 		}
-		got := buildCreateTagSQL(opts)
+		got, err := buildCreateTagSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "COMMENT = 'environment tag'")
 	})
 
@@ -60,7 +64,8 @@ func TestBuildCreateTagSQL(t *testing.T) {
 			Name:          NewSchemaObjectIdentifier("DB", "SCH", "T"),
 			AllowedValues: []string{"it's", "fine"},
 		}
-		got := buildCreateTagSQL(opts)
+		got, err := buildCreateTagSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "ALLOWED_VALUES 'it''s', 'fine'")
 	})
 
@@ -73,7 +78,8 @@ func TestBuildCreateTagSQL(t *testing.T) {
 			Comment:          &comment,
 			UseCreateOrAlter: true,
 		}
-		got := buildCreateTagSQL(opts)
+		got, err := buildCreateTagSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "CREATE OR ALTER TAG")
 		assert.Contains(t, got, "ALLOWED_VALUES 'a', 'b'")
 		assert.Contains(t, got, "COMMENT = 'full tag'")

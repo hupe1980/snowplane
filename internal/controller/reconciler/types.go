@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,6 +50,8 @@ type ManagedResource interface {
 	SetObservedGeneration(int64)
 	GetLastAppliedSpecHash() string
 	SetLastAppliedSpecHash(string)
+	GetLastReconcileTime() *metav1.Time
+	SetLastReconcileTime(*metav1.Time)
 	GetTrackedParametersList() []string
 	SetTrackedParametersList([]string)
 	GetOwner() string
@@ -192,6 +195,28 @@ type PostUpdateHook[T ManagedResource] interface {
 // paths. Default when absent: CREATE OR ALTER is not supported.
 type CreateOrAlterSupporter interface {
 	SupportsCreateOrAlter() bool
+}
+
+// CascadeDropper is an optional interface for adapters whose Snowflake
+// resource supports DROP … CASCADE. When implemented and the force-destroy
+// annotation is set on the CR, the reconciler calls DropCascade instead of
+// Drop. Only resources where Snowflake DDL supports CASCADE (Database,
+// Schema) should implement this.
+// Default when absent: force-destroy annotation is ignored and standard Drop is used.
+type CascadeDropper[T ManagedResource, S any] interface {
+	DropCascade(ctx context.Context, svc S, id Identifier) error
+}
+
+// LateInitializer is an optional interface for adapters that fill unset
+// (nil) spec fields from observed Snowflake state during adoption.
+// This follows the Crossplane late-initialization pattern: when a CR is
+// adopted with adoptionPolicy=adopt, spec fields left nil by the user are
+// populated from the live Snowflake resource, making the spec a complete
+// representation of the managed state.
+// Returns true if any spec field was modified (triggers spec persist).
+// Default when absent: no late-initialization.
+type LateInitializer[T ManagedResource, D any] interface {
+	LateInitialize(obj T, obs *Observation[D]) bool
 }
 
 // SetupWatchesFunc is a callback used during SetupWithManager to add

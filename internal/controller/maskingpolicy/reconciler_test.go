@@ -81,8 +81,8 @@ func newTestMaskingPolicy(name, namespace string) *snowplanev1alpha1.MaskingPoli
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:         "MY_MASKING_POLICY",
-			DatabaseName: testutil.PtrString("MY_DB"),
-			SchemaName:   testutil.PtrString("MY_SCHEMA"),
+			DatabaseName: testutil.Ptr("MY_DB"),
+			SchemaName:   testutil.Ptr("MY_SCHEMA"),
 			Signature: []snowplanev1alpha1.MaskingPolicyArgument{
 				{Name: "val", Type: "VARCHAR"},
 			},
@@ -266,9 +266,9 @@ func TestReconcile_UpdateCommentChanged(t *testing.T) {
 	mp.Generation = 2
 	mp.Status.DatabaseName = "MY_DB"
 	mp.Status.SchemaName = "MY_SCHEMA"
-	mp.Spec.Comment = testutil.PtrString("updated")
+	mp.Spec.Comment = testutil.Ptr("updated")
 
-	mp.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	mp.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -305,9 +305,9 @@ func TestReconcile_AlterFails(t *testing.T) {
 	mp.Generation = 2
 	mp.Status.DatabaseName = "MY_DB"
 	mp.Status.SchemaName = "MY_SCHEMA"
-	mp.Spec.Comment = testutil.PtrString("change")
+	mp.Spec.Comment = testutil.Ptr("change")
 
-	mp.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	mp.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -461,8 +461,8 @@ func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
 	mp := newTestMaskingPolicy("mymp", "default")
-	mp.Spec.Comment = testutil.PtrString("test policy")
-	mp.Spec.ExemptOtherPolicies = testutil.PtrBool(true)
+	mp.Spec.Comment = testutil.Ptr("test policy")
+	mp.Spec.ExemptOtherPolicies = testutil.Ptr(true)
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_MASKING_POLICY")
 
 	opts := buildCreateOptions(mp, id)
@@ -493,8 +493,8 @@ func TestComputeTrackedParameters(t *testing.T) {
 
 	spec := &snowplanev1alpha1.MaskingPolicySpec{
 		Body:                "x",
-		Comment:             testutil.PtrString("c"),
-		ExemptOtherPolicies: testutil.PtrBool(true),
+		Comment:             testutil.Ptr("c"),
+		ExemptOtherPolicies: testutil.Ptr(true),
 	}
 
 	fields := tracked.ComputeTracked(spec)
@@ -555,7 +555,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	mp := &snowplanev1alpha1.MaskingPolicy{
 		Spec: snowplanev1alpha1.MaskingPolicySpec{
 			Name:    "MY_MASKING_POLICY",
-			Comment: testutil.PtrString("test"),
+			Comment: testutil.Ptr("test"),
 		},
 	}
 
@@ -576,7 +576,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	mp := &snowplanev1alpha1.MaskingPolicy{
 		Spec: snowplanev1alpha1.MaskingPolicySpec{
 			Name:    "MY_MASKING_POLICY",
-			Comment: testutil.PtrString("desired"),
+			Comment: testutil.Ptr("desired"),
 		},
 	}
 

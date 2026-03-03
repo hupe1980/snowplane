@@ -83,8 +83,8 @@ func newTestSecret(name, namespace string) *snowplanev1alpha1.SecretWithAuthoriz
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:                        "MY_SECRET",
-			DatabaseName:                testutil.PtrString("MY_DB"),
-			SchemaName:                  testutil.PtrString("MY_SCHEMA"),
+			DatabaseName:                testutil.Ptr("MY_DB"),
+			SchemaName:                  testutil.Ptr("MY_SCHEMA"),
 			APIAuthentication:           "my_integration",
 			OAuthRefreshToken:           "refresh-token-abc",
 			OAuthRefreshTokenExpiryTime: "2025-12-31 23:59:59",
@@ -298,7 +298,7 @@ func TestReconcile_UpdateCommentChanged(t *testing.T) {
 	obj.Generation = 2
 	obj.Status.DatabaseName = "MY_DB"
 	obj.Status.SchemaName = "MY_SCHEMA"
-	obj.Spec.Comment = testutil.PtrString("updated")
+	obj.Spec.Comment = testutil.Ptr("updated")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -333,7 +333,7 @@ func TestReconcile_AlterFails(t *testing.T) {
 	obj.Generation = 2
 	obj.Status.DatabaseName = "MY_DB"
 	obj.Status.SchemaName = "MY_SCHEMA"
-	obj.Spec.Comment = testutil.PtrString("change")
+	obj.Spec.Comment = testutil.Ptr("change")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -455,9 +455,9 @@ func TestReconcile_ImmutableName(t *testing.T) {
 	obj.Status.SchemaName = "MY_SCHEMA"
 	obj.Spec.Name = "RENAMED_SECRET"
 	obj.Status.ShowOutput = &snowplanev1alpha1.SecretShowOutput{
-		Name:         testutil.PtrString("MY_SECRET"),
-		DatabaseName: testutil.PtrString("MY_DB"),
-		SchemaName:   testutil.PtrString("MY_SCHEMA"),
+		Name:         testutil.Ptr("MY_SECRET"),
+		DatabaseName: testutil.Ptr("MY_DB"),
+		SchemaName:   testutil.Ptr("MY_SCHEMA"),
 	}
 
 	obs := successfulObservation()
@@ -545,7 +545,7 @@ func TestDetectDrift_CommentChanged(t *testing.T) {
 	obj := &snowplanev1alpha1.SecretWithAuthorizationCodeGrant{
 		Spec: snowplanev1alpha1.SecretWithAuthorizationCodeGrantSpec{
 			Name:    "MY_SECRET",
-			Comment: testutil.PtrString("new comment"),
+			Comment: testutil.Ptr("new comment"),
 		},
 	}
 

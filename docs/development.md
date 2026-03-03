@@ -208,12 +208,16 @@ All CRD types include `x-kubernetes-validations` rules — evaluated server-side
 
 ### Resource Adoption
 
-Adopt pre-existing Snowflake resources via annotation:
+Adopt pre-existing Snowflake resources via `spec.managementPolicies.adoptionPolicy`:
 
-| Annotation Value | Behaviour |
-|:-----------------|:----------|
+| Policy Value | Behaviour |
+|:-------------|:----------|
 | *(absent)* / `fail-if-exists` | Terminal error — prevents accidental takeover |
-| `adopt` | Populates status from current state, sets `LateInitialized` |
+| `adopt` | Populates status from current state, late-initializes spec, sets `LateInitialized` annotation |
+
+**Late-initialization:** During adoption and post-crash create recovery, nil spec fields are populated from the observed Snowflake resource state (ShowOutput, DescribeOutput, Parameters). This ensures the adopted CR's spec is a complete representation of the managed state. Implemented for 20 adapters via the optional `LateInitializer[T, D]` interface — adapters opt in by implementing `LateInitialize(obj T, obs *Observation[D]) bool`. The `late-initialized` annotation is only set when fields were actually modified. The duplicated late-init logic is consolidated into the `checkLateInit` helper method using an ISP type-assertion pattern.
+
+**LastReconcileTime:** `status.lastReconcileTime` is stamped on every successful reconcile (create, update, adoption, post-crash recovery) via `finalizeSpec()` for SLO monitoring and staleness detection. Consolidating the timestamp into `finalizeSpec` guarantees all success paths stamp it.
 
 ### Terraform Migration Tool
 

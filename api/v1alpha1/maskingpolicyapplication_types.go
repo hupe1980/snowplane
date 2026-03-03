@@ -32,6 +32,7 @@ type MaskingPolicyApplicationSpec struct {
 	// Mutually exclusive with PolicyRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	PolicyName *string `json:"policyName,omitempty"`
 
 	// PolicyRef references a MaskingPolicy CR in the same namespace.
@@ -44,11 +45,13 @@ type MaskingPolicyApplicationSpec struct {
 	// (e.g. "MY_DB"."MY_SCHEMA"."MY_TABLE").
 	// Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	TableName string `json:"tableName"`
 
 	// ColumnName is the column in the table to apply the masking policy to.
 	// Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	ColumnName string `json:"columnName"`
 
 	// UsingColumns is an optional list of column names for a conditional masking policy.

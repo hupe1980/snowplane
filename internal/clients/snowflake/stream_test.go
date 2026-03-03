@@ -21,7 +21,8 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			SourceType: StreamSourceTable,
 			SourceName: `"DB"."SCH"."MY_TABLE"`,
 		}
-		got := buildCreateStreamSQL(opts)
+		got, err := buildCreateStreamSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."MY_STREAM" ON TABLE "DB"."SCH"."MY_TABLE"`, got)
 	})
 
@@ -32,7 +33,8 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			SourceType: StreamSourceExternalTable,
 			SourceName: `"DB"."SCH"."EXT_TBL"`,
 		}
-		got := buildCreateStreamSQL(opts)
+		got, err := buildCreateStreamSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON EXTERNAL TABLE "DB"."SCH"."EXT_TBL"`, got)
 	})
 
@@ -43,7 +45,8 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			SourceType: StreamSourceDynamicTable,
 			SourceName: `"DB"."SCH"."DYN_TBL"`,
 		}
-		got := buildCreateStreamSQL(opts)
+		got, err := buildCreateStreamSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON DYNAMIC TABLE "DB"."SCH"."DYN_TBL"`, got)
 	})
 
@@ -54,7 +57,8 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			SourceType: StreamSourceView,
 			SourceName: `"DB"."SCH"."MY_VIEW"`,
 		}
-		got := buildCreateStreamSQL(opts)
+		got, err := buildCreateStreamSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON VIEW "DB"."SCH"."MY_VIEW"`, got)
 	})
 
@@ -65,7 +69,8 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			SourceType: StreamSourceStage,
 			SourceName: `"DB"."SCH"."MY_STAGE"`,
 		}
-		got := buildCreateStreamSQL(opts)
+		got, err := buildCreateStreamSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON STAGE "DB"."SCH"."MY_STAGE"`, got)
 	})
 
@@ -76,11 +81,12 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			Name:            NewSchemaObjectIdentifier("DB", "SCH", "S"),
 			SourceType:      StreamSourceTable,
 			SourceName:      `"DB"."SCH"."T"`,
-			AppendOnly:      boolPtr(true),
-			ShowInitialRows: boolPtr(true),
+			AppendOnly:      ptr(true),
+			ShowInitialRows: ptr(true),
 			Comment:         &comment,
 		}
-		got := buildCreateStreamSQL(opts)
+		got, err := buildCreateStreamSQL(opts)
+		require.NoError(t, err)
 		// COMMENT must come AFTER ON <source> and mode options per Snowflake syntax.
 		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON TABLE "DB"."SCH"."T" APPEND_ONLY = TRUE SHOW_INITIAL_ROWS = TRUE COMMENT = 'my stream'`, got)
 	})
@@ -91,9 +97,10 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			Name:       NewSchemaObjectIdentifier("DB", "SCH", "S"),
 			SourceType: StreamSourceExternalTable,
 			SourceName: `"DB"."SCH"."E"`,
-			InsertOnly: boolPtr(true),
+			InsertOnly: ptr(true),
 		}
-		got := buildCreateStreamSQL(opts)
+		got, err := buildCreateStreamSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON EXTERNAL TABLE "DB"."SCH"."E" INSERT_ONLY = TRUE`, got)
 	})
 
@@ -103,9 +110,10 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			Name:       NewSchemaObjectIdentifier("DB", "SCH", "S"),
 			SourceType: StreamSourceTable,
 			SourceName: `"DB"."SCH"."T"`,
-			AppendOnly: boolPtr(false),
+			AppendOnly: ptr(false),
 		}
-		got := buildCreateStreamSQL(opts)
+		got, err := buildCreateStreamSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON TABLE "DB"."SCH"."T"`, got)
 	})
 
@@ -118,7 +126,8 @@ func TestBuildCreateStreamSQL(t *testing.T) {
 			SourceName: `"DB"."SCH"."T"`,
 			Comment:    &comment,
 		}
-		got := buildCreateStreamSQL(opts)
+		got, err := buildCreateStreamSQL(opts)
+		require.NoError(t, err)
 		// Verify COMMENT appears after ON TABLE, not before.
 		assert.Equal(t, `CREATE STREAM IF NOT EXISTS "DB"."SCH"."S" ON TABLE "DB"."SCH"."T" COMMENT = 'test'`, got)
 	})

@@ -342,7 +342,7 @@ func TestCEL_AccountRoleGrant_ImmutablePrivilege(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.AccountRoleGrantSpec{
 			Privilege:   "SELECT",
-			AccountRole: strPtr("MY_ROLE"),
+			AccountRole: ptr("MY_ROLE"),
 			On: snowplanev1alpha1.GrantOn{
 				AccountObject: &snowplanev1alpha1.GrantOnAccountObject{
 					ObjectType: "DATABASE",
@@ -374,8 +374,8 @@ func TestCEL_MaskingPolicy_BodyBlocklist(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.MaskingPolicySpec{
 			Name:         "MY_POLICY",
-			DatabaseName: strPtr("MY_DB"),
-			SchemaName:   strPtr("MY_SCHEMA"),
+			DatabaseName: ptr("MY_DB"),
+			SchemaName:   ptr("MY_SCHEMA"),
 			Signature: []snowplanev1alpha1.MaskingPolicyArgument{
 				{Name: "val", Type: "VARCHAR"},
 			},
@@ -399,8 +399,8 @@ func TestCEL_MaskingPolicy_BodyAllowed(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.MaskingPolicySpec{
 			Name:         "CLEAN_POLICY",
-			DatabaseName: strPtr("MY_DB"),
-			SchemaName:   strPtr("MY_SCHEMA"),
+			DatabaseName: ptr("MY_DB"),
+			SchemaName:   ptr("MY_SCHEMA"),
 			Signature: []snowplanev1alpha1.MaskingPolicyArgument{
 				{Name: "val", Type: "VARCHAR"},
 			},
@@ -425,8 +425,8 @@ func TestCEL_Stage_ImmutableType(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.StageSpec{
 			Name:         "MY_STAGE",
-			DatabaseName: strPtr("MY_DB"),
-			SchemaName:   strPtr("MY_SCHEMA"),
+			DatabaseName: ptr("MY_DB"),
+			SchemaName:   ptr("MY_SCHEMA"),
 			URL:          &extURL,
 		},
 	}
@@ -478,7 +478,7 @@ func TestCEL_GrantOwnership_ImmutableFields(t *testing.T) {
 		Spec: snowplanev1alpha1.GrantOwnershipSpec{
 			ObjectType:  "TABLE",
 			ObjectName:  "MY_DB.PUBLIC.MY_TABLE",
-			AccountRole: strPtr("MY_ROLE"),
+			AccountRole: ptr("MY_ROLE"),
 		},
 	}
 
@@ -538,10 +538,6 @@ func TestCEL_ProviderConfig_AuthValidation(t *testing.T) {
 // --------------------------------------------------------------------------
 // helpers
 // --------------------------------------------------------------------------
-
-func strPtr(s string) *string { return &s }
-
-// --------------------------------------------------------------------------
 // Additional CEL Integration Tests — newly added immutability rules
 // --------------------------------------------------------------------------
 
@@ -556,8 +552,8 @@ func TestCEL_MaskingPolicy_ImmutableSignature(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.MaskingPolicySpec{
 			Name:         "SIG_POLICY",
-			DatabaseName: strPtr("MY_DB"),
-			SchemaName:   strPtr("MY_SCHEMA"),
+			DatabaseName: ptr("MY_DB"),
+			SchemaName:   ptr("MY_SCHEMA"),
 			Signature: []snowplanev1alpha1.MaskingPolicyArgument{
 				{Name: "val", Type: "VARCHAR"},
 			},
@@ -588,8 +584,8 @@ func TestCEL_RowAccessPolicy_ImmutableSignature(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.RowAccessPolicySpec{
 			Name:         "SIG_RAP",
-			DatabaseName: strPtr("MY_DB"),
-			SchemaName:   strPtr("MY_SCHEMA"),
+			DatabaseName: ptr("MY_DB"),
+			SchemaName:   ptr("MY_SCHEMA"),
 			Signature: []snowplanev1alpha1.RowAccessPolicyArgument{
 				{Name: "col", Type: "VARCHAR"},
 			},
@@ -620,8 +616,8 @@ func TestCEL_RowAccessPolicy_BodyBlocklist(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.RowAccessPolicySpec{
 			Name:         "BAD_RAP",
-			DatabaseName: strPtr("MY_DB"),
-			SchemaName:   strPtr("MY_SCHEMA"),
+			DatabaseName: ptr("MY_DB"),
+			SchemaName:   ptr("MY_SCHEMA"),
 			Signature: []snowplanev1alpha1.RowAccessPolicyArgument{
 				{Name: "col", Type: "VARCHAR"},
 			},
@@ -731,8 +727,8 @@ func TestCEL_Table_ImmutableName(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.TableSpec{
 			Name:         "MY_TABLE",
-			DatabaseName: strPtr("MY_DB"),
-			SchemaName:   strPtr("MY_SCHEMA"),
+			DatabaseName: ptr("MY_DB"),
+			SchemaName:   ptr("MY_SCHEMA"),
 			Columns: []snowplanev1alpha1.ColumnDefinition{
 				{Name: "ID", Type: "NUMBER(38,0)"},
 			},
@@ -784,8 +780,8 @@ func TestCEL_Task_ImmutableName(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.TaskSpec{
 			Name:         "MY_TASK",
-			DatabaseName: strPtr("MY_DB"),
-			SchemaName:   strPtr("MY_SCHEMA"),
+			DatabaseName: ptr("MY_DB"),
+			SchemaName:   ptr("MY_SCHEMA"),
 			SQLStatement: "SELECT 1",
 		},
 	}
@@ -814,8 +810,8 @@ func TestCEL_Task_WarehouseMutualExclusion(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.TaskSpec{
 			Name:                                "MUTEX_TASK",
-			DatabaseName:                        strPtr("MY_DB"),
-			SchemaName:                          strPtr("MY_SCHEMA"),
+			DatabaseName:                        ptr("MY_DB"),
+			SchemaName:                          ptr("MY_SCHEMA"),
 			SQLStatement:                        "SELECT 1",
 			WarehouseName:                       &wh,
 			UserTaskManagedInitialWarehouseSize: &size,
@@ -871,7 +867,7 @@ func TestCEL_Schema_DatabaseNameNoDots(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.SchemaSpec{
 			Name:         "MY_SCHEMA",
-			DatabaseName: strPtr("MY_DB.EXTRA"),
+			DatabaseName: ptr("MY_DB.EXTRA"),
 		},
 	}
 
@@ -891,8 +887,8 @@ func TestCEL_Table_DatabaseNameNoDots(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.TableSpec{
 			Name:         "MY_TABLE",
-			DatabaseName: strPtr("MY_DB.EXTRA"),
-			SchemaName:   strPtr("MY_SCHEMA"),
+			DatabaseName: ptr("MY_DB.EXTRA"),
+			SchemaName:   ptr("MY_SCHEMA"),
 			Columns: []snowplanev1alpha1.ColumnDefinition{
 				{Name: "ID", Type: "NUMBER(38,0)"},
 			},
@@ -915,8 +911,8 @@ func TestCEL_Table_SchemaNameNoDots(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.TableSpec{
 			Name:         "MY_TABLE",
-			DatabaseName: strPtr("MY_DB"),
-			SchemaName:   strPtr("MY_DB.MY_SCHEMA"),
+			DatabaseName: ptr("MY_DB"),
+			SchemaName:   ptr("MY_DB.MY_SCHEMA"),
 			Columns: []snowplanev1alpha1.ColumnDefinition{
 				{Name: "ID", Type: "NUMBER(38,0)"},
 			},
@@ -939,8 +935,8 @@ func TestCEL_View_DatabaseNameNoDots(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.ViewSpec{
 			Name:         "MY_VIEW",
-			DatabaseName: strPtr("DB.EXTRA"),
-			SchemaName:   strPtr("MY_SCHEMA"),
+			DatabaseName: ptr("DB.EXTRA"),
+			SchemaName:   ptr("MY_SCHEMA"),
 			Statement:    "SELECT 1",
 		},
 	}
@@ -961,8 +957,8 @@ func TestCEL_Stage_SchemaNameNoDots(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.StageSpec{
 			Name:         "MY_STAGE",
-			DatabaseName: strPtr("MY_DB"),
-			SchemaName:   strPtr("MY_DB.MY_SCHEMA"),
+			DatabaseName: ptr("MY_DB"),
+			SchemaName:   ptr("MY_DB.MY_SCHEMA"),
 		},
 	}
 
@@ -982,8 +978,8 @@ func TestCEL_ValidSimpleIdentifiers(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.TableSpec{
 			Name:         "MY_TABLE",
-			DatabaseName: strPtr("MY_DB"),
-			SchemaName:   strPtr("MY_SCHEMA"),
+			DatabaseName: ptr("MY_DB"),
+			SchemaName:   ptr("MY_SCHEMA"),
 			Columns: []snowplanev1alpha1.ColumnDefinition{
 				{Name: "ID", Type: "NUMBER(38,0)"},
 			},

@@ -92,7 +92,7 @@ func newTestAuthenticationPolicy(name, namespace string) *snowplanev1alpha1.Auth
 			SchemaName:            &schemaName,
 			AuthenticationMethods: []string{"PASSWORD", "SAML"},
 			ClientTypes:           []string{"SNOWFLAKE_UI", "DRIVERS"},
-			Comment:               testutil.PtrString("test auth policy"),
+			Comment:               testutil.Ptr("test auth policy"),
 		},
 	}
 }
@@ -349,13 +349,13 @@ func TestBuildCreateOptions_WithSubPolicies(t *testing.T) {
 	ap := newTestAuthenticationPolicy("myap", "default")
 	ap.Spec.MfaPolicy = &snowplanev1alpha1.AuthenticationPolicyMfaPolicy{
 		AllowedMethods:                     []string{"TOTP"},
-		EnforceMfaOnExternalAuthentication: testutil.PtrString("REQUIRED"),
+		EnforceMfaOnExternalAuthentication: testutil.Ptr("REQUIRED"),
 	}
 	ap.Spec.PatPolicy = &snowplanev1alpha1.AuthenticationPolicyPatPolicy{
-		DefaultExpiryInDays:                   testutil.PtrInt32(30),
-		MaxExpiryInDays:                       testutil.PtrInt32(90),
-		NetworkPolicyEvaluation:               testutil.PtrString("REQUIRED"),
-		RequireRoleRestrictionForServiceUsers: testutil.PtrBool(true),
+		DefaultExpiryInDays:                   testutil.Ptr(int32(30)),
+		MaxExpiryInDays:                       testutil.Ptr(int32(90)),
+		NetworkPolicyEvaluation:               testutil.Ptr("REQUIRED"),
+		RequireRoleRestrictionForServiceUsers: testutil.Ptr(true),
 	}
 	ap.Spec.WorkloadIdentityPolicy = &snowplanev1alpha1.AuthenticationPolicyWorkloadIdentityPolicy{
 		AllowedProviders:    []string{"AWS", "AZURE"},
@@ -393,7 +393,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Run("CommentSet", func(t *testing.T) {
 		t.Parallel()
 		spec := &snowplanev1alpha1.AuthenticationPolicySpec{
-			Comment: testutil.PtrString("test"),
+			Comment: testutil.Ptr("test"),
 		}
 		assert.Contains(t, tracked.ComputeTracked(spec), "COMMENT")
 	})
@@ -448,7 +448,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	ap := &snowplanev1alpha1.AuthenticationPolicy{
 		Spec: snowplanev1alpha1.AuthenticationPolicySpec{
 			Name:    "MY_AUTH_POLICY",
-			Comment: testutil.PtrString("desired"),
+			Comment: testutil.Ptr("desired"),
 		},
 	}
 
@@ -470,7 +470,7 @@ func TestDetectDrift_MfaEnrollmentDrift(t *testing.T) {
 	ap := &snowplanev1alpha1.AuthenticationPolicy{
 		Spec: snowplanev1alpha1.AuthenticationPolicySpec{
 			Name:          "MY_AUTH_POLICY",
-			MfaEnrollment: testutil.PtrString("REQUIRED"),
+			MfaEnrollment: testutil.Ptr("REQUIRED"),
 		},
 	}
 
@@ -561,10 +561,10 @@ func TestDetectDrift_PatPolicyDrift(t *testing.T) {
 		Spec: snowplanev1alpha1.AuthenticationPolicySpec{
 			Name: "MY_AUTH_POLICY",
 			PatPolicy: &snowplanev1alpha1.AuthenticationPolicyPatPolicy{
-				DefaultExpiryInDays:                   testutil.PtrInt32(30),
-				MaxExpiryInDays:                       testutil.PtrInt32(90),
-				NetworkPolicyEvaluation:               testutil.PtrString("REQUIRED"),
-				RequireRoleRestrictionForServiceUsers: testutil.PtrBool(true),
+				DefaultExpiryInDays:                   testutil.Ptr(int32(30)),
+				MaxExpiryInDays:                       testutil.Ptr(int32(90)),
+				NetworkPolicyEvaluation:               testutil.Ptr("REQUIRED"),
+				RequireRoleRestrictionForServiceUsers: testutil.Ptr(true),
 			},
 		},
 	}
@@ -624,7 +624,7 @@ func TestDetectDrift_MfaSubPolicyDrift(t *testing.T) {
 			Name: "MY_AUTH_POLICY",
 			MfaPolicy: &snowplanev1alpha1.AuthenticationPolicyMfaPolicy{
 				AllowedMethods:                     []string{"TOTP"},
-				EnforceMfaOnExternalAuthentication: testutil.PtrString("REQUIRED"),
+				EnforceMfaOnExternalAuthentication: testutil.Ptr("REQUIRED"),
 			},
 		},
 	}
@@ -682,14 +682,14 @@ func TestCompareDescInt32(t *testing.T) {
 	t.Run("Match", func(t *testing.T) {
 		t.Parallel()
 		desc := map[string]string{"PAT_DEFAULT_EXPIRY_IN_DAYS": "30"}
-		result := compareDescInt32(testutil.PtrInt32(30), "PAT_DEFAULT_EXPIRY_IN_DAYS", desc)
+		result := compareDescInt32(testutil.Ptr(int32(30)), "PAT_DEFAULT_EXPIRY_IN_DAYS", desc)
 		assert.Nil(t, result, "matching value should return nil (no change needed)")
 	})
 
 	t.Run("Mismatch", func(t *testing.T) {
 		t.Parallel()
 		desc := map[string]string{"PAT_DEFAULT_EXPIRY_IN_DAYS": "60"}
-		result := compareDescInt32(testutil.PtrInt32(30), "PAT_DEFAULT_EXPIRY_IN_DAYS", desc)
+		result := compareDescInt32(testutil.Ptr(int32(30)), "PAT_DEFAULT_EXPIRY_IN_DAYS", desc)
 		assert.NotNil(t, result)
 		assert.Equal(t, int32(30), *result)
 	})
@@ -703,7 +703,7 @@ func TestCompareDescInt32(t *testing.T) {
 
 	t.Run("NilDesc", func(t *testing.T) {
 		t.Parallel()
-		result := compareDescInt32(testutil.PtrInt32(30), "PAT_DEFAULT_EXPIRY_IN_DAYS", nil)
+		result := compareDescInt32(testutil.Ptr(int32(30)), "PAT_DEFAULT_EXPIRY_IN_DAYS", nil)
 		assert.NotNil(t, result)
 		assert.Equal(t, int32(30), *result)
 	})
@@ -782,7 +782,7 @@ func TestBuildAlterOptions_WithChanges(t *testing.T) {
 
 	ap := newTestAuthenticationPolicy("myap", "default")
 	ap.Spec.AuthenticationMethods = []string{"PASSWORD", "OAUTH"} // Changed from SAML
-	ap.Spec.Comment = testutil.PtrString("updated comment")
+	ap.Spec.Comment = testutil.Ptr("updated comment")
 	ap.Status.TrackedParameters = []string{"AUTHENTICATION_METHODS", "CLIENT_TYPES", "COMMENT"}
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "PUBLIC", "MY_AUTH_POLICY")
 
@@ -818,9 +818,9 @@ func TestBuildAlterOptions_SubPolicyChanges(t *testing.T) {
 	ap := &snowplanev1alpha1.AuthenticationPolicy{
 		Spec: snowplanev1alpha1.AuthenticationPolicySpec{
 			Name:          "MY_AUTH_POLICY",
-			MfaEnrollment: testutil.PtrString("REQUIRED"),
+			MfaEnrollment: testutil.Ptr("REQUIRED"),
 			PatPolicy: &snowplanev1alpha1.AuthenticationPolicyPatPolicy{
-				DefaultExpiryInDays: testutil.PtrInt32(30),
+				DefaultExpiryInDays: testutil.Ptr(int32(30)),
 			},
 		},
 	}

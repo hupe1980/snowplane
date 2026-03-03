@@ -44,12 +44,14 @@ type GrantOwnershipSpec struct {
 	// ObjectName is the fully qualified name of the object
 	// (e.g. "MY_DB" for a database, "MY_DB"."MY_SCHEMA"."MY_TABLE" for a table).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	ObjectName string `json:"objectName"`
 
 	// AccountRole is the name of the account role to transfer ownership to.
 	// Mutually exclusive with AccountRoleRef, DatabaseRole, and DatabaseRoleRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	AccountRole *string `json:"accountRole,omitempty"`
 
 	// AccountRoleRef references an AccountRole CR in the same namespace.
@@ -61,6 +63,7 @@ type GrantOwnershipSpec struct {
 	// Mutually exclusive with AccountRole, AccountRoleRef, and DatabaseRoleRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseRole *string `json:"databaseRole,omitempty"`
 
 	// DatabaseRoleRef references a DatabaseRole CR in the same namespace.

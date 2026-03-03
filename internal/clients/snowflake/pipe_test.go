@@ -20,7 +20,8 @@ func TestBuildCreatePipeSQL(t *testing.T) {
 			Name:          NewSchemaObjectIdentifier("DB", "SCH", "MY_PIPE"),
 			CopyStatement: "COPY INTO DB.SCH.T FROM @DB.SCH.S",
 		}
-		got := buildCreatePipeSQL(opts)
+		got, err := buildCreatePipeSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE PIPE IF NOT EXISTS "DB"."SCH"."MY_PIPE"`)
 		assert.Contains(t, got, "AS COPY INTO DB.SCH.T FROM @DB.SCH.S")
 	})
@@ -31,10 +32,11 @@ func TestBuildCreatePipeSQL(t *testing.T) {
 		opts := CreatePipeOptions{
 			Name:          NewSchemaObjectIdentifier("DB", "SCH", "P"),
 			CopyStatement: "COPY INTO T FROM @S",
-			AutoIngest:    boolPtr(true),
+			AutoIngest:    ptr(true),
 			Integration:   &integration,
 		}
-		got := buildCreatePipeSQL(opts)
+		got, err := buildCreatePipeSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "AUTO_INGEST = TRUE")
 		assert.Contains(t, got, "INTEGRATION = 'MY_NOTIF_INT'")
 	})
@@ -47,12 +49,13 @@ func TestBuildCreatePipeSQL(t *testing.T) {
 		opts := CreatePipeOptions{
 			Name:             NewSchemaObjectIdentifier("DB", "SCH", "P"),
 			CopyStatement:    "COPY INTO T FROM @S",
-			AutoIngest:       boolPtr(true),
+			AutoIngest:       ptr(true),
 			Integration:      &integration,
 			ErrorIntegration: &errIntegration,
 			Comment:          &comment,
 		}
-		got := buildCreatePipeSQL(opts)
+		got, err := buildCreatePipeSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "AUTO_INGEST = TRUE")
 		assert.Contains(t, got, "INTEGRATION = 'INT'")
 		assert.Contains(t, got, "ERROR_INTEGRATION = 'ERR_INT'")
@@ -65,9 +68,10 @@ func TestBuildCreatePipeSQL(t *testing.T) {
 		opts := CreatePipeOptions{
 			Name:          NewSchemaObjectIdentifier("DB", "SCH", "P"),
 			CopyStatement: "COPY INTO T FROM @S",
-			AutoIngest:    boolPtr(false),
+			AutoIngest:    ptr(false),
 		}
-		got := buildCreatePipeSQL(opts)
+		got, err := buildCreatePipeSQL(opts)
+		require.NoError(t, err)
 		assert.NotContains(t, got, "AUTO_INGEST")
 	})
 }
@@ -105,7 +109,7 @@ func TestCreatePipeOptions_Validate(t *testing.T) {
 		opts := CreatePipeOptions{
 			Name:          NewSchemaObjectIdentifier("DB", "SCH", "P"),
 			CopyStatement: "COPY INTO T FROM @S",
-			AutoIngest:    boolPtr(true),
+			AutoIngest:    ptr(true),
 		}
 		err := opts.Validate()
 		require.Error(t, err)
@@ -118,7 +122,7 @@ func TestCreatePipeOptions_Validate(t *testing.T) {
 		opts := CreatePipeOptions{
 			Name:          NewSchemaObjectIdentifier("DB", "SCH", "P"),
 			CopyStatement: "COPY INTO T FROM @S",
-			AutoIngest:    boolPtr(true),
+			AutoIngest:    ptr(true),
 			Integration:   &integration,
 		}
 		require.NoError(t, opts.Validate())

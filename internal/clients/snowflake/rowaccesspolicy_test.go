@@ -42,7 +42,8 @@ func TestBuildCreateRowAccessPolicySQL(t *testing.T) {
 			Signature: []RowAccessPolicyArgument{{Name: "region", Type: "VARCHAR"}},
 			Body:      "current_role() IN ('ADMIN') OR region = current_region()",
 		}
-		got := buildCreateRowAccessPolicySQL(opts)
+		got, err := buildCreateRowAccessPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE ROW ACCESS POLICY IF NOT EXISTS "DB"."SCH"."RAP_REGION"`)
 		assert.Contains(t, got, "AS (region VARCHAR) RETURNS BOOLEAN")
 		assert.Contains(t, got, "-> current_role() IN ('ADMIN') OR region = current_region()")
@@ -57,7 +58,8 @@ func TestBuildCreateRowAccessPolicySQL(t *testing.T) {
 			Body:      "true",
 			Comment:   &comment,
 		}
-		got := buildCreateRowAccessPolicySQL(opts)
+		got, err := buildCreateRowAccessPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "COMMENT = 'restrict by region'")
 	})
 }
@@ -71,7 +73,8 @@ func TestBuildCreateRowAccessPolicySQL_CreateOrAlter(t *testing.T) {
 		Body:             "current_role() IN ('ADMIN')",
 		UseCreateOrAlter: true,
 	}
-	got := buildCreateRowAccessPolicySQL(opts)
+	got, err := buildCreateRowAccessPolicySQL(opts)
+		require.NoError(t, err)
 	assert.Contains(t, got, `CREATE OR ALTER ROW ACCESS POLICY "DB"."SCH"."RAP_REGION"`)
 	assert.NotContains(t, got, "IF NOT EXISTS")
 	assert.Contains(t, got, "AS (region VARCHAR) RETURNS BOOLEAN")

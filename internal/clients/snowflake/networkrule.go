@@ -114,15 +114,10 @@ func buildValueListClause(vals []string) string {
 }
 
 // buildCreateNetworkRuleSQL builds the CREATE NETWORK RULE SQL statement.
-func buildCreateNetworkRuleSQL(opts CreateNetworkRuleOptions) string {
+func buildCreateNetworkRuleSQL(opts CreateNetworkRuleOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER NETWORK RULE ")
-	} else {
-		b.WriteString("CREATE NETWORK RULE IF NOT EXISTS ")
-	}
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "NETWORK RULE", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 	fmt.Fprintf(&b.Builder, " TYPE = %s", opts.Type)
 	fmt.Fprintf(&b.Builder, " MODE = %s", opts.Mode)
 
@@ -133,7 +128,11 @@ func buildCreateNetworkRuleSQL(opts CreateNetworkRuleOptions) string {
 
 	b.SetString("COMMENT", opts.Comment)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a network rule in Snowflake.
@@ -142,7 +141,12 @@ func (nr *NetworkRuleClient) Create(ctx context.Context, opts CreateNetworkRuleO
 		return NewTerminalError(fmt.Errorf("invalid create network rule options: %w", err))
 	}
 
-	if _, err := nr.client.Exec(ctx, buildCreateNetworkRuleSQL(opts)); err != nil {
+	sql, err := buildCreateNetworkRuleSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create network rule SQL: %w", err))
+	}
+
+	if _, err := nr.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating network rule %s: %w", opts.Name, err)
 	}
 
@@ -281,49 +285,16 @@ func (nr *NetworkRuleClient) Observe(ctx context.Context, name SchemaObjectIdent
 
 // scanNetworkRuleShowOutput scans SHOW NETWORK RULES results for a matching row.
 func scanNetworkRuleShowOutput(rows *sql.Rows, name string) (*NetworkRuleShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*NetworkRuleShowOutput, error) {
 		return &NetworkRuleShowOutput{
-			CreatedOn:    colMap["created_on"],
-			Name:         colMap["name"],
-			DatabaseName: colMap["database_name"],
-			SchemaName:   colMap["schema_name"],
-			Owner:        colMap["owner"],
-			Type:         colMap["type"],
-			Mode:         colMap["mode"],
-			Comment:      colMap["comment"],
+			CreatedOn:    m["created_on"],
+			Name:         m["name"],
+			DatabaseName: m["database_name"],
+			SchemaName:   m["schema_name"],
+			Owner:        m["owner"],
+			Type:         m["type"],
+			Mode:         m["mode"],
+			Comment:      m["comment"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

@@ -429,11 +429,11 @@ func TestWarehouse_StructuralDriftDetection(t *testing.T) {
 					ScalingPolicy:   "STANDARD",
 				},
 				Parameters: &snowflake.WarehouseParameters{
-					MaxConcurrencyLevel:             ptrInt32(8),
-					StatementQueuedTimeoutInSeconds: ptrInt32(0),
-					StatementTimeoutInSeconds:       ptrInt32(172800),
-					EnableQueryAcceleration:         ptrBool(false),
-					QueryAccelerationMaxScaleFactor: ptrInt32(8),
+					MaxConcurrencyLevel:             ptr(int32(8)),
+					StatementQueuedTimeoutInSeconds: ptr(int32(0)),
+					StatementTimeoutInSeconds:       ptr(int32(172800)),
+					EnableQueryAcceleration:         ptr(false),
+					QueryAccelerationMaxScaleFactor: ptr(int32(8)),
 				},
 			}, nil
 		}

@@ -73,9 +73,9 @@ func newTestStreamOnView(name, namespace string) *snowplanev1alpha1.StreamOnView
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:         "MY_STREAM",
-			DatabaseName: testutil.PtrString("MY_DB"),
-			SchemaName:   testutil.PtrString("MY_SCHEMA"),
-			ViewName:     testutil.PtrString("MY_VIEW"),
+			DatabaseName: testutil.Ptr("MY_DB"),
+			SchemaName:   testutil.Ptr("MY_SCHEMA"),
+			ViewName:     testutil.Ptr("MY_VIEW"),
 		},
 	}
 }
@@ -229,8 +229,8 @@ func TestReconcile_Delete(t *testing.T) {
 func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 	s := newTestStreamOnView("mys", "default")
-	s.Spec.AppendOnly = testutil.PtrBool(true)
-	s.Spec.Comment = testutil.PtrString("test")
+	s.Spec.AppendOnly = testutil.Ptr(true)
+	s.Spec.Comment = testutil.Ptr("test")
 	s.Status.ViewName = "MY_VIEW"
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_STREAM")
 	opts := buildCreateOptions(s, id)
@@ -252,7 +252,7 @@ func TestBuildAlterOptions_NoChanges(t *testing.T) {
 
 func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
-	spec := &snowplanev1alpha1.StreamOnViewSpec{Comment: testutil.PtrString("x")}
+	spec := &snowplanev1alpha1.StreamOnViewSpec{Comment: testutil.Ptr("x")}
 	fields := tracked.ComputeTracked(spec)
 	assert.ElementsMatch(t, []string{"COMMENT"}, fields)
 }
@@ -270,7 +270,7 @@ func TestApplyObservation(t *testing.T) {
 func TestDetectDrift_NoDrift(t *testing.T) {
 	t.Parallel()
 	s := &snowplanev1alpha1.StreamOnView{
-		Spec:   snowplanev1alpha1.StreamOnViewSpec{Name: "MY_STREAM", ViewName: testutil.PtrString("MY_VIEW")},
+		Spec:   snowplanev1alpha1.StreamOnViewSpec{Name: "MY_STREAM", ViewName: testutil.Ptr("MY_VIEW")},
 		Status: snowplanev1alpha1.StreamOnViewStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", ViewName: "MY_VIEW"},
 	}
 	obs := &snowflake.StreamObservation{
@@ -286,7 +286,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 func TestDetectDrift_WithDrift(t *testing.T) {
 	t.Parallel()
 	s := &snowplanev1alpha1.StreamOnView{
-		Spec:   snowplanev1alpha1.StreamOnViewSpec{Name: "MY_STREAM", ViewName: testutil.PtrString("MY_VIEW"), Comment: testutil.PtrString("desired")},
+		Spec:   snowplanev1alpha1.StreamOnViewSpec{Name: "MY_STREAM", ViewName: testutil.Ptr("MY_VIEW"), Comment: testutil.Ptr("desired")},
 		Status: snowplanev1alpha1.StreamOnViewStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", ViewName: "MY_VIEW"},
 	}
 	obs := &snowflake.StreamObservation{

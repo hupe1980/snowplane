@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
@@ -119,15 +118,10 @@ func NewPasswordPolicyClient(c SQLExecutor) *PasswordPolicyClient {
 }
 
 // buildCreatePasswordPolicySQL builds the CREATE PASSWORD POLICY SQL statement.
-func buildCreatePasswordPolicySQL(opts CreatePasswordPolicyOptions) string {
+func buildCreatePasswordPolicySQL(opts CreatePasswordPolicyOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER PASSWORD POLICY ")
-	} else {
-		b.WriteString("CREATE PASSWORD POLICY IF NOT EXISTS ")
-	}
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "PASSWORD POLICY", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 
 	b.SetInt32("PASSWORD_MIN_LENGTH", opts.PasswordMinLength)
 	b.SetInt32("PASSWORD_MAX_LENGTH", opts.PasswordMaxLength)
@@ -142,7 +136,11 @@ func buildCreatePasswordPolicySQL(opts CreatePasswordPolicyOptions) string {
 	b.SetInt32("PASSWORD_HISTORY", opts.PasswordHistory)
 	b.SetString("COMMENT", opts.Comment)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a password policy in Snowflake.
@@ -151,7 +149,12 @@ func (pp *PasswordPolicyClient) Create(ctx context.Context, opts CreatePasswordP
 		return NewTerminalError(fmt.Errorf("invalid create password policy options: %w", err))
 	}
 
-	if _, err := pp.client.Exec(ctx, buildCreatePasswordPolicySQL(opts)); err != nil {
+	sql, err := buildCreatePasswordPolicySQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create password policy SQL: %w", err))
+	}
+
+	if _, err := pp.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating password policy %s: %w", opts.Name, err)
 	}
 
@@ -285,47 +288,14 @@ func (pp *PasswordPolicyClient) Observe(ctx context.Context, name SchemaObjectId
 
 // scanPasswordPolicyShowOutput scans SHOW PASSWORD POLICIES results for a matching row.
 func scanPasswordPolicyShowOutput(rows *sql.Rows, name string) (*PasswordPolicyShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*PasswordPolicyShowOutput, error) {
 		return &PasswordPolicyShowOutput{
-			CreatedOn:    colMap["created_on"],
-			Name:         colMap["name"],
-			DatabaseName: colMap["database_name"],
-			SchemaName:   colMap["schema_name"],
-			Owner:        colMap["owner"],
-			Comment:      colMap["comment"],
+			CreatedOn:    m["created_on"],
+			Name:         m["name"],
+			DatabaseName: m["database_name"],
+			SchemaName:   m["schema_name"],
+			Owner:        m["owner"],
+			Comment:      m["comment"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

@@ -35,6 +35,8 @@ type ReferableObject interface {
 
 // ResolveLocalRef looks up a managed resource by name in the given namespace,
 // checks that it is Ready, and returns its fullyQualifiedName from status.
+// If refNamespace is non-empty, it overrides the default namespace for
+// cross-namespace references (T-1: enterprise platform/project-team model).
 //
 // The factory function creates an empty instance of the correct Go type.
 func ResolveLocalRef(
@@ -42,25 +44,32 @@ func ResolveLocalRef(
 	c client.Client,
 	namespace string,
 	name string,
+	refNamespace string,
 	factory func() ReferableObject,
 ) (string, error) {
 	obj := factory()
 
+	// Cross-namespace override: if the ref carries an explicit namespace, use it.
+	ns := namespace
+	if refNamespace != "" {
+		ns = refNamespace
+	}
+
 	key := types.NamespacedName{
-		Namespace: namespace,
+		Namespace: ns,
 		Name:      name,
 	}
 
 	if err := c.Get(ctx, key, obj); err != nil {
 		if apierrors.IsNotFound(err) {
-			return "", fmt.Errorf("%w: %s %q in namespace %q", ErrReferenceNotFound, obj.GetObjectKind().GroupVersionKind().Kind, name, namespace)
+			return "", fmt.Errorf("%w: %s %q in namespace %q", ErrReferenceNotFound, obj.GetObjectKind().GroupVersionKind().Kind, name, ns)
 		}
 
 		return "", fmt.Errorf("fetching reference %q: %w", name, err)
 	}
 
 	if !conditions.IsTrue(obj, snowplanev1alpha1.TypeReady) {
-		return "", fmt.Errorf("%w: %s %q in namespace %q", ErrReferenceNotReady, obj.GetObjectKind().GroupVersionKind().Kind, name, namespace)
+		return "", fmt.Errorf("%w: %s %q in namespace %q", ErrReferenceNotReady, obj.GetObjectKind().GroupVersionKind().Kind, name, ns)
 	}
 
 	fqn := obj.GetFullyQualifiedName()
@@ -79,7 +88,7 @@ func ResolveDatabaseRef(
 	namespace string,
 	ref snowplanev1alpha1.LocalObjectReference,
 ) (string, error) {
-	return ResolveLocalRef(ctx, c, namespace, ref.Name, func() ReferableObject {
+	return ResolveLocalRef(ctx, c, namespace, ref.Name, ref.Namespace, func() ReferableObject {
 		db := &snowplanev1alpha1.Database{}
 		db.SetGroupVersionKind(schema.GroupVersionKind{
 			Group:   snowplanev1alpha1.GroupVersion.Group,
@@ -99,7 +108,7 @@ func ResolveSchemaRef(
 	namespace string,
 	ref snowplanev1alpha1.LocalObjectReference,
 ) (string, error) {
-	return ResolveLocalRef(ctx, c, namespace, ref.Name, func() ReferableObject {
+	return ResolveLocalRef(ctx, c, namespace, ref.Name, ref.Namespace, func() ReferableObject {
 		s := &snowplanev1alpha1.Schema{}
 		s.SetGroupVersionKind(schema.GroupVersionKind{
 			Group:   snowplanev1alpha1.GroupVersion.Group,
@@ -119,7 +128,7 @@ func ResolveAccountRoleRef(
 	namespace string,
 	ref snowplanev1alpha1.LocalObjectReference,
 ) (string, error) {
-	return ResolveLocalRef(ctx, c, namespace, ref.Name, func() ReferableObject {
+	return ResolveLocalRef(ctx, c, namespace, ref.Name, ref.Namespace, func() ReferableObject {
 		r := &snowplanev1alpha1.AccountRole{}
 		r.SetGroupVersionKind(schema.GroupVersionKind{
 			Group:   snowplanev1alpha1.GroupVersion.Group,
@@ -139,7 +148,7 @@ func ResolveDatabaseRoleRef(
 	namespace string,
 	ref snowplanev1alpha1.LocalObjectReference,
 ) (string, error) {
-	return ResolveLocalRef(ctx, c, namespace, ref.Name, func() ReferableObject {
+	return ResolveLocalRef(ctx, c, namespace, ref.Name, ref.Namespace, func() ReferableObject {
 		r := &snowplanev1alpha1.DatabaseRole{}
 		r.SetGroupVersionKind(schema.GroupVersionKind{
 			Group:   snowplanev1alpha1.GroupVersion.Group,
@@ -159,7 +168,7 @@ func ResolveUserRef(
 	namespace string,
 	ref snowplanev1alpha1.LocalObjectReference,
 ) (string, error) {
-	return ResolveLocalRef(ctx, c, namespace, ref.Name, func() ReferableObject {
+	return ResolveLocalRef(ctx, c, namespace, ref.Name, ref.Namespace, func() ReferableObject {
 		u := &snowplanev1alpha1.User{}
 		u.SetGroupVersionKind(schema.GroupVersionKind{
 			Group:   snowplanev1alpha1.GroupVersion.Group,
@@ -264,9 +273,9 @@ func SourceName(ref *snowplanev1alpha1.LocalObjectReference, name *string) strin
 }
 
 // ResolveSourceRef resolves a reference to any named Snowflake object.
-// When ref is set, it fetches the CR by name, checks it is Ready, and returns
-// the value from extractName (typically spec.name). When rawName is set, it is
-// returned as-is. Exactly one of ref or rawName must be non-nil.
+// When ref is set, it fetches the CR by name (with cross-namespace support),
+// checks it is Ready, and returns the value from extractName (typically spec.name).
+// When rawName is set, it is returned as-is. Exactly one of ref or rawName must be non-nil.
 func ResolveSourceRef[T interface {
 	client.Object
 	conditions.ConditionedObject
@@ -274,7 +283,7 @@ func ResolveSourceRef[T interface {
 	ctx context.Context,
 	c client.Client,
 	namespace string,
-	ref *snowplanev1alpha1.LocalObjectReference,
+	ref *snowplanev1alpha1.ObjectReference,
 	rawName *string,
 	newObj func() T,
 	gvk schema.GroupVersionKind,
@@ -284,17 +293,23 @@ func ResolveSourceRef[T interface {
 		obj := newObj()
 		obj.GetObjectKind().SetGroupVersionKind(gvk)
 
-		key := types.NamespacedName{Namespace: namespace, Name: ref.Name}
+		// Cross-namespace: use ref.Namespace if set, else fallback to resource namespace.
+		ns := namespace
+		if ref.Namespace != "" {
+			ns = ref.Namespace
+		}
+
+		key := types.NamespacedName{Namespace: ns, Name: ref.Name}
 		if err := c.Get(ctx, key, obj); err != nil {
 			if apierrors.IsNotFound(err) {
-				return "", fmt.Errorf("%w: %s %q in namespace %q", ErrReferenceNotFound, gvk.Kind, ref.Name, namespace)
+				return "", fmt.Errorf("%w: %s %q in namespace %q", ErrReferenceNotFound, gvk.Kind, ref.Name, ns)
 			}
 
 			return "", fmt.Errorf("fetching %s reference %q: %w", gvk.Kind, ref.Name, err)
 		}
 
 		if !conditions.IsTrue(obj, snowplanev1alpha1.TypeReady) {
-			return "", fmt.Errorf("%w: %s %q in namespace %q", ErrReferenceNotReady, gvk.Kind, ref.Name, namespace)
+			return "", fmt.Errorf("%w: %s %q in namespace %q", ErrReferenceNotReady, gvk.Kind, ref.Name, ns)
 		}
 
 		return extractName(obj), nil

@@ -21,6 +21,7 @@ type ViewSpec struct {
 
 	// Name is the Snowflake view name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -33,6 +34,7 @@ type ViewSpec struct {
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -46,6 +48,7 @@ type ViewSpec struct {
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// Statement is the SQL SELECT statement that defines the view.
@@ -57,6 +60,7 @@ type ViewSpec struct {
 	// permission to create or update View CRs can execute arbitrary SQL.
 	// Ensure RBAC restricts View CR access to trusted principals only.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Statement string `json:"statement"`
 
 	// Secure enables the SECURE VIEW property.

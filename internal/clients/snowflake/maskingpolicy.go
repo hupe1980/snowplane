@@ -127,15 +127,10 @@ func buildSignatureClause(args []MaskingPolicyArgument) string {
 }
 
 // buildCreateMaskingPolicySQL builds the CREATE MASKING POLICY SQL statement.
-func buildCreateMaskingPolicySQL(opts CreateMaskingPolicyOptions) string {
+func buildCreateMaskingPolicySQL(opts CreateMaskingPolicyOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER MASKING POLICY ")
-	} else {
-		b.WriteString("CREATE MASKING POLICY IF NOT EXISTS ")
-	}
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "MASKING POLICY", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 	b.WriteString(" ")
 	b.WriteString(buildSignatureClause(opts.Signature))
 	b.WriteString(" -> ")
@@ -149,7 +144,11 @@ func buildCreateMaskingPolicySQL(opts CreateMaskingPolicyOptions) string {
 		b.WriteString(" EXEMPT_OTHER_POLICIES = TRUE")
 	}
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a masking policy in Snowflake.
@@ -158,7 +157,12 @@ func (mp *MaskingPolicyClient) Create(ctx context.Context, opts CreateMaskingPol
 		return NewTerminalError(fmt.Errorf("invalid create masking policy options: %w", err))
 	}
 
-	if _, err := mp.client.Exec(ctx, buildCreateMaskingPolicySQL(opts)); err != nil {
+	sql, err := buildCreateMaskingPolicySQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create masking policy SQL: %w", err))
+	}
+
+	if _, err := mp.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating masking policy %s: %w", opts.Name, err)
 	}
 
@@ -268,48 +272,15 @@ func (mp *MaskingPolicyClient) Observe(ctx context.Context, name SchemaObjectIde
 
 // scanMaskingPolicyShowOutput scans SHOW MASKING POLICIES results for a matching row.
 func scanMaskingPolicyShowOutput(rows *sql.Rows, name string) (*MaskingPolicyShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*MaskingPolicyShowOutput, error) {
 		return &MaskingPolicyShowOutput{
-			CreatedOn:    colMap["created_on"],
-			Name:         colMap["name"],
-			DatabaseName: colMap["database_name"],
-			SchemaName:   colMap["schema_name"],
-			Kind:         colMap["kind"],
-			Owner:        colMap["owner"],
-			Comment:      colMap["comment"],
+			CreatedOn:    m["created_on"],
+			Name:         m["name"],
+			DatabaseName: m["database_name"],
+			SchemaName:   m["schema_name"],
+			Kind:         m["kind"],
+			Owner:        m["owner"],
+			Comment:      m["comment"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

@@ -116,7 +116,7 @@ func NewViewClient(c SQLExecutor) *ViewClient {
 }
 
 // buildCreateViewSQL builds the CREATE VIEW SQL statement.
-func buildCreateViewSQL(opts CreateViewOptions) string {
+func buildCreateViewSQL(opts CreateViewOptions) (string, error) {
 	var b sqlbuilder.Builder
 
 	if opts.UseCreateOrAlter {
@@ -148,7 +148,11 @@ func buildCreateViewSQL(opts CreateViewOptions) string {
 	b.WriteString(" AS ")
 	b.WriteString(opts.Statement)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a view in Snowflake.
@@ -157,7 +161,12 @@ func (v *ViewClient) Create(ctx context.Context, opts CreateViewOptions) error {
 		return NewTerminalError(fmt.Errorf("invalid create view options: %w", err))
 	}
 
-	if _, err := v.client.Exec(ctx, buildCreateViewSQL(opts)); err != nil {
+	sql, err := buildCreateViewSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create view SQL: %w", err))
+	}
+
+	if _, err := v.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating view %s: %w", opts.Name, err)
 	}
 
@@ -217,7 +226,12 @@ func (v *ViewClient) Alter(ctx context.Context, opts AlterViewOptions) error {
 			UseCreateOrAlter: true,
 		}
 
-		if _, err := v.client.Exec(ctx, buildCreateViewSQL(createOpts)); err != nil {
+		sql, err := buildCreateViewSQL(createOpts)
+		if err != nil {
+			return NewTerminalError(fmt.Errorf("building create view SQL: %w", err))
+		}
+
+		if _, err := v.client.Exec(ctx, sql); err != nil {
 			// Fallback: if CREATE OR ALTER is unsupported, retry with CREATE OR REPLACE.
 			if isCreateOrAlterUnsupportedErr(err) {
 				fallbackOpts := CreateViewOptions{
@@ -229,7 +243,12 @@ func (v *ViewClient) Alter(ctx context.Context, opts AlterViewOptions) error {
 					OrReplace:      true,
 				}
 
-				if _, err2 := v.client.Exec(ctx, buildCreateViewSQL(fallbackOpts)); err2 != nil {
+				fallbackSQL, err := buildCreateViewSQL(fallbackOpts)
+				if err != nil {
+					return NewTerminalError(fmt.Errorf("building create view SQL: %w", err))
+				}
+
+				if _, err2 := v.client.Exec(ctx, fallbackSQL); err2 != nil {
 					return fmt.Errorf("replacing view %s (fallback): %w", opts.Name, err2)
 				}
 
@@ -316,52 +335,19 @@ func (v *ViewClient) Observe(ctx context.Context, name SchemaObjectIdentifier) (
 
 // scanViewShowOutput scans SHOW VIEWS results for a matching row.
 func scanViewShowOutput(rows *sql.Rows, name string) (*ViewShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*ViewShowOutput, error) {
 		return &ViewShowOutput{
-			CreatedOn:      colMap["created_on"],
-			Name:           colMap["name"],
-			DatabaseName:   colMap["database_name"],
-			SchemaName:     colMap["schema_name"],
-			Comment:        colMap["comment"],
-			Owner:          colMap["owner"],
-			IsSecure:       strings.EqualFold(colMap["is_secure"], "true"),
-			Text:           colMap["text"],
-			ChangeTracking: strings.EqualFold(colMap["change_tracking"], "ON"),
+			CreatedOn:      m["created_on"],
+			Name:           m["name"],
+			DatabaseName:   m["database_name"],
+			SchemaName:     m["schema_name"],
+			Comment:        m["comment"],
+			Owner:          m["owner"],
+			IsSecure:       strings.EqualFold(m["is_secure"], "true"),
+			Text:           m["text"],
+			ChangeTracking: strings.EqualFold(m["change_tracking"], "ON"),
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }
 
 // isCreateOrAlterUnsupportedErr checks whether an error indicates that the

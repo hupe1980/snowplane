@@ -27,6 +27,7 @@ type FieldExportSource struct {
 	// Only dot-separated field names are supported. Array indexing
 	// (e.g. ".status.conditions[0].message") is not supported.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Path string `json:"path"`
 }
 
@@ -35,10 +36,12 @@ type FieldExportSource struct {
 type FieldExportResourceRef struct {
 	// Kind is the resource kind (e.g., "Database", "Warehouse", "Schema").
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Kind string `json:"kind"`
 
 	// Name is the resource name.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 }
 
@@ -51,10 +54,12 @@ type FieldExportTarget struct {
 
 	// Name is the target ConfigMap or Secret name.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// Key is the key within the ConfigMap data or Secret data to write to.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Key string `json:"key"`
 }
 
@@ -91,12 +96,13 @@ type FieldExportStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=fexp,categories=snowplane
-// +kubebuilder:printcolumn:name="Source Kind",type=string,JSONPath=`.spec.from.resource.kind`
-// +kubebuilder:printcolumn:name="Source Name",type=string,JSONPath=`.spec.from.resource.name`
-// +kubebuilder:printcolumn:name="Target Kind",type=string,JSONPath=`.spec.to.kind`
-// +kubebuilder:printcolumn:name="Target Name",type=string,JSONPath=`.spec.to.name`
-// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
-// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
+// +kubebuilder:printcolumn:name="SOURCE-KIND",type=string,JSONPath=`.spec.from.resource.kind`
+// +kubebuilder:printcolumn:name="SOURCE-NAME",type=string,JSONPath=`.spec.from.resource.name`
+// +kubebuilder:printcolumn:name="TARGET-KIND",type=string,JSONPath=`.spec.to.kind`
+// +kubebuilder:printcolumn:name="TARGET-NAME",type=string,JSONPath=`.spec.to.name`
+// +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // FieldExport copies a field from a Snowplane managed resource's status into a
 // ConfigMap or Secret, enabling cross-resource data passing in Kubernetes.

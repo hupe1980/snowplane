@@ -24,8 +24,8 @@ import (
 	"strings"
 )
 
-// TagKey is the struct tag key used to annotate Snowflake parameter fields.
-const TagKey = "snowflake"
+// tagKey is the struct tag key used to annotate Snowflake parameter fields.
+const tagKey = "snowflake"
 
 // ComputeTracked returns the Snowflake parameter names for all spec-struct
 // fields whose current value indicates "user set this". Pointer fields are
@@ -95,7 +95,7 @@ func computeTrackedValue(v reflect.Value, out *[]string) {
 		field := t.Field(i)
 		fv := v.Field(i)
 
-		tag := field.Tag.Get(TagKey)
+		tag := field.Tag.Get(tagKey)
 		if tag == "" || tag == "-" {
 			// If it's an embedded/anonymous struct, recurse anyway
 			// (handles CommonSpec embedding).
@@ -204,7 +204,7 @@ func collectNounsetType(t reflect.Type, out map[string]struct{}) {
 	for i := range t.NumField() {
 		field := t.Field(i)
 
-		tag := field.Tag.Get(TagKey)
+		tag := field.Tag.Get(tagKey)
 		if tag == "" || tag == "-" {
 			// Recurse into embedded structs and pointer-to-struct fields.
 			ft := field.Type

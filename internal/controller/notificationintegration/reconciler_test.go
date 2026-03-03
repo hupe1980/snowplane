@@ -343,7 +343,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 			Email: &snowplanev1alpha1.EmailNotificationConfig{
 				AllowedRecipients: []string{"a@b.com"},
 				DefaultRecipients: []string{"c@d.com"},
-				DefaultSubject:    testutil.PtrString("Alert"),
+				DefaultSubject:    testutil.Ptr("Alert"),
 			},
 		}
 		fields := tracked.ComputeTracked(spec)
@@ -359,8 +359,8 @@ func TestComputeTrackedParameters(t *testing.T) {
 			Queue: &snowplanev1alpha1.QueueNotificationConfig{
 				NotificationProvider: "AWS_SNS",
 				Direction:            "OUTBOUND",
-				AWSSNSTopicARN:       testutil.PtrString("arn:aws:sns:us-east-1:123:topic"),
-				AWSSNSRoleARN:        testutil.PtrString("arn:aws:iam::123:role/myrole"),
+				AWSSNSTopicARN:       testutil.Ptr("arn:aws:sns:us-east-1:123:topic"),
+				AWSSNSRoleARN:        testutil.Ptr("arn:aws:iam::123:role/myrole"),
 			},
 		}
 		fields := tracked.ComputeTracked(spec)
@@ -414,7 +414,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 		t.Parallel()
 		spec := &snowplanev1alpha1.NotificationIntegrationSpec{
 			Type:    snowplanev1alpha1.NotificationIntegrationTypeEmail,
-			Comment: testutil.PtrString("test"),
+			Comment: testutil.Ptr("test"),
 		}
 		assert.Contains(t, tracked.ComputeTracked(spec), "COMMENT")
 	})
@@ -530,7 +530,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 		Spec: snowplanev1alpha1.NotificationIntegrationSpec{
 			Name:    "MY_EMAIL_NI",
 			Type:    snowplanev1alpha1.NotificationIntegrationTypeEmail,
-			Comment: testutil.PtrString("desired"),
+			Comment: testutil.Ptr("desired"),
 		},
 	}
 

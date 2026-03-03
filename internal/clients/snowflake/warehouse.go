@@ -163,22 +163,16 @@ func NewWarehouseClient(c SQLExecutor) *WarehouseClient {
 	return &WarehouseClient{client: c}
 }
 
-func buildCreateWarehouseSQL(opts CreateWarehouseOptions) string {
+func buildCreateWarehouseSQL(opts CreateWarehouseOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	if opts.UseCreateOrAlter {
-		b.WriteString("CREATE OR ALTER WAREHOUSE ")
-	} else {
-		b.WriteString("CREATE WAREHOUSE IF NOT EXISTS ")
-	}
+	sqlbuilder.BuildCreatePreamble(&b, "WAREHOUSE", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 
-	b.WriteString(opts.Name.FullyQualifiedName())
-
-	b.SetString("WAREHOUSE_TYPE", opts.WarehouseType)
-	b.SetString("WAREHOUSE_SIZE", opts.WarehouseSize)
+	b.SetKeyword("WAREHOUSE_TYPE", opts.WarehouseType)
+	b.SetKeyword("WAREHOUSE_SIZE", opts.WarehouseSize)
 	b.SetInt32("MIN_CLUSTER_COUNT", opts.MinClusterCount)
 	b.SetInt32("MAX_CLUSTER_COUNT", opts.MaxClusterCount)
-	b.SetString("SCALING_POLICY", opts.ScalingPolicy)
+	b.SetKeyword("SCALING_POLICY", opts.ScalingPolicy)
 	b.SetInt32("AUTO_SUSPEND", opts.AutoSuspend)
 	b.SetBool("AUTO_RESUME", opts.AutoResume)
 
@@ -196,7 +190,11 @@ func buildCreateWarehouseSQL(opts CreateWarehouseOptions) string {
 	b.SetString("RESOURCE_CONSTRAINT", opts.ResourceConstraint)
 	b.SetKeyword("GENERATION", opts.Generation)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a warehouse in Snowflake.
@@ -205,7 +203,11 @@ func (w *WarehouseClient) Create(ctx context.Context, opts CreateWarehouseOption
 		return NewTerminalError(fmt.Errorf("invalid create warehouse options: %w", err))
 	}
 
-	sql := buildCreateWarehouseSQL(opts)
+	sql, err := buildCreateWarehouseSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create warehouse SQL: %w", err))
+	}
+
 	if _, err := w.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating warehouse %s: %w", opts.Name, err)
 	}
@@ -216,11 +218,11 @@ func (w *WarehouseClient) Create(ctx context.Context, opts CreateWarehouseOption
 func buildAlterWarehouseStatements(opts AlterWarehouseOptions) ([]string, error) {
 	var sc sqlbuilder.SetClauses
 
-	sc.String("WAREHOUSE_TYPE", opts.WarehouseType)
-	sc.String("WAREHOUSE_SIZE", opts.WarehouseSize)
+	sc.Keyword("WAREHOUSE_TYPE", opts.WarehouseType)
+	sc.Keyword("WAREHOUSE_SIZE", opts.WarehouseSize)
 	sc.Int32("MIN_CLUSTER_COUNT", opts.MinClusterCount)
 	sc.Int32("MAX_CLUSTER_COUNT", opts.MaxClusterCount)
-	sc.String("SCALING_POLICY", opts.ScalingPolicy)
+	sc.Keyword("SCALING_POLICY", opts.ScalingPolicy)
 	sc.Int32("AUTO_SUSPEND", opts.AutoSuspend)
 	sc.Bool("AUTO_RESUME", opts.AutoResume)
 	sc.String("RESOURCE_MONITOR", opts.ResourceMonitor)
@@ -331,93 +333,31 @@ func (w *WarehouseClient) Observe(ctx context.Context, name AccountObjectIdentif
 }
 
 func scanWarehouseShowOutput(rows *sql.Rows, name string) (*WarehouseShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("getting columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, c := range cols {
-			if values[i].Valid {
-				colMap[c] = values[i].String
-			}
-		}
-
-		rowName := colMap["name"]
-		if !strings.EqualFold(rowName, name) {
-			continue
-		}
-
-		autoSuspend, _ := parseInt32(colMap["auto_suspend"])
-		minCluster, _ := parseInt32(colMap["min_cluster_count"])
-		maxCluster, _ := parseInt32(colMap["max_cluster_count"])
+	return ScanShowOutput(rows, name, func(m map[string]string) (*WarehouseShowOutput, error) {
+		autoSuspend, _ := parseInt32(m["auto_suspend"])
+		minCluster, _ := parseInt32(m["min_cluster_count"])
+		maxCluster, _ := parseInt32(m["max_cluster_count"])
 
 		return &WarehouseShowOutput{
-			CreatedOn:       colMap["created_on"],
-			Name:            rowName,
-			State:           colMap["state"],
-			Type:            colMap["type"],
-			Size:            colMap["size"],
-			Comment:         colMap["comment"],
-			Owner:           colMap["owner"],
+			CreatedOn:       m["created_on"],
+			Name:            m["name"],
+			State:           m["state"],
+			Type:            m["type"],
+			Size:            m["size"],
+			Comment:         m["comment"],
+			Owner:           m["owner"],
 			AutoSuspend:     autoSuspend,
-			AutoResume:      strings.EqualFold(colMap["auto_resume"], "true"),
+			AutoResume:      strings.EqualFold(m["auto_resume"], "true"),
 			MinClusterCount: minCluster,
 			MaxClusterCount: maxCluster,
-			ScalingPolicy:   colMap["scaling_policy"],
-			ResourceMonitor: colMap["resource_monitor"],
+			ScalingPolicy:   m["scaling_policy"],
+			ResourceMonitor: m["resource_monitor"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, fmt.Errorf("%w: warehouse %q", ErrObjectNotFound, name)
+	})
 }
 
 func scanWarehouseParameters(rows *sql.Rows) (*WarehouseParameters, error) {
-	params := &WarehouseParameters{}
-
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("getting parameter columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning parameter row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, c := range cols {
-			if values[i].Valid {
-				colMap[c] = values[i].String
-			}
-		}
-
-		key := colMap["key"]
-		value := colMap["value"]
-
+	return ScanParameters(rows, func(params *WarehouseParameters, key, value string) {
 		switch key {
 		case "MAX_CONCURRENCY_LEVEL":
 			if v, ok := parseInt32(value); ok {
@@ -439,11 +379,5 @@ func scanWarehouseParameters(rows *sql.Rows) (*WarehouseParameters, error) {
 				params.QueryAccelerationMaxScaleFactor = &v
 			}
 		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating parameter rows: %w", err)
-	}
-
-	return params, nil
+	})
 }

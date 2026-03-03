@@ -326,10 +326,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 	if err := r.client.Get(ctx, req.NamespacedName, pc); err != nil {
 		if apierrors.IsNotFound(err) {
 			// CR deleted — evict any cached client and clean up metrics.
-			r.factory.Evict(req.Name)
-			r.rateLimiter.Evict(req.Name)
-			r.circuitBreaker.Evict(req.Name)
-			metrics.DeleteProviderConfigHealthy(req.Name)
+			// Use namespace-qualified key to avoid cross-namespace collisions (C-3).
+			cacheKey := provider.ProviderCacheKey(req.Namespace, req.Name)
+			r.factory.Evict(cacheKey)
+			r.rateLimiter.Evict(cacheKey)
+			r.circuitBreaker.Evict(cacheKey)
+			metrics.DeleteProviderConfigHealthy(cacheKey)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
@@ -337,9 +339,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 
 	logger.Info("reconciling ProviderConfig", "name", pc.Name)
 
+	// Namespace-qualified cache key for all subsystems (C-3).
+	cacheKey := provider.ProviderCacheKey(pc.Namespace, pc.Name)
+
 	// Handle deletion with in-use guard.
 	if !pc.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, pc)
+		return r.reconcileDelete(ctx, pc, cacheKey)
 	}
 
 	// Ensure finalizer is present.
@@ -361,7 +366,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 		conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonRoleNotAllowed, msg)
 		r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonRoleNotAllowed, msg)
 
-		metrics.SetProviderConfigHealthy(pc.Name, pc.Spec.Account, false)
+		metrics.SetProviderConfigHealthy(cacheKey, pc.Spec.Account, false)
 
 		r.bestEffortPatchStatus(ctx, pc)
 
@@ -419,7 +424,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 		conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonInvalidConfig, err.Error())
 		r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonInvalidConfig, err.Error())
 
-		metrics.SetProviderConfigHealthy(pc.Name, pc.Spec.Account, false)
+		metrics.SetProviderConfigHealthy(cacheKey, pc.Spec.Account, false)
 
 		r.bestEffortPatchStatus(ctx, pc)
 
@@ -431,16 +436,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 
 	// Detect credential rotation: if the factory has a cached client with a
 	// different hash, credentials have changed since the last reconciliation.
-	credentialsRotated := r.factory.HasStaleHash(pc.Name, hash)
+	credentialsRotated := r.factory.HasStaleHash(cacheKey, hash)
 
 	// Get or create a cached Snowflake client.
-	sfClient, err := r.factory.GetOrCreate(pc.Name, hash, cfg)
+	sfClient, err := r.factory.GetOrCreate(cacheKey, hash, cfg)
 	if err != nil {
 		conditions.SetNotReady(pc, snowplanev1alpha1.ReasonClientFailed, err.Error())
 		conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonClientFailed, err.Error())
 		r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonClientFailed, err.Error())
 
-		metrics.SetProviderConfigHealthy(pc.Name, pc.Spec.Account, false)
+		metrics.SetProviderConfigHealthy(cacheKey, pc.Spec.Account, false)
 
 		r.bestEffortPatchStatus(ctx, pc)
 
@@ -459,7 +464,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 		conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonPingFailed, msg)
 		r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonPingFailed, msg)
 
-		metrics.SetProviderConfigHealthy(pc.Name, pc.Spec.Account, false)
+		metrics.SetProviderConfigHealthy(cacheKey, pc.Spec.Account, false)
 
 		r.bestEffortPatchStatus(ctx, pc)
 
@@ -471,7 +476,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 	conditions.SetSynced(pc, "Reconciliation complete")
 	pc.Status.ObservedGeneration = pc.Generation
 
-	metrics.SetProviderConfigHealthy(pc.Name, pc.Spec.Account, true)
+	metrics.SetProviderConfigHealthy(cacheKey, pc.Spec.Account, true)
 
 	if credentialsRotated {
 		r.recorder.Event(pc, corev1.EventTypeNormal, snowplanev1alpha1.ReasonCredentialsRotated, "Credentials rotated, reconnecting")
@@ -512,14 +517,14 @@ func (r *Reconciler) bestEffortPatchStatus(ctx context.Context, pc *snowplanev1a
 // reconcileDelete handles ProviderConfig deletion with an in-use guard.
 // If any managed resource still references this ProviderConfig, the finalizer
 // is not removed and a warning event is emitted.
-func (r *Reconciler) reconcileDelete(ctx context.Context, pc *snowplanev1alpha1.ProviderConfig) (ctrl.Result, error) {
+func (r *Reconciler) reconcileDelete(ctx context.Context, pc *snowplanev1alpha1.ProviderConfig, cacheKey string) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	if !finalizers.Has(pc, finalizerName) {
 		// No finalizer — nothing to do.
-		r.factory.Evict(pc.Name)
-		r.rateLimiter.Evict(pc.Name)
-		r.circuitBreaker.Evict(pc.Name)
+		r.factory.Evict(cacheKey)
+		r.rateLimiter.Evict(cacheKey)
+		r.circuitBreaker.Evict(cacheKey)
 		return ctrl.Result{}, nil
 	}
 
@@ -546,10 +551,10 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, pc *snowplanev1alpha1.
 		return ctrl.Result{}, fmt.Errorf("removing finalizer: %w", err)
 	}
 
-	r.factory.Evict(pc.Name)
-	r.rateLimiter.Evict(pc.Name)
-	r.circuitBreaker.Evict(pc.Name)
-	metrics.DeleteProviderConfigHealthy(pc.Name)
+	r.factory.Evict(cacheKey)
+	r.rateLimiter.Evict(cacheKey)
+	r.circuitBreaker.Evict(cacheKey)
+	metrics.DeleteProviderConfigHealthy(cacheKey)
 	logger.Info("ProviderConfig deleted, client evicted", "name", pc.Name)
 
 	return ctrl.Result{}, nil

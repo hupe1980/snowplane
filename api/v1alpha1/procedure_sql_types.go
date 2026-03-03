@@ -26,6 +26,7 @@ type ProcedureSQLSpec struct {
 
 	// Name is the Snowflake procedure name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -35,6 +36,7 @@ type ProcedureSQLSpec struct {
 	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -44,6 +46,7 @@ type ProcedureSQLSpec struct {
 	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// Arguments defines the procedure arguments. Immutable after creation.
@@ -53,10 +56,12 @@ type ProcedureSQLSpec struct {
 	// Returns is the return type (e.g. "VARCHAR", "TABLE(col1 VARCHAR, col2 NUMBER)").
 	// Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Returns string `json:"returns"`
 
 	// Body is the SQL procedure body (the AS clause content). Required for SQL procedures.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Body string `json:"body"`
 
 	// ExecuteAs specifies the execution context: OWNER or CALLER.

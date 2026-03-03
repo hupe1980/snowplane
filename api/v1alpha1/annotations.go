@@ -35,6 +35,15 @@ const (
 	// privileges). The Snowflake resource will remain and may require
 	// manual cleanup.
 	AnnotationAbandonOnDelete = "snowplane.hupe1980.github.io/abandon-on-delete"
+
+	// AnnotationForceDestroy controls whether the controller issues
+	// DROP … CASCADE when deleting the resource. This cascading drop
+	// removes all child Snowflake objects (e.g., all schemas, tables,
+	// views inside a database). Use with extreme caution — child
+	// Kubernetes CRs will become orphaned (pointing at non-existent
+	// Snowflake objects). Only supported on resources whose Snowflake
+	// DDL supports CASCADE (Database, Schema).
+	AnnotationForceDestroy = "snowplane.hupe1980.github.io/force-destroy"
 )
 
 // Label keys applied to CRD metadata (not CR annotations).
@@ -57,12 +66,6 @@ const (
 const (
 	// MaturityAlpha indicates an alpha-quality CRD with no stability guarantees.
 	MaturityAlpha = "alpha"
-
-	// MaturityBeta indicates a beta-quality CRD with backwards-compatible changes expected.
-	MaturityBeta = "beta"
-
-	// MaturityStable indicates a stable CRD with full backwards-compatibility guarantees.
-	MaturityStable = "stable"
 )
 
 // IsForceNew returns true when the force-new annotation is set to "true",
@@ -77,4 +80,10 @@ func IsForceNew(annotations map[string]string) bool {
 // attempting to drop the Snowflake resource.
 func IsAbandonOnDelete(annotations map[string]string) bool {
 	return annotations[AnnotationAbandonOnDelete] == "true"
+}
+
+// IsForceDestroy returns true when the force-destroy annotation is set
+// to "true", signaling the controller to issue DROP … CASCADE.
+func IsForceDestroy(annotations map[string]string) bool {
+	return annotations[AnnotationForceDestroy] == "true"
 }

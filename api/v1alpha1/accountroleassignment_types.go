@@ -33,6 +33,7 @@ type AccountRoleAssignmentSpec struct {
 	// Mutually exclusive with RoleRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	RoleName *string `json:"roleName,omitempty"`
 
 	// RoleRef references an AccountRole CR in the same namespace.
@@ -45,6 +46,7 @@ type AccountRoleAssignmentSpec struct {
 	// Mutually exclusive with ToRoleRef, ToUser, ToUserRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	ToRole *string `json:"toRole,omitempty"`
 
 	// ToRoleRef references an AccountRole CR in the same namespace.
@@ -57,6 +59,7 @@ type AccountRoleAssignmentSpec struct {
 	// Mutually exclusive with ToUserRef, ToRole, ToRoleRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	ToUser *string `json:"toUser,omitempty"`
 
 	// ToUserRef references a User CR in the same namespace.

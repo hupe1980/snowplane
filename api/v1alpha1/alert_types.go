@@ -23,6 +23,7 @@ type AlertSpec struct {
 
 	// Name is the Snowflake alert name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -34,6 +35,7 @@ type AlertSpec struct {
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -45,6 +47,7 @@ type AlertSpec struct {
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// WarehouseRef references a Warehouse CR in the same namespace.
@@ -56,6 +59,7 @@ type AlertSpec struct {
 	// Mutually exclusive with WarehouseRef. Omit for serverless alerts.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	WarehouseName *string `json:"warehouseName,omitempty" snowflake:"WAREHOUSE"`
 
 	// Schedule defines the evaluation schedule for the alert.
@@ -68,10 +72,12 @@ type AlertSpec struct {
 	// Must be a SELECT, SHOW, or CALL statement. The alert fires when the
 	// condition returns at least one row.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Condition string `json:"condition"`
 
 	// Action is the SQL statement executed when the alert condition is met.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Action string `json:"action"`
 
 	// Comment is an optional description for the alert.

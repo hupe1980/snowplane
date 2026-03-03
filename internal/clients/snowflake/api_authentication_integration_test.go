@@ -23,12 +23,13 @@ func TestBuildCreateAPIAuthIntegrationSQL(t *testing.T) {
 			OAuthClientID:      "client-id",
 			OAuthClientSecret:  "client-secret",
 			Enabled:            &enabled,
-			OAuthTokenEndpoint: strPtr("https://token.example.com/oauth/token"),
+			OAuthTokenEndpoint: ptr("https://token.example.com/oauth/token"),
 			OAuthAllowedScopes: []string{"read", "write"},
-			Comment:            strPtr("CC auth integration"),
+			Comment:            ptr("CC auth integration"),
 		}
 
-		got := buildCreateAPIAuthIntegrationSQL(opts)
+		got, err := buildCreateAPIAuthIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE SECURITY INTEGRATION IF NOT EXISTS "MY_CC_AUTH"`)
 		assert.Contains(t, got, "TYPE = API_AUTHENTICATION AUTH_TYPE = OAUTH2")
 		assert.Contains(t, got, "OAUTH_GRANT = CLIENT_CREDENTIALS")
@@ -52,11 +53,12 @@ func TestBuildCreateAPIAuthIntegrationSQL(t *testing.T) {
 			OAuthClientID:              "acg-client",
 			OAuthClientSecret:          "acg-secret",
 			Enabled:                    &enabled,
-			OAuthAuthorizationEndpoint: strPtr("https://auth.example.com/authorize"),
+			OAuthAuthorizationEndpoint: ptr("https://auth.example.com/authorize"),
 			OAuthRefreshTokenValidity:  &refreshValidity,
 		}
 
-		got := buildCreateAPIAuthIntegrationSQL(opts)
+		got, err := buildCreateAPIAuthIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "OAUTH_GRANT = AUTHORIZATION_CODE")
 		assert.Contains(t, got, "OAUTH_AUTHORIZATION_ENDPOINT = 'https://auth.example.com/authorize'")
 		assert.Contains(t, got, "OAUTH_REFRESH_TOKEN_VALIDITY = 86400")
@@ -71,10 +73,11 @@ func TestBuildCreateAPIAuthIntegrationSQL(t *testing.T) {
 			OAuthClientID:        "jwt-client",
 			OAuthClientSecret:    "jwt-secret",
 			Enabled:              &enabled,
-			OAuthAssertionIssuer: strPtr("https://issuer.example.com"),
+			OAuthAssertionIssuer: ptr("https://issuer.example.com"),
 		}
 
-		got := buildCreateAPIAuthIntegrationSQL(opts)
+		got, err := buildCreateAPIAuthIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "OAUTH_GRANT = JWT_BEARER")
 		assert.Contains(t, got, "OAUTH_ASSERTION_ISSUER = 'https://issuer.example.com'")
 		assert.Contains(t, got, "ENABLED = FALSE")
@@ -91,7 +94,8 @@ func TestBuildCreateAPIAuthIntegrationSQL(t *testing.T) {
 			OAuthClientAuthMethod: &method,
 		}
 
-		got := buildCreateAPIAuthIntegrationSQL(opts)
+		got, err := buildCreateAPIAuthIntegrationSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "OAUTH_CLIENT_AUTH_METHOD = CLIENT_SECRET_POST")
 	})
 }
@@ -108,7 +112,7 @@ func TestBuildAlterAPIAuthIntegrationStatements(t *testing.T) {
 		opts := AlterAPIAuthenticationIntegrationOptions{
 			Name:           NewAccountObjectIdentifier("MY_AUTH"),
 			OAuthGrantType: OAuthGrantTypeClientCredentials,
-			Comment:        strPtr("updated"),
+			Comment:        ptr("updated"),
 		}
 
 		stmts, err := buildAlterAPIAuthIntegrationStatements(opts)
@@ -299,7 +303,7 @@ func TestAlterAPIAuthenticationIntegrationOptions_Validate(t *testing.T) {
 		opts := AlterAPIAuthenticationIntegrationOptions{
 			Name:           NewAccountObjectIdentifier("MY_AUTH"),
 			OAuthGrantType: OAuthGrantTypeClientCredentials,
-			Comment:        strPtr("updated"),
+			Comment:        ptr("updated"),
 		}
 		assert.NoError(t, opts.Validate())
 	})
@@ -308,7 +312,7 @@ func TestAlterAPIAuthenticationIntegrationOptions_Validate(t *testing.T) {
 		t.Parallel()
 		opts := AlterAPIAuthenticationIntegrationOptions{
 			OAuthGrantType: OAuthGrantTypeClientCredentials,
-			Comment:        strPtr("updated"),
+			Comment:        ptr("updated"),
 		}
 		assert.Error(t, opts.Validate())
 	})
@@ -357,7 +361,7 @@ func TestAlterAPIAuthenticationIntegrationOptions_HasChanges(t *testing.T) {
 		opts := AlterAPIAuthenticationIntegrationOptions{
 			Name:           NewAccountObjectIdentifier("MY_AUTH"),
 			OAuthGrantType: OAuthGrantTypeClientCredentials,
-			Comment:        strPtr("hi"),
+			Comment:        ptr("hi"),
 		}
 		assert.True(t, opts.HasChanges())
 	})

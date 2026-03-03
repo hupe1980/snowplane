@@ -82,6 +82,7 @@ type QueueNotificationConfig struct {
 type WebhookNotificationConfig struct {
 	// WebhookURL is the endpoint URL for the webhook.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	WebhookURL string `json:"webhookURL" snowflake:"WEBHOOK_URL,always,nounset"`
 
 	// WebhookSecret is the secret used to sign webhook payloads.
@@ -110,6 +111,7 @@ type NotificationIntegrationSpec struct {
 
 	// Name is the Snowflake notification integration name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// Type specifies the integration type (EMAIL, QUEUE, WEBHOOK).

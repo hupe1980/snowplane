@@ -35,9 +35,9 @@ func TestBuildCreateTableSQL(t *testing.T) {
 					{Name: "ID", Type: "NUMBER"},
 					{Name: "TS", Type: "TIMESTAMP_NTZ"},
 				},
-				DataRetentionTimeInDays: ptrInt32(1),
-				ChangeTracking:          ptrBool(true),
-				Comment:                 ptrString("events table"),
+				DataRetentionTimeInDays: ptr(int32(1)),
+				ChangeTracking:          ptr(true),
+				Comment:                 ptr("events table"),
 			},
 			expected: `CREATE TRANSIENT TABLE IF NOT EXISTS "DB"."SCHEMA"."EVENTS" ("ID" NUMBER, "TS" TIMESTAMP_NTZ) DATA_RETENTION_TIME_IN_DAYS = 1 CHANGE_TRACKING = TRUE COMMENT = 'events table'`,
 		},
@@ -46,8 +46,8 @@ func TestBuildCreateTableSQL(t *testing.T) {
 			opts: CreateTableOptions{
 				Name: NewSchemaObjectIdentifier("DB", "S", "T"),
 				Columns: []CreateTableColumn{
-					{Name: "ID", Type: "NUMBER", Nullable: ptrBool(false)},
-					{Name: "STATUS", Type: "VARCHAR", Default: ptrString("'ACTIVE'"), Comment: ptrString("status col")},
+					{Name: "ID", Type: "NUMBER", Nullable: ptr(false)},
+					{Name: "STATUS", Type: "VARCHAR", Default: ptr("'ACTIVE'"), Comment: ptr("status col")},
 				},
 			},
 			expected: `CREATE TABLE IF NOT EXISTS "DB"."S"."T" ("ID" NUMBER NOT NULL, "STATUS" VARCHAR DEFAULT 'ACTIVE' COMMENT 'status col')`,
@@ -71,7 +71,7 @@ func TestBuildCreateTableSQL(t *testing.T) {
 				Columns: []CreateTableColumn{
 					{Name: "V", Type: "VARIANT"},
 				},
-				EnableSchemaEvolution: ptrBool(true),
+				EnableSchemaEvolution: ptr(true),
 			},
 			expected: `CREATE TABLE IF NOT EXISTS "DB"."S"."T" ("V" VARIANT) ENABLE_SCHEMA_EVOLUTION = TRUE`,
 		},
@@ -92,7 +92,7 @@ func TestBuildCreateTableSQL(t *testing.T) {
 			opts: CreateTableOptions{
 				Name: NewSchemaObjectIdentifier("DB", "S", "ORDERS"),
 				Columns: []CreateTableColumn{
-					{Name: "ID", Type: "NUMBER(38,0)", Nullable: ptrBool(false)},
+					{Name: "ID", Type: "NUMBER(38,0)", Nullable: ptr(false)},
 					{Name: "AMOUNT", Type: "NUMBER(10,2)"},
 				},
 				Constraints: []CreateTableConstraint{
@@ -140,7 +140,7 @@ func TestBuildCreateTableSQL(t *testing.T) {
 			opts: CreateTableOptions{
 				Name: NewSchemaObjectIdentifier("DB", "S", "T"),
 				Columns: []CreateTableColumn{
-					{Name: "ID", Type: "NUMBER", Nullable: ptrBool(false)},
+					{Name: "ID", Type: "NUMBER", Nullable: ptr(false)},
 					{Name: "CODE", Type: "VARCHAR(10)"},
 					{Name: "REF_ID", Type: "NUMBER"},
 				},
@@ -178,8 +178,8 @@ func TestBuildAlterTableStatements(t *testing.T) {
 			name: "set comment and retention",
 			opts: AlterTableOptions{
 				Name:                    id,
-				Comment:                 ptrString("updated"),
-				DataRetentionTimeInDays: ptrInt32(7),
+				Comment:                 ptr("updated"),
+				DataRetentionTimeInDays: ptr(int32(7)),
 			},
 			expected: []string{
 				`ALTER TABLE "DB"."S"."T" SET COMMENT = 'updated' DATA_RETENTION_TIME_IN_DAYS = 7`,
@@ -229,8 +229,8 @@ func TestBuildAlterTableStatements(t *testing.T) {
 			name: "set change tracking and schema evolution",
 			opts: AlterTableOptions{
 				Name:                  id,
-				ChangeTracking:        ptrBool(true),
-				EnableSchemaEvolution: ptrBool(false),
+				ChangeTracking:        ptr(true),
+				EnableSchemaEvolution: ptr(false),
 			},
 			expected: []string{
 				`ALTER TABLE "DB"."S"."T" SET CHANGE_TRACKING = TRUE ENABLE_SCHEMA_EVOLUTION = FALSE`,
@@ -306,7 +306,7 @@ func TestCreateTableOptionsValidation(t *testing.T) {
 			opts: CreateTableOptions{
 				Name:                    NewSchemaObjectIdentifier("DB", "S", "T"),
 				Columns:                 []CreateTableColumn{{Name: "ID", Type: "NUMBER"}},
-				DataRetentionTimeInDays: ptrInt32(100),
+				DataRetentionTimeInDays: ptr(int32(100)),
 			},
 			wantErr: true,
 		},
@@ -409,7 +409,7 @@ func TestAlterTableOptionsValidation(t *testing.T) {
 		t.Parallel()
 		err := (&AlterTableOptions{
 			Name:    NewSchemaObjectIdentifier("DB", "S", "T"),
-			Comment: ptrString("ok"),
+			Comment: ptr("ok"),
 		}).Validate()
 		require.NoError(t, err)
 	})
@@ -418,7 +418,7 @@ func TestAlterTableOptionsValidation(t *testing.T) {
 		t.Parallel()
 		err := (&AlterTableOptions{
 			Name:                    NewSchemaObjectIdentifier("DB", "S", "T"),
-			DataRetentionTimeInDays: ptrInt32(-1),
+			DataRetentionTimeInDays: ptr(int32(-1)),
 		}).Validate()
 		require.Error(t, err)
 	})
@@ -528,12 +528,12 @@ func TestAlterTableOptionsHasChanges(t *testing.T) {
 	t.Parallel()
 
 	assert.False(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T")}).HasChanges())
-	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), Comment: ptrString("x")}).HasChanges())
+	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), Comment: ptr("x")}).HasChanges())
 	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), DropClusteringKey: true}).HasChanges())
 	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), ClusterBy: []string{"A"}}).HasChanges())
 	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), AddColumns: []CreateTableColumn{{Name: "X", Type: "INT"}}}).HasChanges())
 	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), DropColumns: []string{"X"}}).HasChanges())
-	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), AlterColumns: []AlterColumnAction{{Name: "X", SetComment: ptrString("c")}}}).HasChanges())
+	assert.True(t, (&AlterTableOptions{Name: NewSchemaObjectIdentifier("DB", "S", "T"), AlterColumns: []AlterColumnAction{{Name: "X", SetComment: ptr("c")}}}).HasChanges())
 }
 
 func TestBuildAlterTableStatements_AddColumn(t *testing.T) {
@@ -545,7 +545,7 @@ func TestBuildAlterTableStatements_AddColumn(t *testing.T) {
 	got, err := buildAlterTableStatements(AlterTableOptions{
 		Name: id,
 		AddColumns: []CreateTableColumn{
-			{Name: "AGE", Type: "NUMBER(10,0)", Nullable: &notNull, Comment: ptrString("user age")},
+			{Name: "AGE", Type: "NUMBER(10,0)", Nullable: &notNull, Comment: ptr("user age")},
 		},
 	})
 	require.NoError(t, err)
@@ -578,9 +578,9 @@ func TestBuildAlterTableStatements_AlterColumn(t *testing.T) {
 		AlterColumns: []AlterColumnAction{
 			{
 				Name:       "EMAIL",
-				SetType:    ptrString("VARCHAR(500)"),
+				SetType:    ptr("VARCHAR(500)"),
 				SetNotNull: &setNotNull,
-				SetComment: ptrString("email addr"),
+				SetComment: ptr("email addr"),
 			},
 		},
 	})

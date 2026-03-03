@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -312,7 +314,7 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	sfClient := resolved.Client
-	providerName = resolved.Name
+	providerName = resolved.CacheKey
 
 	// L-3: Enrich logger with provider metadata for multi-account log correlation.
 	logger = logger.WithValues("provider", resolved.Name, "account", resolved.Account)
@@ -578,16 +580,21 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 
 	r.Recorder.Event(obj, corev1.EventTypeNormal, snowplanev1alpha1.ReasonCreating, fmt.Sprintf("%s %q created", resName, obj.GetSpecName()))
 
-	if err := r.patchStatus(ctx, obj); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Remove creation-initiated annotation now that status is fully committed.
+	// Persist annotation changes (clear creation-initiated) via a metadata
+	// patch first, then status. This ordering ensures the ResourceVersion
+	// stays consistent across both patches and prevents the metadata patch
+	// from overwriting status fields set by SSA Apply.
 	clearCreationInitiated(obj)
 
-	if err := r.Client.Patch(ctx, obj, client.MergeFrom(statusBase.DeepCopyObject().(T))); err != nil {
-		// Non-fatal: the annotation will be cleaned up on next reconcile.
-		logger.V(1).Info("failed to remove creation-initiated annotation", "error", err)
+	patchTarget := obj.DeepCopyObject().(T)
+	if err := r.Client.Patch(ctx, patchTarget, client.MergeFrom(statusBase.DeepCopyObject().(T))); err != nil {
+		return ctrl.Result{}, fmt.Errorf("removing creation-initiated annotation: %w", err)
+	}
+
+	obj.SetResourceVersion(patchTarget.GetResourceVersion())
+
+	if err := r.patchStatus(ctx, obj); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{RequeueAfter: r.getRequeueInterval()}, nil
@@ -797,6 +804,12 @@ func (r *GenericReconciler[T, S, D]) reconcilePostCrashCreate(ctx context.Contex
 
 	r.Adapter.ApplyObservation(obj, obs)
 	conditions.ClearDriftDetected(obj)
+
+	// Late-initialize spec from observed state for post-crash recovery:
+	// Snowflake may have applied defaults (e.g. warehouse size, data retention)
+	// during CREATE that the user didn't specify. Capture them now.
+	r.checkLateInit(obj, obs, logger, resName)
+
 	conditions.SetReady(obj, resName+" created successfully (recovered)")
 	conditions.SetSynced(obj, "Reconciliation complete")
 	obj.SetObservedGeneration(obj.GetGeneration())
@@ -810,15 +823,20 @@ func (r *GenericReconciler[T, S, D]) reconcilePostCrashCreate(ctx context.Contex
 	r.Recorder.Event(obj, corev1.EventTypeNormal, snowplanev1alpha1.ReasonCreating,
 		fmt.Sprintf("%s %q create recovered after restart", resName, obj.GetSpecName()))
 
-	if err := r.patchStatus(ctx, obj); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Remove the creation-initiated annotation.
+	// Persist annotation changes (late-initialized, clear creation-initiated)
+	// via a metadata patch first, then status. This ordering ensures the
+	// ResourceVersion stays consistent across both patches.
 	clearCreationInitiated(obj)
 
-	if err := r.Client.Patch(ctx, obj, client.MergeFrom(statusBase.DeepCopyObject().(T))); err != nil {
-		logger.V(1).Info("failed to remove creation-initiated annotation", "error", err)
+	patchTarget := obj.DeepCopyObject().(T)
+	if err := r.Client.Patch(ctx, patchTarget, client.MergeFrom(statusBase.DeepCopyObject().(T))); err != nil {
+		return ctrl.Result{}, fmt.Errorf("patching annotations after post-crash recovery: %w", err)
+	}
+
+	obj.SetResourceVersion(patchTarget.GetResourceVersion())
+
+	if err := r.patchStatus(ctx, obj); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{RequeueAfter: r.getRequeueInterval()}, nil
@@ -873,7 +891,13 @@ func (r *GenericReconciler[T, S, D]) reconcileAdoptOrReject(ctx context.Context,
 
 	r.Adapter.ApplyObservation(obj, obs)
 	conditions.ClearDriftDetected(obj)
-	setLateInitializedAnnotation(obj)
+
+	// Late-initialize spec from observed state: fill nil spec fields with
+	// values from the live Snowflake resource. This makes the adopted CR's
+	// spec a complete representation of the managed state, following the
+	// Crossplane late-initialization pattern.
+	r.checkLateInit(obj, obs, logger, resName)
+
 	conditions.SetReady(obj, resName+" adopted successfully")
 	conditions.SetSynced(obj, "Reconciliation complete")
 	obj.SetObservedGeneration(obj.GetGeneration())
@@ -948,8 +972,24 @@ func (r *GenericReconciler[T, S, D]) reconcileDelete(ctx context.Context, obj T,
 			opCtx, cancel := context.WithTimeout(ctx, r.getSnowflakeOpTimeout())
 			defer cancel()
 
+			// Determine whether to issue a cascading DROP.
+			cascade := snowplanev1alpha1.IsForceDestroy(obj.GetAnnotations())
+
 			if err := metrics.ObserveSnowflakeOp(resName, "drop", func() error {
 				return sfretry.Do(opCtx, sfretry.DefaultOptions(), func() error {
+					if cascade {
+						if cd, ok := any(r.Adapter).(CascadeDropper[T, S]); ok {
+							logger.Info("cascade DROP requested via force-destroy annotation",
+								"resource", resName, "name", obj.GetSpecName())
+							r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonDeleting,
+								fmt.Sprintf("CASCADE DROP %s %q — all child Snowflake objects will be destroyed", resName, obj.GetSpecName()))
+							return cd.DropCascade(opCtx, svc, id)
+						}
+
+						logger.Info("force-destroy annotation set but resource does not support CASCADE, falling back to standard DROP",
+							"resource", resName, "name", obj.GetSpecName())
+					}
+
 					return r.Adapter.Drop(opCtx, svc, id)
 				})
 			}); err != nil {
@@ -1133,8 +1173,24 @@ func (r *GenericReconciler[T, S, D]) finalizeSpec(ctx context.Context, obj T) er
 
 	obj.SetLastAppliedSpecHash(hash)
 	obj.SetTrackedParametersList(r.Adapter.ComputeTrackedParameters(obj))
+	obj.SetLastReconcileTime(&metav1.Time{Time: time.Now()})
 
 	return nil
+}
+
+// checkLateInit performs optional late-initialization of spec fields from
+// observed state. Only adapters implementing LateInitializer[T, D] are
+// affected. The late-initialized annotation is set only when fields were
+// actually modified.
+func (r *GenericReconciler[T, S, D]) checkLateInit(obj T, obs *Observation[D], logger logr.Logger, resName string) {
+	// The any() wrapper is required because Go generics do not allow direct
+	// type assertion from one parameterised interface to another.
+	if li, ok := any(r.Adapter).(LateInitializer[T, D]); ok {
+		if li.LateInitialize(obj, obs) {
+			setLateInitializedAnnotation(obj)
+			logger.Info("late-initialized spec fields from observed state", resName, obj.GetSpecName())
+		}
+	}
 }
 
 // isCreateOrAlter returns true when CREATE OR ALTER should be used.

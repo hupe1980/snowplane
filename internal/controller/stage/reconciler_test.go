@@ -352,8 +352,8 @@ func TestReconcile_CreateExternalStage(t *testing.T) {
 
 	stage := newTestStage("mystage", "default")
 	stage.Finalizers = []string{finalizerName}
-	stage.Spec.URL = testutil.PtrString("s3://my-bucket/path/")
-	stage.Spec.StorageIntegration = testutil.PtrString("MY_INT")
+	stage.Spec.URL = testutil.Ptr("s3://my-bucket/path/")
+	stage.Spec.StorageIntegration = testutil.Ptr("MY_INT")
 	db := newTestDB("analytics-db", "default")
 	schema := newTestSchema("public-schema", "default")
 
@@ -476,7 +476,7 @@ func TestValidateImmutableFields_TypeChanged(t *testing.T) {
 		Type:         "INTERNAL",
 	}
 	// Change to external by setting URL.
-	stage.Spec.URL = testutil.PtrString("s3://bucket/path/")
+	stage.Spec.URL = testutil.Ptr("s3://bucket/path/")
 	err := a.ValidateImmutableFields(context.Background(), stage)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot convert between internal and external stage types")
@@ -503,9 +503,9 @@ func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
 	stage := newTestStage("mystage", "default")
-	stage.Spec.Comment = testutil.PtrString("test stage")
-	stage.Spec.URL = testutil.PtrString("s3://bucket/path/")
-	stage.Spec.StorageIntegration = testutil.PtrString("MY_INT")
+	stage.Spec.Comment = testutil.Ptr("test stage")
+	stage.Spec.URL = testutil.Ptr("s3://bucket/path/")
+	stage.Spec.StorageIntegration = testutil.Ptr("MY_INT")
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "DATA_LOAD")
 
 	opts := buildCreateOptions(stage, id)
@@ -519,7 +519,7 @@ func TestBuildAlterOptions_CommentChanged(t *testing.T) {
 	t.Parallel()
 
 	stage := newTestStage("mystage", "default")
-	stage.Spec.Comment = testutil.PtrString("new comment")
+	stage.Spec.Comment = testutil.Ptr("new comment")
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "DATA_LOAD")
 	obs := successfulObservation()
 
@@ -532,9 +532,9 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.StageSpec{
-		Comment:            testutil.PtrString("test"),
-		URL:                testutil.PtrString("s3://bucket/"),
-		StorageIntegration: testutil.PtrString("MY_INT"),
+		Comment:            testutil.Ptr("test"),
+		URL:                testutil.Ptr("s3://bucket/"),
+		StorageIntegration: testutil.Ptr("MY_INT"),
 	}
 
 	fields := tracked.ComputeTracked(spec)
@@ -547,7 +547,7 @@ func TestDetectDrift_CommentDrift(t *testing.T) {
 	t.Parallel()
 
 	stage := newTestStage("mystage", "default")
-	stage.Spec.Comment = testutil.PtrString("expected")
+	stage.Spec.Comment = testutil.Ptr("expected")
 
 	obs := &snowflake.StageObservation{
 		Exists: true,
@@ -614,7 +614,7 @@ func TestComputeUnsetFields_CommentRemoved(t *testing.T) {
 	stage := newTestStage("s", "default")
 	stage.Status.TrackedParameters = []string{"COMMENT", "URL"}
 	stage.Spec.Comment = nil // was set → now removed
-	stage.Spec.URL = testutil.PtrString("s3://bucket/")
+	stage.Spec.URL = testutil.Ptr("s3://bucket/")
 
 	unset := tracked.ComputeUnset(&stage.Spec, stage.Status.TrackedParameters)
 	assert.Contains(t, unset, "COMMENT")
@@ -646,7 +646,7 @@ func TestComputeUnsetFields_NoneRemoved(t *testing.T) {
 
 	stage := newTestStage("s", "default")
 	stage.Status.TrackedParameters = []string{"COMMENT"}
-	stage.Spec.Comment = testutil.PtrString("still here")
+	stage.Spec.Comment = testutil.Ptr("still here")
 
 	unset := tracked.ComputeUnset(&stage.Spec, stage.Status.TrackedParameters)
 	assert.Empty(t, unset)

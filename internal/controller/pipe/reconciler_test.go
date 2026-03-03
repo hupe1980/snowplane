@@ -84,8 +84,8 @@ func newTestPipe(name, namespace string) *snowplanev1alpha1.Pipe {
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:          "MY_PIPE",
-			DatabaseName:  testutil.PtrString("MY_DB"),
-			SchemaName:    testutil.PtrString("MY_SCHEMA"),
+			DatabaseName:  testutil.Ptr("MY_DB"),
+			SchemaName:    testutil.Ptr("MY_SCHEMA"),
 			CopyStatement: "COPY INTO my_table FROM @my_stage",
 		},
 	}
@@ -222,7 +222,7 @@ func TestReconcile_UpdateComment(t *testing.T) {
 	p.Finalizers = []string{finalizerName}
 	p.Status.ObservedGeneration = 1
 	p.Generation = 2
-	p.Spec.Comment = testutil.PtrString("new comment")
+	p.Spec.Comment = testutil.Ptr("new comment")
 	p.Status.DatabaseName = "MY_DB"
 	p.Status.SchemaName = "MY_SCHEMA"
 

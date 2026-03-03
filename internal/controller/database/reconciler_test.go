@@ -33,10 +33,11 @@ const testOriginalComment = "original"
 // --------------------------------------------------------------------------
 
 type mockService struct {
-	observeFn func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.DatabaseObservation, error)
-	createFn  func(ctx context.Context, opts snowflake.CreateDatabaseOptions) error
-	alterFn   func(ctx context.Context, opts snowflake.AlterDatabaseOptions) error
-	dropFn    func(ctx context.Context, name snowflake.AccountObjectIdentifier) error
+	observeFn     func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.DatabaseObservation, error)
+	createFn      func(ctx context.Context, opts snowflake.CreateDatabaseOptions) error
+	alterFn       func(ctx context.Context, opts snowflake.AlterDatabaseOptions) error
+	dropFn        func(ctx context.Context, name snowflake.AccountObjectIdentifier) error
+	dropCascadeFn func(ctx context.Context, name snowflake.AccountObjectIdentifier) error
 }
 
 func (m *mockService) Observe(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.DatabaseObservation, error) {
@@ -66,6 +67,14 @@ func (m *mockService) Alter(ctx context.Context, opts snowflake.AlterDatabaseOpt
 func (m *mockService) Drop(ctx context.Context, name snowflake.AccountObjectIdentifier) error {
 	if m.dropFn != nil {
 		return m.dropFn(ctx, name)
+	}
+
+	return nil
+}
+
+func (m *mockService) DropCascade(ctx context.Context, name snowflake.AccountObjectIdentifier) error {
+	if m.dropCascadeFn != nil {
+		return m.dropCascadeFn(ctx, name)
 	}
 
 	return nil
@@ -104,10 +113,10 @@ func successfulObservation() *snowflake.DatabaseObservation {
 			RetentionTime: 1,
 		},
 		Parameters: &snowflake.DatabaseParameters{
-			DataRetentionTimeInDays:    testutil.PtrInt32(1),
-			MaxDataExtensionTimeInDays: testutil.PtrInt32(14),
+			DataRetentionTimeInDays:    testutil.Ptr(int32(1)),
+			MaxDataExtensionTimeInDays: testutil.Ptr(int32(14)),
 			DefaultDDLCollation:        "",
-			ReplaceInvalidCharacters:   testutil.PtrBool(false),
+			ReplaceInvalidCharacters:   testutil.Ptr(false),
 			StorageSerializationPolicy: "COMPATIBLE",
 			LogLevel:                   "OFF",
 			MetricLevel:                "NONE",
@@ -263,13 +272,13 @@ func TestReconcile_CreateWithAllOptions(t *testing.T) {
 	ml := snowplanev1alpha1.MetricLevelAll
 	tl := snowplanev1alpha1.TraceLevelAlways
 
-	db.Spec.Comment = testutil.PtrString("test db")
-	db.Spec.DataRetentionTimeInDays = testutil.PtrInt32(7)
-	db.Spec.MaxDataExtensionTimeInDays = testutil.PtrInt32(28)
-	db.Spec.Catalog = testutil.PtrString("iceberg_cat")
-	db.Spec.ExternalVolume = testutil.PtrString("vol1")
-	db.Spec.ReplaceInvalidCharacters = testutil.PtrBool(true)
-	db.Spec.DefaultDDLCollation = testutil.PtrString("en-ci")
+	db.Spec.Comment = testutil.Ptr("test db")
+	db.Spec.DataRetentionTimeInDays = testutil.Ptr(int32(7))
+	db.Spec.MaxDataExtensionTimeInDays = testutil.Ptr(int32(28))
+	db.Spec.Catalog = testutil.Ptr("iceberg_cat")
+	db.Spec.ExternalVolume = testutil.Ptr("vol1")
+	db.Spec.ReplaceInvalidCharacters = testutil.Ptr(true)
+	db.Spec.DefaultDDLCollation = testutil.Ptr("en-ci")
 	db.Spec.StorageSerializationPolicy = &ssp
 	db.Spec.LogLevel = &ll
 	db.Spec.MetricLevel = &ml
@@ -401,10 +410,10 @@ func TestReconcile_UpdateWithChanges(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	db.Status.ObservedGeneration = 1
 	db.Generation = 2
-	db.Spec.Comment = testutil.PtrString("new comment")
+	db.Spec.Comment = testutil.Ptr("new comment")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old comment"
@@ -437,10 +446,10 @@ func TestReconcile_DriftCorrection(t *testing.T) {
 	// ObservedGeneration == Generation, but observed state differs from spec → drift.
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	db.Generation = 1
 	db.Status.ObservedGeneration = 1 // same generation → drift path
-	db.Spec.Comment = testutil.PtrString("desired comment")
+	db.Spec.Comment = testutil.Ptr("desired comment")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "drifted comment" // different from desired
@@ -470,13 +479,13 @@ func TestReconcile_DriftCorrection_DataRetention(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	db.Generation = 1
 	db.Status.ObservedGeneration = 1
-	db.Spec.DataRetentionTimeInDays = testutil.PtrInt32(30) // desired
+	db.Spec.DataRetentionTimeInDays = testutil.Ptr(int32(30)) // desired
 
 	obs := successfulObservation()
-	obs.Parameters.DataRetentionTimeInDays = testutil.PtrInt32(1) // actual
+	obs.Parameters.DataRetentionTimeInDays = testutil.Ptr(int32(1)) // actual
 
 	var capturedAlterOpts snowflake.AlterDatabaseOptions
 
@@ -503,9 +512,9 @@ func TestReconcile_AlterFails(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	db.Status.ObservedGeneration = 1
-	db.Spec.Comment = testutil.PtrString("changed")
+	db.Spec.Comment = testutil.Ptr("changed")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = testOriginalComment
@@ -535,9 +544,9 @@ func TestReconcile_AlterTerminalError(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	db.Status.ObservedGeneration = 1
-	db.Spec.Comment = testutil.PtrString("bad")
+	db.Spec.Comment = testutil.Ptr("bad")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = testOriginalComment
@@ -713,6 +722,96 @@ func TestReconcile_DeleteNoFinalizer(t *testing.T) {
 	assert.Equal(t, ctrl.Result{}, result)
 }
 
+func TestReconcile_DeleteCascadeWithForceDestroy(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB("mydb", "default")
+	db.Finalizers = []string{finalizerName}
+	db.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationForceDestroy: "true",
+	}
+	now := metav1.Now()
+	db.DeletionTimestamp = &now
+
+	var cascadeCalled bool
+
+	mock := &mockService{
+		dropCascadeFn: func(_ context.Context, name snowflake.AccountObjectIdentifier) error {
+			cascadeCalled = true
+			assert.Equal(t, "ANALYTICS", name.Name())
+			return nil
+		},
+	}
+
+	r := newTestReconciler(mock, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "default"))
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+	assert.True(t, cascadeCalled, "should use cascade drop with force-destroy annotation")
+}
+
+func TestReconcile_DeleteCascadeDropFails(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB("mydb", "default")
+	db.Finalizers = []string{finalizerName}
+	db.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationForceDestroy: "true",
+	}
+	now := metav1.Now()
+	db.DeletionTimestamp = &now
+
+	mock := &mockService{
+		dropCascadeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) error {
+			return fmt.Errorf("cascade drop failed")
+		},
+	}
+
+	r := newTestReconciler(mock, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "default"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cascade drop failed")
+
+	// Finalizer should still be present.
+	got := &snowplanev1alpha1.Database{}
+	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mydb", Namespace: "default"}, got))
+	assert.Contains(t, got.Finalizers, finalizerName)
+}
+
+func TestReconcile_DeleteWithoutForceDestroyUsesRegularDrop(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB("mydb", "default")
+	db.Finalizers = []string{finalizerName}
+	// No force-destroy annotation
+	now := metav1.Now()
+	db.DeletionTimestamp = &now
+
+	var dropCalled bool
+	var cascadeCalled bool
+
+	mock := &mockService{
+		dropFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) error {
+			dropCalled = true
+			return nil
+		},
+		dropCascadeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) error {
+			cascadeCalled = true
+			return nil
+		},
+	}
+
+	r := newTestReconciler(mock, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "default"))
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+	assert.True(t, dropCalled, "should use regular drop without force-destroy annotation")
+	assert.False(t, cascadeCalled, "should NOT use cascade drop without force-destroy annotation")
+}
+
 // --------------------------------------------------------------------------
 // Tests: Immutable field validation
 // --------------------------------------------------------------------------
@@ -780,7 +879,7 @@ func TestBuildAlterOptions_NilParameters(t *testing.T) {
 	t.Parallel()
 
 	db := newTestDB("mydb", "default")
-	db.Spec.DataRetentionTimeInDays = testutil.PtrInt32(30)
+	db.Spec.DataRetentionTimeInDays = testutil.Ptr(int32(30))
 
 	id := snowflake.NewAccountObjectIdentifier("ANALYTICS")
 	obs := &snowflake.DatabaseObservation{
@@ -803,13 +902,13 @@ func TestBuildAlterOptions_AllDiffs(t *testing.T) {
 	tl := snowplanev1alpha1.TraceLevelAlways
 
 	db := newTestDB("mydb", "default")
-	db.Spec.Comment = testutil.PtrString("new")
-	db.Spec.DataRetentionTimeInDays = testutil.PtrInt32(30)
-	db.Spec.MaxDataExtensionTimeInDays = testutil.PtrInt32(28)
-	db.Spec.DefaultDDLCollation = testutil.PtrString("en-ci")
-	db.Spec.ReplaceInvalidCharacters = testutil.PtrBool(true)
-	db.Spec.Catalog = testutil.PtrString("cat")
-	db.Spec.ExternalVolume = testutil.PtrString("vol")
+	db.Spec.Comment = testutil.Ptr("new")
+	db.Spec.DataRetentionTimeInDays = testutil.Ptr(int32(30))
+	db.Spec.MaxDataExtensionTimeInDays = testutil.Ptr(int32(28))
+	db.Spec.DefaultDDLCollation = testutil.Ptr("en-ci")
+	db.Spec.ReplaceInvalidCharacters = testutil.Ptr(true)
+	db.Spec.Catalog = testutil.Ptr("cat")
+	db.Spec.ExternalVolume = testutil.Ptr("vol")
 	db.Spec.StorageSerializationPolicy = &ssp
 	db.Spec.LogLevel = &ll
 	db.Spec.MetricLevel = &ml
@@ -873,14 +972,14 @@ func TestBuildCreateOptions_Full(t *testing.T) {
 	tl := snowplanev1alpha1.TraceLevelOnEvent
 
 	db := newTestDB("mydb", "default")
-	db.Spec.Comment = testutil.PtrString("c")
-	db.Spec.DataRetentionTimeInDays = testutil.PtrInt32(7)
-	db.Spec.MaxDataExtensionTimeInDays = testutil.PtrInt32(14)
+	db.Spec.Comment = testutil.Ptr("c")
+	db.Spec.DataRetentionTimeInDays = testutil.Ptr(int32(7))
+	db.Spec.MaxDataExtensionTimeInDays = testutil.Ptr(int32(14))
 	db.Spec.Transient = true
-	db.Spec.Catalog = testutil.PtrString("cat")
-	db.Spec.ExternalVolume = testutil.PtrString("vol")
-	db.Spec.ReplaceInvalidCharacters = testutil.PtrBool(true)
-	db.Spec.DefaultDDLCollation = testutil.PtrString("en-ci")
+	db.Spec.Catalog = testutil.Ptr("cat")
+	db.Spec.ExternalVolume = testutil.Ptr("vol")
+	db.Spec.ReplaceInvalidCharacters = testutil.Ptr(true)
+	db.Spec.DefaultDDLCollation = testutil.Ptr("en-ci")
 	db.Spec.StorageSerializationPolicy = &ssp
 	db.Spec.LogLevel = &ll
 	db.Spec.MetricLevel = &ml
@@ -1118,7 +1217,7 @@ func TestReconcile_EventEmission_Update(t *testing.T) {
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
 	db.Generation = 2
-	db.Spec.Comment = testutil.PtrString("new comment")
+	db.Spec.Comment = testutil.Ptr("new comment")
 	db.Status.ObservedGeneration = 1
 
 	obs := successfulObservation()
@@ -1225,7 +1324,7 @@ func TestBuildAlterOptions_NoUnsetWhenFieldStillSet(t *testing.T) {
 	t.Parallel()
 
 	db := newTestDB("mydb", "default")
-	db.Spec.Comment = testutil.PtrString("still here")
+	db.Spec.Comment = testutil.Ptr("still here")
 	db.Status.TrackedParameters = []string{"COMMENT"}
 
 	obs := successfulObservation()
@@ -1252,8 +1351,8 @@ func TestComputeDatabaseTrackedParameters(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.DatabaseSpec{
-		Comment:                 testutil.PtrString("x"),
-		DataRetentionTimeInDays: testutil.PtrInt32(7),
+		Comment:                 testutil.Ptr("x"),
+		DataRetentionTimeInDays: testutil.Ptr(int32(7)),
 	}
 
 	fields := tracked.ComputeTracked(spec)
@@ -1273,12 +1372,12 @@ func TestReconcile_TrackedParametersPersistedOnCreate(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Spec.Comment = testutil.PtrString("hello")
-	db.Spec.DataRetentionTimeInDays = testutil.PtrInt32(7)
+	db.Spec.Comment = testutil.Ptr("hello")
+	db.Spec.DataRetentionTimeInDays = testutil.Ptr(int32(7))
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "hello"
-	obs.Parameters.DataRetentionTimeInDays = testutil.PtrInt32(7)
+	obs.Parameters.DataRetentionTimeInDays = testutil.Ptr(int32(7))
 
 	mock := &mockService{
 		observeFn: func() func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.DatabaseObservation, error) {
@@ -1312,7 +1411,7 @@ func TestReconcile_UnsetTriggered(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	db.Generation = 2
 	db.Status.ObservedGeneration = 1
 	// Previously managed comment, now removed from spec.
@@ -1492,10 +1591,10 @@ func TestReconcile_DriftCorrection_SetsDriftDetectedCondition(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	db.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	db.Generation = 1
 	db.Status.ObservedGeneration = 1 // drift path
-	db.Spec.Comment = testutil.PtrString("desired")
+	db.Spec.Comment = testutil.Ptr("desired")
 	hash, err := snowplanev1alpha1.ComputeSpecHash(db.Spec)
 	require.NoError(t, err)
 	db.Status.LastAppliedSpecHash = hash
@@ -1548,7 +1647,7 @@ func TestReconcile_DriftDetectOnlyPolicy(t *testing.T) {
 	db.Generation = 1
 	db.Status.ObservedGeneration = 1 // drift path
 	db.Spec.ManagementPolicies.DriftPolicy = snowplanev1alpha1.DriftPolicyDetectOnly
-	db.Spec.Comment = testutil.PtrString("desired")
+	db.Spec.Comment = testutil.Ptr("desired")
 	hash, err := snowplanev1alpha1.ComputeSpecHash(db.Spec)
 	require.NoError(t, err)
 	db.Status.LastAppliedSpecHash = hash
@@ -1600,7 +1699,7 @@ func TestReconcile_DriftClearedAfterCorrection(t *testing.T) {
 	db.Finalizers = []string{finalizerName}
 	db.Generation = 1
 	db.Status.ObservedGeneration = 1
-	db.Spec.Comment = testutil.PtrString("desired")
+	db.Spec.Comment = testutil.Ptr("desired")
 
 	// Pre-set DriftDetected condition (simulating a previous reconcile).
 	conditions.SetDriftDetected(db, "previous drift")
@@ -1630,15 +1729,15 @@ func TestDetectDatabaseDrift_NoDrift(t *testing.T) {
 
 	db := &snowplanev1alpha1.Database{
 		Spec: snowplanev1alpha1.DatabaseSpec{
-			Comment:                 testutil.PtrString("test"),
-			DataRetentionTimeInDays: testutil.PtrInt32(1),
+			Comment:                 testutil.Ptr("test"),
+			DataRetentionTimeInDays: testutil.Ptr(int32(1)),
 		},
 	}
 
 	obs := &snowflake.DatabaseObservation{
 		ShowOutput: &snowflake.DatabaseShowOutput{Comment: "test"},
 		Parameters: &snowflake.DatabaseParameters{
-			DataRetentionTimeInDays: testutil.PtrInt32(1),
+			DataRetentionTimeInDays: testutil.Ptr(int32(1)),
 		},
 	}
 
@@ -1652,15 +1751,15 @@ func TestDetectDatabaseDrift_WithDrift(t *testing.T) {
 
 	db := &snowplanev1alpha1.Database{
 		Spec: snowplanev1alpha1.DatabaseSpec{
-			Comment:                 testutil.PtrString("desired"),
-			DataRetentionTimeInDays: testutil.PtrInt32(30),
+			Comment:                 testutil.Ptr("desired"),
+			DataRetentionTimeInDays: testutil.Ptr(int32(30)),
 		},
 	}
 
 	obs := &snowflake.DatabaseObservation{
 		ShowOutput: &snowflake.DatabaseShowOutput{Comment: "drifted"},
 		Parameters: &snowflake.DatabaseParameters{
-			DataRetentionTimeInDays: testutil.PtrInt32(1),
+			DataRetentionTimeInDays: testutil.Ptr(int32(1)),
 		},
 	}
 
@@ -1710,7 +1809,7 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 	db.Finalizers = []string{finalizerName}
 	db.Generation = 1
 	db.Status.ObservedGeneration = 1
-	db.Spec.UseRole = testutil.PtrString("DATA_ADMIN")
+	db.Spec.UseRole = testutil.Ptr("DATA_ADMIN")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Owner = "DATA_ADMIN" // matches to avoid drift noise
@@ -1830,7 +1929,7 @@ func TestReconcile_SpecValidation_RejectsRetentionOutOfRange(t *testing.T) {
 
 	db := newTestDB("mydb", "default")
 	db.Finalizers = []string{finalizerName}
-	db.Spec.DataRetentionTimeInDays = testutil.PtrInt32(100)
+	db.Spec.DataRetentionTimeInDays = testutil.Ptr(int32(100))
 
 	obs := successfulObservation()
 	mock := &mockService{

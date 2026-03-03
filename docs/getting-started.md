@@ -341,6 +341,7 @@ spec:
   name: PUBLIC
   databaseRef:
     name: my-database
+    # namespace: infra  # optional — reference a Database in another namespace
   providerRef:
     name: default
 ```

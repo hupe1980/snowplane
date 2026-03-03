@@ -19,7 +19,8 @@ func TestBuildCreateDatabaseRoleSQL(t *testing.T) {
 		opts := CreateDatabaseRoleOptions{
 			Name: NewDatabaseObjectIdentifier("MY_DB", "DATA_ENGINEER"),
 		}
-		got := buildCreateDatabaseRoleSQL(opts)
+		got, err := buildCreateDatabaseRoleSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE DATABASE ROLE IF NOT EXISTS "MY_DB"."DATA_ENGINEER"`, got)
 	})
 
@@ -30,7 +31,8 @@ func TestBuildCreateDatabaseRoleSQL(t *testing.T) {
 			Name:    NewDatabaseObjectIdentifier("MY_DB", "DATA_ENGINEER"),
 			Comment: &comment,
 		}
-		got := buildCreateDatabaseRoleSQL(opts)
+		got, err := buildCreateDatabaseRoleSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE DATABASE ROLE IF NOT EXISTS "MY_DB"."DATA_ENGINEER" COMMENT = 'Engineering team role'`, got)
 	})
 
@@ -41,7 +43,8 @@ func TestBuildCreateDatabaseRoleSQL(t *testing.T) {
 			Name:    NewDatabaseObjectIdentifier("MY_DB", "BOBS_ROLE"),
 			Comment: &comment,
 		}
-		got := buildCreateDatabaseRoleSQL(opts)
+		got, err := buildCreateDatabaseRoleSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE DATABASE ROLE IF NOT EXISTS "MY_DB"."BOBS_ROLE" COMMENT = 'Bob''s role'`, got)
 	})
 }

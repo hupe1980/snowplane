@@ -19,7 +19,8 @@ func TestBuildCreateSequenceSQL(t *testing.T) {
 		opts := CreateSequenceOptions{
 			Name: NewSchemaObjectIdentifier("DB", "SCH", "MY_SEQ"),
 		}
-		got := buildCreateSequenceSQL(opts)
+		got, err := buildCreateSequenceSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE SEQUENCE IF NOT EXISTS "DB"."SCH"."MY_SEQ"`)
 	})
 
@@ -36,7 +37,8 @@ func TestBuildCreateSequenceSQL(t *testing.T) {
 			Ordering:  &ordering,
 			Comment:   &comment,
 		}
-		got := buildCreateSequenceSQL(opts)
+		got, err := buildCreateSequenceSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE SEQUENCE IF NOT EXISTS "DB"."SCH"."MY_SEQ"`)
 		assert.Contains(t, got, "START = 100")
 		assert.Contains(t, got, "INCREMENT = 5")
@@ -50,7 +52,8 @@ func TestBuildCreateSequenceSQL(t *testing.T) {
 			Name:             NewSchemaObjectIdentifier("DB", "SCH", "MY_SEQ"),
 			UseCreateOrAlter: true,
 		}
-		got := buildCreateSequenceSQL(opts)
+		got, err := buildCreateSequenceSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE OR ALTER SEQUENCE "DB"."SCH"."MY_SEQ"`)
 		assert.NotContains(t, got, "IF NOT EXISTS")
 	})
@@ -62,7 +65,8 @@ func TestBuildCreateSequenceSQL(t *testing.T) {
 			Name:     NewSchemaObjectIdentifier("DB", "SCH", "MY_SEQ"),
 			Ordering: &ordering,
 		}
-		got := buildCreateSequenceSQL(opts)
+		got, err := buildCreateSequenceSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "NOORDER")
 	})
 }

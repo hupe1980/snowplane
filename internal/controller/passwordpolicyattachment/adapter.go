@@ -48,7 +48,7 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.Passw
 	if ref := obj.Spec.PolicyRef; ref != nil {
 		logger := log.FromContext(ctx)
 
-		fqn, err := refresolver.ResolveLocalRef(ctx, a.client, obj.Namespace, ref.Name, func() refresolver.ReferableObject {
+		fqn, err := refresolver.ResolveLocalRef(ctx, a.client, obj.Namespace, ref.Name, ref.Namespace, func() refresolver.ReferableObject {
 			pp := &snowplanev1alpha1.PasswordPolicy{}
 			pp.SetGroupVersionKind(schema.GroupVersionKind{
 				Group:   snowplanev1alpha1.GroupVersion.Group,

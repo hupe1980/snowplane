@@ -80,7 +80,7 @@ type ThingSpec struct {
 
     // +optional
     // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.databaseRef is immutable"
-    DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
+    DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
     // +optional
     // +kubebuilder:validation:MinLength=1
@@ -101,7 +101,7 @@ type ThingSpec struct {
     // ...
 
     // +optional
-    WarehouseRef *LocalObjectReference `json:"warehouseRef,omitempty"`
+    WarehouseRef *ObjectReference `json:"warehouseRef,omitempty"`
 
     // +optional
     // +kubebuilder:validation:MinLength=1
@@ -140,7 +140,7 @@ For **list** fields where each entry can be a ref or a name, use a struct with p
 ```go
 type TaskPredecessor struct {
     // +optional
-    Ref *LocalObjectReference `json:"ref,omitempty"`
+    Ref *ObjectReference `json:"ref,omitempty"`
     // +optional
     // +kubebuilder:validation:MinLength=1
     Name *string `json:"name,omitempty"`
@@ -264,7 +264,9 @@ Create `internal/clients/snowflake/<resource>.go` with:
 2. **Options types** — `Create` and `Alter` options (implement `HasChanges() bool`)
 3. **Client type** — `Observe`, `Create`, `Alter`, `Drop` methods
 
-Use the SQL builder at `internal/clients/snowflake/sqlbuilder/` for safe, parameterised SQL generation instead of raw string concatenation:
+Use the SQL builder at `internal/clients/snowflake/sqlbuilder/` for safe, parameterised SQL generation instead of raw string concatenation.
+
+> ⚠️ **Always check `b.Err()`:** All `buildCreateXxxSQL` functions must return `(string, error)` and check `b.Err()` before returning the SQL string. The builder accumulates validation errors (e.g., from `SetKeyword`/`SetQuotedKeyword`). Callers must wrap the error with `NewTerminalError`:
 
 ```go
 type ThingClient struct {
@@ -454,16 +456,7 @@ Add the new resource to all three resource blocks in `config/rbac/role.yaml`:
 
 ### Controller Name Map
 
-Add the controller name to the `validControllerNames` map in `cmd/manager/main.go`:
-
-```go
-var validControllerNames = map[string]bool{
-    // ... existing entries ...
-    "thing": true,
-}
-```
-
-This map governs `--disable-controllers` validation. Without updating it, the new controller cannot be selectively disabled.
+Controller names for `--disable-controllers` validation are **auto-derived** from the registration table — no manual map update is needed. Simply add your entry to the registration table (see below) and validation is handled automatically.
 
 ### Registration Table
 
@@ -482,7 +475,7 @@ controllers := []struct {
 The shared `SetupConfig` (circuit breaker, requeue interval, snowflake op timeout, maturity, alpha enabled, max concurrent reconciles) is applied automatically via the `Setup()` method — no per-controller `With*()` chains needed.
 
 {: .note }
-> There is an existing sync test (`TestValidControllerNames_MatchesRegistrationTable`) that verifies the controller name map and the registration table stay in sync.
+> The controller name is auto-derived from the registration table entry. The `--disable-controllers` flag validates against the same table, so no separate map update is needed.
 
 ---
 
@@ -590,7 +583,6 @@ The suite automatically runs four sub-tests: **CRNotFound**,
 > Several sync tests run automatically and will catch missing registrations:
 > - `TestCELWhitelist_MatchesValidFieldExportSourceKinds` — FieldExport CEL vs Go map sync
 > - `TestSourceResourceTypes_MatchesValidKinds` — FieldExport reactive watch coverage
-> - `TestValidControllerNames_MatchesRegistrationTable` — controller name map vs registration table
 > - `charts/snowplane/rbac_coverage_test.go` — Helm RBAC covers all CRD types
 
 ---
@@ -623,7 +615,7 @@ Update these docs to include the new resource:
 - [ ] `defaultServiceFactory` + `NewReconcilerWithServiceFactory` for test injection
 - [ ] Interface assertion: `var _ reconciler.ResourceAdapter[...] = (*adapter)(nil)`
 - [ ] Safe type assertions via `reconciler.AssertIdentifier[I]` / `AssertAlterOptions[A]`
-- [ ] Manager wiring: RBAC markers, `validControllerNames`, registration table entry
+- [ ] Manager wiring: RBAC markers, registration table entry
 - [ ] Kustomize RBAC: all three resource blocks in `config/rbac/role.yaml`
 - [ ] FieldExport registration: `ValidFieldExportSourceKinds`, CEL whitelist, `sourceResourceTypes()`
 - [ ] ProviderConfig in-use guard: `managedResourceTypes()`

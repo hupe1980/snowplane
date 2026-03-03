@@ -357,7 +357,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 		t.Parallel()
 		spec := &snowplanev1alpha1.NetworkRuleSpec{
 			ValueList: []string{"10.0.0.1"},
-			Comment:   testutil.PtrString("test"),
+			Comment:   testutil.Ptr("test"),
 		}
 		fields := tracked.ComputeTracked(spec)
 		assert.Contains(t, fields, "VALUE_LIST")
@@ -417,7 +417,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 			Type:      snowplanev1alpha1.NetworkRuleTypeIPV4,
 			Mode:      snowplanev1alpha1.NetworkRuleModeIngress,
 			ValueList: []string{"10.0.0.0/24"},
-			Comment:   testutil.PtrString("desired"),
+			Comment:   testutil.Ptr("desired"),
 		},
 	}
 

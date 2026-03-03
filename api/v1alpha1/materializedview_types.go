@@ -23,6 +23,7 @@ type MaterializedViewSpec struct {
 
 	// Name is the Snowflake materialized view name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef is a reference to a Database CR. Mutually exclusive with databaseName.
@@ -32,6 +33,7 @@ type MaterializedViewSpec struct {
 	// DatabaseName is the Snowflake database identifier (e.g. ANALYTICS). Mutually exclusive with databaseRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef is a reference to a Schema CR. Mutually exclusive with schemaName.
@@ -41,10 +43,12 @@ type MaterializedViewSpec struct {
 	// SchemaName is the Snowflake schema identifier (e.g. PUBLIC). Mutually exclusive with schemaRef.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// Statement is the SELECT query that defines the materialized view. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Statement string `json:"statement"`
 
 	// Secure specifies whether the materialized view is a secure view.

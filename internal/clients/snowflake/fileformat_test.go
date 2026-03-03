@@ -23,7 +23,8 @@ func TestBuildCreateFileFormatSQL(t *testing.T) {
 			Name: NewSchemaObjectIdentifier("DB", "SCH", "MY_CSV"),
 			Type: "CSV",
 		}
-		got := buildCreateFileFormatSQL(opts)
+		got, err := buildCreateFileFormatSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE FILE FORMAT IF NOT EXISTS "DB"."SCH"."MY_CSV"`)
 		assert.Contains(t, got, "TYPE = 'CSV'")
 	})
@@ -44,7 +45,8 @@ func TestBuildCreateFileFormatSQL(t *testing.T) {
 			FieldOptionallyEnclosedBy: &enclosed,
 			Comment:                   &comment,
 		}
-		got := buildCreateFileFormatSQL(opts)
+		got, err := buildCreateFileFormatSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "FIELD_DELIMITER = '|'")
 		assert.Contains(t, got, "SKIP_HEADER = 1")
 		assert.Contains(t, got, "COMMENT = 'my csv format'")
@@ -60,7 +62,8 @@ func TestBuildCreateFileFormatSQL(t *testing.T) {
 			StripOuterArray: &stripOuter,
 			StripNullValues: &stripNull,
 		}
-		got := buildCreateFileFormatSQL(opts)
+		got, err := buildCreateFileFormatSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "TYPE = 'JSON'")
 		assert.Contains(t, got, "STRIP_OUTER_ARRAY = TRUE")
 		assert.Contains(t, got, "STRIP_NULL_VALUES = TRUE")
@@ -74,7 +77,8 @@ func TestBuildCreateFileFormatSQL(t *testing.T) {
 			Type:   "CSV",
 			NullIf: nullIf,
 		}
-		got := buildCreateFileFormatSQL(opts)
+		got, err := buildCreateFileFormatSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "NULL_IF = ('NULL', '')")
 	})
 
@@ -86,7 +90,8 @@ func TestBuildCreateFileFormatSQL(t *testing.T) {
 			Type:        "CSV",
 			Compression: &compression,
 		}
-		got := buildCreateFileFormatSQL(opts)
+		got, err := buildCreateFileFormatSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "COMPRESSION = GZIP")
 	})
 }
@@ -130,7 +135,8 @@ func TestBuildCreateFileFormatSQL_CreateOrAlter(t *testing.T) {
 			Type:             "CSV",
 			UseCreateOrAlter: true,
 		}
-		got := buildCreateFileFormatSQL(opts)
+		got, err := buildCreateFileFormatSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE OR ALTER FILE FORMAT "DB"."SCH"."MY_CSV"`)
 		assert.NotContains(t, got, "IF NOT EXISTS")
 		assert.Contains(t, got, "TYPE = 'CSV'")
@@ -145,7 +151,8 @@ func TestBuildCreateFileFormatSQL_CreateOrAlter(t *testing.T) {
 			Comment:          &comment,
 			UseCreateOrAlter: true,
 		}
-		got := buildCreateFileFormatSQL(opts)
+		got, err := buildCreateFileFormatSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "CREATE OR ALTER FILE FORMAT")
 		assert.Contains(t, got, "COMMENT = 'managed format'")
 	})

@@ -14,6 +14,7 @@ type APIAuthenticationIntegrationWithJWTBearerSpec struct {
 
 	// Snowflake integration identifier (e.g. 'MY_API_AUTH_JWT').
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// Specifies whether this security integration is enabled or disabled.
@@ -23,7 +24,8 @@ type APIAuthenticationIntegrationWithJWTBearerSpec struct {
 	OAuthClientID string `json:"oauthClientId" snowflake:"OAUTH_CLIENT_ID"`
 
 	// Specifies the client secret for the OAuth application in the external service.
-	OAuthClientSecret string `json:"oauthClientSecret" snowflake:"OAUTH_CLIENT_SECRET"`
+	// References a Kubernetes Secret to avoid storing credentials in the CRD spec.
+	OAuthClientSecretRef SecretKeyReference `json:"oauthClientSecretRef"`
 
 	// Specifies the assertion issuer for the JWT bearer flow.
 	OAuthAssertionIssuer string `json:"oauthAssertionIssuer" snowflake:"OAUTH_ASSERTION_ISSUER"`

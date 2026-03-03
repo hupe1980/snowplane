@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // --------------------------------------------------------------------------
@@ -70,7 +71,8 @@ func TestBuildCreateResourceMonitorSQL(t *testing.T) {
 		opts := CreateResourceMonitorOptions{
 			Name: NewAccountObjectIdentifier("MY_MONITOR"),
 		}
-		got := buildCreateResourceMonitorSQL(opts)
+		got, err := buildCreateResourceMonitorSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE RESOURCE MONITOR IF NOT EXISTS "MY_MONITOR" WITH`, got)
 	})
 
@@ -78,9 +80,10 @@ func TestBuildCreateResourceMonitorSQL(t *testing.T) {
 		t.Parallel()
 		opts := CreateResourceMonitorOptions{
 			Name:        NewAccountObjectIdentifier("MON"),
-			CreditQuota: int32Ptr(100),
+			CreditQuota: ptr(int32(100)),
 		}
-		got := buildCreateResourceMonitorSQL(opts)
+		got, err := buildCreateResourceMonitorSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "CREDIT_QUOTA = 100")
 	})
 
@@ -93,7 +96,8 @@ func TestBuildCreateResourceMonitorSQL(t *testing.T) {
 			Frequency:      &freq,
 			StartTimestamp: &ts,
 		}
-		got := buildCreateResourceMonitorSQL(opts)
+		got, err := buildCreateResourceMonitorSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "FREQUENCY = MONTHLY")
 		assert.Contains(t, got, "START_TIMESTAMP = '2024-01-01 00:00'")
 	})
@@ -105,7 +109,8 @@ func TestBuildCreateResourceMonitorSQL(t *testing.T) {
 			Name:           NewAccountObjectIdentifier("MON"),
 			StartTimestamp: &ts,
 		}
-		got := buildCreateResourceMonitorSQL(opts)
+		got, err := buildCreateResourceMonitorSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "START_TIMESTAMP = IMMEDIATELY")
 		assert.NotContains(t, got, "'IMMEDIATELY'")
 	})
@@ -117,7 +122,8 @@ func TestBuildCreateResourceMonitorSQL(t *testing.T) {
 			Name:         NewAccountObjectIdentifier("MON"),
 			EndTimestamp: &endTs,
 		}
-		got := buildCreateResourceMonitorSQL(opts)
+		got, err := buildCreateResourceMonitorSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "END_TIMESTAMP = '2024-12-31 23:59'")
 	})
 
@@ -131,7 +137,8 @@ func TestBuildCreateResourceMonitorSQL(t *testing.T) {
 				{Threshold: 100, Action: "SUSPEND"},
 			},
 		}
-		got := buildCreateResourceMonitorSQL(opts)
+		got, err := buildCreateResourceMonitorSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "NOTIFY_USERS = (ADMIN, DBA)")
 		assert.Contains(t, got, "TRIGGERS ON 90 PERCENT DO NOTIFY ON 100 PERCENT DO SUSPEND")
 	})
@@ -153,7 +160,7 @@ func TestBuildAlterResourceMonitorSQL(t *testing.T) {
 		t.Parallel()
 		opts := AlterResourceMonitorOptions{
 			Name:        NewAccountObjectIdentifier("MON"),
-			CreditQuota: int32Ptr(200),
+			CreditQuota: ptr(int32(200)),
 		}
 		got := buildAlterResourceMonitorSQL(opts)
 		assert.Contains(t, got, `ALTER RESOURCE MONITOR "MON"`)
@@ -275,7 +282,7 @@ func TestAlterResourceMonitorOptions_HasChanges(t *testing.T) {
 		t.Parallel()
 		opts := AlterResourceMonitorOptions{
 			Name:        NewAccountObjectIdentifier("M"),
-			CreditQuota: int32Ptr(100),
+			CreditQuota: ptr(int32(100)),
 		}
 		assert.True(t, opts.HasChanges())
 	})

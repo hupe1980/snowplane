@@ -31,7 +31,7 @@ func TestBuildCreateViewSQL(t *testing.T) {
 				Name:      NewSchemaObjectIdentifier("DB", "S", "SECURE_V"),
 				Statement: "SELECT * FROM T",
 				Secure:    true,
-				Comment:   ptrString("my secure view"),
+				Comment:   ptr("my secure view"),
 			},
 			expected: `CREATE SECURE VIEW IF NOT EXISTS "DB"."S"."SECURE_V" COMMENT = 'my secure view' AS SELECT * FROM T`,
 		},
@@ -49,7 +49,7 @@ func TestBuildCreateViewSQL(t *testing.T) {
 			opts: CreateViewOptions{
 				Name:           NewSchemaObjectIdentifier("DB", "S", "V"),
 				Statement:      "SELECT 1",
-				ChangeTracking: ptrBool(true),
+				ChangeTracking: ptr(true),
 			},
 			expected: `CREATE VIEW IF NOT EXISTS "DB"."S"."V" CHANGE_TRACKING = TRUE AS SELECT 1`,
 		},
@@ -58,7 +58,8 @@ func TestBuildCreateViewSQL(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := buildCreateViewSQL(tc.opts)
+			got, err := buildCreateViewSQL(tc.opts)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected, got)
 		})
 	}
@@ -69,33 +70,36 @@ func TestBuildCreateViewSQL_CreateOrAlter(t *testing.T) {
 
 	t.Run("basic", func(t *testing.T) {
 		t.Parallel()
-		got := buildCreateViewSQL(CreateViewOptions{
+		got, err := buildCreateViewSQL(CreateViewOptions{
 			Name:             NewSchemaObjectIdentifier("DB", "S", "V"),
 			Statement:        "SELECT 1 AS ID",
 			UseCreateOrAlter: true,
 		})
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE OR ALTER VIEW "DB"."S"."V" AS SELECT 1 AS ID`, got)
 	})
 
 	t.Run("secure", func(t *testing.T) {
 		t.Parallel()
-		got := buildCreateViewSQL(CreateViewOptions{
+		got, err := buildCreateViewSQL(CreateViewOptions{
 			Name:             NewSchemaObjectIdentifier("DB", "S", "V"),
 			Statement:        "SELECT 1",
 			Secure:           true,
 			UseCreateOrAlter: true,
 		})
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE OR ALTER SECURE VIEW "DB"."S"."V" AS SELECT 1`, got)
 	})
 
 	t.Run("ignores OrReplace when UseCreateOrAlter", func(t *testing.T) {
 		t.Parallel()
-		got := buildCreateViewSQL(CreateViewOptions{
+		got, err := buildCreateViewSQL(CreateViewOptions{
 			Name:             NewSchemaObjectIdentifier("DB", "S", "V"),
 			Statement:        "SELECT 1",
 			OrReplace:        true,
 			UseCreateOrAlter: true,
 		})
+		require.NoError(t, err)
 		// UseCreateOrAlter takes precedence over OrReplace
 		assert.Contains(t, got, "CREATE OR ALTER")
 		assert.NotContains(t, got, "OR REPLACE")
@@ -117,7 +121,7 @@ func TestBuildAlterViewStatements(t *testing.T) {
 			name: "set secure",
 			opts: AlterViewOptions{
 				Name:   id,
-				Secure: ptrBool(true),
+				Secure: ptr(true),
 			},
 			expected: []string{
 				`ALTER VIEW "DB"."S"."V" SET SECURE`,
@@ -127,7 +131,7 @@ func TestBuildAlterViewStatements(t *testing.T) {
 			name: "unset secure",
 			opts: AlterViewOptions{
 				Name:   id,
-				Secure: ptrBool(false),
+				Secure: ptr(false),
 			},
 			expected: []string{
 				`ALTER VIEW "DB"."S"."V" UNSET SECURE`,
@@ -137,7 +141,7 @@ func TestBuildAlterViewStatements(t *testing.T) {
 			name: "set comment",
 			opts: AlterViewOptions{
 				Name:    id,
-				Comment: ptrString("updated"),
+				Comment: ptr("updated"),
 			},
 			expected: []string{
 				`ALTER VIEW "DB"."S"."V" SET COMMENT = 'updated'`,
@@ -157,7 +161,7 @@ func TestBuildAlterViewStatements(t *testing.T) {
 			name: "set change tracking",
 			opts: AlterViewOptions{
 				Name:           id,
-				ChangeTracking: ptrBool(true),
+				ChangeTracking: ptr(true),
 			},
 			expected: []string{
 				`ALTER VIEW "DB"."S"."V" SET CHANGE_TRACKING = TRUE`,
@@ -214,8 +218,8 @@ func TestAlterViewOptionsHasChanges(t *testing.T) {
 
 	id := NewSchemaObjectIdentifier("DB", "S", "V")
 	assert.False(t, (&AlterViewOptions{Name: id}).HasChanges())
-	assert.True(t, (&AlterViewOptions{Name: id, Comment: ptrString("x")}).HasChanges())
-	assert.True(t, (&AlterViewOptions{Name: id, Secure: ptrBool(true)}).HasChanges())
+	assert.True(t, (&AlterViewOptions{Name: id, Comment: ptr("x")}).HasChanges())
+	assert.True(t, (&AlterViewOptions{Name: id, Secure: ptr(true)}).HasChanges())
 	assert.True(t, (&AlterViewOptions{Name: id, UnsetFields: []string{"COMMENT"}}).HasChanges())
 	assert.True(t, (&AlterViewOptions{
 		Name:             id,
@@ -241,8 +245,8 @@ func TestAlterView_ReplaceStatement(t *testing.T) {
 		ReplaceStatement: &ReplaceViewStatement{
 			Statement:      "SELECT id, name FROM users",
 			Secure:         true,
-			Comment:        ptrString("replaced"),
-			ChangeTracking: ptrBool(true),
+			Comment:        ptr("replaced"),
+			ChangeTracking: ptr(true),
 		},
 	})
 	require.NoError(t, err)

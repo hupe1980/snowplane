@@ -48,7 +48,7 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.Maski
 	if ref := obj.Spec.PolicyRef; ref != nil {
 		logger := log.FromContext(ctx)
 
-		fqn, err := refresolver.ResolveLocalRef(ctx, a.client, obj.Namespace, ref.Name, func() refresolver.ReferableObject {
+		fqn, err := refresolver.ResolveLocalRef(ctx, a.client, obj.Namespace, ref.Name, ref.Namespace, func() refresolver.ReferableObject {
 			mp := &snowplanev1alpha1.MaskingPolicy{}
 			mp.SetGroupVersionKind(schema.GroupVersionKind{
 				Group:   snowplanev1alpha1.GroupVersion.Group,

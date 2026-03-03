@@ -132,10 +132,9 @@ func buildNotifyUsersClause(users []string) string {
 }
 
 // buildCreateResourceMonitorSQL builds the CREATE RESOURCE MONITOR SQL statement.
-func buildCreateResourceMonitorSQL(opts CreateResourceMonitorOptions) string {
+func buildCreateResourceMonitorSQL(opts CreateResourceMonitorOptions) (string, error) {
 	var b sqlbuilder.Builder
-	b.WriteString("CREATE RESOURCE MONITOR IF NOT EXISTS ")
-	b.WriteString(sqlbuilder.QuoteIdentifier(opts.Name.Name()))
+	sqlbuilder.BuildCreatePreamble(&b, "RESOURCE MONITOR", sqlbuilder.QuoteIdentifier(opts.Name.Name()), false, false)
 	b.WriteString(" WITH")
 
 	if opts.CreditQuota != nil {
@@ -169,7 +168,11 @@ func buildCreateResourceMonitorSQL(opts CreateResourceMonitorOptions) string {
 		b.WriteString(buildTriggersClause(opts.Triggers))
 	}
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a resource monitor in Snowflake.
@@ -178,7 +181,12 @@ func (rm *ResourceMonitorClient) Create(ctx context.Context, opts CreateResource
 		return NewTerminalError(fmt.Errorf("invalid create resource monitor options: %w", err))
 	}
 
-	if _, err := rm.client.Exec(ctx, buildCreateResourceMonitorSQL(opts)); err != nil {
+	sql, err := buildCreateResourceMonitorSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create resource monitor SQL: %w", err))
+	}
+
+	if _, err := rm.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating resource monitor %s: %w", opts.Name, err)
 	}
 
@@ -310,54 +318,21 @@ func (rm *ResourceMonitorClient) Observe(ctx context.Context, name AccountObject
 
 // scanResourceMonitorShowOutput scans SHOW RESOURCE MONITORS results for a matching row.
 func scanResourceMonitorShowOutput(rows *sql.Rows, name string) (*ResourceMonitorShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*ResourceMonitorShowOutput, error) {
 		return &ResourceMonitorShowOutput{
-			CreatedOn:            colMap["created_on"],
-			Name:                 colMap["name"],
-			CreditQuota:          colMap["credit_quota"],
-			UsedCredits:          colMap["used_credits"],
-			RemainingCredits:     colMap["remaining_credits"],
-			Level:                colMap["level"],
-			Frequency:            colMap["frequency"],
-			StartTime:            colMap["start_time"],
-			EndTime:              colMap["end_time"],
-			NotifyAt:             colMap["notify_at"],
-			SuspendAt:            colMap["suspend_at"],
-			SuspendImmediatelyAt: colMap["suspend_immediately_at"],
-			NotifyUsers:          colMap["notify_users"],
+			CreatedOn:            m["created_on"],
+			Name:                 m["name"],
+			CreditQuota:          m["credit_quota"],
+			UsedCredits:          m["used_credits"],
+			RemainingCredits:     m["remaining_credits"],
+			Level:                m["level"],
+			Frequency:            m["frequency"],
+			StartTime:            m["start_time"],
+			EndTime:              m["end_time"],
+			NotifyAt:             m["notify_at"],
+			SuspendAt:            m["suspend_at"],
+			SuspendImmediatelyAt: m["suspend_immediately_at"],
+			NotifyUsers:          m["notify_users"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

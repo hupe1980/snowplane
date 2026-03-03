@@ -61,7 +61,7 @@ func TestAssertTerminal(t *testing.T) {
 	db := &snowplanev1alpha1.Database{}
 	conditions.SetNotReady(db, snowplanev1alpha1.ReasonTerminalError, "unrecoverable")
 
-	AssertTerminal(t, db, snowplanev1alpha1.ReasonTerminalError)
+	assertTerminal(t, db, snowplanev1alpha1.ReasonTerminalError)
 }
 
 func TestAssertNoCondition(t *testing.T) {
@@ -69,19 +69,19 @@ func TestAssertNoCondition(t *testing.T) {
 
 	db := &snowplanev1alpha1.Database{}
 
-	AssertNoCondition(t, db, snowplanev1alpha1.TypeDriftDetected)
+	assertNoCondition(t, db, snowplanev1alpha1.TypeDriftDetected)
 }
 
-func TestPtrHelpers(t *testing.T) {
+func TestPtr(t *testing.T) {
 	t.Parallel()
 
-	s := PtrString("hello")
+	s := Ptr("hello")
 	assert.Equal(t, "hello", *s)
 
-	i := PtrInt32(42)
+	i := Ptr(int32(42))
 	assert.Equal(t, int32(42), *i)
 
-	b := PtrBool(true)
+	b := Ptr(true)
 	assert.True(t, *b)
 }
 
@@ -97,7 +97,7 @@ func TestContainsEvent(t *testing.T) {
 func TestDrainEvents(t *testing.T) {
 	t.Parallel()
 
-	rec := NewTestRecorder()
+	rec := newTestRecorder()
 	rec.Events <- "Normal Created test event"
 	rec.Events <- "Warning Error bad thing"
 

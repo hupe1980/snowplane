@@ -108,11 +108,11 @@ func successfulObservation() *snowflake.WarehouseObservation {
 			ResourceMonitor: "",
 		},
 		Parameters: &snowflake.WarehouseParameters{
-			MaxConcurrencyLevel:             testutil.PtrInt32(8),
-			StatementQueuedTimeoutInSeconds: testutil.PtrInt32(0),
-			StatementTimeoutInSeconds:       testutil.PtrInt32(172800),
-			EnableQueryAcceleration:         testutil.PtrBool(false),
-			QueryAccelerationMaxScaleFactor: testutil.PtrInt32(8),
+			MaxConcurrencyLevel:             testutil.Ptr(int32(8)),
+			StatementQueuedTimeoutInSeconds: testutil.Ptr(int32(0)),
+			StatementTimeoutInSeconds:       testutil.Ptr(int32(172800)),
+			EnableQueryAcceleration:         testutil.Ptr(false),
+			QueryAccelerationMaxScaleFactor: testutil.Ptr(int32(8)),
 		},
 	}
 }
@@ -227,19 +227,19 @@ func TestReconcile_CreateWithAllOptions(t *testing.T) {
 
 	wh.Spec.WarehouseType = &whType
 	wh.Spec.WarehouseSize = &whSize
-	wh.Spec.MinClusterCount = testutil.PtrInt32(1)
-	wh.Spec.MaxClusterCount = testutil.PtrInt32(3)
+	wh.Spec.MinClusterCount = testutil.Ptr(int32(1))
+	wh.Spec.MaxClusterCount = testutil.Ptr(int32(3))
 	wh.Spec.ScalingPolicy = &sp
-	wh.Spec.AutoSuspend = testutil.PtrInt32(300)
-	wh.Spec.AutoResume = testutil.PtrBool(true)
+	wh.Spec.AutoSuspend = testutil.Ptr(int32(300))
+	wh.Spec.AutoResume = testutil.Ptr(true)
 	wh.Spec.InitiallySuspended = true
-	wh.Spec.ResourceMonitor = testutil.PtrString("my_monitor")
-	wh.Spec.Comment = testutil.PtrString("ETL warehouse")
-	wh.Spec.EnableQueryAcceleration = testutil.PtrBool(true)
-	wh.Spec.QueryAccelerationMaxScaleFactor = testutil.PtrInt32(10)
-	wh.Spec.MaxConcurrencyLevel = testutil.PtrInt32(16)
-	wh.Spec.StatementQueuedTimeoutInSeconds = testutil.PtrInt32(60)
-	wh.Spec.StatementTimeoutInSeconds = testutil.PtrInt32(3600)
+	wh.Spec.ResourceMonitor = testutil.Ptr("my_monitor")
+	wh.Spec.Comment = testutil.Ptr("ETL warehouse")
+	wh.Spec.EnableQueryAcceleration = testutil.Ptr(true)
+	wh.Spec.QueryAccelerationMaxScaleFactor = testutil.Ptr(int32(10))
+	wh.Spec.MaxConcurrencyLevel = testutil.Ptr(int32(16))
+	wh.Spec.StatementQueuedTimeoutInSeconds = testutil.Ptr(int32(60))
+	wh.Spec.StatementTimeoutInSeconds = testutil.Ptr(int32(3600))
 	wh.Spec.ResourceConstraint = &rc
 
 	var capturedOpts snowflake.CreateWarehouseOptions
@@ -373,10 +373,10 @@ func TestReconcile_UpdateWithChanges(t *testing.T) {
 
 	wh := newTestWH("mywh", "default")
 	wh.Finalizers = []string{finalizerName}
-	wh.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	wh.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	wh.Status.ObservedGeneration = 1
 	wh.Generation = 2
-	wh.Spec.Comment = testutil.PtrString("new comment")
+	wh.Spec.Comment = testutil.Ptr("new comment")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old comment"
@@ -412,10 +412,10 @@ func TestReconcile_DriftCorrection(t *testing.T) {
 
 	wh := newTestWH("mywh", "default")
 	wh.Finalizers = []string{finalizerName}
-	wh.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	wh.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	wh.Generation = 1
 	wh.Status.ObservedGeneration = 1
-	wh.Spec.Comment = testutil.PtrString("desired comment")
+	wh.Spec.Comment = testutil.Ptr("desired comment")
 	hash, err := snowplanev1alpha1.ComputeSpecHash(wh.Spec)
 	require.NoError(t, err)
 	wh.Status.LastAppliedSpecHash = hash
@@ -467,7 +467,7 @@ func TestReconcile_DriftDetectOnly(t *testing.T) {
 	wh.Finalizers = []string{finalizerName}
 	wh.Generation = 1
 	wh.Status.ObservedGeneration = 1
-	wh.Spec.Comment = testutil.PtrString("desired comment")
+	wh.Spec.Comment = testutil.Ptr("desired comment")
 	wh.Spec.ManagementPolicies.DriftPolicy = snowplanev1alpha1.DriftPolicyDetectOnly
 	hash, err := snowplanev1alpha1.ComputeSpecHash(wh.Spec)
 	require.NoError(t, err)
@@ -622,7 +622,7 @@ func TestReconcile_MutableWarehouseTypeChange(t *testing.T) {
 
 	wh := newTestWH("mywh", "default")
 	wh.Finalizers = []string{finalizerName}
-	wh.Spec.ManagementPolicies.CreateOrAlter = testutil.PtrBool(false)
+	wh.Spec.ManagementPolicies.CreateOrAlter = testutil.Ptr(false)
 	wh.Generation = 2
 	wh.Status.ObservedGeneration = 1
 	whType := snowplanev1alpha1.WarehouseTypeSnowparkOptimized
@@ -753,7 +753,7 @@ func TestBuildAlterOptions_NoUnsetWhenFieldStillSet(t *testing.T) {
 	t.Parallel()
 
 	wh := newTestWH("mywh", "default")
-	wh.Spec.Comment = testutil.PtrString("still here")
+	wh.Spec.Comment = testutil.Ptr("still here")
 	wh.Status.TrackedParameters = []string{"COMMENT"}
 
 	obs := successfulObservation()
@@ -805,9 +805,9 @@ func TestComputeWarehouseTrackedParameters(t *testing.T) {
 	whType := snowplanev1alpha1.WarehouseTypeStandard
 	spec := &snowplanev1alpha1.WarehouseSpec{
 		WarehouseType: &whType,
-		Comment:       testutil.PtrString("x"),
+		Comment:       testutil.Ptr("x"),
 		WarehouseSize: &size,
-		AutoSuspend:   testutil.PtrInt32(300),
+		AutoSuspend:   testutil.Ptr(int32(300)),
 	}
 
 	fields := tracked.ComputeTracked(spec)
@@ -950,7 +950,7 @@ func TestDetectDrift_CommentDrift(t *testing.T) {
 	t.Parallel()
 
 	wh := newTestWH("mywh", "default")
-	wh.Spec.Comment = testutil.PtrString("desired")
+	wh.Spec.Comment = testutil.Ptr("desired")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "actual"
@@ -986,10 +986,10 @@ func TestDetectDrift_ParameterDrift(t *testing.T) {
 	t.Parallel()
 
 	wh := newTestWH("mywh", "default")
-	wh.Spec.MaxConcurrencyLevel = testutil.PtrInt32(16)
+	wh.Spec.MaxConcurrencyLevel = testutil.Ptr(int32(16))
 
 	obs := successfulObservation()
-	obs.Parameters.MaxConcurrencyLevel = testutil.PtrInt32(8)
+	obs.Parameters.MaxConcurrencyLevel = testutil.Ptr(int32(8))
 
 	result := detectDrift(wh, obs)
 	assert.True(t, result.HasDrift)
@@ -1000,7 +1000,7 @@ func TestDetectDrift_AutoSuspendDrift(t *testing.T) {
 	t.Parallel()
 
 	wh := newTestWH("mywh", "default")
-	wh.Spec.AutoSuspend = testutil.PtrInt32(300)
+	wh.Spec.AutoSuspend = testutil.Ptr(int32(300))
 
 	obs := successfulObservation()
 	obs.ShowOutput.AutoSuspend = 600
@@ -1014,8 +1014,8 @@ func TestDetectDrift_MultiClusterDrift(t *testing.T) {
 	t.Parallel()
 
 	wh := newTestWH("mywh", "default")
-	wh.Spec.MinClusterCount = testutil.PtrInt32(2)
-	wh.Spec.MaxClusterCount = testutil.PtrInt32(5)
+	wh.Spec.MinClusterCount = testutil.Ptr(int32(2))
+	wh.Spec.MaxClusterCount = testutil.Ptr(int32(5))
 
 	obs := successfulObservation()
 	obs.ShowOutput.MinClusterCount = 1
@@ -1046,7 +1046,7 @@ func TestDetectDrift_ResourceMonitorDrift(t *testing.T) {
 	t.Parallel()
 
 	wh := newTestWH("mywh", "default")
-	wh.Spec.ResourceMonitor = testutil.PtrString("my_monitor")
+	wh.Spec.ResourceMonitor = testutil.Ptr("my_monitor")
 
 	obs := successfulObservation()
 	obs.ShowOutput.ResourceMonitor = ""
@@ -1083,7 +1083,7 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 	wh.Finalizers = []string{finalizerName}
 	wh.Generation = 1
 	wh.Status.ObservedGeneration = 1
-	wh.Spec.UseRole = testutil.PtrString("DATA_ADMIN")
+	wh.Spec.UseRole = testutil.Ptr("DATA_ADMIN")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Owner = "DATA_ADMIN"

@@ -73,7 +73,7 @@ func newTestResourceMonitor(name, namespace string) *snowplanev1alpha1.ResourceM
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        "MY_MONITOR",
-			CreditQuota: testutil.PtrInt32(100),
+			CreditQuota: testutil.Ptr(int32(100)),
 		},
 	}
 }
@@ -181,7 +181,7 @@ func TestReconcile_CreateWithTriggers(t *testing.T) {
 	rm.Finalizers = []string{finalizerName}
 	freq := snowplanev1alpha1.ResourceMonitorFrequencyMonthly
 	rm.Spec.Frequency = &freq
-	rm.Spec.StartTimestamp = testutil.PtrString("IMMEDIATELY")
+	rm.Spec.StartTimestamp = testutil.Ptr("IMMEDIATELY")
 	rm.Spec.Triggers = []snowplanev1alpha1.ResourceMonitorTrigger{
 		{Threshold: 80, Action: snowplanev1alpha1.ResourceMonitorTriggerActionNotify},
 		{Threshold: 100, Action: snowplanev1alpha1.ResourceMonitorTriggerActionSuspend},
@@ -265,7 +265,7 @@ func TestReconcile_UpdateWithChanges(t *testing.T) {
 	rm.Finalizers = []string{finalizerName}
 	rm.Status.ObservedGeneration = 1
 	rm.Generation = 2
-	rm.Spec.CreditQuota = testutil.PtrInt32(200)
+	rm.Spec.CreditQuota = testutil.Ptr(int32(200))
 	obs := successfulObservation()
 	var capturedAlterOpts snowflake.AlterResourceMonitorOptions
 	mock := &mockService{
@@ -290,7 +290,7 @@ func TestReconcile_AlterFails(t *testing.T) {
 	rm := newTestResourceMonitor("myrm", "default")
 	rm.Finalizers = []string{finalizerName}
 	rm.Status.ObservedGeneration = 1
-	rm.Spec.CreditQuota = testutil.PtrInt32(999)
+	rm.Spec.CreditQuota = testutil.Ptr(int32(999))
 	obs := successfulObservation()
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.ResourceMonitorObservation, error) {
@@ -418,7 +418,7 @@ func TestBuildCreateOptions(t *testing.T) {
 	rm := newTestResourceMonitor("myrm", "default")
 	freq := snowplanev1alpha1.ResourceMonitorFrequencyMonthly
 	rm.Spec.Frequency = &freq
-	rm.Spec.StartTimestamp = testutil.PtrString("IMMEDIATELY")
+	rm.Spec.StartTimestamp = testutil.Ptr("IMMEDIATELY")
 	rm.Spec.Triggers = []snowplanev1alpha1.ResourceMonitorTrigger{
 		{Threshold: 90, Action: snowplanev1alpha1.ResourceMonitorTriggerActionNotify},
 	}
@@ -436,7 +436,7 @@ func TestBuildCreateOptions(t *testing.T) {
 func TestBuildAlterOptions_CreditQuotaChanged(t *testing.T) {
 	t.Parallel()
 	rm := newTestResourceMonitor("myrm", "default")
-	rm.Spec.CreditQuota = testutil.PtrInt32(200)
+	rm.Spec.CreditQuota = testutil.Ptr(int32(200))
 	id := snowflake.NewAccountObjectIdentifier("MY_MONITOR")
 	obs := successfulObservation()
 	opts := buildAlterOptions(rm, id, obs)
@@ -458,10 +458,10 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
 	freq := snowplanev1alpha1.ResourceMonitorFrequencyMonthly
 	spec := &snowplanev1alpha1.ResourceMonitorSpec{
-		CreditQuota:    testutil.PtrInt32(100),
+		CreditQuota:    testutil.Ptr(int32(100)),
 		Frequency:      &freq,
-		StartTimestamp: testutil.PtrString("IMMEDIATELY"),
-		EndTimestamp:   testutil.PtrString("2025-12-31"),
+		StartTimestamp: testutil.Ptr("IMMEDIATELY"),
+		EndTimestamp:   testutil.Ptr("2025-12-31"),
 		NotifyUsers:    []string{"admin"},
 		Triggers:       []snowplanev1alpha1.ResourceMonitorTrigger{{Threshold: 80, Action: snowplanev1alpha1.ResourceMonitorTriggerActionNotify}},
 	}
@@ -492,7 +492,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	rm := &snowplanev1alpha1.ResourceMonitor{
 		Spec: snowplanev1alpha1.ResourceMonitorSpec{
 			Name:        "MY_MONITOR",
-			CreditQuota: testutil.PtrInt32(100),
+			CreditQuota: testutil.Ptr(int32(100)),
 		},
 	}
 	obs := &snowflake.ResourceMonitorObservation{
@@ -510,7 +510,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	rm := &snowplanev1alpha1.ResourceMonitor{
 		Spec: snowplanev1alpha1.ResourceMonitorSpec{
 			Name:        "MY_MONITOR",
-			CreditQuota: testutil.PtrInt32(200),
+			CreditQuota: testutil.Ptr(int32(200)),
 		},
 	}
 	obs := &snowflake.ResourceMonitorObservation{

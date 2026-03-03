@@ -55,6 +55,7 @@ type DatabaseSpec struct {
 
 	// Name is the Snowflake database name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// Comment is an optional description for the database.

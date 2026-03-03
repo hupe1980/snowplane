@@ -132,10 +132,9 @@ func NewStageClient(c SQLExecutor) *StageClient {
 }
 
 // buildCreateStageSQL builds the CREATE STAGE SQL statement.
-func buildCreateStageSQL(opts CreateStageOptions) string {
+func buildCreateStageSQL(opts CreateStageOptions) (string, error) {
 	var b sqlbuilder.Builder
-	b.WriteString("CREATE STAGE IF NOT EXISTS ")
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "STAGE", opts.Name.FullyQualifiedName(), false, false)
 
 	if opts.URL != nil {
 		fmt.Fprintf(&b.Builder, " URL = '%s'", sqlbuilder.EscapeString(*opts.URL))
@@ -179,7 +178,11 @@ func buildCreateStageSQL(opts CreateStageOptions) string {
 
 	b.SetString("COMMENT", opts.Comment)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a stage in Snowflake.
@@ -188,7 +191,12 @@ func (s *StageClient) Create(ctx context.Context, opts CreateStageOptions) error
 		return NewTerminalError(fmt.Errorf("invalid create stage options: %w", err))
 	}
 
-	if _, err := s.client.Exec(ctx, buildCreateStageSQL(opts)); err != nil {
+	sql, err := buildCreateStageSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create stage SQL: %w", err))
+	}
+
+	if _, err := s.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating stage %s: %w", opts.Name, err)
 	}
 
@@ -331,51 +339,18 @@ func (s *StageClient) Observe(ctx context.Context, name SchemaObjectIdentifier) 
 
 // scanStageShowOutput scans SHOW STAGES results for a matching row.
 func scanStageShowOutput(rows *sql.Rows, name string) (*StageShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*StageShowOutput, error) {
 		return &StageShowOutput{
-			CreatedOn:          colMap["created_on"],
-			Name:               colMap["name"],
-			DatabaseName:       colMap["database_name"],
-			SchemaName:         colMap["schema_name"],
-			URL:                colMap["url"],
-			Owner:              colMap["owner"],
-			Comment:            colMap["comment"],
-			Type:               colMap["type"],
-			StorageIntegration: colMap["storage_integration"],
-			DirectoryEnabled:   strings.EqualFold(colMap["directory_enabled"], "Y"),
+			CreatedOn:          m["created_on"],
+			Name:               m["name"],
+			DatabaseName:       m["database_name"],
+			SchemaName:         m["schema_name"],
+			URL:                m["url"],
+			Owner:              m["owner"],
+			Comment:            m["comment"],
+			Type:               m["type"],
+			StorageIntegration: m["storage_integration"],
+			DirectoryEnabled:   strings.EqualFold(m["directory_enabled"], "Y"),
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

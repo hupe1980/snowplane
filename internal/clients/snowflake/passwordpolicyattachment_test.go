@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	gosnowflake "github.com/snowflakedb/gosnowflake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -176,7 +177,17 @@ func TestIsSQLCompilationError(t *testing.T) {
 
 	t.Run("MatchingError", func(t *testing.T) {
 		t.Parallel()
-		assert.True(t, IsSQLCompilationError(fmt.Errorf("SQL compilation error: something went wrong")))
+		assert.True(t, IsSQLCompilationError(&gosnowflake.SnowflakeError{Number: ErrCodeSQLCompilation}))
+	})
+
+	t.Run("WrappedMatchingError", func(t *testing.T) {
+		t.Parallel()
+		assert.True(t, IsSQLCompilationError(fmt.Errorf("exec: %w", &gosnowflake.SnowflakeError{Number: ErrCodeSQLCompilation})))
+	})
+
+	t.Run("DifferentSnowflakeError", func(t *testing.T) {
+		t.Parallel()
+		assert.False(t, IsSQLCompilationError(&gosnowflake.SnowflakeError{Number: 9999}))
 	})
 
 	t.Run("NonMatchingError", func(t *testing.T) {

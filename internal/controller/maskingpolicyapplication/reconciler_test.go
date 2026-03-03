@@ -55,7 +55,6 @@ func (m *mockService) UnsetMaskingPolicy(ctx context.Context, opts snowflake.Uns
 // Helpers
 // --------------------------------------------------------------------------
 
-func ptrStr(s string) *string { return &s }
 
 func newTestMaskingPolicyApplication(name, namespace string) *snowplanev1alpha1.MaskingPolicyApplication {
 	return &snowplanev1alpha1.MaskingPolicyApplication{
@@ -71,7 +70,7 @@ func newTestMaskingPolicyApplication(name, namespace string) *snowplanev1alpha1.
 			},
 			TableName:  `"DB"."SCHEMA"."MY_TABLE"`,
 			ColumnName: "EMAIL",
-			PolicyName: ptrStr(`"DB"."SCHEMA"."MASK_POLICY"`),
+			PolicyName: testutil.Ptr(`"DB"."SCHEMA"."MASK_POLICY"`),
 		},
 	}
 }

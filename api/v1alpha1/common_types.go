@@ -9,19 +9,34 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// LocalObjectReference contains enough information to locate the referenced
-// Kubernetes resource within the same namespace.
-type LocalObjectReference struct {
+// ObjectReference contains enough information to locate the referenced
+// Kubernetes resource. If Namespace is omitted, the resource is assumed
+// to be in the same namespace as the referencing object.
+type ObjectReference struct {
 	// Name of the referent.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
+
+	// Namespace of the referent. Defaults to the namespace of the
+	// referencing resource when omitted, enabling cross-namespace
+	// references in platform/project-team enterprise topologies.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 }
+
+// LocalObjectReference is an alias kept for backward compatibility.
+// New code should use ObjectReference directly.
+//
+// Deprecated: Use ObjectReference instead.
+type LocalObjectReference = ObjectReference
 
 // SecretKeyReference contains enough information to locate the referenced
 // Kubernetes Secret and the specific key within it.
 type SecretKeyReference struct {
 	// Name of the Kubernetes Secret.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// Namespace of the Secret. Defaults to the namespace of the referring resource.
@@ -29,6 +44,7 @@ type SecretKeyReference struct {
 
 	// Key within the Secret data to select.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Key string `json:"key"`
 }
 
@@ -38,10 +54,12 @@ type SecretBinding struct {
 	// SecretName is the fully qualified name of the Snowflake secret
 	// (e.g. "MY_DB"."MY_SCHEMA"."MY_SECRET").
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SecretName string `json:"secretName"`
 
 	// VariableName is the variable name used to reference the secret in handler code.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	VariableName string `json:"variableName"`
 }
 
@@ -49,6 +67,7 @@ type SecretBinding struct {
 type ProviderReference struct {
 	// Name of the ProviderConfig to use.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:default="default"
 	Name string `json:"name,omitempty"`
 
@@ -159,6 +178,7 @@ type CommonSpec struct {
 	// This field is immutable after the resource has been created in Snowflake.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	UseRole *string `json:"useRole,omitempty"`
 
 	// Paused suspends reconciliation of this resource. When true, the
@@ -194,6 +214,11 @@ type CommonStatus struct {
 	// changes (labels, annotations) increment Generation without changing
 	// the spec.
 	LastAppliedSpecHash string `json:"lastAppliedSpecHash,omitempty"`
+
+	// LastReconcileTime is the timestamp of the most recent successful
+	// reconciliation. Useful for SLO monitoring and diagnosing whether
+	// reconciliation is running for a specific resource.
+	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty"`
 }
 
 // ComputeSpecHash returns the hex-encoded SHA-256 hash of a spec struct.

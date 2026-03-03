@@ -4,10 +4,12 @@ package v1alpha1
 type CallableArgument struct {
 	// Name is the argument name.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// Type is the Snowflake data type (e.g. VARCHAR, NUMBER, TIMESTAMP_NTZ).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Type string `json:"type"`
 
 	// DefaultValue is the optional default value for the argument.

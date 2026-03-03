@@ -25,12 +25,21 @@ import (
 // exists but has not reached the Ready condition.
 var ErrProviderConfigNotReady = errors.New("ProviderConfig not ready")
 
+// ProviderCacheKey returns the namespace-qualified cache key for a
+// ProviderConfig. All subsystems (ClientFactory, RateLimiter, CircuitBreaker,
+// metrics) must use this key to avoid cross-namespace collisions when two
+// ProviderConfigs share the same name in different namespaces (C-3).
+func ProviderCacheKey(namespace, name string) string {
+	return namespace + "/" + name
+}
+
 // ResolvedProvider contains the resolved Snowflake client along with
 // provider metadata useful for structured logging and metrics.
 type ResolvedProvider struct {
-	Client  clientfactory.SnowflakeClient
-	Name    string // ProviderConfig name (e.g. "default")
-	Account string // Snowflake account identifier (e.g. "orgname-accountname")
+	Client   clientfactory.SnowflakeClient
+	CacheKey string // Namespace-qualified key (e.g. "system/default") for cache/metrics
+	Name     string // ProviderConfig name (e.g. "default")
+	Account  string // Snowflake account identifier (e.g. "orgname-accountname")
 }
 
 // ResolveClient resolves the Snowflake client for a managed resource by
@@ -88,12 +97,15 @@ func ResolveClient(
 	}
 
 	// Circuit breaker: skip providers with many consecutive failures.
+	// Use namespace-qualified key to isolate per-namespace ProviderConfigs (C-3).
+	cacheKey := ProviderCacheKey(pc.Namespace, pc.Name)
+
 	if cb != nil {
-		if err := cb.Allow(pc.Name); err != nil {
+		if err := cb.Allow(cacheKey); err != nil {
 			msg := fmt.Sprintf("ProviderConfig %q circuit breaker open (consecutive failures exceeded threshold)", pc.Name)
 			conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDependencyNotReady, msg)
 
-			return nil, fmt.Errorf("circuit breaker open for provider %q: %w", pc.Name, err)
+			return nil, fmt.Errorf("circuit breaker open for provider %q: %w", cacheKey, err)
 		}
 	}
 
@@ -153,9 +165,9 @@ func ResolveClient(
 	// 2. Per-account: aggregate token bucket keyed by provider, caps total QPS
 	//    to a single Snowflake account across all controllers.
 	if rl != nil {
-		controllerWaited, accountWaited, err := rl.Wait(ctx, pc.Name, controllerName)
+		controllerWaited, accountWaited, err := rl.Wait(ctx, cacheKey, controllerName)
 		if err != nil {
-			return nil, fmt.Errorf("rate limit wait for provider %q controller %q: %w", pc.Name, controllerName, err)
+			return nil, fmt.Errorf("rate limit wait for provider %q controller %q: %w", cacheKey, controllerName, err)
 		}
 
 		if controllerWaited {
@@ -163,19 +175,20 @@ func ResolveClient(
 		}
 
 		if accountWaited {
-			metrics.SnowflakeAccountRateLimitWaits.With(prometheus.Labels{"provider": pc.Name}).Inc()
+			metrics.SnowflakeAccountRateLimitWaits.With(prometheus.Labels{"provider": cacheKey}).Inc()
 		}
 	}
 
-	sfClient, err := factory.GetOrCreate(pc.Name, hash, cfg)
+	sfClient, err := factory.GetOrCreate(cacheKey, hash, cfg)
 	if err != nil {
 		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonReconcileError, fmt.Sprintf("failed to create Snowflake client: %v", err))
 		return nil, err
 	}
 
 	return &ResolvedProvider{
-		Client:  sfClient,
-		Name:    pc.Name,
-		Account: pc.Spec.Account,
+		Client:   sfClient,
+		CacheKey: cacheKey,
+		Name:     pc.Name,
+		Account:  pc.Spec.Account,
 	}, nil
 }

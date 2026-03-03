@@ -81,9 +81,9 @@ func newTestStreamOnTable(name, namespace string) *snowplanev1alpha1.StreamOnTab
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:         "MY_STREAM",
-			DatabaseName: testutil.PtrString("MY_DB"),
-			SchemaName:   testutil.PtrString("MY_SCHEMA"),
-			TableName:    testutil.PtrString("MY_TABLE"),
+			DatabaseName: testutil.Ptr("MY_DB"),
+			SchemaName:   testutil.Ptr("MY_SCHEMA"),
+			TableName:    testutil.Ptr("MY_TABLE"),
 		},
 	}
 }
@@ -288,7 +288,7 @@ func TestReconcile_UpdateComment(t *testing.T) {
 	s.Finalizers = []string{finalizerName}
 	s.Status.ObservedGeneration = 1
 	s.Generation = 2
-	s.Spec.Comment = testutil.PtrString("new comment")
+	s.Spec.Comment = testutil.Ptr("new comment")
 	s.Status.DatabaseName = "MY_DB"
 	s.Status.SchemaName = "MY_SCHEMA"
 
@@ -387,8 +387,8 @@ func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
 	s := newTestStreamOnTable("mys", "default")
-	s.Spec.AppendOnly = testutil.PtrBool(true)
-	s.Spec.Comment = testutil.PtrString("test")
+	s.Spec.AppendOnly = testutil.Ptr(true)
+	s.Spec.Comment = testutil.Ptr("test")
 	s.Status.TableName = "MY_TABLE"
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_STREAM")
 
@@ -404,7 +404,7 @@ func TestBuildAlterOptions_CommentChanged(t *testing.T) {
 	t.Parallel()
 
 	s := newTestStreamOnTable("mys", "default")
-	s.Spec.Comment = testutil.PtrString("new")
+	s.Spec.Comment = testutil.Ptr("new")
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_STREAM")
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -429,7 +429,7 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.StreamOnTableSpec{
-		Comment: testutil.PtrString("x"),
+		Comment: testutil.Ptr("x"),
 	}
 
 	fields := tracked.ComputeTracked(spec)
@@ -469,8 +469,8 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	s := &snowplanev1alpha1.StreamOnTable{
 		Spec: snowplanev1alpha1.StreamOnTableSpec{
 			Name:      "MY_STREAM",
-			TableName: testutil.PtrString("MY_TABLE"),
-			Comment:   testutil.PtrString("test"),
+			TableName: testutil.Ptr("MY_TABLE"),
+			Comment:   testutil.Ptr("test"),
 		},
 		Status: snowplanev1alpha1.StreamOnTableStatus{
 			DatabaseName: "MY_DB",
@@ -500,8 +500,8 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	s := &snowplanev1alpha1.StreamOnTable{
 		Spec: snowplanev1alpha1.StreamOnTableSpec{
 			Name:      "MY_STREAM",
-			TableName: testutil.PtrString("MY_TABLE"),
-			Comment:   testutil.PtrString("desired"),
+			TableName: testutil.Ptr("MY_TABLE"),
+			Comment:   testutil.Ptr("desired"),
 		},
 		Status: snowplanev1alpha1.StreamOnTableStatus{
 			DatabaseName: "MY_DB",
@@ -532,8 +532,8 @@ func TestDetectDrift_AppendOnlyMode(t *testing.T) {
 	s := &snowplanev1alpha1.StreamOnTable{
 		Spec: snowplanev1alpha1.StreamOnTableSpec{
 			Name:       "MY_STREAM",
-			TableName:  testutil.PtrString("MY_TABLE"),
-			AppendOnly: testutil.PtrBool(true),
+			TableName:  testutil.Ptr("MY_TABLE"),
+			AppendOnly: testutil.Ptr(true),
 		},
 		Status: snowplanev1alpha1.StreamOnTableStatus{
 			DatabaseName: "MY_DB",

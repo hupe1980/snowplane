@@ -480,7 +480,7 @@ func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
 	view := newTestView("myview", "default")
-	view.Spec.Comment = testutil.PtrString("test view")
+	view.Spec.Comment = testutil.Ptr("test view")
 	view.Spec.Secure = true
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "ACTIVE_USERS")
 
@@ -511,7 +511,7 @@ func TestBuildAlterOptions_StatementChange(t *testing.T) {
 	view := newTestView("myview", "default")
 	view.Spec.Statement = "SELECT id, name FROM users WHERE active = TRUE"
 	view.Spec.Secure = true
-	view.Spec.Comment = testutil.PtrString("updated comment")
+	view.Spec.Comment = testutil.Ptr("updated comment")
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "ACTIVE_USERS")
 	obs := successfulObservation() // Text = "SELECT * FROM users WHERE active = TRUE"
 
@@ -544,8 +544,8 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.ViewSpec{
-		Comment:        testutil.PtrString("test"),
-		ChangeTracking: testutil.PtrBool(true),
+		Comment:        testutil.Ptr("test"),
+		ChangeTracking: testutil.Ptr(true),
 	}
 
 	fields := tracked.ComputeTracked(spec)
@@ -557,7 +557,7 @@ func TestDetectDrift_CommentDrift(t *testing.T) {
 	t.Parallel()
 
 	view := newTestView("myview", "default")
-	view.Spec.Comment = testutil.PtrString("expected")
+	view.Spec.Comment = testutil.Ptr("expected")
 
 	obs := &snowflake.ViewObservation{
 		Exists: true,

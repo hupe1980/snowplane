@@ -497,24 +497,6 @@ func BuildToClause(accountRole, databaseRole, share string) string {
 	return ""
 }
 
-// BuildFromClause constructs the SQL FROM clause for REVOKE.
-// All identifier names are quoted to prevent SQL injection.
-func BuildFromClause(accountRole, databaseRole, share string) string {
-	if accountRole != "" {
-		return "FROM ROLE " + sqlbuilder.QuoteIdentifier(accountRole)
-	}
-
-	if databaseRole != "" {
-		return "FROM DATABASE ROLE " + sqlbuilder.QuoteIdentifierParts(databaseRole)
-	}
-
-	if share != "" {
-		return "FROM SHARE " + sqlbuilder.QuoteIdentifier(share)
-	}
-
-	return ""
-}
-
 // BuildShowGrantsTarget constructs the target for SHOW GRANTS / SHOW FUTURE GRANTS queries.
 // All identifier names are quoted to prevent SQL injection.
 func BuildShowGrantsTarget(on OnClauseParams, share string) (target string, future bool) {

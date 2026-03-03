@@ -73,9 +73,9 @@ func newTestStreamOnDynamicTable(name, namespace string) *snowplanev1alpha1.Stre
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:             "MY_STREAM",
-			DatabaseName:     testutil.PtrString("MY_DB"),
-			SchemaName:       testutil.PtrString("MY_SCHEMA"),
-			DynamicTableName: testutil.PtrString("MY_DYN_TABLE"),
+			DatabaseName:     testutil.Ptr("MY_DB"),
+			SchemaName:       testutil.Ptr("MY_SCHEMA"),
+			DynamicTableName: testutil.Ptr("MY_DYN_TABLE"),
 		},
 	}
 }
@@ -229,8 +229,8 @@ func TestReconcile_Delete(t *testing.T) {
 func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 	s := newTestStreamOnDynamicTable("mys", "default")
-	s.Spec.AppendOnly = testutil.PtrBool(true)
-	s.Spec.Comment = testutil.PtrString("test")
+	s.Spec.AppendOnly = testutil.Ptr(true)
+	s.Spec.Comment = testutil.Ptr("test")
 	s.Status.DynamicTableName = "MY_DYN_TABLE"
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_STREAM")
 	opts := buildCreateOptions(s, id)
@@ -252,7 +252,7 @@ func TestBuildAlterOptions_NoChanges(t *testing.T) {
 
 func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
-	spec := &snowplanev1alpha1.StreamOnDynamicTableSpec{Comment: testutil.PtrString("x")}
+	spec := &snowplanev1alpha1.StreamOnDynamicTableSpec{Comment: testutil.Ptr("x")}
 	fields := tracked.ComputeTracked(spec)
 	assert.ElementsMatch(t, []string{"COMMENT"}, fields)
 }
@@ -270,7 +270,7 @@ func TestApplyObservation(t *testing.T) {
 func TestDetectDrift_NoDrift(t *testing.T) {
 	t.Parallel()
 	s := &snowplanev1alpha1.StreamOnDynamicTable{
-		Spec:   snowplanev1alpha1.StreamOnDynamicTableSpec{Name: "MY_STREAM", DynamicTableName: testutil.PtrString("MY_DYN_TABLE")},
+		Spec:   snowplanev1alpha1.StreamOnDynamicTableSpec{Name: "MY_STREAM", DynamicTableName: testutil.Ptr("MY_DYN_TABLE")},
 		Status: snowplanev1alpha1.StreamOnDynamicTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", DynamicTableName: "MY_DYN_TABLE"},
 	}
 	obs := &snowflake.StreamObservation{
@@ -286,7 +286,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 func TestDetectDrift_WithDrift(t *testing.T) {
 	t.Parallel()
 	s := &snowplanev1alpha1.StreamOnDynamicTable{
-		Spec:   snowplanev1alpha1.StreamOnDynamicTableSpec{Name: "MY_STREAM", DynamicTableName: testutil.PtrString("MY_DYN_TABLE"), Comment: testutil.PtrString("desired")},
+		Spec:   snowplanev1alpha1.StreamOnDynamicTableSpec{Name: "MY_STREAM", DynamicTableName: testutil.Ptr("MY_DYN_TABLE"), Comment: testutil.Ptr("desired")},
 		Status: snowplanev1alpha1.StreamOnDynamicTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", DynamicTableName: "MY_DYN_TABLE"},
 	}
 	obs := &snowflake.StreamObservation{

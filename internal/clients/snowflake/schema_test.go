@@ -7,10 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func ptrStr(s string) *string { return &s }
-func ptrI32(i int32) *int32   { return &i }
-func ptrBl(b bool) *bool      { return &b }
-
 const testInvalidEnum = "INVALID"
 
 // --------------------------------------------------------------------------
@@ -61,11 +57,11 @@ func TestBuildCreateSchemaSQL_AllOptions(t *testing.T) {
 		Name:                       NewDatabaseObjectIdentifier("DB", "FULL_SCHEMA"),
 		Transient:                  true,
 		ManagedAccess:              true,
-		Comment:                    ptrStr("test schema"),
-		DataRetentionTimeInDays:    ptrI32(7),
-		MaxDataExtensionTimeInDays: ptrI32(14),
-		ReplaceInvalidCharacters:   ptrBl(true),
-		DefaultDDLCollation:        ptrStr("en-ci"),
+		Comment:                    ptr("test schema"),
+		DataRetentionTimeInDays:    ptr(int32(7)),
+		MaxDataExtensionTimeInDays: ptr(int32(14)),
+		ReplaceInvalidCharacters:   ptr(true),
+		DefaultDDLCollation:        ptr("en-ci"),
 		StorageSerializationPolicy: &ssp,
 		LogLevel:                   &logLevel,
 		MetricLevel:                &metricLevel,
@@ -130,7 +126,7 @@ func TestAlterSchemaOptions_HasChanges(t *testing.T) {
 	opts := AlterSchemaOptions{Name: NewDatabaseObjectIdentifier("DB", "S")}
 	assert.False(t, opts.HasChanges())
 
-	opts.Comment = ptrStr("x")
+	opts.Comment = ptr("x")
 	assert.True(t, opts.HasChanges())
 }
 
@@ -190,7 +186,7 @@ func TestBuildAlterSchemaStatements_SetAndUnset(t *testing.T) {
 
 	stmts, err := buildAlterSchemaStatements(AlterSchemaOptions{
 		Name:        NewDatabaseObjectIdentifier("DB", "S"),
-		Comment:     ptrStr("new"),
+		Comment:     ptr("new"),
 		UnsetFields: []string{"LOG_LEVEL"},
 	})
 	require.NoError(t, err)
@@ -223,7 +219,7 @@ func TestBuildAlterSchemaStatements_AllThreeKinds(t *testing.T) {
 	stmts, err := buildAlterSchemaStatements(AlterSchemaOptions{
 		Name:             NewDatabaseObjectIdentifier("DB", "S"),
 		SetManagedAccess: &ma,
-		Comment:          ptrStr("x"),
+		Comment:          ptr("x"),
 		UnsetFields:      []string{"LOG_LEVEL"},
 	})
 	require.NoError(t, err)
@@ -282,7 +278,7 @@ func TestBuildAlterSchemaStatements_ManagedAccessAndSet(t *testing.T) {
 	stmts, err := buildAlterSchemaStatements(AlterSchemaOptions{
 		Name:             NewDatabaseObjectIdentifier("DB", "S"),
 		SetManagedAccess: &ma,
-		Comment:          ptrStr("x"),
+		Comment:          ptr("x"),
 	})
 	require.NoError(t, err)
 	require.Len(t, stmts, 2)
@@ -352,16 +348,16 @@ func TestAlterSchemaOptions_HasChanges_AllFields(t *testing.T) {
 		name string
 		set  func(o *AlterSchemaOptions)
 	}{
-		{"Comment", func(o *AlterSchemaOptions) { o.Comment = ptrStr("c") }},
-		{"DataRetention", func(o *AlterSchemaOptions) { o.DataRetentionTimeInDays = ptrI32(1) }},
-		{"MaxDataExtension", func(o *AlterSchemaOptions) { o.MaxDataExtensionTimeInDays = ptrI32(1) }},
-		{"DefaultDDLCollation", func(o *AlterSchemaOptions) { o.DefaultDDLCollation = ptrStr("utf8") }},
-		{"ReplaceInvalidChars", func(o *AlterSchemaOptions) { o.ReplaceInvalidCharacters = ptrBl(true) }},
-		{"StoragePolicy", func(o *AlterSchemaOptions) { o.StorageSerializationPolicy = ptrStr("OPTIMIZED") }},
-		{"LogLevel", func(o *AlterSchemaOptions) { o.LogLevel = ptrStr("INFO") }},
-		{"MetricLevel", func(o *AlterSchemaOptions) { o.MetricLevel = ptrStr("ALL") }},
-		{"TraceLevel", func(o *AlterSchemaOptions) { o.TraceLevel = ptrStr("OFF") }},
-		{"ManagedAccess", func(o *AlterSchemaOptions) { o.SetManagedAccess = ptrBl(true) }},
+		{"Comment", func(o *AlterSchemaOptions) { o.Comment = ptr("c") }},
+		{"DataRetention", func(o *AlterSchemaOptions) { o.DataRetentionTimeInDays = ptr(int32(1)) }},
+		{"MaxDataExtension", func(o *AlterSchemaOptions) { o.MaxDataExtensionTimeInDays = ptr(int32(1)) }},
+		{"DefaultDDLCollation", func(o *AlterSchemaOptions) { o.DefaultDDLCollation = ptr("utf8") }},
+		{"ReplaceInvalidChars", func(o *AlterSchemaOptions) { o.ReplaceInvalidCharacters = ptr(true) }},
+		{"StoragePolicy", func(o *AlterSchemaOptions) { o.StorageSerializationPolicy = ptr("OPTIMIZED") }},
+		{"LogLevel", func(o *AlterSchemaOptions) { o.LogLevel = ptr("INFO") }},
+		{"MetricLevel", func(o *AlterSchemaOptions) { o.MetricLevel = ptr("ALL") }},
+		{"TraceLevel", func(o *AlterSchemaOptions) { o.TraceLevel = ptr("OFF") }},
+		{"ManagedAccess", func(o *AlterSchemaOptions) { o.SetManagedAccess = ptr(true) }},
 		{"UnsetFields", func(o *AlterSchemaOptions) { o.UnsetFields = []string{"COMMENT"} }},
 	}
 
@@ -433,7 +429,7 @@ func TestBuildAlterSchemaStatements_OnlySet(t *testing.T) {
 
 	opts := AlterSchemaOptions{
 		Name:    NewDatabaseObjectIdentifier("DB", "S"),
-		Comment: ptrStr("hello"),
+		Comment: ptr("hello"),
 	}
 	stmts, err := buildAlterSchemaStatements(opts)
 	require.NoError(t, err)

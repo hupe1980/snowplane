@@ -81,8 +81,8 @@ func newTestTask(name, namespace string) *snowplanev1alpha1.Task {
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:         "MY_TASK",
-			DatabaseName: testutil.PtrString("MY_DB"),
-			SchemaName:   testutil.PtrString("MY_SCHEMA"),
+			DatabaseName: testutil.Ptr("MY_DB"),
+			SchemaName:   testutil.Ptr("MY_SCHEMA"),
 			SQLStatement: "SELECT 1",
 		},
 	}
@@ -211,19 +211,19 @@ func TestReconcile_CreateWithAllFields(t *testing.T) {
 	task.Finalizers = []string{finalizerName}
 	task.Status.DatabaseName = "MY_DB"
 	task.Status.SchemaName = "MY_SCHEMA"
-	task.Spec.Schedule = testutil.PtrString("10 MINUTE")
-	task.Spec.WarehouseName = testutil.PtrString("COMPUTE_WH")
+	task.Spec.Schedule = testutil.Ptr("10 MINUTE")
+	task.Spec.WarehouseName = testutil.Ptr("COMPUTE_WH")
 	task.Status.WarehouseName = "COMPUTE_WH"
-	task.Spec.Comment = testutil.PtrString("test task")
-	task.Spec.When = testutil.PtrString("SYSTEM$STREAM_HAS_DATA('MYSTREAM')")
-	task.Spec.AllowOverlappingExecution = testutil.PtrBool(true)
-	task.Spec.UserTaskTimeoutMs = testutil.PtrInt32(60000)
-	task.Spec.SuspendTaskAfterNumFailures = testutil.PtrInt32(3)
-	task.Spec.ErrorIntegrationName = testutil.PtrString("MY_ERROR_INT")
+	task.Spec.Comment = testutil.Ptr("test task")
+	task.Spec.When = testutil.Ptr("SYSTEM$STREAM_HAS_DATA('MYSTREAM')")
+	task.Spec.AllowOverlappingExecution = testutil.Ptr(true)
+	task.Spec.UserTaskTimeoutMs = testutil.Ptr(int32(60000))
+	task.Spec.SuspendTaskAfterNumFailures = testutil.Ptr(int32(3))
+	task.Spec.ErrorIntegrationName = testutil.Ptr("MY_ERROR_INT")
 	task.Status.ErrorIntegrationName = "MY_ERROR_INT"
-	task.Spec.SuccessIntegrationName = testutil.PtrString("MY_SUCCESS_INT")
+	task.Spec.SuccessIntegrationName = testutil.Ptr("MY_SUCCESS_INT")
 	task.Status.SuccessIntegrationName = "MY_SUCCESS_INT"
-	task.Spec.TaskAutoRetryAttempts = testutil.PtrInt32(2)
+	task.Spec.TaskAutoRetryAttempts = testutil.Ptr(int32(2))
 
 	var capturedOpts snowflake.CreateTaskOptions
 	obs := successfulObservation()
@@ -330,7 +330,7 @@ func TestReconcile_UpdateCommentChanged(t *testing.T) {
 	task.Generation = 2
 	task.Status.DatabaseName = "MY_DB"
 	task.Status.SchemaName = "MY_SCHEMA"
-	task.Spec.Comment = testutil.PtrString("new comment")
+	task.Spec.Comment = testutil.Ptr("new comment")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old comment"
@@ -367,7 +367,7 @@ func TestReconcile_CreateOrAlterFails(t *testing.T) {
 	task.Generation = 2
 	task.Status.DatabaseName = "MY_DB"
 	task.Status.SchemaName = "MY_SCHEMA"
-	task.Spec.Comment = testutil.PtrString("change")
+	task.Spec.Comment = testutil.Ptr("change")
 
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -521,19 +521,19 @@ func TestBuildCreateOptions(t *testing.T) {
 	t.Parallel()
 
 	task := newTestTask("mytask", "default")
-	task.Spec.Schedule = testutil.PtrString("5 MINUTE")
-	task.Spec.WarehouseName = testutil.PtrString("WH")
+	task.Spec.Schedule = testutil.Ptr("5 MINUTE")
+	task.Spec.WarehouseName = testutil.Ptr("WH")
 	task.Status.WarehouseName = "WH"
-	task.Spec.Comment = testutil.PtrString("c")
-	task.Spec.When = testutil.PtrString("SYSTEM$STREAM_HAS_DATA('S')")
-	task.Spec.AllowOverlappingExecution = testutil.PtrBool(false)
-	task.Spec.UserTaskTimeoutMs = testutil.PtrInt32(1000)
-	task.Spec.SuspendTaskAfterNumFailures = testutil.PtrInt32(5)
-	task.Spec.ErrorIntegrationName = testutil.PtrString("EI")
+	task.Spec.Comment = testutil.Ptr("c")
+	task.Spec.When = testutil.Ptr("SYSTEM$STREAM_HAS_DATA('S')")
+	task.Spec.AllowOverlappingExecution = testutil.Ptr(false)
+	task.Spec.UserTaskTimeoutMs = testutil.Ptr(int32(1000))
+	task.Spec.SuspendTaskAfterNumFailures = testutil.Ptr(int32(5))
+	task.Spec.ErrorIntegrationName = testutil.Ptr("EI")
 	task.Status.ErrorIntegrationName = "EI"
-	task.Spec.SuccessIntegrationName = testutil.PtrString("SI")
+	task.Spec.SuccessIntegrationName = testutil.Ptr("SI")
 	task.Status.SuccessIntegrationName = "SI"
-	task.Spec.TaskAutoRetryAttempts = testutil.PtrInt32(1)
+	task.Spec.TaskAutoRetryAttempts = testutil.Ptr(int32(1))
 
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_TASK")
 	opts := buildCreateOptions(task, id)
@@ -556,7 +556,7 @@ func TestBuildAlterOptions_CommentChanged(t *testing.T) {
 	t.Parallel()
 
 	task := newTestTask("mytask", "default")
-	task.Spec.Comment = testutil.PtrString("updated")
+	task.Spec.Comment = testutil.Ptr("updated")
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_TASK")
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old"
@@ -581,7 +581,7 @@ func TestBuildAlterOptions_ScheduleChanged(t *testing.T) {
 	t.Parallel()
 
 	task := newTestTask("mytask", "default")
-	task.Spec.Schedule = testutil.PtrString("10 MINUTE")
+	task.Spec.Schedule = testutil.Ptr("10 MINUTE")
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_TASK")
 	obs := successfulObservation()
 	obs.ShowOutput.Schedule = "5 MINUTE"
@@ -608,7 +608,7 @@ func TestBuildAlterOptions_SuspendStateChange(t *testing.T) {
 	t.Parallel()
 
 	task := newTestTask("mytask", "default")
-	task.Spec.Suspend = testutil.PtrBool(false)
+	task.Spec.Suspend = testutil.Ptr(false)
 	id := snowflake.NewSchemaObjectIdentifier("MY_DB", "MY_SCHEMA", "MY_TASK")
 	obs := successfulObservation()
 	obs.ShowOutput.State = "suspended"
@@ -645,14 +645,14 @@ func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
 
 	spec := &snowplanev1alpha1.TaskSpec{
-		Comment:                     testutil.PtrString("c"),
-		Schedule:                    testutil.PtrString("s"),
-		UserTaskTimeoutMs:           testutil.PtrInt32(1),
-		SuspendTaskAfterNumFailures: testutil.PtrInt32(1),
-		ErrorIntegrationName:        testutil.PtrString("e"),
-		SuccessIntegrationName:      testutil.PtrString("s"),
-		AllowOverlappingExecution:   testutil.PtrBool(true),
-		TaskAutoRetryAttempts:       testutil.PtrInt32(1),
+		Comment:                     testutil.Ptr("c"),
+		Schedule:                    testutil.Ptr("s"),
+		UserTaskTimeoutMs:           testutil.Ptr(int32(1)),
+		SuspendTaskAfterNumFailures: testutil.Ptr(int32(1)),
+		ErrorIntegrationName:        testutil.Ptr("e"),
+		SuccessIntegrationName:      testutil.Ptr("s"),
+		AllowOverlappingExecution:   testutil.Ptr(true),
+		TaskAutoRetryAttempts:       testutil.Ptr(int32(1)),
 	}
 
 	fields := tracked.ComputeTracked(spec)
@@ -700,9 +700,9 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 		Spec: snowplanev1alpha1.TaskSpec{
 			Name:          "MY_TASK",
 			SQLStatement:  "SELECT 1",
-			Comment:       testutil.PtrString("test"),
-			Schedule:      testutil.PtrString("5 MINUTE"),
-			WarehouseName: testutil.PtrString("WH"),
+			Comment:       testutil.Ptr("test"),
+			Schedule:      testutil.Ptr("5 MINUTE"),
+			WarehouseName: testutil.Ptr("WH"),
 		},
 		Status: snowplanev1alpha1.TaskStatus{
 			DatabaseName:  "MY_DB",
@@ -734,7 +734,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 		Spec: snowplanev1alpha1.TaskSpec{
 			Name:         "MY_TASK",
 			SQLStatement: "SELECT 1",
-			Comment:      testutil.PtrString("desired"),
+			Comment:      testutil.Ptr("desired"),
 		},
 		Status: snowplanev1alpha1.TaskStatus{
 			DatabaseName: "MY_DB",

@@ -49,7 +49,8 @@ func TestBuildCreateMaskingPolicySQL(t *testing.T) {
 			Signature: []MaskingPolicyArgument{{Name: "val", Type: "VARCHAR"}},
 			Body:      "CASE WHEN current_role() IN ('ADMIN') THEN val ELSE '***' END",
 		}
-		got := buildCreateMaskingPolicySQL(opts)
+		got, err := buildCreateMaskingPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, `CREATE MASKING POLICY IF NOT EXISTS "DB"."SCH"."MASK_EMAIL"`)
 		assert.Contains(t, got, `AS ("val" VARCHAR) RETURNS VARCHAR`)
 		assert.Contains(t, got, "-> CASE WHEN current_role() IN ('ADMIN') THEN val ELSE '***' END")
@@ -64,7 +65,8 @@ func TestBuildCreateMaskingPolicySQL(t *testing.T) {
 			Body:      "v",
 			Comment:   &comment,
 		}
-		got := buildCreateMaskingPolicySQL(opts)
+		got, err := buildCreateMaskingPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "COMMENT = 'masks emails'")
 	})
 
@@ -74,9 +76,10 @@ func TestBuildCreateMaskingPolicySQL(t *testing.T) {
 			Name:                NewSchemaObjectIdentifier("DB", "SCH", "P"),
 			Signature:           []MaskingPolicyArgument{{Name: "v", Type: "VARCHAR"}},
 			Body:                "v",
-			ExemptOtherPolicies: boolPtr(true),
+			ExemptOtherPolicies: ptr(true),
 		}
-		got := buildCreateMaskingPolicySQL(opts)
+		got, err := buildCreateMaskingPolicySQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, got, "EXEMPT_OTHER_POLICIES = TRUE")
 	})
 
@@ -86,9 +89,10 @@ func TestBuildCreateMaskingPolicySQL(t *testing.T) {
 			Name:                NewSchemaObjectIdentifier("DB", "SCH", "P"),
 			Signature:           []MaskingPolicyArgument{{Name: "v", Type: "VARCHAR"}},
 			Body:                "v",
-			ExemptOtherPolicies: boolPtr(false),
+			ExemptOtherPolicies: ptr(false),
 		}
-		got := buildCreateMaskingPolicySQL(opts)
+		got, err := buildCreateMaskingPolicySQL(opts)
+		require.NoError(t, err)
 		assert.NotContains(t, got, "EXEMPT_OTHER_POLICIES")
 	})
 }
@@ -102,7 +106,8 @@ func TestBuildCreateMaskingPolicySQL_CreateOrAlter(t *testing.T) {
 		Body:             "CASE WHEN current_role() IN ('ADMIN') THEN val ELSE '***' END",
 		UseCreateOrAlter: true,
 	}
-	got := buildCreateMaskingPolicySQL(opts)
+	got, err := buildCreateMaskingPolicySQL(opts)
+		require.NoError(t, err)
 	assert.Contains(t, got, `CREATE OR ALTER MASKING POLICY "DB"."SCH"."MASK_EMAIL"`)
 	assert.NotContains(t, got, "IF NOT EXISTS")
 	assert.Contains(t, got, `AS ("val" VARCHAR) RETURNS VARCHAR`)

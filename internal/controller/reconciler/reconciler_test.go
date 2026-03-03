@@ -16,6 +16,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	gosnowflake "github.com/snowflakedb/gosnowflake"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
@@ -196,6 +198,29 @@ var _ reconciler.ResourceAdapter[*snowplanev1alpha1.Database, any, any] = (*mock
 // ---------------------------------------------------------------------------
 
 func newTestReconciler(adapter *mockAdapter, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any] {
+	return buildTestReconciler(adapter, objs...)
+}
+
+// mockLateInitAdapter embeds mockAdapter and implements LateInitializer.
+type mockLateInitAdapter struct {
+	mockAdapter
+	lateInitResult bool
+}
+
+func (m *mockLateInitAdapter) LateInitialize(_ *snowplanev1alpha1.Database, _ *reconciler.Observation[any]) bool {
+	return m.lateInitResult
+}
+
+var _ reconciler.LateInitializer[*snowplanev1alpha1.Database, any] = (*mockLateInitAdapter)(nil)
+
+func newTestLateInitReconciler(adapter *mockLateInitAdapter, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any] {
+	return buildTestReconciler(adapter, objs...)
+}
+
+// buildTestReconciler constructs a GenericReconciler with the given adapter.
+// Shared by newTestReconciler and newTestLateInitReconciler to eliminate
+// boilerplate duplication.
+func buildTestReconciler(adapter reconciler.ResourceAdapter[*snowplanev1alpha1.Database, any, any], objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Database, any, any] {
 	scheme := testutil.TestScheme()
 	cb := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(&snowplanev1alpha1.Database{}, &snowplanev1alpha1.ProviderConfig{})
@@ -255,7 +280,10 @@ func TestReconcile_Create_Success(t *testing.T) {
 	adapter := &mockAdapter{
 		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
 			observeCalls++
-			if observeCalls <= 2 {
+			// First reconcile (finalizer) does not call Observe.
+			// Second reconcile: call 1 = main observe (Exists=false → create),
+			// call 2 = post-create observe (Exists=true → success).
+			if observeCalls <= 1 {
 				return &reconciler.Observation[any]{Exists: false}, nil
 			}
 			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
@@ -265,10 +293,15 @@ func TestReconcile_Create_Success(t *testing.T) {
 	// First reconcile adds finalizer and requeues.
 	_, err := r.Reconcile(context.Background(), reconcileReq())
 	require.NoError(t, err)
-	// Second reconcile executes create.
+	// Second reconcile executes create (including post-create observe).
 	result, err := r.Reconcile(context.Background(), reconcileReq())
 	require.NoError(t, err)
-	assert.True(t, result.RequeueAfter > 0, "should requeue after create")
+	assert.Equal(t, reconciler.DefaultRequeueInterval, result.RequeueAfter, "should requeue after successful create")
+
+	// LastReconcileTime must be set after a successful create.
+	var fetched snowplanev1alpha1.Database
+	require.NoError(t, r.Client.Get(context.Background(), reconcileReq().NamespacedName, &fetched))
+	assert.NotNil(t, fetched.Status.LastReconcileTime, "lastReconcileTime must be set after create")
 }
 
 func TestReconcile_Create_PostCreateHook(t *testing.T) {
@@ -314,6 +347,11 @@ func TestReconcile_Update_NoChanges(t *testing.T) {
 	assert.Equal(t, reconciler.DefaultRequeueInterval, result.RequeueAfter)
 	assert.Equal(t, 1, adapter.postUpdateCalled)
 	assert.False(t, adapter.postUpdateAltered, "no ALTER should have happened")
+
+	// LastReconcileTime must be set after a successful update.
+	var fetched snowplanev1alpha1.Database
+	require.NoError(t, r.Client.Get(context.Background(), reconcileReq().NamespacedName, &fetched))
+	assert.NotNil(t, fetched.Status.LastReconcileTime, "lastReconcileTime must be set after update")
 }
 
 func TestReconcile_Update_WithChanges(t *testing.T) {
@@ -1243,8 +1281,61 @@ func TestReconcile_Adoption_Adopt_Success(t *testing.T) {
 	require.NoError(t, r.Client.Get(context.Background(), reconcileReq().NamespacedName, &fetched))
 	assert.True(t, conditions.IsTrue(&fetched, snowplanev1alpha1.TypeReady))
 	assert.True(t, conditions.IsTrue(&fetched, snowplanev1alpha1.TypeSynced))
-	assert.Equal(t, "true", fetched.Annotations[snowplanev1alpha1.AnnotationLateInitialized])
+	// Adapter does not implement LateInitializer → annotation must NOT be set.
+	assert.Empty(t, fetched.Annotations[snowplanev1alpha1.AnnotationLateInitialized])
 	assert.False(t, conditions.IsTerminal(&fetched))
+
+	// LastReconcileTime must be set after adoption.
+	assert.NotNil(t, fetched.Status.LastReconcileTime, "lastReconcileTime must be set after adoption")
+}
+
+func TestReconcile_Adoption_Adopt_LateInit(t *testing.T) {
+	t.Parallel()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.Spec.ManagementPolicies.AdoptionPolicy = snowplanev1alpha1.AdoptionPolicyTypeAdopt
+	adapter := &mockLateInitAdapter{
+		mockAdapter: mockAdapter{
+			observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+				return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
+			},
+		},
+		lateInitResult: true, // simulate fields were modified
+	}
+	r := newTestLateInitReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	result, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.Equal(t, reconciler.DefaultRequeueInterval, result.RequeueAfter)
+
+	var fetched snowplanev1alpha1.Database
+	require.NoError(t, r.Client.Get(context.Background(), reconcileReq().NamespacedName, &fetched))
+	assert.True(t, conditions.IsTrue(&fetched, snowplanev1alpha1.TypeReady))
+	assert.Equal(t, "true", fetched.Annotations[snowplanev1alpha1.AnnotationLateInitialized])
+}
+
+func TestReconcile_Adoption_Adopt_LateInit_NoChange(t *testing.T) {
+	t.Parallel()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.Spec.ManagementPolicies.AdoptionPolicy = snowplanev1alpha1.AdoptionPolicyTypeAdopt
+	adapter := &mockLateInitAdapter{
+		mockAdapter: mockAdapter{
+			observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+				return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
+			},
+		},
+		lateInitResult: false, // no fields were modified
+	}
+	r := newTestLateInitReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	result, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.Equal(t, reconciler.DefaultRequeueInterval, result.RequeueAfter)
+
+	var fetched snowplanev1alpha1.Database
+	require.NoError(t, r.Client.Get(context.Background(), reconcileReq().NamespacedName, &fetched))
+	assert.True(t, conditions.IsTrue(&fetched, snowplanev1alpha1.TypeReady))
+	// LateInitialize returned false → annotation must NOT be set.
+	assert.Empty(t, fetched.Annotations[snowplanev1alpha1.AnnotationLateInitialized])
 }
 
 func TestReconcile_Adoption_SecondReconcile_SkipsAdoptionCheck(t *testing.T) {
@@ -1446,7 +1537,8 @@ func TestIsCreateOrAlterUnsupported(t *testing.T) {
 		{"unsupported keyword", errors.New("SQL compilation error: UNSUPPORTED feature"), true},
 		{"unexpected OR", errors.New("SQL compilation error: unexpected 'OR'"), true},
 		{"syntax error", errors.New("SQL compilation error: syntax error"), true},
-		{"error code 002032", errors.New("002032 (42601): SQL compilation error"), true},
+		{"structured error code 2032", &gosnowflake.SnowflakeError{Number: snowflake.ErrCodeCreateOrAlterUnsupported}, true},
+		{"error code 002032 no longer matches", errors.New("002032 (42601): SQL compilation error"), false},
 		{"case insensitive unsupported", errors.New("unsupported statement type"), true},
 		{"case insensitive syntax", errors.New("Syntax Error near 'CREATE'"), true},
 	}
@@ -1550,6 +1642,41 @@ func TestReconcile_PostCrashCreate_Recovery(t *testing.T) {
 	// Creation-initiated annotation should be cleared.
 	assert.Empty(t, fetched.Annotations[snowplanev1alpha1.AnnotationCreationInitiated],
 		"creation-initiated annotation should be cleared after recovery")
+
+	// LastReconcileTime must be set after post-crash recovery.
+	assert.NotNil(t, fetched.Status.LastReconcileTime, "lastReconcileTime must be set after post-crash recovery")
+}
+
+func TestReconcile_PostCrashCreate_WithLateInit(t *testing.T) {
+	t.Parallel()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.Status.ObservedGeneration = 0 // Never successfully reconciled.
+	db.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationCreationInitiated: "true",
+	}
+
+	adapter := &mockLateInitAdapter{
+		mockAdapter: mockAdapter{
+			observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+				return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
+			},
+		},
+		lateInitResult: true,
+	}
+	r := newTestLateInitReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	result, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.True(t, result.RequeueAfter > 0, "should requeue after post-crash recovery")
+
+	var fetched snowplanev1alpha1.Database
+	require.NoError(t, r.Client.Get(context.Background(), reconcileReq().NamespacedName, &fetched))
+
+	// Late-init annotation should be set since LateInitialize returned true.
+	assert.Equal(t, "true", fetched.Annotations[snowplanev1alpha1.AnnotationLateInitialized])
+
+	// Should be Ready after recovery.
+	assert.True(t, conditions.IsTrue(&fetched, snowplanev1alpha1.TypeReady))
 }
 
 // ---------------------------------------------------------------------------

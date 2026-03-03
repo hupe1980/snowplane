@@ -61,6 +61,7 @@ type GrantOnSchema struct {
 	// For: ON SCHEMA <schema_name>
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -73,6 +74,7 @@ type GrantOnSchema struct {
 	// For: ON ALL SCHEMAS IN DATABASE <db_name>
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	AllInDatabase *string `json:"allInDatabase,omitempty"`
 
 	// AllInDatabaseRef references a Database CR for the ALL SCHEMAS IN DATABASE grant.
@@ -84,6 +86,7 @@ type GrantOnSchema struct {
 	// For: ON FUTURE SCHEMAS IN DATABASE <db_name>
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	FutureInDatabase *string `json:"futureInDatabase,omitempty"`
 
 	// FutureInDatabaseRef references a Database CR for the FUTURE SCHEMAS IN DATABASE grant.
@@ -132,6 +135,7 @@ type GrantOnBulk struct {
 	// InDatabase scopes the grant to all objects of the type in the specified database.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	InDatabase *string `json:"inDatabase,omitempty"`
 
 	// InDatabaseRef references a Database CR.
@@ -142,6 +146,7 @@ type GrantOnBulk struct {
 	// InSchema scopes the grant to all objects of the type in the specified schema.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	InSchema *string `json:"inSchema,omitempty"`
 
 	// InSchemaRef references a Schema CR.

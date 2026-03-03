@@ -17,7 +17,8 @@ func TestBuildCreateMaterializedViewSQL(t *testing.T) {
 			Name:      NewSchemaObjectIdentifier("DB", "SCH", "MV1"),
 			Statement: "SELECT col1, col2 FROM my_table",
 		}
-		sql := buildCreateMaterializedViewSQL(opts)
+		sql, err := buildCreateMaterializedViewSQL(opts)
+		require.NoError(t, err)
 		assert.Equal(t, `CREATE MATERIALIZED VIEW IF NOT EXISTS "DB"."SCH"."MV1" AS SELECT col1, col2 FROM my_table`, sql)
 	})
 
@@ -29,7 +30,8 @@ func TestBuildCreateMaterializedViewSQL(t *testing.T) {
 			Statement: "SELECT col1 FROM my_table",
 			OrReplace: true,
 		}
-		sql := buildCreateMaterializedViewSQL(opts)
+		sql, err := buildCreateMaterializedViewSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, sql, "CREATE OR REPLACE")
 		assert.NotContains(t, sql, "IF NOT EXISTS")
 	})
@@ -42,7 +44,8 @@ func TestBuildCreateMaterializedViewSQL(t *testing.T) {
 			Statement: "SELECT col1 FROM my_table",
 			Secure:    true,
 		}
-		sql := buildCreateMaterializedViewSQL(opts)
+		sql, err := buildCreateMaterializedViewSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, sql, "SECURE MATERIALIZED VIEW")
 	})
 
@@ -55,7 +58,8 @@ func TestBuildCreateMaterializedViewSQL(t *testing.T) {
 			Statement: "SELECT col1 FROM my_table",
 			Comment:   &comment,
 		}
-		sql := buildCreateMaterializedViewSQL(opts)
+		sql, err := buildCreateMaterializedViewSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, sql, "COMMENT = 'test comment'")
 	})
 
@@ -67,7 +71,8 @@ func TestBuildCreateMaterializedViewSQL(t *testing.T) {
 			Statement: "SELECT col1, col2 FROM my_table",
 			ClusterBy: []string{"col1", "col2"},
 		}
-		sql := buildCreateMaterializedViewSQL(opts)
+		sql, err := buildCreateMaterializedViewSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, sql, "CLUSTER BY (col1, col2)")
 	})
 
@@ -83,7 +88,8 @@ func TestBuildCreateMaterializedViewSQL(t *testing.T) {
 			ClusterBy: []string{"col1"},
 			OrReplace: true,
 		}
-		sql := buildCreateMaterializedViewSQL(opts)
+		sql, err := buildCreateMaterializedViewSQL(opts)
+		require.NoError(t, err)
 		assert.Contains(t, sql, "CREATE OR REPLACE SECURE MATERIALIZED VIEW")
 		assert.Contains(t, sql, "COMMENT = 'full options'")
 		assert.Contains(t, sql, "CLUSTER BY (col1)")

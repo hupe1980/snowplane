@@ -203,16 +203,6 @@ var OwnershipConflictsTotal = prometheus.NewCounterVec(
 	[]string{"controller"},
 )
 
-// ManagedResources tracks the number of managed resources by controller and state.
-var ManagedResources = prometheus.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "managed_resources",
-		Help:      "Number of managed resources by controller and state (ready, not_ready, terminal).",
-	},
-	[]string{"controller", "state"},
-)
-
 // CircuitBreakerTripsTotal counts the number of times a circuit breaker has
 // transitioned to the open state for a provider.
 var CircuitBreakerTripsTotal = prometheus.NewCounterVec(
@@ -271,11 +261,6 @@ func RecordOrphanedResource(controller string) {
 // CR already manages the same Snowflake resource.
 func RecordOwnershipConflict(controller string) {
 	OwnershipConflictsTotal.With(prometheus.Labels{"controller": controller}).Inc()
-}
-
-// SetManagedResources updates the managed resources gauge for a controller.
-func SetManagedResources(controller, state string, count float64) {
-	ManagedResources.With(prometheus.Labels{"controller": controller, "state": state}).Set(count)
 }
 
 // RecordCircuitBreakerTrip increments the trip counter for a provider.
@@ -350,7 +335,6 @@ func init() {
 		DriftDetectedTotal,
 		OrphanedResourcesTotal,
 		OwnershipConflictsTotal,
-		ManagedResources,
 		CircuitBreakerTripsTotal,
 		CircuitBreakerState,
 		ProviderConfigHealthy,

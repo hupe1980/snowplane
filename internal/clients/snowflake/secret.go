@@ -152,12 +152,10 @@ func NewSecretClient(c SQLExecutor) *SecretClient {
 }
 
 // buildCreateSecretSQL builds the CREATE SECRET SQL statement.
-func buildCreateSecretSQL(opts CreateSecretOptions) string {
+func buildCreateSecretSQL(opts CreateSecretOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	b.WriteString("CREATE SECRET IF NOT EXISTS ")
-
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "SECRET", opts.Name.FullyQualifiedName(), false, false)
 
 	switch opts.SecretType {
 	case SecretTypeOAuth2:
@@ -206,7 +204,11 @@ func buildCreateSecretSQL(opts CreateSecretOptions) string {
 
 	b.SetString("COMMENT", opts.Comment)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a secret in Snowflake.
@@ -215,7 +217,12 @@ func (sc *SecretClient) Create(ctx context.Context, opts CreateSecretOptions) er
 		return NewTerminalError(fmt.Errorf("invalid create secret options: %w", err))
 	}
 
-	if _, err := sc.client.Exec(ctx, buildCreateSecretSQL(opts)); err != nil {
+	sql, err := buildCreateSecretSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create secret SQL: %w", err))
+	}
+
+	if _, err := sc.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating secret %s: %w", opts.Name, err)
 	}
 
@@ -407,49 +414,16 @@ func (sc *SecretClient) Observe(ctx context.Context, name SchemaObjectIdentifier
 
 // scanSecretShowOutput scans SHOW SECRETS results for a matching row.
 func scanSecretShowOutput(rows *sql.Rows, name string) (*SecretShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*SecretShowOutput, error) {
 		return &SecretShowOutput{
-			CreatedOn:    colMap["created_on"],
-			Name:         colMap["name"],
-			DatabaseName: colMap["database_name"],
-			SchemaName:   colMap["schema_name"],
-			Owner:        colMap["owner"],
-			Comment:      colMap["comment"],
-			SecretType:   colMap["secret_type"],
-			OAuthScopes:  colMap["oauth_scopes"],
+			CreatedOn:    m["created_on"],
+			Name:         m["name"],
+			DatabaseName: m["database_name"],
+			SchemaName:   m["schema_name"],
+			Owner:        m["owner"],
+			Comment:      m["comment"],
+			SecretType:   m["secret_type"],
+			OAuthScopes:  m["oauth_scopes"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }

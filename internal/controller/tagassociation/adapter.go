@@ -49,7 +49,7 @@ func (a *adapter) PreReconcile(ctx context.Context, obj *snowplanev1alpha1.TagAs
 	if ref := obj.Spec.TagRef; ref != nil {
 		logger := log.FromContext(ctx)
 
-		fqn, err := refresolver.ResolveLocalRef(ctx, a.client, obj.Namespace, ref.Name, func() refresolver.ReferableObject {
+		fqn, err := refresolver.ResolveLocalRef(ctx, a.client, obj.Namespace, ref.Name, ref.Namespace, func() refresolver.ReferableObject {
 			t := &snowplanev1alpha1.Tag{}
 			t.SetGroupVersionKind(schema.GroupVersionKind{
 				Group:   snowplanev1alpha1.GroupVersion.Group,

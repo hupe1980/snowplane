@@ -96,6 +96,7 @@ type WarehouseSpec struct {
 
 	// Name is the Snowflake warehouse name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// WarehouseType specifies the warehouse type (STANDARD or SNOWPARK-OPTIMIZED).

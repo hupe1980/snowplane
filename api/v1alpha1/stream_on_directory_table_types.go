@@ -26,6 +26,7 @@ type StreamOnDirectoryTableSpec struct {
 
 	// Name is the Snowflake stream name. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	Name string `json:"name"`
 
 	// DatabaseRef references a Database CR in the same namespace.
@@ -37,6 +38,7 @@ type StreamOnDirectoryTableSpec struct {
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a Schema CR in the same namespace.
@@ -48,6 +50,7 @@ type StreamOnDirectoryTableSpec struct {
 	// Mutually exclusive with SchemaRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// StageRef references a Stage CR in the same namespace.
@@ -59,6 +62,7 @@ type StreamOnDirectoryTableSpec struct {
 	// Mutually exclusive with StageRef. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	StageName *string `json:"stageName,omitempty"`
 
 	// Comment is an optional description for the stream.

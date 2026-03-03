@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
@@ -103,10 +102,9 @@ func NewPipeClient(c SQLExecutor) *PipeClient {
 }
 
 // buildCreatePipeSQL builds the CREATE PIPE SQL statement.
-func buildCreatePipeSQL(opts CreatePipeOptions) string {
+func buildCreatePipeSQL(opts CreatePipeOptions) (string, error) {
 	var b sqlbuilder.Builder
-	b.WriteString("CREATE PIPE IF NOT EXISTS ")
-	b.WriteString(opts.Name.FullyQualifiedName())
+	sqlbuilder.BuildCreatePreamble(&b, "PIPE", opts.Name.FullyQualifiedName(), false, false)
 
 	if opts.AutoIngest != nil && *opts.AutoIngest {
 		b.WriteString(" AUTO_INGEST = TRUE")
@@ -124,7 +122,11 @@ func buildCreatePipeSQL(opts CreatePipeOptions) string {
 	b.WriteString(" AS ")
 	b.WriteString(opts.CopyStatement)
 
-	return b.String()
+	if err := b.Err(); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 // Create creates a pipe in Snowflake.
@@ -133,7 +135,12 @@ func (p *PipeClient) Create(ctx context.Context, opts CreatePipeOptions) error {
 		return NewTerminalError(fmt.Errorf("invalid create pipe options: %w", err))
 	}
 
-	if _, err := p.client.Exec(ctx, buildCreatePipeSQL(opts)); err != nil {
+	sql, err := buildCreatePipeSQL(opts)
+	if err != nil {
+		return NewTerminalError(fmt.Errorf("building create pipe SQL: %w", err))
+	}
+
+	if _, err := p.client.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("creating pipe %s: %w", opts.Name, err)
 	}
 
@@ -231,52 +238,19 @@ func (p *PipeClient) Observe(ctx context.Context, name SchemaObjectIdentifier) (
 
 // scanPipeShowOutput scans SHOW PIPES results for a matching row.
 func scanPipeShowOutput(rows *sql.Rows, name string) (*PipeShowOutput, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
-	}
-
-	for rows.Next() {
-		values := make([]sql.NullString, len(cols))
-		ptrs := make([]any, len(cols))
-
-		for i := range values {
-			ptrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
-		}
-
-		colMap := make(map[string]string, len(cols))
-		for i, col := range cols {
-			if values[i].Valid {
-				colMap[col] = values[i].String
-			}
-		}
-
-		if !strings.EqualFold(colMap["name"], name) {
-			continue
-		}
-
+	return ScanShowOutput(rows, name, func(m map[string]string) (*PipeShowOutput, error) {
 		return &PipeShowOutput{
-			CreatedOn:           colMap["created_on"],
-			Name:                colMap["name"],
-			DatabaseName:        colMap["database_name"],
-			SchemaName:          colMap["schema_name"],
-			Owner:               colMap["owner"],
-			Comment:             colMap["comment"],
-			Definition:          colMap["definition"],
-			NotificationChannel: colMap["notification_channel"],
-			Integration:         colMap["integration"],
-			ErrorIntegration:    colMap["error_integration"],
-			AwsSnsTopic:         colMap["aws_sns_topic"],
+			CreatedOn:           m["created_on"],
+			Name:                m["name"],
+			DatabaseName:        m["database_name"],
+			SchemaName:          m["schema_name"],
+			Owner:               m["owner"],
+			Comment:             m["comment"],
+			Definition:          m["definition"],
+			NotificationChannel: m["notification_channel"],
+			Integration:         m["integration"],
+			ErrorIntegration:    m["error_integration"],
+			AwsSnsTopic:         m["aws_sns_topic"],
 		}, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
-	}
-
-	return nil, ErrObjectNotFound
+	})
 }
