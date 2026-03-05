@@ -32,7 +32,7 @@
 #         on:
 #           schemaObject:
 #             future:
-#               objectType: TABLE
+#               objectTypePlural: TABLES
 #               inSchema: '"ANALYTICS"."PUBLIC"'
 #     assignToRole: SYSADMIN
 #

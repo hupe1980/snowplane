@@ -82,6 +82,8 @@ spec:
   environment: prod
   warehouseSize: MEDIUM
   retentionDays: 7
+  providerRef:
+    name: default
 ```
 
 ```bash
@@ -115,9 +117,14 @@ metadata:
   namespace: data-team
 spec:
   name: ORDERS_PIPELINE
-  databaseRef: analytics-db
-  schemaRef: analytics-schema
-  warehouseRef: analytics-wh
+  providerRef:
+    name: default
+  databaseRef:
+    name: analytics-db
+  schemaRef:
+    name: analytics-schema
+  warehouseRef:
+    name: analytics-wh
   columns:
     - name: ID
       type: NUMBER(38,0)
@@ -152,8 +159,12 @@ metadata:
   namespace: data-team
 spec:
   name: ORDERS
-  databaseRef: analytics-db
-  schemaRef: analytics-schema
+  providerRef:
+    name: default
+  databaseRef:
+    name: analytics-db
+  schemaRef:
+    name: analytics-schema
   comment: "Order events table with governance tags"
   columns:
     - name: ID
@@ -164,11 +175,14 @@ spec:
     - name: CREATED_AT
       type: TIMESTAMP_NTZ
   tags:
-    - tagRef: cost-center
+    - tagRef:
+        name: cost-center
       value: engineering
-    - tagRef: environment
+    - tagRef:
+        name: environment
       value: production
-    - tagRef: pii-level
+    - tagRef:
+        name: pii-level
       value: "none"
 ```
 
@@ -198,6 +212,8 @@ metadata:
 spec:
   roleName: ANALYTICS_READER
   comment: "Read-only access to analytics database"
+  providerRef:
+    name: default
   grants:
     - privilege: USAGE
       on:
@@ -212,7 +228,7 @@ spec:
       on:
         schemaObject:
           future:
-            objectType: TABLE
+            objectTypePlural: TABLES
             inSchema: '"ANALYTICS"."PUBLIC"'
   assignToRole: SYSADMIN
 ```
