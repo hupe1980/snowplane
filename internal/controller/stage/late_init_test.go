@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -26,14 +27,12 @@ func newStage() *snowplanev1alpha1.Stage {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newStage()
 		obs := &reconciler.Observation[*snowflake.StageObservation]{
 			Exists: true,
 			Detail: &snowflake.StageObservation{
-				ShowOutput: &snowflake.StageShowOutput{
+				ShowOutput: &snowplanev1alpha1.StageShowOutput{
 					Comment:            "stage comment",
 					URL:                "s3://my-bucket/path/",
 					StorageIntegration: "MY_INTEGRATION",
@@ -41,7 +40,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 		assert.Equal(t, "stage comment", *obj.Spec.Comment)
 		assert.Equal(t, "s3://my-bucket/path/", *obj.Spec.URL)
@@ -57,7 +56,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.StageObservation]{
 			Exists: true,
 			Detail: &snowflake.StageObservation{
-				ShowOutput: &snowflake.StageShowOutput{
+				ShowOutput: &snowplanev1alpha1.StageShowOutput{
 					Comment:            "snowflake comment",
 					URL:                "s3://other-bucket/",
 					StorageIntegration: "OTHER_INT",
@@ -65,7 +64,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 		assert.Equal(t, "user comment", *obj.Spec.Comment)
 		assert.Equal(t, "s3://user-bucket/", *obj.Spec.URL)
@@ -75,7 +74,7 @@ func TestLateInitialize(t *testing.T) {
 	t.Run("returns false when detail is nil", func(t *testing.T) {
 		obj := newStage()
 
-		modified := a.LateInitialize(obj, &reconciler.Observation[*snowflake.StageObservation]{
+		modified := lateInitialize(obj, &reconciler.Observation[*snowflake.StageObservation]{
 			Exists: true,
 			Detail: nil,
 		})
@@ -88,7 +87,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.StageObservation]{
 			Exists: true,
 			Detail: &snowflake.StageObservation{
-				ShowOutput: &snowflake.StageShowOutput{
+				ShowOutput: &snowplanev1alpha1.StageShowOutput{
 					Comment:            "",
 					URL:                "",
 					StorageIntegration: "",
@@ -96,7 +95,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 }

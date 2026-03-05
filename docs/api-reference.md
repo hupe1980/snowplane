@@ -23,9 +23,11 @@ Complete field-level documentation for all Snowplane CRDs. Each resource support
 
 > 🏷️ **Annotations:** `snowplane.hupe1980.github.io/force-destroy` enables CASCADE DROP for databases and schemas. `snowplane.hupe1980.github.io/force-new` triggers delete-and-recreate for immutable field changes. `snowplane.hupe1980.github.io/late-initialized` is set to `"true"` after adoption, indicating spec fields were populated from observed state.
 
-> 🔄 **Late-initialization:** When `adoptionPolicy: adopt` is used, nil spec fields are automatically populated from the existing Snowflake resource state (ShowOutput, DescribeOutput, Parameters). This ensures the adopted CR's spec accurately represents the managed state. Supports 20 adapters: Database, Schema, Warehouse, User, Task, PasswordPolicy, Table, Alert, DynamicTable, Sequence, View, Tag, AccountRole, DatabaseRole, StorageIntegration, Stage, Pipe, NetworkPolicy, NotificationIntegration, ResourceMonitor.
+> 🔄 **Late-initialization:** When `adoptionPolicy: adopt` is used, nil spec fields are automatically populated from the existing Snowflake resource state (ShowOutput, DescribeOutput, Parameters). This ensures the adopted CR's spec accurately represents the managed state. Supports 23 adapters: Database, SecondaryDatabase, SharedDatabase, Schema, Warehouse, User, Task, PasswordPolicy, Table, Alert, DynamicTable, Sequence, View, Tag, AccountRole, DatabaseRole, StorageIntegration, Stage, Pipe, NetworkPolicy, NotificationIntegration, ResourceMonitor, APIIntegration.
 
 > ⏱️ **LastReconcileTime:** Every resource's `status.lastReconcileTime` is stamped on each successful reconcile (create, update, adoption, and post-crash recovery) via `finalizeSpec()`. Use this for SLO dashboards, staleness alerting, and diagnosing whether reconciliation is running for a specific resource.
+
+> ✈️ **Pre-flight validation:** For all database/schema-scoped resources (38 types), the controller automatically verifies that the referenced Snowflake database and schema exist before issuing CREATE. When using `databaseRef`/`schemaRef`, existence is validated via CR readiness. When using raw `databaseName`/`schemaName` strings, the controller issues `SHOW DATABASES LIKE`/`SHOW SCHEMAS LIKE` queries. Non-existent targets set `Ready=False` with reason `DependencyNotReady`.
 
 ---
 
@@ -45,6 +47,10 @@ Complete field-level documentation for all Snowplane CRDs. Each resource support
 | `spec.workloadIdentity.audience` | `string` | OIDC audience for WIF |
 | `spec.workloadIdentity.tokenFilePath` | `string` | Path to projected SA token file |
 | `spec.workloadIdentity.provider` | `enum` | `OIDC` (default) / `AWS` / `GCP` / `Azure` |
+| `spec.allowedNamespaces` | `[]string` | Static list of namespaces that may reference this ProviderConfig. Empty = all allowed. Contains `"*"` = all allowed. |
+| `spec.allowedNamespaceSelector` | `*LabelSelector` | Label selector matching namespaces that may reference this ProviderConfig. Used as OR with `allowedNamespaces`. |
+| `spec.allowedDatabases` | `[]string` | Restrict which Snowflake databases may be targeted by resources using this ProviderConfig. Empty = all allowed. Case-insensitive. |
+| `spec.allowedSchemas` | `[]string` | Restrict which Snowflake schemas may be targeted. Supports `"SCHEMA"` or `"DATABASE.SCHEMA"` format. Empty = all allowed. |
 
 </details>
 
@@ -75,7 +81,42 @@ Complete field-level documentation for all Snowplane CRDs. Each resource support
 </details>
 
 <details>
-<summary>📂 <strong>Schema</strong></summary>
+<summary>�️ <strong>SecondaryDatabase</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Snowflake database name *(immutable, 1–255 chars)* |
+| `spec.asReplicaOf` | `string` | Fully qualified source database: `<org>.<account>.<db>` *(immutable)* |
+| `spec.comment` | `*string` | Optional description |
+| `spec.dataRetentionTimeInDays` | `*int32` | Time Travel retention (0–90 days) |
+| `spec.maxDataExtensionTimeInDays` | `*int32` | Max data extension days (0–90) |
+
+> 🔄 **Replication:** Secondary databases are read-only replicas of a primary database in another account. Use `asReplicaOf` with the format `org.account.database_name`. Data retention settings can be configured independently of the primary.
+
+</details>
+
+<details>
+<summary>🗄️ <strong>SharedDatabase</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Snowflake database name *(immutable, 1–255 chars)* |
+| `spec.fromShare` | `string` | Source share: `<account>.<share>` or `<org>.<account>.<share>` *(immutable)* |
+| `spec.comment` | `*string` | Optional description |
+| `spec.externalVolume` | `*string` | External volume for Iceberg table storage |
+| `spec.catalog` | `*string` | Apache Iceberg catalog integration name |
+| `spec.defaultDDLCollation` | `*string` | Default string column collation |
+| `spec.replaceInvalidCharacters` | `*bool` | Replace invalid UTF-8 characters |
+| `spec.storageSerializationPolicy` | `*enum` | `COMPATIBLE` / `OPTIMIZED` |
+| `spec.logLevel` | `*enum` | `TRACE` / `DEBUG` / `INFO` / `WARN` / `ERROR` / `FATAL` / `OFF` |
+| `spec.traceLevel` | `*enum` | `ALWAYS` / `ON_EVENT` / `OFF` |
+
+> 🤝 **Data Sharing:** Shared databases are created from a Snowflake share provided by another account. Use `fromShare` with the provider account and share name. Supports the same Iceberg, collation, and logging parameters as standard databases.
+
+</details>
+
+<details>
+<summary>�📂 <strong>Schema</strong></summary>
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -171,30 +212,49 @@ Complete field-level documentation for all Snowplane CRDs. Each resource support
 </details>
 
 <details>
-<summary>🔑 <strong>AccountRoleGrant</strong></summary>
+<summary>🔑 <strong>GrantPrivilegesToAccountRole</strong></summary>
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `spec.privilege` | `string` | Snowflake privilege (e.g. USAGE, SELECT) *(immutable)* |
+| `spec.privilege` | `string` | Snowflake privilege (e.g. USAGE, SELECT) *(immutable, mutually exclusive with allPrivileges)* |
+| `spec.allPrivileges` | `bool` | Grant all privileges on the target *(immutable, mutually exclusive with privilege)* |
 | `spec.on` | `GrantOn` | Grant target — exactly one of `account`, `accountObject`, `schema`, `schemaObject` *(immutable)* |
 | `spec.accountRole` | `string` | Account role name *(immutable, mutually exclusive with accountRoleRef)* |
 | `spec.accountRoleRef` | `ObjectReference` | AccountRole CR reference *(immutable, mutually exclusive with accountRole)* |
 | `spec.withGrantOption` | `bool` | Allow grantee to re-grant *(immutable)* |
+
+**GrantOn** — exactly one field must be set:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `account` | `bool` | Global account-level privilege (`ON ACCOUNT`) |
+| `accountObject` | `GrantOnAccountObject` | Account-level object (DATABASE, WAREHOUSE, etc.) |
+| `schema` | `GrantOnSchema` | Schema or all/future schemas in a database |
+| `schemaObject` | `GrantOnSchemaObject` | Schema object, or all/future schema objects of a type |
 
 > ⚠️ **Grant Immutability:** All spec fields are immutable after creation. Changing any field requires deleting and recreating the CR (or using the `force-new` annotation).
 
 </details>
 
 <details>
-<summary>🔑 <strong>DatabaseRoleGrant</strong></summary>
+<summary>🔑 <strong>GrantPrivilegesToDatabaseRole</strong></summary>
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `spec.privilege` | `string` | Snowflake privilege (e.g. USAGE, SELECT) *(immutable)* |
-| `spec.on` | `GrantOn` | Grant target — exactly one of `account`, `accountObject`, `schema`, `schemaObject` *(immutable)* |
+| `spec.privilege` | `string` | Snowflake privilege (e.g. USAGE, SELECT) *(immutable, mutually exclusive with allPrivileges)* |
+| `spec.allPrivileges` | `bool` | Grant all privileges on the target *(immutable, mutually exclusive with privilege)* |
+| `spec.on` | `GrantPrivilegesToDatabaseRoleOn` | Grant target — exactly one of `database`, `schema`, `schemaObject` *(immutable)* |
 | `spec.databaseRole` | `string` | Fully qualified database role name *(immutable, mutually exclusive with databaseRoleRef)* |
 | `spec.databaseRoleRef` | `ObjectReference` | DatabaseRole CR reference *(immutable, mutually exclusive with databaseRole)* |
 | `spec.withGrantOption` | `bool` | Allow grantee to re-grant *(immutable)* |
+
+**GrantPrivilegesToDatabaseRoleOn** — exactly one field must be set:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `database` | `*string` | Grant on the database itself (`ON DATABASE <name>`) |
+| `schema` | `GrantOnSchema` | Schema or all/future schemas |
+| `schemaObject` | `GrantOnSchemaObject` | Schema object, or all/future schema objects |
 
 > ⚠️ **Grant Immutability:** All spec fields are immutable after creation. Changing any field requires deleting and recreating the CR (or using the `force-new` annotation).
 
@@ -237,16 +297,27 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 </details>
 
 <details>
-<summary>🔑 <strong>ShareGrant</strong></summary>
+<summary>🔑 <strong>GrantPrivilegesToShare</strong></summary>
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `spec.privilege` | `string` | Snowflake privilege (e.g. USAGE, SELECT) *(immutable)* |
-| `spec.objectType` | `string` | Object type (e.g. DATABASE, SCHEMA, TABLE, VIEW) *(immutable)* |
-| `spec.objectName` | `string` | Fully qualified object name *(immutable)* |
-| `spec.share` | `string` | Share name *(immutable)* |
+| `spec.privilege` | `string` | Snowflake privilege (USAGE, SELECT, REFERENCE_USAGE, READ, EVOLVE SCHEMA) *(immutable, required)* |
+| `spec.on` | `GrantPrivilegesToShareOn` | Grant target — exactly one field must be set *(immutable)* |
+| `spec.share` | `string` | Share name *(immutable, required)* |
 
-> ⚠️ **Grant Immutability:** All spec fields are immutable after creation. Shares do not support WITH GRANT OPTION.
+**GrantPrivilegesToShareOn** — exactly one field must be set:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `database` | `*string` | Grant on a database (`ON DATABASE <name>`) |
+| `schema` | `*string` | Grant on a schema (`ON SCHEMA <fqn>`) |
+| `table` | `*string` | Grant on a table (`ON TABLE <fqn>`) |
+| `allTablesInSchema` | `*string` | Grant on all tables in a schema (`ON ALL TABLES IN SCHEMA <fqn>`) |
+| `functionName` | `*string` | Grant on a function (`ON FUNCTION <fqn>`) |
+| `tag` | `*string` | Grant on a tag (`ON TAG <fqn>`) |
+| `view` | `*string` | Grant on a view (`ON VIEW <fqn>`) |
+
+> ⚠️ **Grant Immutability:** All spec fields are immutable after creation. Shares do not support `allPrivileges` or `withGrantOption`.
 
 </details>
 
@@ -339,6 +410,32 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 > 📤 **Cross-Resource Data Passing:** FieldExport reads status fields and writes them to ConfigMaps/Secrets. The exported value is tracked by SHA-256 hash to avoid unnecessary writes. On deletion, exported keys are cleaned up.
 >
 > 🔒 **Same-Namespace Security:** FieldExport is restricted to resources in the same namespace — the source resource, target ConfigMap/Secret, and the FieldExport itself must all reside in the same namespace. This prevents cross-namespace privilege escalation (following the ACK model).
+
+</details>
+
+<details>
+<summary>🔧 <strong>SQLStatement</strong> (shortName: <code>sqlstmt</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.execute` | `string` | **Required.** SQL to run on create (multi-statement supported via `;`) |
+| `spec.revert` | `string` | SQL to run on delete (optional, multi-statement) |
+| `spec.observe` | `string` | SQL to run periodically to check state (optional) |
+| `spec.observeExpect` | `[]object` | Column/value pairs the observe query must match |
+| `spec.observeExpect[].column` | `string` | Column name (case-insensitive match) |
+| `spec.observeExpect[].value` | `string` | Expected value (case-insensitive match) |
+| `spec.idempotent` | `bool` | Informational: indicates whether execute SQL is safe to run multiple times (default false) |
+| `spec.dangerousAllowDestructive` | `bool` | Required when `execute` contains DROP/TRUNCATE/DELETE/REMOVE (revert is exempt) |
+| `spec.useRole` | `string` | Snowflake role to USE before execution *(immutable)* |
+| `status.executeHash` | `string` | SHA-256 hash of the execute SQL at creation time |
+| `status.observeResult.rowCount` | `int32` | Number of rows from last observe query |
+| `status.observeResult.matched` | `bool` | Whether all expectations were satisfied |
+
+> 🔧 **Escape-Hatch Resource:** SQLStatement executes arbitrary SQL that doesn't map to any first-class Snowflake CRD. Typical use cases: GRANT statements, ALTER ACCOUNT, session parameters, or any DDL/DML not yet supported by a dedicated resource type.
+>
+> 🔒 **Safety Guards:** `spec.execute` is immutable after creation — changing it requires the `force-new` annotation. Destructive keywords (DROP, TRUNCATE, DELETE, REMOVE) are blocked unless `dangerousAllowDestructive` is explicitly set. The controller is disabled by default (`--enable-sql-statement=false`).
+>
+> 📡 **Observe & Drift:** When `observe` SQL is provided, the controller runs it periodically and checks expectations. A mismatch sets the `DriftDetected` condition. Without observe SQL, the resource reports as "not yet observable" and relies on hash tracking.
 
 </details>
 
@@ -558,6 +655,28 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 </details>
 
 <details>
+<summary>🔌 <strong>APIIntegration</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | API integration name *(immutable)* |
+| `spec.apiProvider` | `enum` | Cloud API provider *(immutable)*: `aws_api_gateway` / `aws_private_api_gateway` / `aws_gov_api_gateway` / `aws_gov_private_api_gateway` / `azure_api_management` / `google_api_gateway` / `git_https_api` |
+| `spec.enabled` | `*bool` | Whether the integration is active *(default: true)* |
+| `spec.apiAllowedPrefixes` | `[]string` | URL prefixes the integration can access *(min 1)* |
+| `spec.apiBlockedPrefixes` | `[]string` | URL prefixes explicitly denied access |
+| `spec.apiAwsRoleArn` | `*string` | IAM role ARN Snowflake assumes for AWS API Gateway |
+| `spec.azureTenantId` | `*string` | Azure AD tenant ID *(required for azure_api_management, immutable)* |
+| `spec.azureAdApplicationId` | `*string` | Azure AD application ID *(required for azure_api_management)* |
+| `spec.googleAudience` | `*string` | Google audience for API Gateway *(required for google_api_gateway, immutable)* |
+| `spec.apiKey` | `*string` | API key for authentication |
+| `spec.comment` | `*string` | Optional description |
+| `status.describeOutput` | `map[string]string` | Key-value pairs from DESCRIBE INTEGRATION |
+
+> 🔌 **External APIs:** API integrations allow Snowflake external functions and services to securely call cloud APIs (AWS API Gateway, Azure API Management, Google API Gateway). Use `status.describeOutput` to retrieve Snowflake-generated values like `API_AWS_IAM_USER_ARN` for IAM trust policy configuration.
+
+</details>
+
+<details>
 <summary>�📄 <strong>FileFormat</strong></summary>
 
 | Field | Type | Description |
@@ -681,8 +800,10 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | Field | Type | Description |
 |-------|------|-------------|
 | `spec.name` | `string` | Authentication policy name *(immutable)* |
-| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
-| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, mutually exclusive with databaseName)* |
+| `spec.databaseName` | `*string` | Snowflake database identifier *(immutable, mutually exclusive with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, mutually exclusive with schemaName)* |
+| `spec.schemaName` | `*string` | Snowflake schema identifier *(immutable, mutually exclusive with schemaRef)* |
 | `spec.authenticationMethods` | `[]string` | Allowed authentication methods (e.g. `PASSWORD`, `SAML`, `OAUTH`, `KEYPAIR`, `PROGRAMMATIC_ACCESS_TOKEN`, `WORKLOAD_IDENTITY`) |
 | `spec.clientTypes` | `[]string` | Allowed client types (e.g. `SNOWFLAKE_UI`, `DRIVERS`, `SNOWFLAKE_CLI`, `SNOWSQL`) |
 | `spec.securityIntegrations` | `[]string` | Security integration names allowed with this policy |

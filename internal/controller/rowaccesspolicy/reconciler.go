@@ -3,14 +3,20 @@ package rowaccesspolicy
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	sigs "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/tracked"
@@ -35,44 +41,162 @@ type Service interface {
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
 // NewReconciler returns a new RowAccessPolicy reconciler backed by the generic framework.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.RowAccessPolicy, Service, *snowflake.RowAccessPolicyObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.RowAccessPolicy, Service, *snowflake.RowAccessPolicyObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+func NewReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.RowAccessPolicy, Service, *snowflake.RowAccessPolicyObservation] {
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewRowAccessPolicyClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
 // supply a custom ServiceFactory for testing.
 func NewReconcilerWithServiceFactory(
-	c client.Client,
+	c sigs.Client,
 	factory *clientfactory.ClientFactory,
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.RowAccessPolicy, Service, *snowflake.RowAccessPolicyObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.RowAccessPolicy, Service, *snowflake.RowAccessPolicyObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, recorder, sf))
+}
+
+// newAdapter creates the BaseAdapter for RowAccessPolicy resources.
+func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.RowAccessPolicy, Service, *snowflake.RowAccessPolicyObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.RowAccessPolicy, Service, *snowflake.RowAccessPolicyObservation]{
+		ResourceNameVal:  "rowaccesspolicy",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.RowAccessPolicy { return &snowplanev1alpha1.RowAccessPolicy{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(rap *snowplanev1alpha1.RowAccessPolicy) (reconciler.Identifier, error) {
+			dbName := snowflake.ParseDatabaseNameFromFQN(rap.Status.DatabaseName)
+			schemaName := snowflake.ParseSchemaNameFromFQN(rap.Status.SchemaName)
+			return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, rap.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) (*snowflake.RowAccessPolicyObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.RowAccessPolicyObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.RowAccessPolicy, id snowflake.SchemaObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterRowAccessPolicyOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.RowAccessPolicy, id snowflake.SchemaObjectIdentifier, obs *reconciler.Observation[*snowflake.RowAccessPolicyObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.RowAccessPolicy, obs *reconciler.Observation[*snowflake.RowAccessPolicyObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.RowAccessPolicy, obs *reconciler.Observation[*snowflake.RowAccessPolicyObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		SupportsCoA: true,
+		PreReconcileFn: func(ctx context.Context, rap *snowplanev1alpha1.RowAccessPolicy) error {
+			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, rap,
+				rap.Namespace, rap.Spec.DatabaseRef, rap.Spec.DatabaseName, rap.Status.DatabaseName)
+			if err != nil {
+				return err
+			}
+
+			rap.Status.DatabaseName = dbFQN
+
+			schemaFQN, err := refresolver.PreReconcileSchemaRef(ctx, c, recorder, rap,
+				rap.Namespace, rap.Spec.SchemaRef, rap.Spec.SchemaName, rap.Status.SchemaName)
+			if err != nil {
+				return err
+			}
+
+			rap.Status.SchemaName = schemaFQN
+
+			refresolver.SetDatabaseAndSchemaResolvedCondition(rap, rap.Spec.DatabaseRef, rap.Spec.DatabaseName, rap.Spec.SchemaRef, rap.Spec.SchemaName)
+
+			return nil
+		},
+		SetupWatchesFn: func(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.RowAccessPolicy{},
+				".spec.databaseRef.name",
+				func(o sigs.Object) []string {
+					rap, ok := o.(*snowplanev1alpha1.RowAccessPolicy)
+					if !ok || rap.Spec.DatabaseRef == nil {
+						return nil
+					}
+
+					return []string{rap.Spec.DatabaseRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.databaseRef.name: %w", err)
+			}
+
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.RowAccessPolicy{},
+				".spec.schemaRef.name",
+				func(o sigs.Object) []string {
+					rap, ok := o.(*snowplanev1alpha1.RowAccessPolicy)
+					if !ok || rap.Spec.SchemaRef == nil {
+						return nil
+					}
+
+					return []string{rap.Spec.SchemaRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.schemaRef.name: %w", err)
+			}
+
+			bldr.Watches(
+				&snowplanev1alpha1.Database{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.RowAccessPolicyList{} }, ".spec.databaseRef.name", "listing row access policies for database watch")),
+			)
+
+			bldr.Watches(
+				&snowplanev1alpha1.Schema{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.RowAccessPolicyList{} }, ".spec.schemaRef.name", "listing row access policies for schema watch")),
+			)
+
+			return nil
+		},
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+func validateImmutableFields(_ context.Context, rap *snowplanev1alpha1.RowAccessPolicy) error {
+	if reconciler.ShouldSkipImmutableValidation(rap) {
+		return nil
 	}
 
-	return snowflake.NewRowAccessPolicyClient(sfC), cleanup, nil
+	if rap.Status.ShowOutput != nil {
+		if rap.Status.ShowOutput.Name != "" && !strings.EqualFold(rap.Spec.Name, rap.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", rap.Status.ShowOutput.Name, rap.Spec.Name)
+		}
+
+		if rap.Status.ShowOutput.DatabaseName != "" && rap.Status.DatabaseName != "" {
+			resolvedDB := snowflake.ParseDatabaseNameFromFQN(rap.Status.DatabaseName)
+			if !strings.EqualFold(resolvedDB, rap.Status.ShowOutput.DatabaseName) {
+				return fmt.Errorf("spec.databaseRef is immutable after creation (current database: %q, resolved: %q)", rap.Status.ShowOutput.DatabaseName, resolvedDB)
+			}
+		}
+
+		if rap.Status.ShowOutput.SchemaName != "" && rap.Status.SchemaName != "" {
+			resolvedSchema := snowflake.ParseSchemaNameFromFQN(rap.Status.SchemaName)
+			if !strings.EqualFold(resolvedSchema, rap.Status.ShowOutput.SchemaName) {
+				return fmt.Errorf("spec.schemaRef is immutable after creation (current schema: %q, resolved: %q)", rap.Status.ShowOutput.SchemaName, resolvedSchema)
+			}
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(rap *snowplanev1alpha1.RowAccessPolicy, obs *snowflake.RowAccessPolicyObservation) {
@@ -83,15 +207,7 @@ func applyObservation(rap *snowplanev1alpha1.RowAccessPolicy, obs *snowflake.Row
 			obs.ShowOutput.Name,
 		).FullyQualifiedName()
 
-		rap.Status.ShowOutput = &snowplanev1alpha1.RowAccessPolicyShowOutput{
-			CreatedOn:    obs.ShowOutput.CreatedOn,
-			Name:         obs.ShowOutput.Name,
-			DatabaseName: obs.ShowOutput.DatabaseName,
-			SchemaName:   obs.ShowOutput.SchemaName,
-			Kind:         obs.ShowOutput.Kind,
-			Owner:        obs.ShowOutput.Owner,
-			Comment:      obs.ShowOutput.Comment,
-		}
+		rap.Status.ShowOutput = obs.ShowOutput
 	}
 }
 

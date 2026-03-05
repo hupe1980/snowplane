@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -97,7 +96,7 @@ func newTestSecurityIntegration(name, namespace string) *snowplanev1alpha1.Secur
 func successfulObservation() *snowflake.SecurityIntegrationObservation {
 	return &snowflake.SecurityIntegrationObservation{
 		Exists: true,
-		ShowOutput: &snowflake.SecurityIntegrationShowOutput{
+		ShowOutput: &snowplanev1alpha1.SecurityIntegrationShowOutput{
 			CreatedOn: "2024-01-01",
 			Name:      "MY_SCIM",
 			Type:      "SCIM - AZURE",
@@ -121,21 +120,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.SecurityIntegration, Service, *snowflake.SecurityIntegrationObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client: c,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("SecurityIntegration"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("SecurityIntegration")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -425,7 +420,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.SecurityIntegrationObservation{
-		ShowOutput: &snowflake.SecurityIntegrationShowOutput{
+		ShowOutput: &snowplanev1alpha1.SecurityIntegrationShowOutput{
 			Name: "MY_SCIM",
 		},
 	}
@@ -445,7 +440,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.SecurityIntegrationObservation{
-		ShowOutput: &snowflake.SecurityIntegrationShowOutput{
+		ShowOutput: &snowplanev1alpha1.SecurityIntegrationShowOutput{
 			Name:    "MY_SCIM",
 			Comment: "drifted",
 		},

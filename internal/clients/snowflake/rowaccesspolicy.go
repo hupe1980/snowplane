@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,18 +17,7 @@ type RowAccessPolicyObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW ROW ACCESS POLICIES row.
-	ShowOutput *RowAccessPolicyShowOutput
-}
-
-// RowAccessPolicyShowOutput contains the fields from SHOW ROW ACCESS POLICIES.
-type RowAccessPolicyShowOutput struct {
-	CreatedOn    string
-	Name         string
-	DatabaseName string
-	SchemaName   string
-	Kind         string
-	Owner        string
-	Comment      string
+	ShowOutput *v1alpha1.RowAccessPolicyShowOutput
 }
 
 // RowAccessPolicyArgument defines an argument in the row access policy signature.
@@ -232,7 +222,7 @@ func buildShowRowAccessPolicyByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW ROW ACCESS POLICIES for a specific policy.
-func (rap *RowAccessPolicyClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*RowAccessPolicyShowOutput, error) {
+func (rap *RowAccessPolicyClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.RowAccessPolicyShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("row access policy name is required"))
 	}
@@ -264,9 +254,9 @@ func (rap *RowAccessPolicyClient) Observe(ctx context.Context, name SchemaObject
 }
 
 // scanRowAccessPolicyShowOutput scans SHOW ROW ACCESS POLICIES results for a matching row.
-func scanRowAccessPolicyShowOutput(rows *sql.Rows, name string) (*RowAccessPolicyShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*RowAccessPolicyShowOutput, error) {
-		return &RowAccessPolicyShowOutput{
+func scanRowAccessPolicyShowOutput(rows *sql.Rows, name string) (*v1alpha1.RowAccessPolicyShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.RowAccessPolicyShowOutput, error) {
+		return &v1alpha1.RowAccessPolicyShowOutput{
 			CreatedOn:    m["created_on"],
 			Name:         m["name"],
 			DatabaseName: m["database_name"],

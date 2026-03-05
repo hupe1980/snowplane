@@ -1,0 +1,15 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: GrantPrivilegesToAccountRole
+metadata:
+  name: future-select-on-tables
+  namespace: default
+spec:
+  privilege: SELECT
+  on:
+    schemaObject:
+      future:
+        objectTypePlural: TABLES
+        inSchema: '"MY_DB"."PUBLIC"'
+  accountRole: ANALYST
+  providerRef:
+    name: default

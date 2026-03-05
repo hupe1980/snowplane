@@ -629,7 +629,8 @@ func TestReconcile_EmptyPath_TerminalError(t *testing.T) {
 
 	cond := conditions.Get(&updated, snowplanev1alpha1.TypeReady)
 	require.NotNil(t, cond)
-	assert.Equal(t, snowplanev1alpha1.ReasonTerminalError, cond.Reason)
+	// Path "." fails validation (must start with ".status."), surfacing as ValidationFailed.
+	assert.Equal(t, snowplanev1alpha1.ReasonValidationFailed, cond.Reason)
 }
 
 func TestReconcile_ExportsToSecretUpdatesExisting(t *testing.T) {

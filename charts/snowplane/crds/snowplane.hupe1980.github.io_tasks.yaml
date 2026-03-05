@@ -83,7 +83,14 @@ spec:
                       properties:
                         name:
                           description: Name of the referent.
+                          maxLength: 255
                           minLength: 1
+                          type: string
+                        namespace:
+                          description: |-
+                            Namespace of the referent. Defaults to the namespace of the
+                            referencing resource when omitted, enabling cross-namespace
+                            references in platform/project-team enterprise topologies.
                           type: string
                       required:
                       - name
@@ -117,7 +124,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -135,6 +149,7 @@ spec:
                 description: |-
                   ErrorIntegrationName is the Snowflake notification integration identifier for error notifications.
                   Mutually exclusive with ErrorIntegrationRef.
+                maxLength: 255
                 minLength: 1
                 type: string
               errorIntegrationRef:
@@ -144,7 +159,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -163,7 +185,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -231,6 +260,7 @@ spec:
                   name:
                     default: default
                     description: Name of the ProviderConfig to use.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   namespace:
@@ -259,7 +289,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -290,12 +327,14 @@ spec:
                 type: string
               sqlStatement:
                 description: SQLStatement is the SQL code executed when the task runs.
+                maxLength: 255
                 minLength: 1
                 type: string
               successIntegrationName:
                 description: |-
                   SuccessIntegrationName is the Snowflake notification integration identifier for success notifications.
                   Mutually exclusive with SuccessIntegrationRef.
+                maxLength: 255
                 minLength: 1
                 type: string
               successIntegrationRef:
@@ -305,7 +344,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -343,6 +389,7 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                maxLength: 255
                 minLength: 1
                 type: string
               userTaskManagedInitialWarehouseSize:
@@ -386,7 +433,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -562,6 +616,13 @@ spec:
                   comparing ObservedGeneration vs Generation because metadata-only
                   changes (labels, annotations) increment Generation without changing
                   the spec.
+                type: string
+              lastReconcileTime:
+                description: |-
+                  LastReconcileTime is the timestamp of the most recent successful
+                  reconciliation. Useful for SLO monitoring and diagnosing whether
+                  reconciliation is running for a specific resource.
+                format: date-time
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent metadata.generation

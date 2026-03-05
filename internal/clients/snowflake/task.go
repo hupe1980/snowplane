@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,29 +17,10 @@ type TaskObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW TASKS row.
-	ShowOutput *TaskShowOutput
+	ShowOutput *v1alpha1.TaskShowOutput
 
 	// Parameters contains the task-level parameters from SHOW PARAMETERS IN TASK.
 	Parameters *TaskParameters
-}
-
-// TaskShowOutput contains the fields from SHOW TASKS.
-type TaskShowOutput struct {
-	CreatedOn                 string
-	Name                      string
-	DatabaseName              string
-	SchemaName                string
-	Owner                     string
-	Comment                   string
-	Warehouse                 string
-	Schedule                  string
-	State                     string // started, suspended
-	Definition                string
-	Condition                 string
-	Predecessors              string
-	ErrorIntegration          string
-	AllowOverlappingExecution bool
-	Config                    string
 }
 
 // TaskParameters contains relevant task parameters from SHOW PARAMETERS IN TASK.
@@ -457,7 +439,7 @@ func buildShowTaskByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW TASKS for a specific task name within a schema.
-func (t *TaskClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*TaskShowOutput, error) {
+func (t *TaskClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.TaskShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("task name is required"))
 	}
@@ -495,9 +477,9 @@ func (t *TaskClient) Observe(ctx context.Context, name SchemaObjectIdentifier) (
 }
 
 // scanTaskShowOutput scans SHOW TASKS results for a matching row.
-func scanTaskShowOutput(rows *sql.Rows, name string) (*TaskShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*TaskShowOutput, error) {
-		return &TaskShowOutput{
+func scanTaskShowOutput(rows *sql.Rows, name string) (*v1alpha1.TaskShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.TaskShowOutput, error) {
+		return &v1alpha1.TaskShowOutput{
 			CreatedOn:                 m["created_on"],
 			Name:                      m["name"],
 			DatabaseName:              m["database_name"],

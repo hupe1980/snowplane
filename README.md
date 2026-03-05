@@ -22,13 +22,13 @@
 |----------|-----------|
 | 🗄️ **Core Infrastructure** | Database, Schema, Warehouse |
 | 📊 **Data Objects** | Table, TableConstraint, View, MaterializedView, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, ExternalTable, FileFormat, Pipe, Sequence |
-| 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
+| 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, GrantPrivilegesToAccountRole, GrantPrivilegesToDatabaseRole, AccountRoleAssignment, DatabaseRoleAssignment, GrantPrivilegesToShare, GrantOwnership |
 | ⏰ **Orchestration** | Task (DAG scheduling, serverless or warehouse-backed), Alert (condition-based monitoring & notification) |
 | 🔧 **Programmability** | ProcedureSQL, ProcedureJavascript, ProcedurePython, ProcedureJava, ProcedureScala, FunctionSQL, FunctionJavascript, FunctionPython, FunctionJava, FunctionScala |
-| 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration, APIAuthenticationIntegrationWithAuthorizationCodeGrant, APIAuthenticationIntegrationWithClientCredentials, APIAuthenticationIntegrationWithJWTBearer |
+| 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration, APIIntegration, APIAuthenticationIntegrationWithAuthorizationCodeGrant, APIAuthenticationIntegrationWithClientCredentials, APIAuthenticationIntegrationWithJWTBearer |
 | 🔒 **Secrets** | SecretWithAuthorizationCodeGrant, SecretWithBasicAuthentication, SecretWithClientCredentials, SecretWithGenericString |
 | 🛡️ **Security & Governance** | NetworkPolicy, NetworkPolicyAttachment, NetworkRule, AuthenticationPolicy, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
-| 📤 **Utilities** | FieldExport (copy status fields into ConfigMaps/Secrets), ProviderConfig |
+| 📤 **Utilities** | FieldExport (copy status fields into ConfigMaps/Secrets), SQLStatement (escape-hatch for arbitrary SQL), ProviderConfig |
 
 Every resource supports full lifecycle management (create, alter, drop), drift detection, adoption of pre-existing objects, and deletion policies. See the [API Reference](#-api-reference) below for detailed field documentation.
 
@@ -199,7 +199,7 @@ kubectl get databases
 | `--account-rate-limit-burst` | `100` | Max burst size for per-account aggregate rate limiter |
 | `--requeue-interval` | `5m` | Drift detection re-observe interval |
 | `--enable-alpha-resources` | `true` | Enable alpha-maturity controllers |
-| `--disable-controllers` | `""` | Comma-separated controllers to disable (e.g. `accountrolegrant,stage,view`) |
+| `--disable-controllers` | `""` | Comma-separated controllers to disable (e.g. `grantprivilegestoaccountrole,stage,view`) |
 | `--circuit-breaker-threshold` | `5` | Consecutive Snowflake failures before circuit opens |
 | `--circuit-breaker-reset-timeout` | `60s` | Backoff duration before half-open probe |
 | `--allowed-roles` | `""` | Comma-separated allowlist of Snowflake roles permitted in ProviderConfig (case-insensitive; empty = all allowed) |
@@ -294,16 +294,16 @@ All metrics use the `snowplane_` namespace.
 | `snowplane_ownership_conflicts_total` | Counter | `controller` | Ownership conflicts during adoption |
 | `snowplane_adoption_total` | Counter | `controller`, `result` | Adoption outcomes |
 | `snowplane_drift_detected_total` | Counter | `controller` | Drift detection events |
-| `snowplane_managed_resources` | Gauge | `controller`, `state` | Resources by state (`ready`/`not_ready`/`terminal`) |
 | `snowplane_account_rate_limit_waits_total` | Counter | `provider` | Per-account aggregate rate limiter wait events |
 | `snowplane_circuit_breaker_trips_total` | Counter | `provider` | Circuit breaker trips |
 | `snowplane_circuit_breaker_state` | Gauge | `provider` | Breaker state (0=closed, 1=open, 2=half-open) |
-| `snowplane_db_max_open_conns` | Gauge | `provider` | Max open DB connections per provider |
-| `snowplane_db_open_conns` | Gauge | `provider` | Current open DB connections per provider |
-| `snowplane_db_in_use_conns` | Gauge | `provider` | In-use DB connections per provider |
-| `snowplane_db_idle_conns` | Gauge | `provider` | Idle DB connections per provider |
-| `snowplane_db_wait_count` | Gauge | `provider` | Total DB connection wait count per provider |
-| `snowplane_db_wait_duration_seconds` | Gauge | `provider` | Total DB connection wait duration per provider |
+| `snowplane_providerconfig_healthy` | Gauge | `provider`, `account` | 1=connected, 0=unhealthy |
+| `snowplane_db_max_open_connections` | Gauge | `provider` | Max open DB connections per provider |
+| `snowplane_db_open_connections` | Gauge | `provider` | Current open DB connections per provider |
+| `snowplane_db_in_use_connections` | Gauge | `provider` | In-use DB connections per provider |
+| `snowplane_db_idle_connections` | Gauge | `provider` | Idle DB connections per provider |
+| `snowplane_db_wait_count_total` | Gauge | `provider` | Total DB connection wait count per provider |
+| `snowplane_db_wait_duration_seconds_total` | Gauge | `provider` | Total DB connection wait duration per provider |
 
 ### 📉 Grafana Dashboard
 
@@ -323,14 +323,14 @@ Complete field-level documentation for all Snowplane CRDs is available in the **
 | Category | Resources |
 |----------|-----------|
 | 🔌 **Provider** | ProviderConfig |
-| 🗄️ **Core Infrastructure** | Database, Schema, Warehouse |
+| 🗄️ **Core Infrastructure** | Database, SecondaryDatabase, SharedDatabase, Schema, Warehouse |
 | 📊 **Data Objects** | Table, View, MaterializedView, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe, Sequence, ExternalTable |
-| 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
+| 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, GrantPrivilegesToAccountRole, GrantPrivilegesToDatabaseRole, AccountRoleAssignment, DatabaseRoleAssignment, GrantPrivilegesToShare, GrantOwnership |
 | ⏰ **Orchestration** | Task, Alert |
-| 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
+| 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration, APIIntegration |
 | 🛡️ **Security & Governance** | AuthenticationPolicy, NetworkPolicy, NetworkPolicyAttachment, NetworkRule, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
 | 🔧 **Programmability** | ProcedureSQL, ProcedureJavascript, ProcedurePython, ProcedureJava, ProcedureScala, FunctionSQL, FunctionJavascript, FunctionPython, FunctionJava, FunctionScala |
-| �📤 **Utilities** | FieldExport |
+| 📤 **Utilities** | FieldExport, SQLStatement |
 
 ## 🔍 Drift Detection
 
@@ -401,9 +401,9 @@ kubectl apply -f manifests.yaml
 | `snowflake_user` | User |
 | `snowflake_account_role` / `snowflake_role` | AccountRole |
 | `snowflake_database_role` | DatabaseRole |
-| `snowflake_grant_privileges_to_account_role` | AccountRoleGrant |
-| `snowflake_grant_privileges_to_database_role` | DatabaseRoleGrant |
-| `snowflake_grant_privileges_to_share` | ShareGrant |
+| `snowflake_grant_privileges_to_account_role` | GrantPrivilegesToAccountRole |
+| `snowflake_grant_privileges_to_database_role` | GrantPrivilegesToDatabaseRole |
+| `snowflake_grant_privileges_to_share` | GrantPrivilegesToShare |
 | `snowflake_table` | Table |
 | `snowflake_view` | View |
 | `snowflake_materialized_view` | MaterializedView |

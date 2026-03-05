@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -15,26 +16,14 @@ type SchemaObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW SCHEMAS row.
-	ShowOutput *SchemaShowOutput
+	ShowOutput *v1alpha1.SchemaShowOutput
 
 	// Parameters contains the schema-level parameters from SHOW PARAMETERS.
 	Parameters *SchemaParameters
 }
 
-// SchemaShowOutput contains the fields from SHOW SCHEMAS.
-type SchemaShowOutput struct {
-	CreatedOn     string
-	Name          string
-	DatabaseName  string
-	Kind          string // STANDARD or TRANSIENT
-	Comment       string
-	Owner         string
-	RetentionTime int32
-	Options       string // Contains "MANAGED ACCESS" if managed access is enabled
-}
-
 // IsManagedAccess returns true if the schema has managed access enabled.
-func (o *SchemaShowOutput) IsManagedAccess() bool {
+func IsManagedAccess(o *v1alpha1.SchemaShowOutput) bool {
 	return strings.Contains(o.Options, "MANAGED ACCESS")
 }
 
@@ -302,7 +291,7 @@ func buildShowSchemaByIDSQL(name DatabaseObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW SCHEMAS for a specific schema name within a database.
-func (s *SchemaClient) ShowByID(ctx context.Context, name DatabaseObjectIdentifier) (*SchemaShowOutput, error) {
+func (s *SchemaClient) ShowByID(ctx context.Context, name DatabaseObjectIdentifier) (*v1alpha1.SchemaShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("schema name is required"))
 	}
@@ -360,11 +349,11 @@ func (s *SchemaClient) Observe(ctx context.Context, name DatabaseObjectIdentifie
 }
 
 // scanSchemaShowOutput scans SHOW SCHEMAS results for a matching row.
-func scanSchemaShowOutput(rows *sql.Rows, name string) (*SchemaShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*SchemaShowOutput, error) {
+func scanSchemaShowOutput(rows *sql.Rows, name string) (*v1alpha1.SchemaShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.SchemaShowOutput, error) {
 		rt, _ := parseInt32(m["retention_time"])
 
-		return &SchemaShowOutput{
+		return &v1alpha1.SchemaShowOutput{
 			CreatedOn:     m["created_on"],
 			Name:          m["name"],
 			DatabaseName:  m["database_name"],

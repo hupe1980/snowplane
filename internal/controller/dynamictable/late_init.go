@@ -6,12 +6,12 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 )
 
-// LateInitialize fills nil spec fields from the observed Snowflake state.
+// lateInitialize fills nil spec fields from the observed Snowflake state.
 // Only called during adoption (adoptionPolicy=adopt, first reconcile).
 // Ref fields (WarehouseRef, DatabaseRef, SchemaRef) are excluded.
 // RefreshMode and Initialize are set-at-create but still useful for adoption
 // so the spec faithfully represents the adopted resource.
-func (a *adapter) LateInitialize(obj *snowplanev1alpha1.DynamicTable, obs *reconciler.Observation[*snowflake.DynamicTableObservation]) bool {
+func lateInitialize(obj *snowplanev1alpha1.DynamicTable, obs *reconciler.Observation[*snowflake.DynamicTableObservation]) bool {
 	detail := obs.Detail
 	if detail == nil || detail.ShowOutput == nil {
 		return false
@@ -38,4 +38,4 @@ func (a *adapter) LateInitialize(obj *snowplanev1alpha1.DynamicTable, obs *recon
 	return modified
 }
 
-var _ reconciler.LateInitializer[*snowplanev1alpha1.DynamicTable, *snowflake.DynamicTableObservation] = (*adapter)(nil)
+var _ reconciler.LateInitializer[*snowplanev1alpha1.DynamicTable, *snowflake.DynamicTableObservation] = (*reconciler.BaseAdapter[*snowplanev1alpha1.DynamicTable, Service, *snowflake.DynamicTableObservation])(nil)

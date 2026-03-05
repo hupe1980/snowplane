@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,18 +17,7 @@ type FileFormatObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW FILE FORMATS row.
-	ShowOutput *FileFormatShowOutput
-}
-
-// FileFormatShowOutput contains the fields from SHOW FILE FORMATS.
-type FileFormatShowOutput struct {
-	CreatedOn    string
-	Name         string
-	DatabaseName string
-	SchemaName   string
-	Owner        string
-	Comment      string
-	Type         string
+	ShowOutput *v1alpha1.FileFormatShowOutput
 }
 
 // CreateFileFormatOptions holds the parameters for creating a file format.
@@ -357,7 +347,7 @@ func (ff *FileFormatClient) Drop(ctx context.Context, name SchemaObjectIdentifie
 }
 
 // ShowByID queries SHOW FILE FORMATS for a specific file format.
-func (ff *FileFormatClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*FileFormatShowOutput, error) {
+func (ff *FileFormatClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.FileFormatShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("file format name is required"))
 	}
@@ -392,9 +382,9 @@ func (ff *FileFormatClient) Observe(ctx context.Context, name SchemaObjectIdenti
 }
 
 // scanFileFormatShowOutput scans SHOW FILE FORMATS results for a matching row.
-func scanFileFormatShowOutput(rows *sql.Rows, name string) (*FileFormatShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*FileFormatShowOutput, error) {
-		return &FileFormatShowOutput{
+func scanFileFormatShowOutput(rows *sql.Rows, name string) (*v1alpha1.FileFormatShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.FileFormatShowOutput, error) {
+		return &v1alpha1.FileFormatShowOutput{
 			CreatedOn:    m["created_on"],
 			Name:         m["name"],
 			DatabaseName: m["database_name"],

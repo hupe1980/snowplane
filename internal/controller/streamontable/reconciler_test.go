@@ -91,7 +91,7 @@ func newTestStreamOnTable(name, namespace string) *snowplanev1alpha1.StreamOnTab
 func successfulObservation() *snowflake.StreamObservation {
 	return &snowflake.StreamObservation{
 		Exists: true,
-		ShowOutput: &snowflake.StreamShowOutput{
+		ShowOutput: &snowplanev1alpha1.StreamShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         "MY_STREAM",
 			DatabaseName: "MY_DB",
@@ -115,22 +115,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.StreamOnTable, Service, *snowflake.StreamObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("StreamOnTable"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("StreamOnTable")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -480,7 +475,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.StreamObservation{
-		ShowOutput: &snowflake.StreamShowOutput{
+		ShowOutput: &snowplanev1alpha1.StreamShowOutput{
 			Name:         "MY_STREAM",
 			DatabaseName: "MY_DB",
 			SchemaName:   "MY_SCHEMA",
@@ -511,7 +506,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.StreamObservation{
-		ShowOutput: &snowflake.StreamShowOutput{
+		ShowOutput: &snowplanev1alpha1.StreamShowOutput{
 			Name:         "MY_STREAM",
 			DatabaseName: "MY_DB",
 			SchemaName:   "MY_SCHEMA",
@@ -543,7 +538,7 @@ func TestDetectDrift_AppendOnlyMode(t *testing.T) {
 	}
 
 	obs := &snowflake.StreamObservation{
-		ShowOutput: &snowflake.StreamShowOutput{
+		ShowOutput: &snowplanev1alpha1.StreamShowOutput{
 			Name:         "MY_STREAM",
 			DatabaseName: "MY_DB",
 			SchemaName:   "MY_SCHEMA",

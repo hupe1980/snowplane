@@ -83,8 +83,8 @@ func newTestStage(name, namespace string) *snowplanev1alpha1.Stage {
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        "DATA_LOAD",
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "analytics-db"},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: "public-schema"},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "analytics-db"},
+			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: "public-schema"},
 		},
 	}
 }
@@ -126,7 +126,7 @@ func newTestSchema(name, namespace string) *snowplanev1alpha1.Schema {
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        "PUBLIC",
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "analytics-db"},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "analytics-db"},
 		},
 		Status: snowplanev1alpha1.SchemaStatus{
 			CommonStatus: snowplanev1alpha1.CommonStatus{
@@ -144,7 +144,7 @@ func newTestSchema(name, namespace string) *snowplanev1alpha1.Schema {
 func successfulObservation() *snowflake.StageObservation {
 	return &snowflake.StageObservation{
 		Exists: true,
-		ShowOutput: &snowflake.StageShowOutput{
+		ShowOutput: &snowplanev1alpha1.StageShowOutput{
 			CreatedOn:          "2024-01-01",
 			Name:               "DATA_LOAD",
 			DatabaseName:       "ANALYTICS",
@@ -174,22 +174,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Stage, Service, *snowflake.StageObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("Stage"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("Stage")
+
+	return r
 }
 
 func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Stage, Service, *snowflake.StageObservation] {
@@ -223,22 +218,17 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Stage, Service, *snowflake.StageObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("Stage"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("Stage")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -448,7 +438,6 @@ func TestReconcile_DeleteStage(t *testing.T) {
 func TestValidateImmutableFields_NameChanged(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{}
 	stage := newTestStage("mystage", "default")
 	stage.Status.ObservedGeneration = 1
 	stage.Status.ShowOutput = &snowplanev1alpha1.StageShowOutput{
@@ -458,7 +447,7 @@ func TestValidateImmutableFields_NameChanged(t *testing.T) {
 		Type:         "INTERNAL",
 	}
 	stage.Spec.Name = "DIFFERENT_STAGE"
-	err := a.ValidateImmutableFields(context.Background(), stage)
+	err := validateImmutableFields(context.Background(), stage)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.name is immutable")
 }
@@ -466,7 +455,6 @@ func TestValidateImmutableFields_NameChanged(t *testing.T) {
 func TestValidateImmutableFields_TypeChanged(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{}
 	stage := newTestStage("mystage", "default")
 	stage.Status.ObservedGeneration = 1
 	stage.Status.ShowOutput = &snowplanev1alpha1.StageShowOutput{
@@ -477,7 +465,7 @@ func TestValidateImmutableFields_TypeChanged(t *testing.T) {
 	}
 	// Change to external by setting URL.
 	stage.Spec.URL = testutil.Ptr("s3://bucket/path/")
-	err := a.ValidateImmutableFields(context.Background(), stage)
+	err := validateImmutableFields(context.Background(), stage)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot convert between internal and external stage types")
 }
@@ -485,13 +473,12 @@ func TestValidateImmutableFields_TypeChanged(t *testing.T) {
 func TestValidateImmutableFields_ForceNew(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{}
 	stage := newTestStage("mystage", "default")
 	stage.Status.ObservedGeneration = 1
 	stage.Status.ShowOutput = &snowplanev1alpha1.StageShowOutput{Name: "DATA_LOAD", Type: "INTERNAL"}
 	stage.Annotations = map[string]string{snowplanev1alpha1.AnnotationForceNew: "true"}
 	stage.Spec.Name = "DIFFERENT"
-	err := a.ValidateImmutableFields(context.Background(), stage)
+	err := validateImmutableFields(context.Background(), stage)
 	require.NoError(t, err)
 }
 
@@ -551,7 +538,7 @@ func TestDetectDrift_CommentDrift(t *testing.T) {
 
 	obs := &snowflake.StageObservation{
 		Exists: true,
-		ShowOutput: &snowflake.StageShowOutput{
+		ShowOutput: &snowplanev1alpha1.StageShowOutput{
 			Comment: "actual",
 		},
 	}

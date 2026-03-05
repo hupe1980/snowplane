@@ -8,9 +8,9 @@
 //   - snowflake_user            → User
 //   - snowflake_account_role / snowflake_role → AccountRole
 //   - snowflake_database_role   → DatabaseRole
-//   - snowflake_grant_privileges_to_account_role → AccountRoleGrant
-//   - snowflake_grant_privileges_to_database_role → DatabaseRoleGrant
-//   - snowflake_grant_privileges_to_share → ShareGrant
+//   - snowflake_grant_privileges_to_account_role → GrantPrivilegesToAccountRole
+//   - snowflake_grant_privileges_to_database_role → GrantPrivilegesToDatabaseRole
+//   - snowflake_grant_privileges_to_share → GrantPrivilegesToShare
 //   - snowflake_table            → Table
 //   - snowflake_view             → View
 //   - snowflake_stage            → Stage
@@ -372,16 +372,20 @@ func convertDatabaseRole(attrs map[string]any, provider, namespace string) strin
 	return b.String()
 }
 
-func convertAccountRoleGrant(attrs map[string]any, provider, namespace string) string {
-	return convertGrant(attrs, provider, namespace, "AccountRoleGrant", "account_role_name", "accountRole")
+func convertGrantPrivilegesToAccountRole(attrs map[string]any, provider, namespace string) string {
+	return convertGrant(attrs, provider, namespace, "GrantPrivilegesToAccountRole", "account_role_name", "accountRole", buildGrantPrivilegesToAccountRoleOnYAML)
 }
 
-func convertDatabaseRoleGrant(attrs map[string]any, provider, namespace string) string {
-	return convertGrant(attrs, provider, namespace, "DatabaseRoleGrant", "database_role_name", "databaseRole")
+func convertGrantPrivilegesToDatabaseRole(attrs map[string]any, provider, namespace string) string {
+	return convertGrant(attrs, provider, namespace, "GrantPrivilegesToDatabaseRole", "database_role_name", "databaseRole", buildGrantPrivilegesToDatabaseRoleOnYAML)
 }
 
-// convertGrant handles the shared logic for AccountRoleGrant and DatabaseRoleGrant.
-func convertGrant(attrs map[string]any, provider, namespace, kind, roleAttrKey, roleSpecKey string) string {
+// onYAMLBuilder is a function that inspects TF attrs and returns
+// the YAML fragment for the "on:" section plus a short description for naming.
+type onYAMLBuilder func(attrs map[string]any) (string, string)
+
+// convertGrant handles the shared logic for GrantPrivilegesToAccountRole and GrantPrivilegesToDatabaseRole.
+func convertGrant(attrs map[string]any, provider, namespace, kind, roleAttrKey, roleSpecKey string, buildOnYAML onYAMLBuilder) string {
 	// The Terraform provider stores privileges as a list.
 	privileges := sliceAttr(attrs, "privileges")
 	if len(privileges) == 0 {
@@ -401,7 +405,7 @@ func convertGrant(attrs map[string]any, provider, namespace, kind, roleAttrKey, 
 	}
 
 	// Determine the "on" target from nested blocks.
-	onYAML, targetDesc := buildGrantOnYAML(attrs)
+	onYAML, targetDesc := buildOnYAML(attrs)
 	if onYAML == "" {
 		return ""
 	}
@@ -416,7 +420,13 @@ func convertGrant(attrs map[string]any, provider, namespace, kind, roleAttrKey, 
 		fmt.Fprintf(&b, "apiVersion: %s\nkind: %s\nmetadata:\n  name: %s\n  namespace: %s\nspec:\n", apiVersion, kind, crName, namespace)
 		fmt.Fprintf(&b, "  providerRef:\n    name: %s\n", provider)
 		fmt.Fprintf(&b, "  deletionPolicy: Orphan\n")
-		fmt.Fprintf(&b, "  privilege: %s\n", yamlString(priv))
+
+		if priv == "ALL PRIVILEGES" || priv == "ALL" {
+			fmt.Fprintf(&b, "  allPrivileges: true\n")
+		} else {
+			fmt.Fprintf(&b, "  privilege: %s\n", yamlString(priv))
+		}
+
 		fmt.Fprintf(&b, "  %s: %s\n", roleSpecKey, yamlString(roleName))
 		b.WriteString(onYAML)
 
@@ -430,9 +440,10 @@ func convertGrant(attrs map[string]any, provider, namespace, kind, roleAttrKey, 
 	return strings.Join(manifests, "---\n")
 }
 
-// buildGrantOnYAML inspects the Terraform "on_*" nested blocks and returns
+// buildGrantPrivilegesToAccountRoleOnYAML inspects the Terraform "on_*" nested blocks and returns
 // the YAML fragment for the "on:" section plus a short description for naming.
-func buildGrantOnYAML(attrs map[string]any) (string, string) {
+// GrantPrivilegesToAccountRole supports: on_account, on_account_object, on_schema, on_schema_object.
+func buildGrantPrivilegesToAccountRoleOnYAML(attrs map[string]any) (string, string) {
 	// on_account_object { object_type, object_name }
 	if block := firstBlock(attrs, "on_account_object"); block != nil {
 		objType := ""
@@ -509,6 +520,65 @@ func buildGrantOnYAML(attrs map[string]any) (string, string) {
 	return "", ""
 }
 
+// buildGrantPrivilegesToDatabaseRoleOnYAML builds the "on:" YAML for GrantPrivilegesToDatabaseRole.
+// GrantPrivilegesToDatabaseRole supports: on_database, on_schema, on_schema_object (no account-level).
+// Maps TF's on_database to the flat `database:` field in GrantPrivilegesToDatabaseRoleOn.
+func buildGrantPrivilegesToDatabaseRoleOnYAML(attrs map[string]any) (string, string) {
+	// on_database is a simple string attribute in the TF provider for database role grants.
+	if v := stringAttr(attrs, "on_database"); v != nil {
+		yaml := fmt.Sprintf("  on:\n    database: %s\n", yamlString(*v))
+		return yaml, "DATABASE-" + *v
+	}
+
+	// on_schema { schema_name | all_schemas_in_database | future_schemas_in_database }
+	if block := firstBlock(attrs, "on_schema"); block != nil {
+		if v := stringAttr(block, "schema_name"); v != nil {
+			yaml := fmt.Sprintf("  on:\n    schema:\n      schemaName: %s\n", yamlString(*v))
+			return yaml, "schema-" + *v
+		}
+
+		if v := stringAttr(block, "all_schemas_in_database"); v != nil {
+			yaml := fmt.Sprintf("  on:\n    schema:\n      allInDatabase: %s\n", yamlString(*v))
+			return yaml, "all-schemas-" + *v
+		}
+
+		if v := stringAttr(block, "future_schemas_in_database"); v != nil {
+			yaml := fmt.Sprintf("  on:\n    schema:\n      futureInDatabase: %s\n", yamlString(*v))
+			return yaml, "future-schemas-" + *v
+		}
+	}
+
+	// on_schema_object { object_type, object_name } or { all / future }
+	if block := firstBlock(attrs, "on_schema_object"); block != nil {
+		objType := ""
+		objName := ""
+
+		if v := stringAttr(block, "object_type"); v != nil {
+			objType = *v
+		}
+
+		if v := stringAttr(block, "object_name"); v != nil {
+			objName = *v
+		}
+
+		if objType != "" && objName != "" {
+			yaml := fmt.Sprintf("  on:\n    schemaObject:\n      objectType: %s\n      objectName: %s\n",
+				yamlString(objType), yamlString(objName))
+			return yaml, objType + "-" + objName
+		}
+
+		if futureBlock := firstBlock(block, "future"); futureBlock != nil {
+			return buildBulkOnYAML("future", futureBlock)
+		}
+
+		if allBlock := firstBlock(block, "all"); allBlock != nil {
+			return buildBulkOnYAML("all", allBlock)
+		}
+	}
+
+	return "", ""
+}
+
 // buildBulkOnYAML builds the YAML for all/future grant targets.
 func buildBulkOnYAML(bulkType string, block map[string]any) (string, string) {
 	objPlural := ""
@@ -538,7 +608,7 @@ func buildBulkOnYAML(bulkType string, block map[string]any) (string, string) {
 	return yaml, desc
 }
 
-func convertShareGrant(attrs map[string]any, provider, namespace string) string {
+func convertGrantPrivilegesToShare(attrs map[string]any, provider, namespace string) string {
 	privileges := sliceAttr(attrs, "privileges")
 	if len(privileges) == 0 {
 		if isTruthy(attrs, "all_privileges") {
@@ -555,52 +625,70 @@ func convertShareGrant(attrs map[string]any, provider, namespace string) string 
 		return ""
 	}
 
-	objectType := ""
-	objectName := ""
+	// Determine the on-target field and value, matching GrantPrivilegesToShareOn flat fields.
+	onField := ""
+	onValue := ""
 
 	if block := firstBlock(attrs, "on_database"); block != nil {
-		objectType = "DATABASE"
+		onField = "database"
 
 		if v := stringAttr(block, "database_name"); v != nil {
-			objectName = *v
+			onValue = *v
 		}
 	} else if block := firstBlock(attrs, "on_schema"); block != nil {
-		objectType = "SCHEMA"
+		onField = "schema"
 
 		if v := stringAttr(block, "schema_name"); v != nil {
-			objectName = *v
+			onValue = *v
 		}
 	} else if block := firstBlock(attrs, "on_table"); block != nil {
-		objectType = "TABLE"
+		onField = "table"
 
 		if v := stringAttr(block, "table_name"); v != nil {
-			objectName = *v
+			onValue = *v
+		}
+	} else if block := firstBlock(attrs, "on_all_tables_in_schema"); block != nil {
+		onField = "allTablesInSchema"
+
+		if v := stringAttr(block, "schema_name"); v != nil {
+			onValue = *v
+		}
+	} else if block := firstBlock(attrs, "on_function"); block != nil {
+		onField = "functionName"
+
+		if v := stringAttr(block, "function_name"); v != nil {
+			onValue = *v
+		}
+	} else if block := firstBlock(attrs, "on_tag"); block != nil {
+		onField = "tag"
+
+		if v := stringAttr(block, "tag_name"); v != nil {
+			onValue = *v
 		}
 	} else if block := firstBlock(attrs, "on_view"); block != nil {
-		objectType = "VIEW"
+		onField = "view"
 
 		if v := stringAttr(block, "view_name"); v != nil {
-			objectName = *v
+			onValue = *v
 		}
 	}
 
-	if objectType == "" || objectName == "" {
+	if onField == "" || onValue == "" {
 		return ""
 	}
 
 	var manifests []string
 
 	for _, priv := range privileges {
-		crName := sanitizeName(share + "-" + priv + "-" + objectType + "-" + objectName)
+		crName := sanitizeName(share + "-" + priv + "-" + onField + "-" + onValue)
 
 		var b strings.Builder
 
-		fmt.Fprintf(&b, "apiVersion: %s\nkind: ShareGrant\nmetadata:\n  name: %s\n  namespace: %s\nspec:\n", apiVersion, crName, namespace)
+		fmt.Fprintf(&b, "apiVersion: %s\nkind: GrantPrivilegesToShare\nmetadata:\n  name: %s\n  namespace: %s\nspec:\n", apiVersion, crName, namespace)
 		fmt.Fprintf(&b, "  providerRef:\n    name: %s\n", provider)
 		fmt.Fprintf(&b, "  deletionPolicy: Orphan\n")
 		fmt.Fprintf(&b, "  privilege: %s\n", yamlString(priv))
-		fmt.Fprintf(&b, "  objectType: %s\n", yamlString(objectType))
-		fmt.Fprintf(&b, "  objectName: %s\n", yamlString(objectName))
+		fmt.Fprintf(&b, "  on:\n    %s: %s\n", onField, yamlString(onValue))
 		fmt.Fprintf(&b, "  share: %s\n", yamlString(share))
 
 		manifests = append(manifests, b.String())
@@ -924,9 +1012,9 @@ var resourceTypeMap = map[string]func(map[string]any, string, string) string{
 	"snowflake_account_role":                      convertAccountRole,
 	"snowflake_role":                              convertAccountRole, // legacy resource name
 	"snowflake_database_role":                     convertDatabaseRole,
-	"snowflake_grant_privileges_to_account_role":  convertAccountRoleGrant,
-	"snowflake_grant_privileges_to_database_role": convertDatabaseRoleGrant,
-	"snowflake_grant_privileges_to_share":         convertShareGrant,
+	"snowflake_grant_privileges_to_account_role":  convertGrantPrivilegesToAccountRole,
+	"snowflake_grant_privileges_to_database_role": convertGrantPrivilegesToDatabaseRole,
+	"snowflake_grant_privileges_to_share":         convertGrantPrivilegesToShare,
 	"snowflake_table":                             convertTable,
 	"snowflake_view":                              convertView,
 	"snowflake_stage":                             convertStage,

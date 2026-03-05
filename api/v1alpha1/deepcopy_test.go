@@ -243,12 +243,12 @@ func TestDeepCopy_GrantOn_NestedPointerIsolation(t *testing.T) {
 	assert.Equal(t, "DB1.PUBLIC", *orig.SchemaObject.Future.InSchema)
 }
 
-// TestDeepCopy_AccountRoleGrantSpec_FullIsolation tests the complete AccountRoleGrantSpec with all
+// TestDeepCopy_GrantPrivilegesToAccountRoleSpec_FullIsolation tests the complete GrantPrivilegesToAccountRoleSpec with all
 // nested pointer types to catch any missing deep copy in the chain.
-func TestDeepCopy_AccountRoleGrantSpec_FullIsolation(t *testing.T) {
+func TestDeepCopy_GrantPrivilegesToAccountRoleSpec_FullIsolation(t *testing.T) {
 	t.Parallel()
 
-	orig := AccountRoleGrantSpec{
+	orig := GrantPrivilegesToAccountRoleSpec{
 		Privilege: "SELECT",
 		On: GrantOn{
 			SchemaObject: &GrantOnSchemaObject{

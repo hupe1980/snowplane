@@ -763,8 +763,8 @@ func BuildCreatePreamble(b *Builder, objectType string, fqn string, useCreateOrA
 	}
 
 	if useCreateOrAlter {
-		b.WriteString(fmt.Sprintf(" %s %s", objectType, fqn))
+		_, _ = fmt.Fprintf(b, " %s %s", objectType, fqn)
 	} else {
-		b.WriteString(fmt.Sprintf(" %s IF NOT EXISTS %s", objectType, fqn))
+		_, _ = fmt.Fprintf(b, " %s IF NOT EXISTS %s", objectType, fqn)
 	}
 }

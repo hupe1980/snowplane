@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -81,7 +80,7 @@ func newTestResourceMonitor(name, namespace string) *snowplanev1alpha1.ResourceM
 func successfulObservation() *snowflake.ResourceMonitorObservation {
 	return &snowflake.ResourceMonitorObservation{
 		Exists: true,
-		ShowOutput: &snowflake.ResourceMonitorShowOutput{
+		ShowOutput: &snowplanev1alpha1.ResourceMonitorShowOutput{
 			CreatedOn:        "2024-01-01",
 			Name:             "MY_MONITOR",
 			CreditQuota:      "100",
@@ -103,18 +102,16 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 		cb = cb.WithRuntimeObjects(obj)
 	}
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.ResourceMonitor, Service, *snowflake.ResourceMonitorObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: record.NewFakeRecorder(100),
-		Adapter: &adapter{
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	factory := testutil.NewTestClientFactory()
+
+	r := NewReconcilerWithServiceFactory(c, factory, record.NewFakeRecorder(100), nil,
+		func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("ResourceMonitor"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("ResourceMonitor")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -496,7 +493,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 		},
 	}
 	obs := &snowflake.ResourceMonitorObservation{
-		ShowOutput: &snowflake.ResourceMonitorShowOutput{
+		ShowOutput: &snowplanev1alpha1.ResourceMonitorShowOutput{
 			Name:        "MY_MONITOR",
 			CreditQuota: "100",
 		},
@@ -514,7 +511,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 		},
 	}
 	obs := &snowflake.ResourceMonitorObservation{
-		ShowOutput: &snowflake.ResourceMonitorShowOutput{
+		ShowOutput: &snowplanev1alpha1.ResourceMonitorShowOutput{
 			Name:        "MY_MONITOR",
 			CreditQuota: "100",
 		},
@@ -561,7 +558,7 @@ func TestNormalizeTriggers_Empty(t *testing.T) {
 
 func TestBuildObservedTriggers(t *testing.T) {
 	t.Parallel()
-	show := &snowflake.ResourceMonitorShowOutput{
+	show := &snowplanev1alpha1.ResourceMonitorShowOutput{
 		NotifyAt:             "80,90",
 		SuspendAt:            "100",
 		SuspendImmediatelyAt: "110",
@@ -575,7 +572,7 @@ func TestBuildObservedTriggers(t *testing.T) {
 
 func TestBuildObservedTriggers_Empty(t *testing.T) {
 	t.Parallel()
-	show := &snowflake.ResourceMonitorShowOutput{}
+	show := &snowplanev1alpha1.ResourceMonitorShowOutput{}
 	result := buildObservedTriggers(show)
 	assert.Equal(t, "", result)
 }

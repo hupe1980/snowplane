@@ -160,10 +160,11 @@ var terminalReasons = map[string]bool{
 	snowplanev1alpha1.ReasonImmutableField:   true,
 	snowplanev1alpha1.ReasonResourceExists:   true,
 	snowplanev1alpha1.ReasonDeleteBlocked:    true,
+	snowplanev1alpha1.ReasonConflictDetected: true,
 }
 
 // IsTerminal returns true when the object has Ready=False with a terminal
-// reason (TerminalError, ValidationFailed, ImmutableField, ResourceAlreadyExists).
+// reason (TerminalError, ValidationFailed, ImmutableField, ResourceAlreadyExists, ConflictDetected).
 func IsTerminal(o ConditionedObject) bool {
 	c := Get(o, snowplanev1alpha1.TypeReady)
 	if c == nil || c.Status != metav1.ConditionFalse {

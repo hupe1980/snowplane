@@ -123,7 +123,7 @@ spec:
 ---
 # Wave 4: Grants and field exports
 apiVersion: snowplane.hupe1980.github.io/v1alpha1
-kind: AccountRoleGrant
+kind: GrantPrivilegesToAccountRole
 metadata:
   name: analyst-usage
   annotations:

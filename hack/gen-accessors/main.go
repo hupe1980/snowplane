@@ -26,8 +26,6 @@ const (
 	OwnerFromShowOutputOwner OwnerSource = iota
 	// OwnerFromShowOutputGrantedBy reads Status.ShowOutput.GrantedBy.
 	OwnerFromShowOutputGrantedBy
-	// OwnerFromShowOutputOwnerPtr reads Status.ShowOutput.Owner when it is *string.
-	OwnerFromShowOutputOwnerPtr
 	// OwnerEmpty always returns "".
 	OwnerEmpty
 )
@@ -56,6 +54,10 @@ type TypeDef struct {
 	OwnerComment string
 	// TrackedParams mode.
 	TrackedParams TrackedParamsMode
+	// HasDatabaseScope indicates the type has Status.DatabaseName.
+	HasDatabaseScope bool
+	// HasSchemaScope indicates the type has Status.SchemaName.
+	HasSchemaScope bool
 }
 
 // OwnerString returns a stable string key for template comparison,
@@ -66,8 +68,6 @@ func (td TypeDef) OwnerString() string {
 		return "ShowOutputOwner"
 	case OwnerFromShowOutputGrantedBy:
 		return "ShowOutputGrantedBy"
-	case OwnerFromShowOutputOwnerPtr:
-		return "ShowOutputOwnerPtr"
 	default:
 		return "Empty"
 	}
@@ -86,24 +86,24 @@ func (td TypeDef) TrackedParamsString() string {
 var types = []TypeDef{
 	// Pattern A1 — Standard resources with ShowOutput.Owner
 	{TypeName: "Database", Receiver: "d", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "Schema", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "Schema", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true},
 	{TypeName: "Warehouse", Receiver: "w", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "User", Receiver: "u", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "AccountRole", Receiver: "r", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "DatabaseRole", Receiver: "r", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "Tag", Receiver: "t", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "MaskingPolicy", Receiver: "mp", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "RowAccessPolicy", Receiver: "rap", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "Stage", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "StreamOnTable", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "StreamOnView", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "StreamOnExternalTable", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "StreamOnDirectoryTable", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "StreamOnDynamicTable", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "Task", Receiver: "t", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "Alert", Receiver: "a", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "View", Receiver: "v", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "Table", Receiver: "t", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "DatabaseRole", Receiver: "r", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true},
+	{TypeName: "Tag", Receiver: "t", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "MaskingPolicy", Receiver: "mp", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "RowAccessPolicy", Receiver: "rap", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "Stage", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "StreamOnTable", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "StreamOnView", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "StreamOnExternalTable", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "StreamOnDirectoryTable", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "StreamOnDynamicTable", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "Task", Receiver: "t", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "Alert", Receiver: "a", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "View", Receiver: "v", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "Table", Receiver: "t", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
 
 	// Pattern A2 — Standard resources without owner column
 	{TypeName: "NetworkPolicy", Receiver: "np", Owner: OwnerEmpty, OwnerComment: "SHOW NETWORK POLICIES does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
@@ -111,35 +111,41 @@ var types = []TypeDef{
 	{TypeName: "StorageIntegration", Receiver: "si", Owner: OwnerEmpty, OwnerComment: "SHOW STORAGE INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
 
 	// Pattern A3 — Schema-level resources with ShowOutput.Owner (new Phase 5 resources)
-	{TypeName: "FileFormat", Receiver: "ff", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "Pipe", Receiver: "p", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "DynamicTable", Receiver: "dt", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "FileFormat", Receiver: "ff", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "Pipe", Receiver: "p", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "DynamicTable", Receiver: "dt", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
 
 	// Phase 6 — Wave 2 resources
 	{TypeName: "NotificationIntegration", Receiver: "ni", Owner: OwnerEmpty, OwnerComment: "SHOW NOTIFICATION INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "SecurityIntegration", Receiver: "si", Owner: OwnerEmpty, OwnerComment: "SHOW SECURITY INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "PasswordPolicy", Receiver: "pp", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "AuthenticationPolicy", Receiver: "ap", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "NetworkRule", Receiver: "nr", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "Sequence", Receiver: "seq", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "ExternalTable", Receiver: "et", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "MaterializedView", Receiver: "mv", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "ProcedureSQL", Receiver: "p", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "ProcedureJavascript", Receiver: "p", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "ProcedurePython", Receiver: "p", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "ProcedureJava", Receiver: "p", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "ProcedureScala", Receiver: "p", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "FunctionSQL", Receiver: "f", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "FunctionJavascript", Receiver: "f", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "FunctionPython", Receiver: "f", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "FunctionJava", Receiver: "f", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "FunctionScala", Receiver: "f", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "SAML2Integration", Receiver: "si", Owner: OwnerEmpty, OwnerComment: "SHOW SECURITY INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "ExternalOAuthIntegration", Receiver: "eoi", Owner: OwnerEmpty, OwnerComment: "SHOW SECURITY INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "FailoverGroup", Receiver: "fg", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "APIIntegration", Receiver: "ai", Owner: OwnerEmpty, OwnerComment: "SHOW API INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "SecondaryDatabase", Receiver: "sd", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "SharedDatabase", Receiver: "shd", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "PasswordPolicy", Receiver: "pp", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "AuthenticationPolicy", Receiver: "ap", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "NetworkRule", Receiver: "nr", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "Sequence", Receiver: "seq", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "ExternalTable", Receiver: "et", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "MaterializedView", Receiver: "mv", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "ProcedureSQL", Receiver: "p", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "ProcedureJavascript", Receiver: "p", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "ProcedurePython", Receiver: "p", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "ProcedureJava", Receiver: "p", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "ProcedureScala", Receiver: "p", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "FunctionSQL", Receiver: "f", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "FunctionJavascript", Receiver: "f", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "FunctionPython", Receiver: "f", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "FunctionJava", Receiver: "f", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "FunctionScala", Receiver: "f", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
 
 	// Phase 7 — Secret types (schema-level, owner from SHOW)
-	{TypeName: "SecretWithClientCredentials", Receiver: "s", Owner: OwnerFromShowOutputOwnerPtr, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "SecretWithAuthorizationCodeGrant", Receiver: "s", Owner: OwnerFromShowOutputOwnerPtr, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "SecretWithBasicAuthentication", Receiver: "s", Owner: OwnerFromShowOutputOwnerPtr, TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "SecretWithGenericString", Receiver: "s", Owner: OwnerFromShowOutputOwnerPtr, TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "SecretWithClientCredentials", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "SecretWithAuthorizationCodeGrant", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "SecretWithBasicAuthentication", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "SecretWithGenericString", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
 
 	// Phase 7 — API Authentication Integration types (account-level, no owner)
 	{TypeName: "APIAuthenticationIntegrationWithClientCredentials", Receiver: "a", Owner: OwnerEmpty, OwnerComment: "SHOW SECURITY INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
@@ -147,9 +153,9 @@ var types = []TypeDef{
 	{TypeName: "APIAuthenticationIntegrationWithJWTBearer", Receiver: "a", Owner: OwnerEmpty, OwnerComment: "SHOW SECURITY INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
 
 	// Pattern B — Grant resources (custom GetSpecName)
-	{TypeName: "AccountRoleGrant", Receiver: "r", SkipGetSpecName: true, Owner: OwnerFromShowOutputGrantedBy, TrackedParams: TrackedParamsNil},
-	{TypeName: "DatabaseRoleGrant", Receiver: "r", SkipGetSpecName: true, Owner: OwnerFromShowOutputGrantedBy, TrackedParams: TrackedParamsNil},
-	{TypeName: "ShareGrant", Receiver: "r", SkipGetSpecName: true, Owner: OwnerFromShowOutputGrantedBy, TrackedParams: TrackedParamsNil},
+	{TypeName: "GrantPrivilegesToAccountRole", Receiver: "r", SkipGetSpecName: true, Owner: OwnerFromShowOutputGrantedBy, TrackedParams: TrackedParamsNil},
+	{TypeName: "GrantPrivilegesToDatabaseRole", Receiver: "r", SkipGetSpecName: true, Owner: OwnerFromShowOutputGrantedBy, TrackedParams: TrackedParamsNil},
+	{TypeName: "GrantPrivilegesToShare", Receiver: "r", SkipGetSpecName: true, Owner: OwnerFromShowOutputGrantedBy, TrackedParams: TrackedParamsNil},
 
 	// Pattern C — GrantOwnership (custom GetSpecName, nil tracked params)
 	{TypeName: "GrantOwnership", Receiver: "g", SkipGetSpecName: true, Owner: OwnerEmpty, TrackedParams: TrackedParamsNil},
@@ -168,6 +174,9 @@ var types = []TypeDef{
 
 	// Pattern G — Table constraint resources (custom GetSpecName, no owner, no tracked params)
 	{TypeName: "TableConstraint", Receiver: "tc", SkipGetSpecName: true, Owner: OwnerEmpty, OwnerComment: "Table constraints do not have an owner.", TrackedParams: TrackedParamsNil},
+
+	// Pattern H — SQLStatement escape-hatch (no ShowOutput, no owner, no tracked params, no spec.name)
+	{TypeName: "SQLStatement", Receiver: "s", SkipGetSpecName: true, Owner: OwnerEmpty, OwnerComment: "SQLStatement executes arbitrary SQL and has no Snowflake owner.", TrackedParams: TrackedParamsNil},
 }
 
 const accessorTmpl = `// Code generated by hack/gen-accessors/main.go; DO NOT EDIT.
@@ -274,14 +283,6 @@ func ({{ .Receiver }} *{{ .TypeName }}) GetOwner() string {
 
 	return ""
 }
-{{ else if eq .OwnerString "ShowOutputOwnerPtr" }}
-func ({{ .Receiver }} *{{ .TypeName }}) GetOwner() string {
-	if {{ .Receiver }}.Status.ShowOutput != nil && {{ .Receiver }}.Status.ShowOutput.Owner != nil {
-		return *{{ .Receiver }}.Status.ShowOutput.Owner
-	}
-
-	return ""
-}
 {{ else }}{{/* Empty */}}
 func ({{ .Receiver }} *{{ .TypeName }}) GetOwner() string {
 {{- if .OwnerComment }}
@@ -303,6 +304,38 @@ func ({{ .Receiver }} *{{ .TypeName }}) SetTrackedParametersList(val []string) {
 func ({{ .Receiver }} *{{ .TypeName }}) GetTrackedParametersList() []string { return nil }
 
 func ({{ .Receiver }} *{{ .TypeName }}) SetTrackedParametersList(_ []string) {}
+{{ end }}
+{{ if .HasDatabaseScope }}
+func ({{ .Receiver }} *{{ .TypeName }}) GetScopeDatabaseName() string {
+	return {{ .Receiver }}.Status.DatabaseName
+}
+
+func ({{ .Receiver }} *{{ .TypeName }}) GetSpecDatabaseRef() *ObjectReference {
+	return {{ .Receiver }}.Spec.DatabaseRef
+}
+
+func ({{ .Receiver }} *{{ .TypeName }}) GetSpecDatabaseName() *string {
+	return {{ .Receiver }}.Spec.DatabaseName
+}
+{{ end }}
+{{ if .HasSchemaScope }}
+func ({{ .Receiver }} *{{ .TypeName }}) GetScopeSchemaName() string {
+	return {{ .Receiver }}.Status.SchemaName
+}
+
+func ({{ .Receiver }} *{{ .TypeName }}) GetSpecSchemaRef() *ObjectReference {
+	return {{ .Receiver }}.Spec.SchemaRef
+}
+
+func ({{ .Receiver }} *{{ .TypeName }}) GetSpecSchemaName() *string {
+	return {{ .Receiver }}.Spec.SchemaName
+}
+{{ else if .HasDatabaseScope }}
+func ({{ .Receiver }} *{{ .TypeName }}) GetScopeSchemaName() string { return "" }
+
+func ({{ .Receiver }} *{{ .TypeName }}) GetSpecSchemaRef() *ObjectReference { return nil }
+
+func ({{ .Receiver }} *{{ .TypeName }}) GetSpecSchemaName() *string { return nil }
 {{ end }}
 {{ end }}`
 

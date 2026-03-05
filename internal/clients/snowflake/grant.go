@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,37 +17,14 @@ type GrantObservation struct {
 	Exists bool
 
 	// ShowOutput contains the matching SHOW GRANTS row.
-	ShowOutput *GrantShowOutput
+	ShowOutput *v1alpha1.GrantShowOutput
 }
 
-// GrantShowOutput contains the fields from SHOW GRANTS ON <object_type> <object_name>.
-type GrantShowOutput struct {
-	// CreatedOn is the timestamp when the grant was created.
-	CreatedOn string
-
-	// Privilege is the privilege name (e.g. USAGE, SELECT, CREATE SCHEMA).
-	Privilege string
-
-	// GrantedOn is the object type the privilege is granted on (e.g. DATABASE, WAREHOUSE).
-	// For future grants from SHOW FUTURE GRANTS, this comes from the "grant_on" column.
-	GrantedOn string
-
-	// Name is the fully qualified name of the object.
-	Name string
-
-	// GrantedTo is the category of the grantee (e.g. ROLE, DATABASE_ROLE, SHARE).
-	// For future grants from SHOW FUTURE GRANTS, this comes from the "grant_to" column.
-	GrantedTo string
-
-	// GranteeName is the name of the role/share the privilege is granted to.
-	GranteeName string
-
-	// GrantOption indicates whether the grantee can re-grant the privilege.
-	GrantOption bool
-
-	// GrantedBy is the role that performed the grant.
-	GrantedBy string
-}
+// Privilege keyword constants used for ALL PRIVILEGES grants.
+const (
+	PrivilegeAllPrivileges = "ALL PRIVILEGES"
+	PrivilegeAll           = "ALL"
+)
 
 // GrantKind indicates the type of grant for observation dispatch.
 type GrantKind string
@@ -120,8 +98,12 @@ func (o *CreateGrantOptions) Validate() error {
 		return fmt.Errorf("privilege is required")
 	}
 
-	if err := sqlbuilder.ValidateKeywordValue(o.Privilege); err != nil {
-		return fmt.Errorf("invalid privilege: %w", err)
+	// Allow "ALL PRIVILEGES" and "ALL" as special privilege keywords.
+	upper := strings.ToUpper(strings.TrimSpace(o.Privilege))
+	if upper != PrivilegeAllPrivileges && upper != PrivilegeAll {
+		if err := sqlbuilder.ValidateKeywordValue(o.Privilege); err != nil {
+			return fmt.Errorf("invalid privilege: %w", err)
+		}
 	}
 
 	if strings.TrimSpace(o.OnClause) == "" {
@@ -155,8 +137,12 @@ func (o *RevokeGrantOptions) Validate() error {
 		return fmt.Errorf("privilege is required")
 	}
 
-	if err := sqlbuilder.ValidateKeywordValue(o.Privilege); err != nil {
-		return fmt.Errorf("invalid privilege: %w", err)
+	// Allow "ALL PRIVILEGES" and "ALL" as special privilege keywords.
+	upper := strings.ToUpper(strings.TrimSpace(o.Privilege))
+	if upper != PrivilegeAllPrivileges && upper != PrivilegeAll {
+		if err := sqlbuilder.ValidateKeywordValue(o.Privilege); err != nil {
+			return fmt.Errorf("invalid privilege: %w", err)
+		}
 	}
 
 	if strings.TrimSpace(o.OnClause) == "" {
@@ -263,7 +249,7 @@ func (g *GrantClient) Revoke(ctx context.Context, opts RevokeGrantOptions) error
 //   - "TO SHARE my_share"            → SHOW GRANTS TO SHARE my_share
 //   - "IN DATABASE MY_DB"            → SHOW FUTURE GRANTS IN DATABASE MY_DB
 //   - "IN SCHEMA MY_DB.PUBLIC"       → SHOW FUTURE GRANTS IN SCHEMA MY_DB.PUBLIC
-func (g *GrantClient) ShowGrants(ctx context.Context, target string, future bool) ([]*GrantShowOutput, error) {
+func (g *GrantClient) ShowGrants(ctx context.Context, target string, future bool) ([]*v1alpha1.GrantShowOutput, error) {
 	if strings.TrimSpace(target) == "" {
 		return nil, NewTerminalError(fmt.Errorf("showGrants target is required"))
 	}
@@ -298,9 +284,15 @@ func (g *GrantClient) Observe(ctx context.Context, id GrantIdentifier) (*GrantOb
 		return nil, err
 	}
 
+	// For ALL PRIVILEGES, match ANY grant for the grantee on the target.
+	isAllPrivileges := strings.EqualFold(id.Privilege, PrivilegeAllPrivileges) || strings.EqualFold(id.Privilege, PrivilegeAll)
+
 	for _, grant := range grants {
-		if strings.EqualFold(grant.Privilege, id.Privilege) &&
-			matchesGranteeName(grant.GranteeName, id.GranteeName) {
+		if !matchesGranteeName(grant.GranteeName, id.GranteeName) {
+			continue
+		}
+
+		if isAllPrivileges || strings.EqualFold(grant.Privilege, id.Privilege) {
 			return &GrantObservation{
 				Exists:     true,
 				ShowOutput: grant,
@@ -335,13 +327,13 @@ func matchesGranteeName(actual, expected string) bool {
 //
 //	Regular: created_on, privilege, granted_on, name, granted_to, grantee_name, grant_option, granted_by
 //	Future:  created_on, privilege, grant_on,  name, grant_to,  grantee_name, grant_option
-func scanGrantShowOutput(rows *sql.Rows, future bool) ([]*GrantShowOutput, error) {
+func scanGrantShowOutput(rows *sql.Rows, future bool) ([]*v1alpha1.GrantShowOutput, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, fmt.Errorf("reading columns: %w", err)
 	}
 
-	var results []*GrantShowOutput
+	var results []*v1alpha1.GrantShowOutput
 
 	for rows.Next() {
 		values := make([]sql.NullString, len(cols))
@@ -364,7 +356,7 @@ func scanGrantShowOutput(rows *sql.Rows, future bool) ([]*GrantShowOutput, error
 
 		grantOption := strings.EqualFold(colMap["grant_option"], "true")
 
-		out := &GrantShowOutput{
+		out := &v1alpha1.GrantShowOutput{
 			CreatedOn:   colMap["created_on"],
 			Privilege:   colMap["privilege"],
 			GranteeName: colMap["grantee_name"],
@@ -495,6 +487,17 @@ func BuildToClause(accountRole, databaseRole, share string) string {
 	}
 
 	return ""
+}
+
+// BuildShareOnClause constructs the SQL ON clause for share grants.
+// Share grants use explicit object types per TF provider pattern.
+func BuildShareOnClause(objectType, objectName string) string {
+	switch objectType {
+	case "ALL TABLES IN SCHEMA":
+		return "ON ALL TABLES IN SCHEMA " + sqlbuilder.QuoteIdentifierParts(objectName)
+	default:
+		return "ON " + objectType + " " + sqlbuilder.QuoteIdentifierParts(objectName)
+	}
 }
 
 // BuildShowGrantsTarget constructs the target for SHOW GRANTS / SHOW FUTURE GRANTS queries.

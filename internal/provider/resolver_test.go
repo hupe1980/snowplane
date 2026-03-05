@@ -238,6 +238,194 @@ func TestResolveClient_AllowedNamespaces_EmptyListAllowsAll(t *testing.T) {
 	assert.NotNil(t, resolved.Client)
 }
 
+func TestResolveClient_AllowedNamespaceSelector_MatchLabels(t *testing.T) {
+	t.Parallel()
+
+	pc := newReadyPC("system")
+	pc.Spec.AllowedNamespaceSelector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{"team": "analytics"},
+	}
+	secret := newTestSecret("system")
+
+	// Namespace with matching label.
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "team-analytics",
+			Labels: map[string]string{"team": "analytics"},
+		},
+	}
+
+	c := fake.NewClientBuilder().
+		WithScheme(testScheme()).
+		WithRuntimeObjects(pc, secret, ns).
+		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
+		Build()
+
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+		return &fakeSnowflakeClient{}, nil
+	})
+
+	obj := &testConditionedObject{}
+	ref := snowplanev1alpha1.ProviderReference{Name: "default-pc", Namespace: "system"}
+
+	resolved, err := ResolveClient(context.Background(), c, factory, obj, ref, "team-analytics", nil, nil, "test")
+	require.NoError(t, err)
+	assert.NotNil(t, resolved.Client)
+}
+
+func TestResolveClient_AllowedNamespaceSelector_NoMatch(t *testing.T) {
+	t.Parallel()
+
+	pc := newReadyPC("system")
+	pc.Spec.AllowedNamespaceSelector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{"team": "analytics"},
+	}
+	secret := newTestSecret("system")
+
+	// Namespace without matching label.
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "team-marketing",
+			Labels: map[string]string{"team": "marketing"},
+		},
+	}
+
+	c := fake.NewClientBuilder().
+		WithScheme(testScheme()).
+		WithRuntimeObjects(pc, secret, ns).
+		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
+		Build()
+
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+		return &fakeSnowflakeClient{}, nil
+	})
+
+	obj := &testConditionedObject{}
+	ref := snowplanev1alpha1.ProviderReference{Name: "default-pc", Namespace: "system"}
+
+	_, err := ResolveClient(context.Background(), c, factory, obj, ref, "team-marketing", nil, nil, "test")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "namespace not allowed")
+
+	cond := conditions.Get(obj, snowplanev1alpha1.TypeReady)
+	require.NotNil(t, cond)
+	assert.Equal(t, snowplanev1alpha1.ReasonNamespaceNotAllowed, cond.Reason)
+}
+
+func TestResolveClient_AllowedNamespaceSelector_ORWithStaticList(t *testing.T) {
+	t.Parallel()
+
+	pc := newReadyPC("system")
+	pc.Spec.AllowedNamespaces = []string{"team-a"}
+	pc.Spec.AllowedNamespaceSelector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{"env": "prod"},
+	}
+	secret := newTestSecret("system")
+
+	// team-b: not in static list, but has matching label → allowed via selector.
+	nsB := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "team-b",
+			Labels: map[string]string{"env": "prod"},
+		},
+	}
+
+	c := fake.NewClientBuilder().
+		WithScheme(testScheme()).
+		WithRuntimeObjects(pc, secret, nsB).
+		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
+		Build()
+
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+		return &fakeSnowflakeClient{}, nil
+	})
+
+	// team-a: allowed via static list (no namespace object needed).
+	objA := &testConditionedObject{}
+	refA := snowplanev1alpha1.ProviderReference{Name: "default-pc", Namespace: "system"}
+	resolvedA, err := ResolveClient(context.Background(), c, factory, objA, refA, "team-a", nil, nil, "test")
+	require.NoError(t, err)
+	assert.NotNil(t, resolvedA.Client)
+
+	// team-b: allowed via selector.
+	objB := &testConditionedObject{}
+	resolvedB, err := ResolveClient(context.Background(), c, factory, objB, refA, "team-b", nil, nil, "test")
+	require.NoError(t, err)
+	assert.NotNil(t, resolvedB.Client)
+}
+
+func TestResolveClient_AllowedDatabases_Propagated(t *testing.T) {
+	t.Parallel()
+
+	pc := newReadyPC("default")
+	pc.Spec.AllowedDatabases = []string{"ANALYTICS", "RAW"}
+	pc.Spec.AllowedSchemas = []string{"ANALYTICS.PUBLIC"}
+	secret := newTestSecret("default")
+
+	c := fake.NewClientBuilder().
+		WithScheme(testScheme()).
+		WithRuntimeObjects(pc, secret).
+		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
+		Build()
+
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+		return &fakeSnowflakeClient{}, nil
+	})
+
+	obj := &testConditionedObject{}
+	ref := snowplanev1alpha1.ProviderReference{Name: "default-pc"}
+
+	resolved, err := ResolveClient(context.Background(), c, factory, obj, ref, "default", nil, nil, "test")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"ANALYTICS", "RAW"}, resolved.AllowedDatabases)
+	assert.Equal(t, []string{"ANALYTICS.PUBLIC"}, resolved.AllowedSchemas)
+}
+
+func TestIsDatabaseAllowed(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		resolved *ResolvedProvider
+		database string
+		want     bool
+	}{
+		{"empty_allows_all", &ResolvedProvider{}, "ANY", true},
+		{"wildcard", &ResolvedProvider{AllowedDatabases: []string{"*"}}, "ANY", true},
+		{"match", &ResolvedProvider{AllowedDatabases: []string{"ANALYTICS"}}, "ANALYTICS", true},
+		{"case_insensitive", &ResolvedProvider{AllowedDatabases: []string{"Analytics"}}, "ANALYTICS", true},
+		{"denied", &ResolvedProvider{AllowedDatabases: []string{"ANALYTICS"}}, "RAW", false},
+	}
+
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, IsDatabaseAllowed(tt.resolved, tt.database), tt.name)
+	}
+}
+
+func TestIsSchemaAllowed(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		resolved *ResolvedProvider
+		database string
+		schema   string
+		want     bool
+	}{
+		{"empty_allows_all", &ResolvedProvider{}, "DB", "S", true},
+		{"wildcard", &ResolvedProvider{AllowedSchemas: []string{"*"}}, "DB", "S", true},
+		{"fqn_match", &ResolvedProvider{AllowedSchemas: []string{"DB.PUBLIC"}}, "DB", "PUBLIC", true},
+		{"fqn_case_insensitive", &ResolvedProvider{AllowedSchemas: []string{"db.public"}}, "DB", "PUBLIC", true},
+		{"fqn_wrong_db", &ResolvedProvider{AllowedSchemas: []string{"DB.PUBLIC"}}, "OTHER", "PUBLIC", false},
+		{"name_only", &ResolvedProvider{AllowedSchemas: []string{"PUBLIC"}}, "ANY", "PUBLIC", true},
+		{"name_only_denied", &ResolvedProvider{AllowedSchemas: []string{"PUBLIC"}}, "DB", "STAGING", false},
+	}
+
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, IsSchemaAllowed(tt.resolved, tt.database, tt.schema), tt.name)
+	}
+}
+
 func TestResolveClient_ProviderConfigNotFound(t *testing.T) {
 	t.Parallel()
 

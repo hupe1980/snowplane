@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,18 +17,7 @@ type MaskingPolicyObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW MASKING POLICIES row.
-	ShowOutput *MaskingPolicyShowOutput
-}
-
-// MaskingPolicyShowOutput contains the fields from SHOW MASKING POLICIES.
-type MaskingPolicyShowOutput struct {
-	CreatedOn    string
-	Name         string
-	DatabaseName string
-	SchemaName   string
-	Kind         string
-	Owner        string
-	Comment      string
+	ShowOutput *v1alpha1.MaskingPolicyShowOutput
 }
 
 // MaskingPolicyArgument defines an argument in the masking policy signature.
@@ -239,7 +229,7 @@ func buildShowMaskingPolicyByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW MASKING POLICIES for a specific policy.
-func (mp *MaskingPolicyClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*MaskingPolicyShowOutput, error) {
+func (mp *MaskingPolicyClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.MaskingPolicyShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("masking policy name is required"))
 	}
@@ -271,9 +261,9 @@ func (mp *MaskingPolicyClient) Observe(ctx context.Context, name SchemaObjectIde
 }
 
 // scanMaskingPolicyShowOutput scans SHOW MASKING POLICIES results for a matching row.
-func scanMaskingPolicyShowOutput(rows *sql.Rows, name string) (*MaskingPolicyShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*MaskingPolicyShowOutput, error) {
-		return &MaskingPolicyShowOutput{
+func scanMaskingPolicyShowOutput(rows *sql.Rows, name string) (*v1alpha1.MaskingPolicyShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.MaskingPolicyShowOutput, error) {
+		return &v1alpha1.MaskingPolicyShowOutput{
 			CreatedOn:    m["created_on"],
 			Name:         m["name"],
 			DatabaseName: m["database_name"],

@@ -9,16 +9,29 @@ metadata:
 spec:
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  {{- if gt (int .Values.replicaCount) 1 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  {{- else }}
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "snowplane.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: controller-manager
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
+        {{- if .Values.webhook.enabled }}
+        checksum/webhook-cert: {{ include (print $.Template.BasePath "/webhook-certificate.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       labels:
         {{- include "snowplane.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: controller-manager
@@ -28,6 +41,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "snowplane.serviceAccountName" . }}
+      automountServiceAccountToken: true
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
@@ -52,6 +66,9 @@ spec:
             {{- if not .Values.controller.enableAlphaResources }}
             - --enable-alpha-resources=false
             {{- end }}
+            {{- if .Values.controller.enableSQLStatement }}
+            - --enable-sql-statement
+            {{- end }}
             {{- if .Values.logging.development }}
             - --development
             {{- end }}
@@ -67,6 +84,11 @@ spec:
             - --circuit-breaker-threshold={{ .Values.circuitBreaker.threshold }}
             - --circuit-breaker-reset-timeout={{ .Values.circuitBreaker.resetTimeout }}
             - --zap-log-level={{ .Values.logging.level }}
+            {{- if .Values.webhook.enabled }}
+            - --enable-webhook
+            - --webhook-port={{ .Values.webhook.port }}
+            - --webhook-cert-dir={{ .Values.webhook.certDir }}
+            {{- end }}
           ports:
             - name: metrics
               containerPort: {{ .Values.metrics.containerPort }}
@@ -74,6 +96,11 @@ spec:
             - name: health
               containerPort: {{ .Values.healthProbes.containerPort }}
               protocol: TCP
+            {{- if .Values.webhook.enabled }}
+            - name: webhook
+              containerPort: {{ .Values.webhook.port }}
+              protocol: TCP
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -90,7 +117,7 @@ spec:
             httpGet:
               path: /healthz
               port: health
-            failureThreshold: 30
+            failureThreshold: 60
             periodSeconds: 2
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
@@ -100,18 +127,23 @@ spec:
           env:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if or .Values.workloadIdentity.enabled .Values.extraVolumeMounts }}
+          {{- if or .Values.workloadIdentity.enabled .Values.webhook.enabled .Values.extraVolumeMounts }}
           volumeMounts:
             {{- if .Values.workloadIdentity.enabled }}
             - name: snowflake-token
               mountPath: {{ .Values.workloadIdentity.mountPath }}
               readOnly: true
             {{- end }}
+            {{- if .Values.webhook.enabled }}
+            - name: webhook-certs
+              mountPath: {{ .Values.webhook.certDir }}
+              readOnly: true
+            {{- end }}
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
-      {{- if or .Values.workloadIdentity.enabled .Values.extraVolumes }}
+      {{- if or .Values.workloadIdentity.enabled .Values.webhook.enabled .Values.extraVolumes }}
       volumes:
         {{- if .Values.workloadIdentity.enabled }}
         - name: snowflake-token
@@ -121,6 +153,11 @@ spec:
                   audience: {{ .Values.workloadIdentity.audience | quote }}
                   expirationSeconds: {{ .Values.workloadIdentity.expirationSeconds }}
                   path: {{ .Values.workloadIdentity.tokenFileName }}
+        {{- end }}
+        {{- if .Values.webhook.enabled }}
+        - name: webhook-certs
+          secret:
+            secretName: {{ include "snowplane.fullname" . }}-webhook-cert
         {{- end }}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}

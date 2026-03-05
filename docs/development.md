@@ -116,15 +116,15 @@ This minimises Snowflake API calls and avoids unnecessary mutations.
 All resource reconcilers share the same state machine via `internal/controller/reconciler/`:
 
 - **`GenericReconciler[T, S, D]`** — Type-parameterised reconciler handling finalizers, ProviderConfig resolution, client caching, SSA status patching, conditions, rate limiting, retry, metrics, and drift detection
-- **`ResourceAdapter[T, S, D]`** — Interface each resource implements for resource-specific behaviour
+- **`BaseAdapter[T, S, D]`** — Closure-based `ResourceAdapter` implementation with nil-safe optional interface defaults
+- **`MakeObserve/MakeCreate/MakeAlter/MakeDrop/MakeBuildAlterOpts`** — Generic helper factories eliminating `AssertIdentifier`/`AssertAlterOptions` boilerplate
 - **`Observation[D]`** — Typed observation struct (`Exists bool`, `Detail D`) with compile-time safety
 - **`ManagedResource`** — Constraint interface with code-generated accessor methods
 
 Each resource package provides:
-1. **`adapter.go`** — Implements `ResourceAdapter` with resource-specific logic
-2. **`reconciler.go`** — Service interface, constructor, helper functions
+1. **`reconciler.go`** — Service interface, `newAdapter()` returning configured `BaseAdapter`, helper functions (`buildCreateOptions`, `buildAlterOptions`, `applyObservation`, `detectDrift`, `validateImmutableFields`)
 
-This reduces each reconciler from ~800 lines to ~200-400 lines of resource-specific code.
+This reduces each reconciler to ~200-400 lines of resource-specific code.
 
 ### Drift Correction
 

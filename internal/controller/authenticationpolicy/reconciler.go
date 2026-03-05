@@ -7,12 +7,16 @@ import (
 	"strings"
 
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/tracked"
@@ -38,14 +42,11 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 
 // NewReconciler returns a new AuthenticationPolicy reconciler backed by the generic framework.
 func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.AuthenticationPolicy, Service, *snowflake.AuthenticationPolicyObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.AuthenticationPolicy, Service, *snowflake.AuthenticationPolicyObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewAuthenticationPolicyClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
@@ -57,24 +58,146 @@ func NewReconcilerWithServiceFactory(
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.AuthenticationPolicy, Service, *snowflake.AuthenticationPolicyObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.AuthenticationPolicy, Service, *snowflake.AuthenticationPolicyObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, recorder, sf))
+}
+
+// newAdapter creates the BaseAdapter for AuthenticationPolicy resources.
+func newAdapter(c client.Client, recorder record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.AuthenticationPolicy, Service, *snowflake.AuthenticationPolicyObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.AuthenticationPolicy, Service, *snowflake.AuthenticationPolicyObservation]{
+		ResourceNameVal:  "authenticationpolicy",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.AuthenticationPolicy { return &snowplanev1alpha1.AuthenticationPolicy{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(ap *snowplanev1alpha1.AuthenticationPolicy) (reconciler.Identifier, error) {
+			dbName := snowflake.ParseDatabaseNameFromFQN(ap.Status.DatabaseName)
+			schemaName := snowflake.ParseSchemaNameFromFQN(ap.Status.SchemaName)
+			return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, ap.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) (*snowflake.AuthenticationPolicyObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.AuthenticationPolicyObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.AuthenticationPolicy, id snowflake.SchemaObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterAuthenticationPolicyOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.AuthenticationPolicy, id snowflake.SchemaObjectIdentifier, obs *reconciler.Observation[*snowflake.AuthenticationPolicyObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.AuthenticationPolicy, obs *reconciler.Observation[*snowflake.AuthenticationPolicyObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.AuthenticationPolicy, obs *reconciler.Observation[*snowflake.AuthenticationPolicyObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		SupportsCoA: true,
+		PreReconcileFn: func(ctx context.Context, ap *snowplanev1alpha1.AuthenticationPolicy) error {
+			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, ap,
+				ap.Namespace, ap.Spec.DatabaseRef, ap.Spec.DatabaseName, ap.Status.DatabaseName)
+			if err != nil {
+				return err
+			}
+
+			ap.Status.DatabaseName = dbFQN
+
+			schemaFQN, err := refresolver.PreReconcileSchemaRef(ctx, c, recorder, ap,
+				ap.Namespace, ap.Spec.SchemaRef, ap.Spec.SchemaName, ap.Status.SchemaName)
+			if err != nil {
+				return err
+			}
+
+			ap.Status.SchemaName = schemaFQN
+
+			refresolver.SetDatabaseAndSchemaResolvedCondition(ap, ap.Spec.DatabaseRef, ap.Spec.DatabaseName, ap.Spec.SchemaRef, ap.Spec.SchemaName)
+
+			return nil
+		},
+		SetupWatchesFn: func(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.AuthenticationPolicy{},
+				".spec.databaseRef.name",
+				func(o client.Object) []string {
+					ap, ok := o.(*snowplanev1alpha1.AuthenticationPolicy)
+					if !ok || ap.Spec.DatabaseRef == nil {
+						return nil
+					}
+
+					return []string{ap.Spec.DatabaseRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.databaseRef.name: %w", err)
+			}
+
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.AuthenticationPolicy{},
+				".spec.schemaRef.name",
+				func(o client.Object) []string {
+					ap, ok := o.(*snowplanev1alpha1.AuthenticationPolicy)
+					if !ok || ap.Spec.SchemaRef == nil {
+						return nil
+					}
+
+					return []string{ap.Spec.SchemaRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.schemaRef.name: %w", err)
+			}
+
+			bldr.Watches(
+				&snowplanev1alpha1.Database{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() client.ObjectList { return &snowplanev1alpha1.AuthenticationPolicyList{} }, ".spec.databaseRef.name", "listing authentication policies for database watch")),
+			)
+
+			bldr.Watches(
+				&snowplanev1alpha1.Schema{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() client.ObjectList { return &snowplanev1alpha1.AuthenticationPolicyList{} }, ".spec.schemaRef.name", "listing authentication policies for schema watch")),
+			)
+
+			return nil
+		},
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+// validateImmutableFields checks that immutable fields have not changed.
+func validateImmutableFields(_ context.Context, ap *snowplanev1alpha1.AuthenticationPolicy) error {
+	if reconciler.ShouldSkipImmutableValidation(ap) {
+		return nil
 	}
 
-	return snowflake.NewAuthenticationPolicyClient(sfC), cleanup, nil
+	if ap.Status.ShowOutput != nil {
+		if ap.Status.ShowOutput.Name != "" && !strings.EqualFold(ap.Spec.Name, ap.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", ap.Status.ShowOutput.Name, ap.Spec.Name)
+		}
+
+		if ap.Status.ShowOutput.DatabaseName != "" && ap.Status.DatabaseName != "" {
+			resolvedDB := snowflake.ParseDatabaseNameFromFQN(ap.Status.DatabaseName)
+			if !strings.EqualFold(resolvedDB, ap.Status.ShowOutput.DatabaseName) {
+				return fmt.Errorf("spec.databaseRef is immutable after creation (current database: %q, resolved: %q)", ap.Status.ShowOutput.DatabaseName, resolvedDB)
+			}
+		}
+
+		if ap.Status.ShowOutput.SchemaName != "" && ap.Status.SchemaName != "" {
+			resolvedSchema := snowflake.ParseSchemaNameFromFQN(ap.Status.SchemaName)
+			if !strings.EqualFold(resolvedSchema, ap.Status.ShowOutput.SchemaName) {
+				return fmt.Errorf("spec.schemaRef is immutable after creation (current schema: %q, resolved: %q)", ap.Status.ShowOutput.SchemaName, resolvedSchema)
+			}
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(ap *snowplanev1alpha1.AuthenticationPolicy, obs *snowflake.AuthenticationPolicyObservation) {
@@ -85,14 +208,7 @@ func applyObservation(ap *snowplanev1alpha1.AuthenticationPolicy, obs *snowflake
 			obs.ShowOutput.Name,
 		).FullyQualifiedName()
 
-		ap.Status.ShowOutput = &snowplanev1alpha1.AuthenticationPolicyShowOutput{
-			CreatedOn:    obs.ShowOutput.CreatedOn,
-			Name:         obs.ShowOutput.Name,
-			DatabaseName: obs.ShowOutput.DatabaseName,
-			SchemaName:   obs.ShowOutput.SchemaName,
-			Owner:        obs.ShowOutput.Owner,
-			Comment:      obs.ShowOutput.Comment,
-		}
+		ap.Status.ShowOutput = obs.ShowOutput
 	}
 
 	if obs.DescribeOutput != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -15,25 +16,7 @@ type RoleAssignmentObservation struct {
 	Exists bool
 
 	// ShowOutput contains the matching SHOW GRANTS OF ROLE row.
-	ShowOutput *RoleAssignmentShowOutput
-}
-
-// RoleAssignmentShowOutput contains the fields from SHOW GRANTS OF ROLE.
-type RoleAssignmentShowOutput struct {
-	// CreatedOn is the timestamp when the assignment was created.
-	CreatedOn string
-
-	// Role is the role name that was assigned.
-	Role string
-
-	// GrantedTo is the grantee category: "ROLE", "USER", or "DATABASE_ROLE".
-	GrantedTo string
-
-	// GranteeName is the name of the role, user, or database role receiving the assignment.
-	GranteeName string
-
-	// GrantedBy is the role that performed the assignment.
-	GrantedBy string
+	ShowOutput *v1alpha1.RoleAssignmentShowOutput
 }
 
 // RoleAssignmentIdentifier uniquely identifies a role assignment for observation.
@@ -291,7 +274,7 @@ func (c *RoleAssignmentClient) RevokeRole(ctx context.Context, opts RevokeRoleOp
 //
 //	SHOW GRANTS OF ROLE "ANALYST"
 //	SHOW GRANTS OF DATABASE ROLE "MY_DB"."READER"
-func (c *RoleAssignmentClient) ShowGrantsOfRole(ctx context.Context, roleName string, isDatabaseRole bool) ([]*RoleAssignmentShowOutput, error) {
+func (c *RoleAssignmentClient) ShowGrantsOfRole(ctx context.Context, roleName string, isDatabaseRole bool) ([]*v1alpha1.RoleAssignmentShowOutput, error) {
 	if strings.TrimSpace(roleName) == "" {
 		return nil, NewTerminalError(fmt.Errorf("roleName is required for ShowGrantsOfRole"))
 	}
@@ -365,13 +348,13 @@ func matchesRoleAssignmentGrantee(actual, expected string) bool {
 
 // scanRoleAssignmentShowOutput scans SHOW GRANTS OF ROLE results.
 // Columns: created_on, role, granted_to, grantee_name, granted_by
-func scanRoleAssignmentShowOutput(rows *sql.Rows) ([]*RoleAssignmentShowOutput, error) {
+func scanRoleAssignmentShowOutput(rows *sql.Rows) ([]*v1alpha1.RoleAssignmentShowOutput, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, fmt.Errorf("reading columns: %w", err)
 	}
 
-	var results []*RoleAssignmentShowOutput
+	var results []*v1alpha1.RoleAssignmentShowOutput
 
 	for rows.Next() {
 		values := make([]sql.NullString, len(cols))
@@ -392,7 +375,7 @@ func scanRoleAssignmentShowOutput(rows *sql.Rows) ([]*RoleAssignmentShowOutput, 
 			}
 		}
 
-		out := &RoleAssignmentShowOutput{
+		out := &v1alpha1.RoleAssignmentShowOutput{
 			CreatedOn:   colMap["created_on"],
 			Role:        colMap["role"],
 			GrantedTo:   colMap["granted_to"],

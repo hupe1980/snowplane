@@ -4,14 +4,19 @@ package passwordpolicy
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	sigs "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/tracked"
@@ -36,44 +41,163 @@ type Service interface {
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
 // NewReconciler returns a new PasswordPolicy reconciler backed by the generic framework.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.PasswordPolicy, Service, *snowflake.PasswordPolicyObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.PasswordPolicy, Service, *snowflake.PasswordPolicyObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+func NewReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.PasswordPolicy, Service, *snowflake.PasswordPolicyObservation] {
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewPasswordPolicyClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
 // supply a custom ServiceFactory for testing.
 func NewReconcilerWithServiceFactory(
-	c client.Client,
+	c sigs.Client,
 	factory *clientfactory.ClientFactory,
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.PasswordPolicy, Service, *snowflake.PasswordPolicyObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.PasswordPolicy, Service, *snowflake.PasswordPolicyObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, recorder, sf))
+}
+
+// newAdapter creates the BaseAdapter for PasswordPolicy resources.
+func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.PasswordPolicy, Service, *snowflake.PasswordPolicyObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.PasswordPolicy, Service, *snowflake.PasswordPolicyObservation]{
+		ResourceNameVal:  "passwordpolicy",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.PasswordPolicy { return &snowplanev1alpha1.PasswordPolicy{} },
+		ServiceFactoryFn: sf,
+		SupportsCoA:      true,
+		BuildIdentifierFn: func(pp *snowplanev1alpha1.PasswordPolicy) (reconciler.Identifier, error) {
+			dbName := snowflake.ParseDatabaseNameFromFQN(pp.Status.DatabaseName)
+			schemaName := snowflake.ParseSchemaNameFromFQN(pp.Status.SchemaName)
+			return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, pp.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) (*snowflake.PasswordPolicyObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.PasswordPolicyObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.PasswordPolicy, id snowflake.SchemaObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterPasswordPolicyOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.PasswordPolicy, id snowflake.SchemaObjectIdentifier, obs *reconciler.Observation[*snowflake.PasswordPolicyObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.PasswordPolicy, obs *reconciler.Observation[*snowflake.PasswordPolicyObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.PasswordPolicy, obs *reconciler.Observation[*snowflake.PasswordPolicyObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		LateInitializeFn: lateInitialize,
+		PreReconcileFn: func(ctx context.Context, pp *snowplanev1alpha1.PasswordPolicy) error {
+			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, pp,
+				pp.Namespace, pp.Spec.DatabaseRef, pp.Spec.DatabaseName, pp.Status.DatabaseName)
+			if err != nil {
+				return err
+			}
+
+			pp.Status.DatabaseName = dbFQN
+
+			schemaFQN, err := refresolver.PreReconcileSchemaRef(ctx, c, recorder, pp,
+				pp.Namespace, pp.Spec.SchemaRef, pp.Spec.SchemaName, pp.Status.SchemaName)
+			if err != nil {
+				return err
+			}
+
+			pp.Status.SchemaName = schemaFQN
+
+			refresolver.SetDatabaseAndSchemaResolvedCondition(pp, pp.Spec.DatabaseRef, pp.Spec.DatabaseName, pp.Spec.SchemaRef, pp.Spec.SchemaName)
+
+			return nil
+		},
+		SetupWatchesFn: func(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.PasswordPolicy{},
+				".spec.databaseRef.name",
+				func(o sigs.Object) []string {
+					pp, ok := o.(*snowplanev1alpha1.PasswordPolicy)
+					if !ok || pp.Spec.DatabaseRef == nil {
+						return nil
+					}
+
+					return []string{pp.Spec.DatabaseRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.databaseRef.name: %w", err)
+			}
+
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.PasswordPolicy{},
+				".spec.schemaRef.name",
+				func(o sigs.Object) []string {
+					pp, ok := o.(*snowplanev1alpha1.PasswordPolicy)
+					if !ok || pp.Spec.SchemaRef == nil {
+						return nil
+					}
+
+					return []string{pp.Spec.SchemaRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.schemaRef.name: %w", err)
+			}
+
+			bldr.Watches(
+				&snowplanev1alpha1.Database{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.PasswordPolicyList{} }, ".spec.databaseRef.name", "listing password policies for database watch")),
+			)
+
+			bldr.Watches(
+				&snowplanev1alpha1.Schema{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.PasswordPolicyList{} }, ".spec.schemaRef.name", "listing password policies for schema watch")),
+			)
+
+			return nil
+		},
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+func validateImmutableFields(_ context.Context, pp *snowplanev1alpha1.PasswordPolicy) error {
+	if reconciler.ShouldSkipImmutableValidation(pp) {
+		return nil
 	}
 
-	return snowflake.NewPasswordPolicyClient(sfC), cleanup, nil
+	if pp.Status.ShowOutput != nil {
+		if pp.Status.ShowOutput.Name != "" && !strings.EqualFold(pp.Spec.Name, pp.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", pp.Status.ShowOutput.Name, pp.Spec.Name)
+		}
+
+		if pp.Status.ShowOutput.DatabaseName != "" && pp.Status.DatabaseName != "" {
+			resolvedDB := snowflake.ParseDatabaseNameFromFQN(pp.Status.DatabaseName)
+			if !strings.EqualFold(resolvedDB, pp.Status.ShowOutput.DatabaseName) {
+				return fmt.Errorf("spec.databaseRef is immutable after creation (current database: %q, resolved: %q)", pp.Status.ShowOutput.DatabaseName, resolvedDB)
+			}
+		}
+
+		if pp.Status.ShowOutput.SchemaName != "" && pp.Status.SchemaName != "" {
+			resolvedSchema := snowflake.ParseSchemaNameFromFQN(pp.Status.SchemaName)
+			if !strings.EqualFold(resolvedSchema, pp.Status.ShowOutput.SchemaName) {
+				return fmt.Errorf("spec.schemaRef is immutable after creation (current schema: %q, resolved: %q)", pp.Status.ShowOutput.SchemaName, resolvedSchema)
+			}
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(pp *snowplanev1alpha1.PasswordPolicy, obs *snowflake.PasswordPolicyObservation) {
@@ -84,14 +208,7 @@ func applyObservation(pp *snowplanev1alpha1.PasswordPolicy, obs *snowflake.Passw
 			obs.ShowOutput.Name,
 		).FullyQualifiedName()
 
-		pp.Status.ShowOutput = &snowplanev1alpha1.PasswordPolicyShowOutput{
-			CreatedOn:    obs.ShowOutput.CreatedOn,
-			Name:         obs.ShowOutput.Name,
-			DatabaseName: obs.ShowOutput.DatabaseName,
-			SchemaName:   obs.ShowOutput.SchemaName,
-			Owner:        obs.ShowOutput.Owner,
-			Comment:      obs.ShowOutput.Comment,
-		}
+		pp.Status.ShowOutput = obs.ShowOutput
 	}
 
 	if obs.DescribeOutput != nil {

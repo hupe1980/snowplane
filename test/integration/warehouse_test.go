@@ -414,7 +414,7 @@ func TestWarehouse_StructuralDriftDetection(t *testing.T) {
 		if created.Load() {
 			return &snowflake.WarehouseObservation{
 				Exists: true,
-				ShowOutput: &snowflake.WarehouseShowOutput{
+				ShowOutput: &snowplanev1alpha1.WarehouseShowOutput{
 					CreatedOn:       "2024-01-01",
 					Name:            sfWH,
 					State:           "STARTED",

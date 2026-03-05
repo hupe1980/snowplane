@@ -3,14 +3,20 @@ package maskingpolicy
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	sigs "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/tracked"
@@ -35,44 +41,162 @@ type Service interface {
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
 // NewReconciler returns a new MaskingPolicy reconciler backed by the generic framework.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.MaskingPolicy, Service, *snowflake.MaskingPolicyObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.MaskingPolicy, Service, *snowflake.MaskingPolicyObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+func NewReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.MaskingPolicy, Service, *snowflake.MaskingPolicyObservation] {
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewMaskingPolicyClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
 // supply a custom ServiceFactory for testing.
 func NewReconcilerWithServiceFactory(
-	c client.Client,
+	c sigs.Client,
 	factory *clientfactory.ClientFactory,
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.MaskingPolicy, Service, *snowflake.MaskingPolicyObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.MaskingPolicy, Service, *snowflake.MaskingPolicyObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, recorder, sf))
+}
+
+// newAdapter creates the BaseAdapter for MaskingPolicy resources.
+func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.MaskingPolicy, Service, *snowflake.MaskingPolicyObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.MaskingPolicy, Service, *snowflake.MaskingPolicyObservation]{
+		ResourceNameVal:  "maskingpolicy",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.MaskingPolicy { return &snowplanev1alpha1.MaskingPolicy{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(mp *snowplanev1alpha1.MaskingPolicy) (reconciler.Identifier, error) {
+			dbName := snowflake.ParseDatabaseNameFromFQN(mp.Status.DatabaseName)
+			schemaName := snowflake.ParseSchemaNameFromFQN(mp.Status.SchemaName)
+			return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, mp.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) (*snowflake.MaskingPolicyObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.MaskingPolicyObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.MaskingPolicy, id snowflake.SchemaObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterMaskingPolicyOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.MaskingPolicy, id snowflake.SchemaObjectIdentifier, obs *reconciler.Observation[*snowflake.MaskingPolicyObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.MaskingPolicy, obs *reconciler.Observation[*snowflake.MaskingPolicyObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.MaskingPolicy, obs *reconciler.Observation[*snowflake.MaskingPolicyObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		SupportsCoA: true,
+		PreReconcileFn: func(ctx context.Context, mp *snowplanev1alpha1.MaskingPolicy) error {
+			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, mp,
+				mp.Namespace, mp.Spec.DatabaseRef, mp.Spec.DatabaseName, mp.Status.DatabaseName)
+			if err != nil {
+				return err
+			}
+
+			mp.Status.DatabaseName = dbFQN
+
+			schemaFQN, err := refresolver.PreReconcileSchemaRef(ctx, c, recorder, mp,
+				mp.Namespace, mp.Spec.SchemaRef, mp.Spec.SchemaName, mp.Status.SchemaName)
+			if err != nil {
+				return err
+			}
+
+			mp.Status.SchemaName = schemaFQN
+
+			refresolver.SetDatabaseAndSchemaResolvedCondition(mp, mp.Spec.DatabaseRef, mp.Spec.DatabaseName, mp.Spec.SchemaRef, mp.Spec.SchemaName)
+
+			return nil
+		},
+		SetupWatchesFn: func(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.MaskingPolicy{},
+				".spec.databaseRef.name",
+				func(o sigs.Object) []string {
+					mp, ok := o.(*snowplanev1alpha1.MaskingPolicy)
+					if !ok || mp.Spec.DatabaseRef == nil {
+						return nil
+					}
+
+					return []string{mp.Spec.DatabaseRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.databaseRef.name: %w", err)
+			}
+
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.MaskingPolicy{},
+				".spec.schemaRef.name",
+				func(o sigs.Object) []string {
+					mp, ok := o.(*snowplanev1alpha1.MaskingPolicy)
+					if !ok || mp.Spec.SchemaRef == nil {
+						return nil
+					}
+
+					return []string{mp.Spec.SchemaRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.schemaRef.name: %w", err)
+			}
+
+			bldr.Watches(
+				&snowplanev1alpha1.Database{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.MaskingPolicyList{} }, ".spec.databaseRef.name", "listing masking policies for database watch")),
+			)
+
+			bldr.Watches(
+				&snowplanev1alpha1.Schema{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.MaskingPolicyList{} }, ".spec.schemaRef.name", "listing masking policies for schema watch")),
+			)
+
+			return nil
+		},
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+func validateImmutableFields(_ context.Context, mp *snowplanev1alpha1.MaskingPolicy) error {
+	if reconciler.ShouldSkipImmutableValidation(mp) {
+		return nil
 	}
 
-	return snowflake.NewMaskingPolicyClient(sfC), cleanup, nil
+	if mp.Status.ShowOutput != nil {
+		if mp.Status.ShowOutput.Name != "" && !strings.EqualFold(mp.Spec.Name, mp.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", mp.Status.ShowOutput.Name, mp.Spec.Name)
+		}
+
+		if mp.Status.ShowOutput.DatabaseName != "" && mp.Status.DatabaseName != "" {
+			resolvedDB := snowflake.ParseDatabaseNameFromFQN(mp.Status.DatabaseName)
+			if !strings.EqualFold(resolvedDB, mp.Status.ShowOutput.DatabaseName) {
+				return fmt.Errorf("spec.databaseRef is immutable after creation (current database: %q, resolved: %q)", mp.Status.ShowOutput.DatabaseName, resolvedDB)
+			}
+		}
+
+		if mp.Status.ShowOutput.SchemaName != "" && mp.Status.SchemaName != "" {
+			resolvedSchema := snowflake.ParseSchemaNameFromFQN(mp.Status.SchemaName)
+			if !strings.EqualFold(resolvedSchema, mp.Status.ShowOutput.SchemaName) {
+				return fmt.Errorf("spec.schemaRef is immutable after creation (current schema: %q, resolved: %q)", mp.Status.ShowOutput.SchemaName, resolvedSchema)
+			}
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(mp *snowplanev1alpha1.MaskingPolicy, obs *snowflake.MaskingPolicyObservation) {
@@ -83,15 +207,7 @@ func applyObservation(mp *snowplanev1alpha1.MaskingPolicy, obs *snowflake.Maskin
 			obs.ShowOutput.Name,
 		).FullyQualifiedName()
 
-		mp.Status.ShowOutput = &snowplanev1alpha1.MaskingPolicyShowOutput{
-			CreatedOn:    obs.ShowOutput.CreatedOn,
-			Name:         obs.ShowOutput.Name,
-			DatabaseName: obs.ShowOutput.DatabaseName,
-			SchemaName:   obs.ShowOutput.SchemaName,
-			Kind:         obs.ShowOutput.Kind,
-			Owner:        obs.ShowOutput.Owner,
-			Comment:      obs.ShowOutput.Comment,
-		}
+		mp.Status.ShowOutput = obs.ShowOutput
 	}
 }
 

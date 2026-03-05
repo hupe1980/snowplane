@@ -1,0 +1,13 @@
+# SQLStatement that contains destructive SQL (DROP/TRUNCATE/DELETE).
+# Requires dangerousAllowDestructive: true as a safety guard.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: SQLStatement
+metadata:
+  name: cleanup-staging
+  namespace: snowplane-system
+spec:
+  providerRef:
+    name: default
+  execute: |
+    DROP TABLE IF EXISTS MY_DB.STAGING.TEMP_IMPORT
+  dangerousAllowDestructive: true

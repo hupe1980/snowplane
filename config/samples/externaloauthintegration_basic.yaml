@@ -1,0 +1,20 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ExternalOAuthIntegration
+metadata:
+  name: my-external-oauth
+spec:
+  providerRef:
+    name: default
+  name: MY_EXTERNAL_OAUTH
+  externalOAuthType: "OKTA"
+  issuer: "https://dev-123456.okta.com"
+  tokenUserMappingClaim: "sub"
+  snowflakeUserMappingAttribute: "LOGIN_NAME"
+  jwsKeysURL: "https://dev-123456.okta.com/oauth2/v1/keys"
+  audienceList:
+    - "https://myaccount.snowflakecomputing.com"
+  allowedRoles:
+    - "ANALYST"
+    - "DATA_ENGINEER"
+  enabled: true
+  comment: "External OAuth integration managed by Snowplane"

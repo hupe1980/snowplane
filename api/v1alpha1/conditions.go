@@ -44,6 +44,8 @@ const (
 	ReasonResourceExists        = "ResourceAlreadyExists"
 	ReasonRecoverableError      = "RecoverableError"
 	ReasonNamespaceNotAllowed   = "NamespaceNotAllowed"
+	ReasonDatabaseNotAllowed    = "DatabaseNotAllowed"
+	ReasonSchemaNotAllowed      = "SchemaNotAllowed"
 	ReasonOrphanedResource      = "OrphanedResource"
 	ReasonConflictDetected      = "ConflictDetected"
 	ReasonForceNewActive        = "ForceNewActive"

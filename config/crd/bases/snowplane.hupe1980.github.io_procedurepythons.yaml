@@ -79,11 +79,13 @@ spec:
                       type: string
                     name:
                       description: Name is the argument name.
+                      maxLength: 255
                       minLength: 1
                       type: string
                     type:
                       description: Type is the Snowflake data type (e.g. VARCHAR,
                         NUMBER, TIMESTAMP_NTZ).
+                      maxLength: 255
                       minLength: 1
                       type: string
                   required:
@@ -102,6 +104,7 @@ spec:
               databaseName:
                 description: DatabaseName is the Snowflake database identifier (e.g.
                   "ANALYTICS").
+                maxLength: 255
                 minLength: 1
                 type: string
               databaseRef:
@@ -109,7 +112,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -139,6 +149,7 @@ spec:
               handler:
                 description: Handler is the fully qualified Python handler function
                   (e.g. "my_module.my_function").
+                maxLength: 255
                 minLength: 1
                 type: string
               imports:
@@ -181,6 +192,7 @@ spec:
               name:
                 description: Name is the Snowflake procedure name. Immutable after
                   creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               nullInputBehavior:
@@ -210,6 +222,7 @@ spec:
                   name:
                     default: default
                     description: Name of the ProviderConfig to use.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   namespace:
@@ -222,15 +235,18 @@ spec:
               returns:
                 description: Returns is the return type (e.g. "VARCHAR", "TABLE(col1
                   VARCHAR, col2 NUMBER)").
+                maxLength: 255
                 minLength: 1
                 type: string
               runtimeVersion:
                 description: RuntimeVersion is the Python runtime version (e.g. "3.8",
                   "3.11").
+                maxLength: 255
                 minLength: 1
                 type: string
               schemaName:
                 description: SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
+                maxLength: 255
                 minLength: 1
                 type: string
               schemaRef:
@@ -238,7 +254,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -255,11 +278,13 @@ spec:
                       description: |-
                         SecretName is the fully qualified name of the Snowflake secret
                         (e.g. "MY_DB"."MY_SCHEMA"."MY_SECRET").
+                      maxLength: 255
                       minLength: 1
                       type: string
                     variableName:
                       description: VariableName is the variable name used to reference
                         the secret in handler code.
+                      maxLength: 255
                       minLength: 1
                       type: string
                   required:
@@ -272,6 +297,7 @@ spec:
                 type: boolean
               snowparkPackage:
                 description: SnowparkPackage is the Snowpark package spec (e.g. "snowflake-snowpark-python").
+                maxLength: 255
                 minLength: 1
                 type: string
               useRole:
@@ -281,6 +307,7 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                maxLength: 255
                 minLength: 1
                 type: string
             required:
@@ -414,6 +441,13 @@ spec:
                   comparing ObservedGeneration vs Generation because metadata-only
                   changes (labels, annotations) increment Generation without changing
                   the spec.
+                type: string
+              lastReconcileTime:
+                description: |-
+                  LastReconcileTime is the timestamp of the most recent successful
+                  reconciliation. Useful for SLO monitoring and diagnosing whether
+                  reconciliation is running for a specific resource.
+                format: date-time
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent metadata.generation

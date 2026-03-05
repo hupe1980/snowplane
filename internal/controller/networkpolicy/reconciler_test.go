@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -81,7 +80,7 @@ func newTestNetworkPolicy(name, namespace string) *snowplanev1alpha1.NetworkPoli
 func successfulObservation() *snowflake.NetworkPolicyObservation {
 	return &snowflake.NetworkPolicyObservation{
 		Exists: true,
-		ShowOutput: &snowflake.NetworkPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.NetworkPolicyShowOutput{
 			CreatedOn:              "2024-01-01",
 			Name:                   "MY_POLICY",
 			Comment:                "",
@@ -99,16 +98,14 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 		cb = cb.WithRuntimeObjects(obj)
 	}
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	return &reconciler.GenericReconciler[*snowplanev1alpha1.NetworkPolicy, Service, *snowflake.NetworkPolicyObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: record.NewFakeRecorder(100),
-		Adapter: &adapter{
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
-		},
+		Adapter: newAdapter(func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
+		}),
 		GVK: snowplanev1alpha1.GroupVersion.WithKind("NetworkPolicy"),
 	}
 }
@@ -530,7 +527,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 		},
 	}
 	obs := &snowflake.NetworkPolicyObservation{
-		ShowOutput: &snowflake.NetworkPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.NetworkPolicyShowOutput{
 			Name:                   "MY_POLICY",
 			Comment:                "test",
 			EntriesInAllowedIPList: "192.168.1.0/24",
@@ -550,7 +547,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 		},
 	}
 	obs := &snowflake.NetworkPolicyObservation{
-		ShowOutput: &snowflake.NetworkPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.NetworkPolicyShowOutput{
 			Name:    "MY_POLICY",
 			Comment: "drifted",
 		},

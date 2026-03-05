@@ -213,6 +213,10 @@ func TestIsTerminal(t *testing.T) {
 	SetNotReady(obj, "ResourceAlreadyExists", "bad")
 	assert.True(t, IsTerminal(obj))
 
+	// Ready=False with ConflictDetected → terminal.
+	SetNotReady(obj, "ConflictDetected", "bad")
+	assert.True(t, IsTerminal(obj))
+
 	// Ready=False with ReconcileError → NOT terminal.
 	SetNotReady(obj, "ReconcileError", "retry")
 	assert.False(t, IsTerminal(obj))

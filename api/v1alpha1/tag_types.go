@@ -27,7 +27,7 @@ type TagSpec struct {
 	// DatabaseRef references a Database CR in the same namespace.
 	// Mutually exclusive with DatabaseName. Immutable after creation.
 	// +optional
-	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
+	DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
 	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
@@ -39,7 +39,7 @@ type TagSpec struct {
 	// SchemaRef references a Schema CR in the same namespace.
 	// Mutually exclusive with SchemaName. Immutable after creation.
 	// +optional
-	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
+	SchemaRef *ObjectReference `json:"schemaRef,omitempty"`
 
 	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// Mutually exclusive with SchemaRef. Immutable after creation.

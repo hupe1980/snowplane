@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,32 +17,7 @@ type MaterializedViewObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW MATERIALIZED VIEWS row.
-	ShowOutput *MaterializedViewShowOutput
-}
-
-// MaterializedViewShowOutput contains the fields from SHOW MATERIALIZED VIEWS.
-type MaterializedViewShowOutput struct {
-	CreatedOn           string
-	Name                string
-	DatabaseName        string
-	SchemaName          string
-	ClusterBy           string
-	Rows                string
-	Bytes               string
-	SourceDatabaseName  string
-	SourceSchemaName    string
-	SourceTableName     string
-	RefreshedOn         string
-	CompactedOn         string
-	Owner               string
-	Invalid             string
-	InvalidReason       string
-	BehindBy            string
-	Comment             string
-	Text                string
-	IsSecure            string
-	AutomaticClustering string
-	OwnerRoleType       string
+	ShowOutput *v1alpha1.MaterializedViewShowOutput
 }
 
 // CreateMaterializedViewOptions holds the parameters for creating a materialized view.
@@ -245,7 +221,7 @@ func buildShowMaterializedViewByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW MATERIALIZED VIEWS for a specific view name within a schema.
-func (c *MaterializedViewClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*MaterializedViewShowOutput, error) {
+func (c *MaterializedViewClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.MaterializedViewShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("materialized view name is required"))
 	}
@@ -277,9 +253,9 @@ func (c *MaterializedViewClient) Observe(ctx context.Context, name SchemaObjectI
 }
 
 // scanMaterializedViewShowOutput scans SHOW MATERIALIZED VIEWS results for a matching row.
-func scanMaterializedViewShowOutput(rows *sql.Rows, name string) (*MaterializedViewShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*MaterializedViewShowOutput, error) {
-		return &MaterializedViewShowOutput{
+func scanMaterializedViewShowOutput(rows *sql.Rows, name string) (*v1alpha1.MaterializedViewShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.MaterializedViewShowOutput, error) {
+		return &v1alpha1.MaterializedViewShowOutput{
 			CreatedOn:           m["created_on"],
 			Name:                m["name"],
 			DatabaseName:        m["database_name"],

@@ -24,7 +24,7 @@ type SchemaSpec struct {
 	// DatabaseRef references a Database CR in the same namespace.
 	// Mutually exclusive with DatabaseName. Immutable after creation.
 	// +optional
-	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
+	DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
 	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Use this when the database is NOT managed by Snowplane.

@@ -11,6 +11,7 @@ import (
 	"database/sql"
 	"encoding/asn1"
 	"encoding/pem"
+	"fmt"
 	"testing"
 	"time"
 
@@ -422,4 +423,32 @@ func TestRow_Scan_PassesThroughOnSuccess(t *testing.T) {
 
 	// Static compile-time check: Client.QueryRow returns *Row.
 	var _ = (*Client)(nil).QueryRow
+}
+
+func TestNewErrorRow_Scan_ReturnsPresetError(t *testing.T) {
+	t.Parallel()
+
+	presetErr := fmt.Errorf("test: preset error")
+	row := NewErrorRow(presetErr)
+
+	var dummy int
+	scanErr := row.Scan(&dummy)
+	assert.ErrorIs(t, scanErr, presetErr, "Scan must return the preset error")
+}
+
+func TestNewErrorRow_Err_ReturnsPresetError(t *testing.T) {
+	t.Parallel()
+
+	presetErr := fmt.Errorf("test: preset error")
+	row := NewErrorRow(presetErr)
+
+	assert.ErrorIs(t, row.Err(), presetErr, "Err must return the preset error")
+}
+
+func TestNewErrorRow_NilRow_Field(t *testing.T) {
+	t.Parallel()
+
+	row := NewErrorRow(fmt.Errorf("test error"))
+	assert.Nil(t, row.row, "NewErrorRow must not set the underlying sql.Row")
+	assert.NotNil(t, row.err, "NewErrorRow must set the err field")
 }

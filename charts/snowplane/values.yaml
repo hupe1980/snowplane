@@ -56,6 +56,8 @@ securityContext:
   capabilities:
     drop: ["ALL"]
   readOnlyRootFilesystem: true
+  runAsUser: 65532
+  runAsGroup: 65532
 
 resources:
   limits:
@@ -84,6 +86,9 @@ controller:
   requeueInterval: 5m
   # -- Enable alpha-maturity resource controllers
   enableAlphaResources: true
+  # -- Enable the SQLStatement escape-hatch controller.
+  # WARNING: This allows executing arbitrary SQL against Snowflake — use with caution.
+  enableSQLStatement: false
   # -- Comma-separated list of controllers to disable (e.g. "grant,view")
   disableControllers: ""
   # -- Comma-separated allowlist of Snowflake roles permitted in ProviderConfig (case-insensitive).
@@ -241,3 +246,30 @@ grafana:
     labels: {}
     # -- Annotations for the dashboard ConfigMap
     annotations: {}
+
+# -- Ownership-conflict validating admission webhook.
+# Rejects CRs at admission time when another CR already manages the same
+# Snowflake resource, preventing post-reconciliation conflict detection.
+webhook:
+  # -- Enable the ownership-conflict validating webhook.
+  enabled: false
+  # -- Webhook failure policy: Ignore (safe default — allows admission if the webhook
+  # is unreachable) or Fail (strict — rejects admission on webhook failure).
+  failurePolicy: Ignore
+  # -- Webhook timeout in seconds (API server aborts after this duration).
+  timeoutSeconds: 10
+  # -- Webhook server port inside the controller pod.
+  port: 9443
+  # -- Directory inside the pod where TLS cert/key are mounted.
+  certDir: /tmp/k8s-webhook-server/serving-certs
+  # -- Optional namespace selector to limit webhook scope.
+  # Example: matchLabels: { snowplane-webhook: "enabled" }
+  namespaceSelector: {}
+  # -- cert-manager integration for automatic TLS certificate provisioning.
+  certManager:
+    # -- Use cert-manager to provision and inject the webhook TLS certificate.
+    enabled: true
+    # -- Override the issuer reference. When empty, a self-signed Issuer is created automatically.
+    issuerRef: {}
+  # -- Base64-encoded CA bundle (only needed when certManager.enabled is false).
+  caBundle: ""

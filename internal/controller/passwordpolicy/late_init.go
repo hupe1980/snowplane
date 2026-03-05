@@ -31,10 +31,10 @@ func lateInitInt32FromMap(target **int32, m map[string]string, key string) bool 
 	return true
 }
 
-// LateInitialize fills nil spec fields from the observed Snowflake state.
+// lateInitialize fills nil spec fields from the observed Snowflake state.
 // Only called during adoption (adoptionPolicy=adopt, first reconcile).
 // Ref fields (DatabaseRef, SchemaRef) are excluded.
-func (a *adapter) LateInitialize(obj *snowplanev1alpha1.PasswordPolicy, obs *reconciler.Observation[*snowflake.PasswordPolicyObservation]) bool {
+func lateInitialize(obj *snowplanev1alpha1.PasswordPolicy, obs *reconciler.Observation[*snowflake.PasswordPolicyObservation]) bool {
 	detail := obs.Detail
 	if detail == nil {
 		return false
@@ -99,4 +99,4 @@ func (a *adapter) LateInitialize(obj *snowplanev1alpha1.PasswordPolicy, obs *rec
 	return modified
 }
 
-var _ reconciler.LateInitializer[*snowplanev1alpha1.PasswordPolicy, *snowflake.PasswordPolicyObservation] = (*adapter)(nil)
+var _ reconciler.LateInitializer[*snowplanev1alpha1.PasswordPolicy, *snowflake.PasswordPolicyObservation] = (*reconciler.BaseAdapter[*snowplanev1alpha1.PasswordPolicy, Service, *snowflake.PasswordPolicyObservation])(nil)

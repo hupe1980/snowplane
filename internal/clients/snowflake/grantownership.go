@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -15,17 +16,7 @@ type GrantOwnershipObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW GRANTS row for the OWNERSHIP privilege.
-	ShowOutput *GrantOwnershipShowOutput
-}
-
-// GrantOwnershipShowOutput contains the fields from SHOW GRANTS for OWNERSHIP.
-type GrantOwnershipShowOutput struct {
-	CreatedOn   string
-	Privilege   string
-	GrantedOn   string
-	Name        string
-	GrantedTo   string
-	GranteeName string
+	ShowOutput *v1alpha1.GrantOwnershipShowOutput
 }
 
 // GrantOwnershipIdentifier identifies the ownership grant to observe.
@@ -199,7 +190,7 @@ func scanOwnershipGrant(rows *sql.Rows, expectedGrantee string) (*GrantOwnership
 			continue
 		}
 
-		out := &GrantOwnershipShowOutput{
+		out := &v1alpha1.GrantOwnershipShowOutput{
 			CreatedOn:   colMap["created_on"],
 			Privilege:   colMap["privilege"],
 			GrantedOn:   colMap["granted_on"],

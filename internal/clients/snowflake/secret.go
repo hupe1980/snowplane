@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -25,22 +26,10 @@ type SecretObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW SECRETS row.
-	ShowOutput *SecretShowOutput
+	ShowOutput *v1alpha1.SecretShowOutput
 
 	// DescribeOutput contains the DESCRIBE SECRET output (key-value pairs).
 	DescribeOutput map[string]string
-}
-
-// SecretShowOutput contains the fields from SHOW SECRETS.
-type SecretShowOutput struct {
-	CreatedOn    string
-	Name         string
-	DatabaseName string
-	SchemaName   string
-	Owner        string
-	Comment      string
-	SecretType   string
-	OAuthScopes  string
 }
 
 // CreateSecretOptions holds the parameters for creating a secret.
@@ -354,7 +343,7 @@ func buildShowSecretByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW SECRETS for a specific secret.
-func (sc *SecretClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*SecretShowOutput, error) {
+func (sc *SecretClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.SecretShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("secret name is required"))
 	}
@@ -413,9 +402,9 @@ func (sc *SecretClient) Observe(ctx context.Context, name SchemaObjectIdentifier
 }
 
 // scanSecretShowOutput scans SHOW SECRETS results for a matching row.
-func scanSecretShowOutput(rows *sql.Rows, name string) (*SecretShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*SecretShowOutput, error) {
-		return &SecretShowOutput{
+func scanSecretShowOutput(rows *sql.Rows, name string) (*v1alpha1.SecretShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.SecretShowOutput, error) {
+		return &v1alpha1.SecretShowOutput{
 			CreatedOn:    m["created_on"],
 			Name:         m["name"],
 			DatabaseName: m["database_name"],

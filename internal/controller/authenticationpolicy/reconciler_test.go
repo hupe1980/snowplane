@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -100,7 +99,7 @@ func newTestAuthenticationPolicy(name, namespace string) *snowplanev1alpha1.Auth
 func successfulObservation() *snowflake.AuthenticationPolicyObservation {
 	return &snowflake.AuthenticationPolicyObservation{
 		Exists: true,
-		ShowOutput: &snowflake.AuthenticationPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.AuthenticationPolicyShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         "MY_AUTH_POLICY",
 			DatabaseName: "MY_DB",
@@ -125,22 +124,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.AuthenticationPolicy, Service, *snowflake.AuthenticationPolicyObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("AuthenticationPolicy"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("AuthenticationPolicy")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -433,7 +427,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.AuthenticationPolicyObservation{
-		ShowOutput: &snowflake.AuthenticationPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.AuthenticationPolicyShowOutput{
 			Name: "MY_AUTH_POLICY",
 		},
 	}
@@ -453,7 +447,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.AuthenticationPolicyObservation{
-		ShowOutput: &snowflake.AuthenticationPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.AuthenticationPolicyShowOutput{
 			Name:    "MY_AUTH_POLICY",
 			Comment: "drifted",
 		},
@@ -475,7 +469,7 @@ func TestDetectDrift_MfaEnrollmentDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.AuthenticationPolicyObservation{
-		ShowOutput: &snowflake.AuthenticationPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.AuthenticationPolicyShowOutput{
 			Name: "MY_AUTH_POLICY",
 		},
 		DescribeOutput: map[string]string{
@@ -499,7 +493,7 @@ func TestDetectDrift_AuthenticationMethodsDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.AuthenticationPolicyObservation{
-		ShowOutput: &snowflake.AuthenticationPolicyShowOutput{Name: "MY_AUTH_POLICY"},
+		ShowOutput: &snowplanev1alpha1.AuthenticationPolicyShowOutput{Name: "MY_AUTH_POLICY"},
 		DescribeOutput: map[string]string{
 			"AUTHENTICATION_METHODS": "[PASSWORD, OAUTH]",
 		},
@@ -521,7 +515,7 @@ func TestDetectDrift_ClientTypesDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.AuthenticationPolicyObservation{
-		ShowOutput: &snowflake.AuthenticationPolicyShowOutput{Name: "MY_AUTH_POLICY"},
+		ShowOutput: &snowplanev1alpha1.AuthenticationPolicyShowOutput{Name: "MY_AUTH_POLICY"},
 		DescribeOutput: map[string]string{
 			"CLIENT_TYPES": "[SNOWFLAKE_UI]",
 		},
@@ -543,7 +537,7 @@ func TestDetectDrift_SecurityIntegrationsDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.AuthenticationPolicyObservation{
-		ShowOutput: &snowflake.AuthenticationPolicyShowOutput{Name: "MY_AUTH_POLICY"},
+		ShowOutput: &snowplanev1alpha1.AuthenticationPolicyShowOutput{Name: "MY_AUTH_POLICY"},
 		DescribeOutput: map[string]string{
 			"SECURITY_INTEGRATIONS": "[OTHER_INT]",
 		},
@@ -570,7 +564,7 @@ func TestDetectDrift_PatPolicyDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.AuthenticationPolicyObservation{
-		ShowOutput: &snowflake.AuthenticationPolicyShowOutput{Name: "MY_AUTH_POLICY"},
+		ShowOutput: &snowplanev1alpha1.AuthenticationPolicyShowOutput{Name: "MY_AUTH_POLICY"},
 		DescribeOutput: map[string]string{
 			"PAT_DEFAULT_EXPIRY_IN_DAYS":                     "60",
 			"PAT_MAX_EXPIRY_IN_DAYS":                         "90",
@@ -602,7 +596,7 @@ func TestDetectDrift_WorkloadIdentityDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.AuthenticationPolicyObservation{
-		ShowOutput: &snowflake.AuthenticationPolicyShowOutput{Name: "MY_AUTH_POLICY"},
+		ShowOutput: &snowplanev1alpha1.AuthenticationPolicyShowOutput{Name: "MY_AUTH_POLICY"},
 		DescribeOutput: map[string]string{
 			"WORKLOAD_IDENTITY_ALLOWED_PROVIDERS":    "[AWS, GCP]",
 			"WORKLOAD_IDENTITY_ALLOWED_AWS_ACCOUNTS": "[123456789012]",
@@ -630,7 +624,7 @@ func TestDetectDrift_MfaSubPolicyDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.AuthenticationPolicyObservation{
-		ShowOutput: &snowflake.AuthenticationPolicyShowOutput{Name: "MY_AUTH_POLICY"},
+		ShowOutput: &snowplanev1alpha1.AuthenticationPolicyShowOutput{Name: "MY_AUTH_POLICY"},
 		DescribeOutput: map[string]string{
 			"MFA_AUTHENTICATION_METHODS":             "[TOTP, EMAIL]",
 			"ENFORCE_MFA_ON_EXTERNAL_AUTHENTICATION": "OPTIONAL",
@@ -719,8 +713,7 @@ func TestImmutableName(t *testing.T) {
 		Name: "MY_AUTH_POLICY",
 	}
 
-	a := &adapter{}
-	err := a.ValidateImmutableFields(context.Background(), ap)
+	err := validateImmutableFields(context.Background(), ap)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "immutable")
 }
@@ -736,8 +729,7 @@ func TestImmutableDatabase(t *testing.T) {
 		DatabaseName: "OLD_DB",
 	}
 
-	a := &adapter{}
-	err := a.ValidateImmutableFields(context.Background(), ap)
+	err := validateImmutableFields(context.Background(), ap)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "immutable")
 	assert.Contains(t, err.Error(), "databaseRef")
@@ -755,8 +747,7 @@ func TestImmutableSchema(t *testing.T) {
 		SchemaName:   "OLD_SCHEMA",
 	}
 
-	a := &adapter{}
-	err := a.ValidateImmutableFields(context.Background(), ap)
+	err := validateImmutableFields(context.Background(), ap)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "immutable")
 	assert.Contains(t, err.Error(), "schemaRef")
@@ -828,7 +819,7 @@ func TestBuildAlterOptions_SubPolicyChanges(t *testing.T) {
 
 	obs := &snowflake.AuthenticationPolicyObservation{
 		Exists: true,
-		ShowOutput: &snowflake.AuthenticationPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.AuthenticationPolicyShowOutput{
 			Name: "MY_AUTH_POLICY",
 		},
 		DescribeOutput: map[string]string{

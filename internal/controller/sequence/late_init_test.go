@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -26,14 +27,12 @@ func newSequence() *snowplanev1alpha1.Sequence {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newSequence()
 		obs := &reconciler.Observation[*snowflake.SequenceObservation]{
 			Exists: true,
 			Detail: &snowflake.SequenceObservation{
-				ShowOutput: &snowflake.SequenceShowOutput{
+				ShowOutput: &snowplanev1alpha1.SequenceShowOutput{
 					Interval: "5",
 					Ordering: "ORDER",
 					Comment:  "my sequence",
@@ -41,7 +40,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 
 		assert.Equal(t, int64(5), *obj.Spec.Increment)
@@ -56,7 +55,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.SequenceObservation]{
 			Exists: true,
 			Detail: &snowflake.SequenceObservation{
-				ShowOutput: &snowflake.SequenceShowOutput{
+				ShowOutput: &snowplanev1alpha1.SequenceShowOutput{
 					Interval: "5",
 					Ordering: "NOORDER",
 					Comment:  "comment",
@@ -64,7 +63,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified) // Ordering and Comment were set
 
 		assert.Equal(t, int64(10), *obj.Spec.Increment) // preserved
@@ -81,7 +80,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.SequenceObservation]{
 			Exists: true,
 			Detail: &snowflake.SequenceObservation{
-				ShowOutput: &snowflake.SequenceShowOutput{
+				ShowOutput: &snowplanev1alpha1.SequenceShowOutput{
 					Interval: "99",
 					Ordering: "NOORDER",
 					Comment:  "other",
@@ -89,7 +88,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -98,13 +97,13 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.SequenceObservation]{
 			Exists: true,
 			Detail: &snowflake.SequenceObservation{
-				ShowOutput: &snowflake.SequenceShowOutput{
+				ShowOutput: &snowplanev1alpha1.SequenceShowOutput{
 					Interval: "not-a-number",
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 		assert.Nil(t, obj.Spec.Increment)
 	})
@@ -116,7 +115,7 @@ func TestLateInitialize(t *testing.T) {
 			Detail: nil,
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 }

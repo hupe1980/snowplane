@@ -57,7 +57,7 @@ type GrantOwnershipSpec struct {
 	// AccountRoleRef references an AccountRole CR in the same namespace.
 	// Mutually exclusive with AccountRole, DatabaseRole, and DatabaseRoleRef.
 	// +optional
-	AccountRoleRef *LocalObjectReference `json:"accountRoleRef,omitempty"`
+	AccountRoleRef *ObjectReference `json:"accountRoleRef,omitempty"`
 
 	// DatabaseRole is the fully qualified database role name (e.g. "MY_DB"."MY_ROLE").
 	// Mutually exclusive with AccountRole, AccountRoleRef, and DatabaseRoleRef.
@@ -69,7 +69,7 @@ type GrantOwnershipSpec struct {
 	// DatabaseRoleRef references a DatabaseRole CR in the same namespace.
 	// Mutually exclusive with AccountRole, AccountRoleRef, and DatabaseRole.
 	// +optional
-	DatabaseRoleRef *LocalObjectReference `json:"databaseRoleRef,omitempty"`
+	DatabaseRoleRef *ObjectReference `json:"databaseRoleRef,omitempty"`
 
 	// CurrentGrantsBehavior specifies how existing outbound privileges
 	// on the object are handled during the ownership transfer.

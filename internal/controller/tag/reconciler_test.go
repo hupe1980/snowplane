@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -86,7 +85,7 @@ func newTestTag(name, namespace string) *snowplanev1alpha1.Tag {
 func successfulObservation() *snowflake.TagObservation {
 	return &snowflake.TagObservation{
 		Exists: true,
-		ShowOutput: &snowflake.TagShowOutput{
+		ShowOutput: &snowplanev1alpha1.TagShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         "COST_CENTER",
 			DatabaseName: "MY_DB",
@@ -107,22 +106,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Tag, Service, *snowflake.TagObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("Tag"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("Tag")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -464,7 +458,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.TagObservation{
-		ShowOutput: &snowflake.TagShowOutput{
+		ShowOutput: &snowplanev1alpha1.TagShowOutput{
 			Name:          "COST_CENTER",
 			DatabaseName:  "MY_DB",
 			SchemaName:    "MY_SCHEMA",
@@ -492,7 +486,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.TagObservation{
-		ShowOutput: &snowflake.TagShowOutput{
+		ShowOutput: &snowplanev1alpha1.TagShowOutput{
 			Name:         "COST_CENTER",
 			DatabaseName: "MY_DB",
 			SchemaName:   "MY_SCHEMA",

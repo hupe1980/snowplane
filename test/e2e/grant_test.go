@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestAccountRoleGrant_FullLifecycle creates a database and account role, grants
+// TestGrantPrivilegesToAccountRole_FullLifecycle creates a database and account role, grants
 // USAGE on the database to the role, verifies the grant exists in Snowflake,
 // then deletes the grant and confirms it was revoked.
-func TestAccountRoleGrant_FullLifecycle(t *testing.T) {
+func TestGrantPrivilegesToAccountRole_FullLifecycle(t *testing.T) {
 	dbSFName := uniqueName("DB_FOR_ARGRANT")
 	dbName := k8sName(dbSFName)
 	dbCleanup := createCR(t, gvrDatabase, newDatabaseCR(dbName, dbSFName, "grant test db"))
@@ -25,22 +25,22 @@ func TestAccountRoleGrant_FullLifecycle(t *testing.T) {
 	waitForReady(t, gvrAccountRole, roleName)
 
 	grantName := roleName + "-usage-db"
-	grantCR := newAccountRoleGrantCR(grantName, "USAGE", roleSFName, map[string]interface{}{
+	grantCR := newGrantPrivilegesToAccountRoleCR(grantName, "USAGE", roleSFName, map[string]interface{}{
 		"accountObject": map[string]interface{}{
 			"objectType": "DATABASE",
 			"objectName": dbSFName,
 		},
 	})
-	grantCleanup := createCR(t, gvrAccountRoleGrant, grantCR)
+	grantCleanup := createCR(t, gvrGrantPrivilegesToAccountRole, grantCR)
 	defer grantCleanup()
-	waitForReady(t, gvrAccountRoleGrant, grantName)
+	waitForReady(t, gvrGrantPrivilegesToAccountRole, grantName)
 
 	require.Eventually(t, func() bool {
 		return sfGrantExists(t, roleSFName, "USAGE", "DATABASE", dbSFName)
 	}, defaultTimeout, defaultInterval, "USAGE grant on DATABASE should exist")
 
-	deleteCR(t, gvrAccountRoleGrant, grantName)
-	waitForCRDeleted(t, gvrAccountRoleGrant, grantName)
+	deleteCR(t, gvrGrantPrivilegesToAccountRole, grantName)
+	waitForCRDeleted(t, gvrGrantPrivilegesToAccountRole, grantName)
 
 	require.Eventually(t, func() bool {
 		return !sfGrantExists(t, roleSFName, "USAGE", "DATABASE", dbSFName)
@@ -52,9 +52,9 @@ func TestAccountRoleGrant_FullLifecycle(t *testing.T) {
 	waitForCRDeleted(t, gvrDatabase, dbName)
 }
 
-// TestDatabaseRoleGrant_FullLifecycle creates a database, schema, and database role,
+// TestGrantPrivilegesToDatabaseRole_FullLifecycle creates a database, schema, and database role,
 // grants USAGE on the schema to the database role, then cleans up.
-func TestDatabaseRoleGrant_FullLifecycle(t *testing.T) {
+func TestGrantPrivilegesToDatabaseRole_FullLifecycle(t *testing.T) {
 	dbSFName := uniqueName("DB_FOR_DRGRANT")
 	dbName := k8sName(dbSFName)
 	dbCleanup := createCR(t, gvrDatabase, newDatabaseCR(dbName, dbSFName, "dbrole grant test"))
@@ -75,20 +75,20 @@ func TestDatabaseRoleGrant_FullLifecycle(t *testing.T) {
 
 	grantName := droleName + "-usage-schema"
 	fqDBRole := dbSFName + "." + droleSFName
-	grantCR := newDatabaseRoleGrantCR(grantName, "USAGE", fqDBRole, map[string]interface{}{
+	grantCR := newGrantPrivilegesToDatabaseRoleCR(grantName, "USAGE", fqDBRole, map[string]interface{}{
 		"schema": map[string]interface{}{
 			"schemaName": dbSFName + "." + schemaSFName,
 		},
 	})
-	grantCleanup := createCR(t, gvrDatabaseRoleGrant, grantCR)
+	grantCleanup := createCR(t, gvrGrantPrivilegesToDatabaseRole, grantCR)
 	defer grantCleanup()
-	waitForReady(t, gvrDatabaseRoleGrant, grantName)
+	waitForReady(t, gvrGrantPrivilegesToDatabaseRole, grantName)
 
-	fqn := getStatusField(t, gvrDatabaseRoleGrant, grantName, "fullyQualifiedName")
+	fqn := getStatusField(t, gvrGrantPrivilegesToDatabaseRole, grantName, "fullyQualifiedName")
 	require.NotEmpty(t, fqn, "grant FQN should be set")
 
-	deleteCR(t, gvrDatabaseRoleGrant, grantName)
-	waitForCRDeleted(t, gvrDatabaseRoleGrant, grantName)
+	deleteCR(t, gvrGrantPrivilegesToDatabaseRole, grantName)
+	waitForCRDeleted(t, gvrGrantPrivilegesToDatabaseRole, grantName)
 	deleteCR(t, gvrDatabaseRole, droleName)
 	waitForCRDeleted(t, gvrDatabaseRole, droleName)
 	deleteCR(t, gvrSchema, schemaName)
@@ -97,9 +97,9 @@ func TestDatabaseRoleGrant_FullLifecycle(t *testing.T) {
 	waitForCRDeleted(t, gvrDatabase, dbName)
 }
 
-// TestAccountRoleGrant_FutureGrant grants SELECT on future tables in a
+// TestGrantPrivilegesToAccountRole_FutureGrant grants SELECT on future tables in a
 // database to an account role, verifying the future grant is recorded.
-func TestAccountRoleGrant_FutureGrant(t *testing.T) {
+func TestGrantPrivilegesToAccountRole_FutureGrant(t *testing.T) {
 	dbSFName := uniqueName("DB_FOR_FUTGRANT")
 	dbName := k8sName(dbSFName)
 	dbCleanup := createCR(t, gvrDatabase, newDatabaseCR(dbName, dbSFName, "future grant test"))
@@ -113,7 +113,7 @@ func TestAccountRoleGrant_FutureGrant(t *testing.T) {
 	waitForReady(t, gvrAccountRole, roleName)
 
 	grantName := roleName + "-future-tables"
-	grantCR := newAccountRoleGrantCR(grantName, "SELECT", roleSFName, map[string]interface{}{
+	grantCR := newGrantPrivilegesToAccountRoleCR(grantName, "SELECT", roleSFName, map[string]interface{}{
 		"schemaObject": map[string]interface{}{
 			"future": map[string]interface{}{
 				"objectTypePlural": "TABLES",
@@ -121,15 +121,15 @@ func TestAccountRoleGrant_FutureGrant(t *testing.T) {
 			},
 		},
 	})
-	grantCleanup := createCR(t, gvrAccountRoleGrant, grantCR)
+	grantCleanup := createCR(t, gvrGrantPrivilegesToAccountRole, grantCR)
 	defer grantCleanup()
-	waitForReady(t, gvrAccountRoleGrant, grantName)
+	waitForReady(t, gvrGrantPrivilegesToAccountRole, grantName)
 
-	fqn := getStatusField(t, gvrAccountRoleGrant, grantName, "fullyQualifiedName")
+	fqn := getStatusField(t, gvrGrantPrivilegesToAccountRole, grantName, "fullyQualifiedName")
 	require.NotEmpty(t, fqn, "future grant FQN should be set")
 
-	deleteCR(t, gvrAccountRoleGrant, grantName)
-	waitForCRDeleted(t, gvrAccountRoleGrant, grantName)
+	deleteCR(t, gvrGrantPrivilegesToAccountRole, grantName)
+	waitForCRDeleted(t, gvrGrantPrivilegesToAccountRole, grantName)
 	deleteCR(t, gvrAccountRole, roleName)
 	waitForCRDeleted(t, gvrAccountRole, roleName)
 	deleteCR(t, gvrDatabase, dbName)

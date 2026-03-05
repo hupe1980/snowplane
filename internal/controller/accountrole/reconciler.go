@@ -3,6 +3,8 @@ package accountrole
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,14 +40,11 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 
 // NewReconciler returns a new AccountRole reconciler backed by the generic framework.
 func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRole, Service, *snowflake.AccountRoleObservation] {
-	a := &adapter{newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRole, Service, *snowflake.AccountRoleObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewAccountRoleClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
@@ -58,38 +57,69 @@ func NewReconcilerWithServiceFactory(
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRole, Service, *snowflake.AccountRoleObservation] {
-	a := &adapter{newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRole, Service, *snowflake.AccountRoleObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(sf))
+}
+
+// newAdapter creates the BaseAdapter for AccountRole resources.
+func newAdapter(sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.AccountRole, Service, *snowflake.AccountRoleObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.AccountRole, Service, *snowflake.AccountRoleObservation]{
+		ResourceNameVal:  "accountrole",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.AccountRole { return &snowplanev1alpha1.AccountRole{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(obj *snowplanev1alpha1.AccountRole) (reconciler.Identifier, error) {
+			return snowflake.NewAccountObjectIdentifier(obj.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) (*snowflake.AccountRoleObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.AccountRoleObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.AccountRole, id snowflake.AccountObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterAccountRoleOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.AccountRole, id snowflake.AccountObjectIdentifier, obs *reconciler.Observation[*snowflake.AccountRoleObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.AccountRole, obs *reconciler.Observation[*snowflake.AccountRoleObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.AccountRole, obs *reconciler.Observation[*snowflake.AccountRoleObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		LateInitializeFn: lateInitialize,
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory used by NewReconciler.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+func validateImmutableFields(_ context.Context, role *snowplanev1alpha1.AccountRole) error {
+	if reconciler.ShouldSkipImmutableValidation(role) {
+		return nil
 	}
 
-	return snowflake.NewAccountRoleClient(sfC), cleanup, nil
+	if role.Status.ShowOutput != nil {
+		if role.Status.ShowOutput.Name != "" && !strings.EqualFold(role.Spec.Name, role.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", role.Status.ShowOutput.Name, role.Spec.Name)
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(role *snowplanev1alpha1.AccountRole, obs *snowflake.AccountRoleObservation) {
 	if obs.ShowOutput != nil {
 		role.Status.FullyQualifiedName = snowflake.NewAccountObjectIdentifier(obs.ShowOutput.Name).FullyQualifiedName()
 
-		role.Status.ShowOutput = &snowplanev1alpha1.AccountRoleShowOutput{
-			CreatedOn:      obs.ShowOutput.CreatedOn,
-			Name:           obs.ShowOutput.Name,
-			Comment:        obs.ShowOutput.Comment,
-			Owner:          obs.ShowOutput.Owner,
-			GrantedToRoles: obs.ShowOutput.GrantedToRoles,
-			GrantedRoles:   obs.ShowOutput.GrantedRoles,
-		}
+		role.Status.ShowOutput = obs.ShowOutput
 	}
 }
 

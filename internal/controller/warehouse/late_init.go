@@ -1,14 +1,22 @@
 package warehouse
 
 import (
+	"strings"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 )
 
-// LateInitialize fills nil spec fields from the observed Snowflake state.
+// normalizeWarehouseSize converts Snowflake's display format (e.g. "X-Small",
+// "2X-Large") to the CRD enum format (e.g. "XSMALL", "2XLARGE").
+func normalizeWarehouseSize(raw string) snowplanev1alpha1.WarehouseSize {
+	return snowplanev1alpha1.WarehouseSize(strings.ToUpper(strings.ReplaceAll(raw, "-", "")))
+}
+
+// lateInitialize fills nil spec fields from the observed Snowflake state.
 // Only called during adoption (adoptionPolicy=adopt, first reconcile).
-func (a *adapter) LateInitialize(obj *snowplanev1alpha1.Warehouse, obs *reconciler.Observation[*snowflake.WarehouseObservation]) bool {
+func lateInitialize(obj *snowplanev1alpha1.Warehouse, obs *reconciler.Observation[*snowflake.WarehouseObservation]) bool {
 	detail := obs.Detail
 	if detail == nil {
 		return false
@@ -27,7 +35,7 @@ func (a *adapter) LateInitialize(obj *snowplanev1alpha1.Warehouse, obs *reconcil
 		}
 
 		if s.Size != "" && obj.Spec.WarehouseSize == nil {
-			v := snowplanev1alpha1.WarehouseSize(s.Size)
+			v := normalizeWarehouseSize(s.Size)
 			obj.Spec.WarehouseSize = &v
 			modified = true
 		}
@@ -91,4 +99,4 @@ func (a *adapter) LateInitialize(obj *snowplanev1alpha1.Warehouse, obs *reconcil
 	return modified
 }
 
-var _ reconciler.LateInitializer[*snowplanev1alpha1.Warehouse, *snowflake.WarehouseObservation] = (*adapter)(nil)
+var _ reconciler.LateInitializer[*snowplanev1alpha1.Warehouse, *snowflake.WarehouseObservation] = (*reconciler.BaseAdapter[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation])(nil)

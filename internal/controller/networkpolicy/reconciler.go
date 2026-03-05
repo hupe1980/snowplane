@@ -3,6 +3,8 @@ package networkpolicy
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,14 +38,11 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 
 // NewReconciler returns a new NetworkPolicy reconciler backed by the generic framework.
 func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.NetworkPolicy, Service, *snowflake.NetworkPolicyObservation] {
-	a := &adapter{newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.NetworkPolicy, Service, *snowflake.NetworkPolicyObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewNetworkPolicyClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
@@ -55,37 +54,69 @@ func NewReconcilerWithServiceFactory(
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.NetworkPolicy, Service, *snowflake.NetworkPolicyObservation] {
-	a := &adapter{newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.NetworkPolicy, Service, *snowflake.NetworkPolicyObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(sf))
+}
+
+// newAdapter creates the BaseAdapter for NetworkPolicy resources.
+func newAdapter(sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.NetworkPolicy, Service, *snowflake.NetworkPolicyObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.NetworkPolicy, Service, *snowflake.NetworkPolicyObservation]{
+		ResourceNameVal:  "networkpolicy",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.NetworkPolicy { return &snowplanev1alpha1.NetworkPolicy{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(obj *snowplanev1alpha1.NetworkPolicy) (reconciler.Identifier, error) {
+			return snowflake.NewAccountObjectIdentifier(obj.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) (*snowflake.NetworkPolicyObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.NetworkPolicyObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.NetworkPolicy, id snowflake.AccountObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterNetworkPolicyOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.NetworkPolicy, id snowflake.AccountObjectIdentifier, obs *reconciler.Observation[*snowflake.NetworkPolicyObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.NetworkPolicy, obs *reconciler.Observation[*snowflake.NetworkPolicyObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.NetworkPolicy, obs *reconciler.Observation[*snowflake.NetworkPolicyObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		LateInitializeFn: lateInitialize,
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+func validateImmutableFields(_ context.Context, np *snowplanev1alpha1.NetworkPolicy) error {
+	if reconciler.ShouldSkipImmutableValidation(np) {
+		return nil
 	}
 
-	return snowflake.NewNetworkPolicyClient(sfC), cleanup, nil
+	if np.Status.ShowOutput != nil {
+		if np.Status.ShowOutput.Name != "" && !strings.EqualFold(np.Spec.Name, np.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", np.Status.ShowOutput.Name, np.Spec.Name)
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(np *snowplanev1alpha1.NetworkPolicy, obs *snowflake.NetworkPolicyObservation) {
 	if obs.ShowOutput != nil {
 		np.Status.FullyQualifiedName = obs.ShowOutput.Name
 
-		np.Status.ShowOutput = &snowplanev1alpha1.NetworkPolicyShowOutput{
-			CreatedOn:              obs.ShowOutput.CreatedOn,
-			Name:                   obs.ShowOutput.Name,
-			Comment:                obs.ShowOutput.Comment,
-			EntriesInAllowedIPList: obs.ShowOutput.EntriesInAllowedIPList,
-			EntriesInBlockedIPList: obs.ShowOutput.EntriesInBlockedIPList,
-		}
+		np.Status.ShowOutput = obs.ShowOutput
 	}
 }
 

@@ -522,7 +522,7 @@ func TestGrantIdentifier(t *testing.T) {
 		assert.Equal(t, `GRANT SELECT ON FUTURE TABLES IN SCHEMA "MY_DB"."PUBLIC" TO ROLE "ANALYST"`, id.FullyQualifiedName())
 	})
 
-	t.Run("ShareGrant", func(t *testing.T) {
+	t.Run("GrantPrivilegesToShare", func(t *testing.T) {
 		t.Parallel()
 		id := GrantIdentifier{
 			Kind:             GrantKindShare,

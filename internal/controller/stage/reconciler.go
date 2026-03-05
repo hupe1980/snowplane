@@ -3,14 +3,20 @@ package stage
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	sigs "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/tracked"
@@ -35,44 +41,173 @@ type Service interface {
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
 // NewReconciler returns a new Stage reconciler backed by the generic framework.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Stage, Service, *snowflake.StageObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Stage, Service, *snowflake.StageObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+func NewReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Stage, Service, *snowflake.StageObservation] {
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewStageClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
 // supply a custom ServiceFactory for testing.
 func NewReconcilerWithServiceFactory(
-	c client.Client,
+	c sigs.Client,
 	factory *clientfactory.ClientFactory,
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.Stage, Service, *snowflake.StageObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Stage, Service, *snowflake.StageObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, recorder, sf))
+}
+
+// newAdapter creates the BaseAdapter for Stage resources.
+func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.Stage, Service, *snowflake.StageObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.Stage, Service, *snowflake.StageObservation]{
+		ResourceNameVal:  "stage",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.Stage { return &snowplanev1alpha1.Stage{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(stage *snowplanev1alpha1.Stage) (reconciler.Identifier, error) {
+			dbName := snowflake.ParseDatabaseNameFromFQN(stage.Status.DatabaseName)
+			schemaName := snowflake.ParseSchemaNameFromFQN(stage.Status.SchemaName)
+			return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, stage.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) (*snowflake.StageObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.StageObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.Stage, id snowflake.SchemaObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterStageOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.Stage, id snowflake.SchemaObjectIdentifier, obs *reconciler.Observation[*snowflake.StageObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.Stage, obs *reconciler.Observation[*snowflake.StageObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.Stage, obs *reconciler.Observation[*snowflake.StageObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		LateInitializeFn: lateInitialize,
+		PreReconcileFn: func(ctx context.Context, stage *snowplanev1alpha1.Stage) error {
+			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, stage,
+				stage.Namespace, stage.Spec.DatabaseRef, stage.Spec.DatabaseName, stage.Status.DatabaseName)
+			if err != nil {
+				return err
+			}
+
+			stage.Status.DatabaseName = dbFQN
+
+			schemaFQN, err := refresolver.PreReconcileSchemaRef(ctx, c, recorder, stage,
+				stage.Namespace, stage.Spec.SchemaRef, stage.Spec.SchemaName, stage.Status.SchemaName)
+			if err != nil {
+				return err
+			}
+
+			stage.Status.SchemaName = schemaFQN
+
+			refresolver.SetDatabaseAndSchemaResolvedCondition(stage, stage.Spec.DatabaseRef, stage.Spec.DatabaseName, stage.Spec.SchemaRef, stage.Spec.SchemaName)
+
+			return nil
+		},
+		SetupWatchesFn: func(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.Stage{},
+				".spec.databaseRef.name",
+				func(o sigs.Object) []string {
+					s, ok := o.(*snowplanev1alpha1.Stage)
+					if !ok || s.Spec.DatabaseRef == nil {
+						return nil
+					}
+
+					return []string{s.Spec.DatabaseRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.databaseRef.name: %w", err)
+			}
+
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.Stage{},
+				".spec.schemaRef.name",
+				func(o sigs.Object) []string {
+					s, ok := o.(*snowplanev1alpha1.Stage)
+					if !ok || s.Spec.SchemaRef == nil {
+						return nil
+					}
+
+					return []string{s.Spec.SchemaRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.schemaRef.name: %w", err)
+			}
+
+			bldr.Watches(
+				&snowplanev1alpha1.Database{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.StageList{} }, ".spec.databaseRef.name", "listing stages for database watch")),
+			)
+
+			bldr.Watches(
+				&snowplanev1alpha1.Schema{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.StageList{} }, ".spec.schemaRef.name", "listing stages for schema watch")),
+			)
+
+			return nil
+		},
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+// validateImmutableFields checks that immutable fields have not been changed.
+func validateImmutableFields(_ context.Context, stage *snowplanev1alpha1.Stage) error {
+	if reconciler.ShouldSkipImmutableValidation(stage) {
+		return nil
 	}
 
-	return snowflake.NewStageClient(sfC), cleanup, nil
+	if stage.Status.ShowOutput != nil {
+		if stage.Status.ShowOutput.Name != "" && !strings.EqualFold(stage.Spec.Name, stage.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", stage.Status.ShowOutput.Name, stage.Spec.Name)
+		}
+
+		// Stage type (internal/external) is immutable.
+		if stage.Status.ShowOutput.Type != "" {
+			wasExternal := strings.EqualFold(stage.Status.ShowOutput.Type, "EXTERNAL")
+			isExternal := stage.IsExternal()
+
+			if wasExternal != isExternal {
+				return fmt.Errorf("spec.url is immutable after creation: cannot convert between internal and external stage types (current type: %s)", stage.Status.ShowOutput.Type)
+			}
+		}
+
+		if stage.Status.ShowOutput.DatabaseName != "" && stage.Status.DatabaseName != "" {
+			resolvedDB := snowflake.ParseDatabaseNameFromFQN(stage.Status.DatabaseName)
+			if !strings.EqualFold(resolvedDB, stage.Status.ShowOutput.DatabaseName) {
+				return fmt.Errorf("spec.databaseRef is immutable after creation (current database: %q, resolved: %q)", stage.Status.ShowOutput.DatabaseName, resolvedDB)
+			}
+		}
+
+		if stage.Status.ShowOutput.SchemaName != "" && stage.Status.SchemaName != "" {
+			resolvedSchema := snowflake.ParseSchemaNameFromFQN(stage.Status.SchemaName)
+			if !strings.EqualFold(resolvedSchema, stage.Status.ShowOutput.SchemaName) {
+				return fmt.Errorf("spec.schemaRef is immutable after creation (current schema: %q, resolved: %q)", stage.Status.ShowOutput.SchemaName, resolvedSchema)
+			}
+		}
+
+	}
+
+	return nil
 }
 
 func applyObservation(stage *snowplanev1alpha1.Stage, obs *snowflake.StageObservation) {
@@ -85,18 +220,7 @@ func applyObservation(stage *snowplanev1alpha1.Stage, obs *snowflake.StageObserv
 		stage.Status.DatabaseName = obs.ShowOutput.DatabaseName
 		stage.Status.SchemaName = obs.ShowOutput.SchemaName
 
-		stage.Status.ShowOutput = &snowplanev1alpha1.StageShowOutput{
-			CreatedOn:          obs.ShowOutput.CreatedOn,
-			Name:               obs.ShowOutput.Name,
-			DatabaseName:       obs.ShowOutput.DatabaseName,
-			SchemaName:         obs.ShowOutput.SchemaName,
-			URL:                obs.ShowOutput.URL,
-			Owner:              obs.ShowOutput.Owner,
-			Comment:            obs.ShowOutput.Comment,
-			Type:               obs.ShowOutput.Type,
-			StorageIntegration: obs.ShowOutput.StorageIntegration,
-			DirectoryEnabled:   obs.ShowOutput.DirectoryEnabled,
-		}
+		stage.Status.ShowOutput = obs.ShowOutput
 	}
 }
 

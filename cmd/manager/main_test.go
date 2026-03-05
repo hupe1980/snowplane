@@ -10,8 +10,8 @@ import (
 // testControllerNames is a representative set of valid controller names for tests.
 var testControllerNames = []string{
 	"alert", "authenticationpolicy", "database", "schema", "warehouse",
-	"accountrole", "databaserole", "accountrolegrant", "databaserolegrant",
-	"sharegrant", "user", "table", "view", "stage", "task", "fieldexport",
+	"accountrole", "databaserole", "grantprivilegestoaccountrole", "grantprivilegestodatabaserole",
+	"grantprivilegestoshare", "user", "table", "view", "stage", "task", "fieldexport",
 }
 
 func TestParseDisabledControllers_Empty(t *testing.T) {
@@ -22,15 +22,15 @@ func TestParseDisabledControllers_Empty(t *testing.T) {
 
 func TestParseDisabledControllers_Single(t *testing.T) {
 	t.Parallel()
-	result := parseDisabledControllers("accountrolegrant")
-	assert.True(t, result["accountrolegrant"])
+	result := parseDisabledControllers("grantprivilegestoaccountrole")
+	assert.True(t, result["grantprivilegestoaccountrole"])
 	assert.False(t, result["database"])
 }
 
 func TestParseDisabledControllers_Multiple(t *testing.T) {
 	t.Parallel()
-	result := parseDisabledControllers("accountrolegrant,stage,view")
-	assert.True(t, result["accountrolegrant"])
+	result := parseDisabledControllers("grantprivilegestoaccountrole,stage,view")
+	assert.True(t, result["grantprivilegestoaccountrole"])
 	assert.True(t, result["stage"])
 	assert.True(t, result["view"])
 	assert.False(t, result["database"])
@@ -38,22 +38,22 @@ func TestParseDisabledControllers_Multiple(t *testing.T) {
 
 func TestParseDisabledControllers_WithSpaces(t *testing.T) {
 	t.Parallel()
-	result := parseDisabledControllers(" accountrolegrant , stage , view ")
-	assert.True(t, result["accountrolegrant"])
+	result := parseDisabledControllers(" grantprivilegestoaccountrole , stage , view ")
+	assert.True(t, result["grantprivilegestoaccountrole"])
 	assert.True(t, result["stage"])
 	assert.True(t, result["view"])
 }
 
 func TestParseDisabledControllers_TrailingComma(t *testing.T) {
 	t.Parallel()
-	result := parseDisabledControllers("accountrolegrant,")
-	assert.True(t, result["accountrolegrant"])
+	result := parseDisabledControllers("grantprivilegestoaccountrole,")
+	assert.True(t, result["grantprivilegestoaccountrole"])
 	assert.Equal(t, 1, len(result))
 }
 
 func TestValidateDisabledControllers_InvalidName(t *testing.T) {
 	t.Parallel()
-	disabled := parseDisabledControllers("accountrolegrant,foobar")
+	disabled := parseDisabledControllers("grantprivilegestoaccountrole,foobar")
 	err := validateDisabledControllers(disabled, testControllerNames)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown controller name \"foobar\"")
@@ -61,7 +61,7 @@ func TestValidateDisabledControllers_InvalidName(t *testing.T) {
 
 func TestValidateDisabledControllers_AllValid(t *testing.T) {
 	t.Parallel()
-	disabled := parseDisabledControllers("database,schema,warehouse,accountrole,databaserole,accountrolegrant,databaserolegrant,sharegrant,user,table,view,stage,fieldexport")
+	disabled := parseDisabledControllers("database,schema,warehouse,accountrole,databaserole,grantprivilegestoaccountrole,grantprivilegestodatabaserole,grantprivilegestoshare,user,table,view,stage,fieldexport")
 	err := validateDisabledControllers(disabled, testControllerNames)
 	require.NoError(t, err)
 	assert.Equal(t, 13, len(disabled))

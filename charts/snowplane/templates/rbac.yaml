@@ -60,11 +60,11 @@ rules:
   - warehouses
   - accountroles
   - databaseroles
-  - accountrolegrants
-  - databaserolegrants
+  - grantprivilegestoaccountroles
+  - grantprivilegestodatabaseroles
   - accountroleassignments
   - databaseroleassignments
-  - sharegrants
+  - grantprivilegestoshares
   - users
   - tables
   - views
@@ -95,6 +95,12 @@ rules:
   - pipes
   - storageintegrations
   - securityintegrations
+  - saml2integrations
+  - externaloauthintegrations
+  - apiintegrations
+  - secondarydatabases
+  - shareddatabases
+  - failovergroups
   - secretwithclientcredentials
   - secretwithauthorizationcodegrants
   - secretwithbasicauthentications
@@ -118,6 +124,7 @@ rules:
   - functionpythons
   - functionjavas
   - functionscalas
+  - sqlstatements
   verbs:
   - get
   - list
@@ -134,11 +141,11 @@ rules:
   - warehouses/status
   - accountroles/status
   - databaseroles/status
-  - accountrolegrants/status
-  - databaserolegrants/status
+  - grantprivilegestoaccountroles/status
+  - grantprivilegestodatabaseroles/status
   - accountroleassignments/status
   - databaseroleassignments/status
-  - sharegrants/status
+  - grantprivilegestoshares/status
   - users/status
   - tables/status
   - views/status
@@ -169,6 +176,12 @@ rules:
   - materializedviews/status
   - storageintegrations/status
   - securityintegrations/status
+  - saml2integrations/status
+  - externaloauthintegrations/status
+  - apiintegrations/status
+  - secondarydatabases/status
+  - shareddatabases/status
+  - failovergroups/status
   - secretwithclientcredentials/status
   - secretwithauthorizationcodegrants/status
   - secretwithbasicauthentications/status
@@ -192,6 +205,8 @@ rules:
   - functionpythons/status
   - functionjavas/status
   - functionscalas/status
+  - sqlstatements/status
+  - sqlstatements/status
   verbs:
   - get
   - patch
@@ -204,11 +219,11 @@ rules:
   - warehouses/finalizers
   - accountroles/finalizers
   - databaseroles/finalizers
-  - accountrolegrants/finalizers
-  - databaserolegrants/finalizers
+  - grantprivilegestoaccountroles/finalizers
+  - grantprivilegestodatabaseroles/finalizers
   - accountroleassignments/finalizers
   - databaseroleassignments/finalizers
-  - sharegrants/finalizers
+  - grantprivilegestoshares/finalizers
   - users/finalizers
   - tables/finalizers
   - views/finalizers
@@ -239,6 +254,12 @@ rules:
   - storageintegrations/finalizers
   - materializedviews/finalizers
   - securityintegrations/finalizers
+  - saml2integrations/finalizers
+  - externaloauthintegrations/finalizers
+  - apiintegrations/finalizers
+  - secondarydatabases/finalizers
+  - shareddatabases/finalizers
+  - failovergroups/finalizers
   - secretwithclientcredentials/finalizers
   - secretwithauthorizationcodegrants/finalizers
   - secretwithbasicauthentications/finalizers
@@ -262,6 +283,7 @@ rules:
   - functionpythons/finalizers
   - functionjavas/finalizers
   - functionscalas/finalizers
+  - sqlstatements/finalizers
   verbs:
   - update
 ---
@@ -333,11 +355,11 @@ rules:
   - warehouses
   - accountroles
   - databaseroles
-  - accountrolegrants
-  - databaserolegrants
+  - grantprivilegestoaccountroles
+  - grantprivilegestodatabaseroles
   - accountroleassignments
   - databaseroleassignments
-  - sharegrants
+  - grantprivilegestoshares
   - users
   - tables
   - views
@@ -367,6 +389,12 @@ rules:
   - pipes
   - storageintegrations
   - securityintegrations
+  - saml2integrations
+  - externaloauthintegrations
+  - apiintegrations
+  - secondarydatabases
+  - shareddatabases
+  - failovergroups
   - secretwithclientcredentials
   - secretwithauthorizationcodegrants
   - secretwithbasicauthentications
@@ -391,6 +419,7 @@ rules:
   - functionpythons
   - functionjavas
   - functionscalas
+  - sqlstatements
   verbs:
   - get
   - list
@@ -403,11 +432,11 @@ rules:
   - warehouses/status
   - accountroles/status
   - databaseroles/status
-  - accountrolegrants/status
-  - databaserolegrants/status
+  - grantprivilegestoaccountroles/status
+  - grantprivilegestodatabaseroles/status
   - accountroleassignments/status
   - databaseroleassignments/status
-  - sharegrants/status
+  - grantprivilegestoshares/status
   - users/status
   - tables/status
   - views/status
@@ -437,6 +466,12 @@ rules:
   - pipes/status
   - storageintegrations/status
   - securityintegrations/status
+  - saml2integrations/status
+  - externaloauthintegrations/status
+  - apiintegrations/status
+  - secondarydatabases/status
+  - shareddatabases/status
+  - failovergroups/status
   - secretwithclientcredentials/status
   - secretwithauthorizationcodegrants/status
   - secretwithbasicauthentications/status
@@ -461,6 +496,7 @@ rules:
   - functionpythons/status
   - functionjavas/status
   - functionscalas/status
+  - sqlstatements/status
   verbs:
   - get
 ---
@@ -484,11 +520,11 @@ rules:
   - warehouses
   - accountroles
   - databaseroles
-  - accountrolegrants
-  - databaserolegrants
+  - grantprivilegestoaccountroles
+  - grantprivilegestodatabaseroles
   - accountroleassignments
   - databaseroleassignments
-  - sharegrants
+  - grantprivilegestoshares
   - users
   - tables
   - views
@@ -518,6 +554,12 @@ rules:
   - pipes
   - storageintegrations
   - securityintegrations
+  - saml2integrations
+  - externaloauthintegrations
+  - apiintegrations
+  - secondarydatabases
+  - shareddatabases
+  - failovergroups
   - secretwithclientcredentials
   - secretwithauthorizationcodegrants
   - secretwithbasicauthentications
@@ -542,6 +584,7 @@ rules:
   - functionpythons
   - functionjavas
   - functionscalas
+  - sqlstatements
   verbs:
   - get
   - list
@@ -558,11 +601,11 @@ rules:
   - warehouses/status
   - accountroles/status
   - databaseroles/status
-  - accountrolegrants/status
-  - databaserolegrants/status
+  - grantprivilegestoaccountroles/status
+  - grantprivilegestodatabaseroles/status
   - accountroleassignments/status
   - databaseroleassignments/status
-  - sharegrants/status
+  - grantprivilegestoshares/status
   - users/status
   - tables/status
   - views/status
@@ -592,6 +635,12 @@ rules:
   - pipes/status
   - storageintegrations/status
   - securityintegrations/status
+  - saml2integrations/status
+  - externaloauthintegrations/status
+  - apiintegrations/status
+  - secondarydatabases/status
+  - shareddatabases/status
+  - failovergroups/status
   - secretwithclientcredentials/status
   - secretwithauthorizationcodegrants/status
   - secretwithbasicauthentications/status
@@ -616,5 +665,6 @@ rules:
   - functionpythons/status
   - functionjavas/status
   - functionscalas/status
+  - sqlstatements/status
   verbs:
   - get

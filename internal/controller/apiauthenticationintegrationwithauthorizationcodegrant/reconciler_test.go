@@ -18,7 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -98,7 +97,7 @@ func newTestIntegration(name, namespace string) *snowplanev1alpha1.APIAuthentica
 func successfulObservation() *snowflake.APIAuthenticationIntegrationObservation {
 	return &snowflake.APIAuthenticationIntegrationObservation{
 		Exists: true,
-		ShowOutput: &snowflake.SecurityIntegrationShowOutput{
+		ShowOutput: &snowplanev1alpha1.SecurityIntegrationShowOutput{
 			CreatedOn: "2024-01-01",
 			Name:      "MY_ACG_AUTH",
 			Type:      "API_AUTHENTICATION",
@@ -126,21 +125,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, Service, *snowflake.APIAuthenticationIntegrationObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client: c,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("APIAuthenticationIntegrationWithAuthorizationCodeGrant"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("APIAuthenticationIntegrationWithAuthorizationCodeGrant")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -436,8 +431,8 @@ func TestReconcile_ImmutableName(t *testing.T) {
 	obj.Finalizers = []string{finalizerName}
 	obj.Status.ObservedGeneration = 1
 	obj.Spec.Name = "RENAMED_AUTH"
-	obj.Status.ShowOutput = &snowplanev1alpha1.APIAuthenticationIntegrationShowOutput{
-		Name: testutil.Ptr("MY_ACG_AUTH"),
+	obj.Status.ShowOutput = &snowplanev1alpha1.SecurityIntegrationShowOutput{
+		Name: "MY_ACG_AUTH",
 	}
 
 	obs := successfulObservation()
@@ -505,7 +500,7 @@ func TestApplyObservation(t *testing.T) {
 
 	assert.Equal(t, "MY_ACG_AUTH", obj.Status.FullyQualifiedName)
 	assert.NotNil(t, obj.Status.ShowOutput)
-	assert.Equal(t, "MY_ACG_AUTH", *obj.Status.ShowOutput.Name)
+	assert.Equal(t, "MY_ACG_AUTH", obj.Status.ShowOutput.Name)
 	assert.NotNil(t, obj.Status.DescribeOutput)
 	assert.Equal(t, "OAUTH2", *obj.Status.DescribeOutput.AuthType)
 }
@@ -521,7 +516,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.APIAuthenticationIntegrationObservation{
-		ShowOutput: &snowflake.SecurityIntegrationShowOutput{
+		ShowOutput: &snowplanev1alpha1.SecurityIntegrationShowOutput{
 			Name:    "MY_ACG_AUTH",
 			Enabled: true,
 		},
@@ -543,7 +538,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.APIAuthenticationIntegrationObservation{
-		ShowOutput: &snowflake.SecurityIntegrationShowOutput{
+		ShowOutput: &snowplanev1alpha1.SecurityIntegrationShowOutput{
 			Name:    "MY_ACG_AUTH",
 			Enabled: true,
 			Comment: "drifted",

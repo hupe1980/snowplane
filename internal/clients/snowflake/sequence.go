@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -15,20 +16,7 @@ type SequenceObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW SEQUENCES row.
-	ShowOutput *SequenceShowOutput
-}
-
-// SequenceShowOutput contains the fields from SHOW SEQUENCES.
-type SequenceShowOutput struct {
-	CreatedOn    string
-	Name         string
-	DatabaseName string
-	SchemaName   string
-	Owner        string
-	Comment      string
-	NextValue    string
-	Interval     string
-	Ordering     string
+	ShowOutput *v1alpha1.SequenceShowOutput
 }
 
 // CreateSequenceOptions holds the parameters for creating a sequence.
@@ -64,6 +52,12 @@ func (o *CreateSequenceOptions) Validate() error {
 		errs = append(errs, fmt.Errorf("sequence name is required"))
 	}
 
+	if o.Ordering != nil {
+		if err := validateSequenceOrdering(*o.Ordering); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
 	return errors.Join(errs...)
 }
 
@@ -89,11 +83,19 @@ type AlterSequenceOptions struct {
 
 // Validate checks the AlterSequenceOptions for validity.
 func (o *AlterSequenceOptions) Validate() error {
+	var errs []error
+
 	if !ValidObjectIdentifier(o.Name) {
-		return fmt.Errorf("sequence name is required")
+		errs = append(errs, fmt.Errorf("sequence name is required"))
 	}
 
-	return nil
+	if o.Ordering != nil {
+		if err := validateSequenceOrdering(*o.Ordering); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
 }
 
 // HasChanges reports whether any fields are set for alteration.
@@ -112,6 +114,21 @@ type SequenceClient struct {
 // NewSequenceClient creates a new SequenceClient.
 func NewSequenceClient(c SQLExecutor) *SequenceClient {
 	return &SequenceClient{client: c}
+}
+
+// validSequenceOrderings is the allowlist of accepted ORDERING values.
+var validSequenceOrderings = map[string]bool{
+	"ORDER":   true,
+	"NOORDER": true,
+}
+
+// validateSequenceOrdering checks that the ordering value is ORDER or NOORDER.
+func validateSequenceOrdering(ordering string) error {
+	if !validSequenceOrderings[ordering] {
+		return fmt.Errorf("invalid ordering %q: must be ORDER or NOORDER", ordering)
+	}
+
+	return nil
 }
 
 // buildCreateSequenceSQL builds the CREATE SEQUENCE SQL statement.
@@ -214,7 +231,7 @@ func (sc *SequenceClient) Drop(ctx context.Context, name SchemaObjectIdentifier)
 }
 
 // ShowByID queries SHOW SEQUENCES for a specific sequence.
-func (sc *SequenceClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*SequenceShowOutput, error) {
+func (sc *SequenceClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.SequenceShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("sequence name is required"))
 	}
@@ -249,9 +266,9 @@ func (sc *SequenceClient) Observe(ctx context.Context, name SchemaObjectIdentifi
 }
 
 // scanSequenceShowOutput scans SHOW SEQUENCES results for a matching row.
-func scanSequenceShowOutput(rows *sql.Rows, name string) (*SequenceShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*SequenceShowOutput, error) {
-		return &SequenceShowOutput{
+func scanSequenceShowOutput(rows *sql.Rows, name string) (*v1alpha1.SequenceShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.SequenceShowOutput, error) {
+		return &v1alpha1.SequenceShowOutput{
 			CreatedOn:    m["created_on"],
 			Name:         m["name"],
 			DatabaseName: m["database_name"],

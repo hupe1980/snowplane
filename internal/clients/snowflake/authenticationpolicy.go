@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -14,20 +15,10 @@ type AuthenticationPolicyObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW AUTHENTICATION POLICIES row.
-	ShowOutput *AuthenticationPolicyShowOutput
+	ShowOutput *v1alpha1.AuthenticationPolicyShowOutput
 
 	// DescribeOutput contains the DESCRIBE AUTHENTICATION POLICY output (key-value pairs).
 	DescribeOutput map[string]string
-}
-
-// AuthenticationPolicyShowOutput contains the fields from SHOW AUTHENTICATION POLICIES.
-type AuthenticationPolicyShowOutput struct {
-	CreatedOn    string
-	Name         string
-	DatabaseName string
-	SchemaName   string
-	Owner        string
-	Comment      string
 }
 
 // CreateAuthenticationPolicyOptions holds the parameters for creating an authentication policy.
@@ -277,7 +268,7 @@ func buildShowAuthenticationPolicyByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW AUTHENTICATION POLICIES for a specific policy.
-func (c *AuthenticationPolicyClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*AuthenticationPolicyShowOutput, error) {
+func (c *AuthenticationPolicyClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.AuthenticationPolicyShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("authentication policy name is required"))
 	}
@@ -336,9 +327,9 @@ func (c *AuthenticationPolicyClient) Observe(ctx context.Context, name SchemaObj
 }
 
 // scanAuthenticationPolicyShowOutput scans SHOW AUTHENTICATION POLICIES results for a matching row.
-func scanAuthenticationPolicyShowOutput(rows *sql.Rows, name string) (*AuthenticationPolicyShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*AuthenticationPolicyShowOutput, error) {
-		return &AuthenticationPolicyShowOutput{
+func scanAuthenticationPolicyShowOutput(rows *sql.Rows, name string) (*v1alpha1.AuthenticationPolicyShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.AuthenticationPolicyShowOutput, error) {
+		return &v1alpha1.AuthenticationPolicyShowOutput{
 			CreatedOn:    m["created_on"],
 			Name:         m["name"],
 			DatabaseName: m["database_name"],

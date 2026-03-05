@@ -11,7 +11,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -55,7 +54,6 @@ func (m *mockService) UnsetNetworkPolicy(ctx context.Context, opts snowflake.Uns
 // Helpers
 // --------------------------------------------------------------------------
 
-
 func newTestNetworkPolicyAttachment(name, namespace string) *snowplanev1alpha1.NetworkPolicyAttachment {
 	return &snowplanev1alpha1.NetworkPolicyAttachment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -84,20 +82,16 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
 	return &reconciler.GenericReconciler[*snowplanev1alpha1.NetworkPolicyAttachment, Service, *snowflake.NetworkPolicyAttachmentObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
-		},
+		Adapter: newAdapter(c, rec, func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
+		}),
 		GVK: snowplanev1alpha1.GroupVersion.WithKind("NetworkPolicyAttachment"),
 	}
 }

@@ -68,7 +68,7 @@ type GrantOnSchema struct {
 	// When set, the schema FQN is resolved from the CR's fullyQualifiedName.
 	// Mutually exclusive with SchemaName.
 	// +optional
-	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
+	SchemaRef *ObjectReference `json:"schemaRef,omitempty"`
 
 	// AllInDatabase grants on all existing schemas in the specified database.
 	// For: ON ALL SCHEMAS IN DATABASE <db_name>
@@ -80,7 +80,7 @@ type GrantOnSchema struct {
 	// AllInDatabaseRef references a Database CR for the ALL SCHEMAS IN DATABASE grant.
 	// Mutually exclusive with AllInDatabase.
 	// +optional
-	AllInDatabaseRef *LocalObjectReference `json:"allInDatabaseRef,omitempty"`
+	AllInDatabaseRef *ObjectReference `json:"allInDatabaseRef,omitempty"`
 
 	// FutureInDatabase grants on future schemas in the specified database.
 	// For: ON FUTURE SCHEMAS IN DATABASE <db_name>
@@ -92,7 +92,7 @@ type GrantOnSchema struct {
 	// FutureInDatabaseRef references a Database CR for the FUTURE SCHEMAS IN DATABASE grant.
 	// Mutually exclusive with FutureInDatabase.
 	// +optional
-	FutureInDatabaseRef *LocalObjectReference `json:"futureInDatabaseRef,omitempty"`
+	FutureInDatabaseRef *ObjectReference `json:"futureInDatabaseRef,omitempty"`
 }
 
 // GrantOnSchemaObject specifies a grant on schema-level objects.
@@ -141,7 +141,7 @@ type GrantOnBulk struct {
 	// InDatabaseRef references a Database CR.
 	// Mutually exclusive with InDatabase.
 	// +optional
-	InDatabaseRef *LocalObjectReference `json:"inDatabaseRef,omitempty"`
+	InDatabaseRef *ObjectReference `json:"inDatabaseRef,omitempty"`
 
 	// InSchema scopes the grant to all objects of the type in the specified schema.
 	// +optional
@@ -152,7 +152,7 @@ type GrantOnBulk struct {
 	// InSchemaRef references a Schema CR.
 	// Mutually exclusive with InSchema.
 	// +optional
-	InSchemaRef *LocalObjectReference `json:"inSchemaRef,omitempty"`
+	InSchemaRef *ObjectReference `json:"inSchemaRef,omitempty"`
 }
 
 // GrantShowOutput mirrors the SHOW GRANTS output stored in status.
@@ -254,6 +254,196 @@ func (o *GrantOn) Description() string {
 	}
 
 	return "ON <unknown>"
+}
+
+// GrantPrivilegesToDatabaseRoleOn defines the target object for a database role grant.
+// Database roles can grant on the database itself, on schemas, or on schema objects.
+// Unlike account role grants, they cannot grant on ACCOUNT or account-level objects
+// other than the parent database.
+// Exactly one field must be set.
+//
+// +kubebuilder:validation:XValidation:rule="(has(self.database) && size(self.database) > 0 ? 1 : 0) + (has(self.schema) ? 1 : 0) + (has(self.schemaObject) ? 1 : 0) == 1",message="exactly one of database, schema, or schemaObject must be set"
+type GrantPrivilegesToDatabaseRoleOn struct {
+	// Database grants a privilege on the database itself (e.g. USAGE, CREATE SCHEMA).
+	// For: ON DATABASE <database_name>
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
+	Database *string `json:"database,omitempty"`
+
+	// Schema grants a privilege on a schema or on all/future schemas in a database.
+	// +optional
+	Schema *GrantOnSchema `json:"schema,omitempty"`
+
+	// SchemaObject grants a privilege on a specific schema object, or on
+	// all/future schema objects of a given type in a database or schema.
+	// +optional
+	SchemaObject *GrantOnSchemaObject `json:"schemaObject,omitempty"`
+}
+
+// Description returns a human-readable description of the GrantPrivilegesToDatabaseRoleOn.
+func (o *GrantPrivilegesToDatabaseRoleOn) Description() string {
+	if o.Database != nil {
+		return "ON DATABASE " + *o.Database
+	}
+
+	// Reuse GrantOn logic for schema/schemaObject via delegation.
+	on := &GrantOn{Schema: o.Schema, SchemaObject: o.SchemaObject}
+	return on.Description()
+}
+
+// ResolveKind determines the GrantKind for a database role grant.
+func (o *GrantPrivilegesToDatabaseRoleOn) ResolveKind() GrantKind {
+	if o.Schema != nil && (o.Schema.FutureInDatabase != nil || o.Schema.FutureInDatabaseRef != nil) {
+		return GrantKindFuture
+	}
+
+	if o.SchemaObject != nil && o.SchemaObject.Future != nil {
+		return GrantKindFuture
+	}
+
+	if o.Schema != nil && (o.Schema.AllInDatabase != nil || o.Schema.AllInDatabaseRef != nil) {
+		return GrantKindAll
+	}
+
+	if o.SchemaObject != nil && o.SchemaObject.All != nil {
+		return GrantKindAll
+	}
+
+	return GrantKindRegular
+}
+
+// GrantPrivilegesToShareOn defines the target object for a share grant.
+// Share grants only support specific named objects — no ALL/FUTURE bulk grants.
+// Exactly one field must be set.
+//
+// +kubebuilder:validation:XValidation:rule="(has(self.database) && size(self.database) > 0 ? 1 : 0) + (has(self.schema) && size(self.schema) > 0 ? 1 : 0) + (has(self.table) && size(self.table) > 0 ? 1 : 0) + (has(self.allTablesInSchema) && size(self.allTablesInSchema) > 0 ? 1 : 0) + (has(self.functionName) && size(self.functionName) > 0 ? 1 : 0) + (has(self.tag) && size(self.tag) > 0 ? 1 : 0) + (has(self.view) && size(self.view) > 0 ? 1 : 0) == 1",message="exactly one of database, schema, table, allTablesInSchema, functionName, tag, or view must be set"
+type GrantPrivilegesToShareOn struct {
+	// Database grants USAGE on a database.
+	// For: ON DATABASE <database_name>
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
+	Database *string `json:"database,omitempty"`
+
+	// Schema grants USAGE on a schema.
+	// For: ON SCHEMA <schema_fqn>
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
+	Schema *string `json:"schema,omitempty"`
+
+	// Table grants SELECT on a table.
+	// For: ON TABLE <table_fqn>
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
+	Table *string `json:"table,omitempty"`
+
+	// AllTablesInSchema grants the privilege on all tables in a schema.
+	// For: ON ALL TABLES IN SCHEMA <schema_fqn>
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
+	AllTablesInSchema *string `json:"allTablesInSchema,omitempty"`
+
+	// Function grants USAGE on a function.
+	// For: ON FUNCTION <function_fqn>
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
+	Function *string `json:"functionName,omitempty"`
+
+	// Tag grants READ on a tag.
+	// For: ON TAG <tag_fqn>
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
+	Tag *string `json:"tag,omitempty"`
+
+	// View grants SELECT on a view.
+	// For: ON VIEW <view_fqn>
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
+	View *string `json:"view,omitempty"`
+}
+
+// Description returns a human-readable description of the GrantPrivilegesToShareOn.
+func (o *GrantPrivilegesToShareOn) Description() string {
+	if o.Database != nil {
+		return "ON DATABASE " + *o.Database
+	}
+
+	if o.Schema != nil {
+		return "ON SCHEMA " + *o.Schema
+	}
+
+	if o.Table != nil {
+		return "ON TABLE " + *o.Table
+	}
+
+	if o.AllTablesInSchema != nil {
+		return "ON ALL TABLES IN SCHEMA " + *o.AllTablesInSchema
+	}
+
+	if o.Function != nil {
+		return "ON FUNCTION " + *o.Function
+	}
+
+	if o.Tag != nil {
+		return "ON TAG " + *o.Tag
+	}
+
+	if o.View != nil {
+		return "ON VIEW " + *o.View
+	}
+
+	return "ON <unknown>"
+}
+
+// ObjectType returns the SQL object type keyword for the share grant target.
+func (o *GrantPrivilegesToShareOn) ObjectType() string {
+	switch {
+	case o.Database != nil:
+		return "DATABASE"
+	case o.Schema != nil:
+		return "SCHEMA"
+	case o.Table != nil:
+		return "TABLE"
+	case o.AllTablesInSchema != nil:
+		return "ALL TABLES IN SCHEMA"
+	case o.Function != nil:
+		return "FUNCTION"
+	case o.Tag != nil:
+		return "TAG"
+	case o.View != nil:
+		return "VIEW"
+	default:
+		return ""
+	}
+}
+
+// ObjectName returns the object name for the share grant target.
+func (o *GrantPrivilegesToShareOn) ObjectName() string {
+	switch {
+	case o.Database != nil:
+		return *o.Database
+	case o.Schema != nil:
+		return *o.Schema
+	case o.Table != nil:
+		return *o.Table
+	case o.AllTablesInSchema != nil:
+		return *o.AllTablesInSchema
+	case o.Function != nil:
+		return *o.Function
+	case o.Tag != nil:
+		return *o.Tag
+	case o.View != nil:
+		return *o.View
+	default:
+		return ""
+	}
 }
 
 // description builds a descriptive ON clause for bulk grants.

@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -82,7 +81,7 @@ func newTestDatabaseRole(name, namespace string) *snowplanev1alpha1.DatabaseRole
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        "DATA_ANALYST",
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "my-db"},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "my-db"},
 		},
 	}
 }
@@ -123,7 +122,7 @@ func newTestDatabase(name, namespace string) *snowplanev1alpha1.Database {
 func newSuccessfulObservation() *snowflake.DatabaseRoleObservation {
 	return &snowflake.DatabaseRoleObservation{
 		Exists: true,
-		ShowOutput: &snowflake.DatabaseRoleShowOutput{
+		ShowOutput: &snowplanev1alpha1.DatabaseRoleShowOutput{
 			CreatedOn:      "2024-01-01",
 			Name:           "DATA_ANALYST",
 			DatabaseName:   "MY_DB",
@@ -150,22 +149,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	recorder := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRole, Service, *snowflake.DatabaseRoleObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: recorder,
-		Adapter: &adapter{
-			client:   c,
-			recorder: recorder,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, recorder, nil,
+		func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("DatabaseRole"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("DatabaseRole")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -453,7 +447,7 @@ func TestDetectDrift(t *testing.T) {
 		role := &snowplanev1alpha1.DatabaseRole{}
 		role.Spec.Comment = &comment
 		obs := &snowflake.DatabaseRoleObservation{
-			ShowOutput: &snowflake.DatabaseRoleShowOutput{Comment: "hello"},
+			ShowOutput: &snowplanev1alpha1.DatabaseRoleShowOutput{Comment: "hello"},
 		}
 		result := detectDrift(role, obs)
 		assert.False(t, result.HasDrift)
@@ -465,7 +459,7 @@ func TestDetectDrift(t *testing.T) {
 		role := &snowplanev1alpha1.DatabaseRole{}
 		role.Spec.Comment = &comment
 		obs := &snowflake.DatabaseRoleObservation{
-			ShowOutput: &snowflake.DatabaseRoleShowOutput{Comment: "old"},
+			ShowOutput: &snowplanev1alpha1.DatabaseRoleShowOutput{Comment: "old"},
 		}
 		result := detectDrift(role, obs)
 		assert.True(t, result.HasDrift)

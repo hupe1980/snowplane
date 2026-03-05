@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -15,22 +16,7 @@ type PipeObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW PIPES row.
-	ShowOutput *PipeShowOutput
-}
-
-// PipeShowOutput contains the fields from SHOW PIPES.
-type PipeShowOutput struct {
-	CreatedOn           string
-	Name                string
-	DatabaseName        string
-	SchemaName          string
-	Owner               string
-	Comment             string
-	Definition          string
-	NotificationChannel string
-	Integration         string
-	ErrorIntegration    string
-	AwsSnsTopic         string
+	ShowOutput *v1alpha1.PipeShowOutput
 }
 
 // CreatePipeOptions holds the parameters for creating a pipe.
@@ -205,7 +191,7 @@ func buildShowPipeByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW PIPES for a specific pipe within a schema.
-func (p *PipeClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*PipeShowOutput, error) {
+func (p *PipeClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.PipeShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("pipe name is required"))
 	}
@@ -237,9 +223,9 @@ func (p *PipeClient) Observe(ctx context.Context, name SchemaObjectIdentifier) (
 }
 
 // scanPipeShowOutput scans SHOW PIPES results for a matching row.
-func scanPipeShowOutput(rows *sql.Rows, name string) (*PipeShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*PipeShowOutput, error) {
-		return &PipeShowOutput{
+func scanPipeShowOutput(rows *sql.Rows, name string) (*v1alpha1.PipeShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.PipeShowOutput, error) {
+		return &v1alpha1.PipeShowOutput{
 			CreatedOn:           m["created_on"],
 			Name:                m["name"],
 			DatabaseName:        m["database_name"],

@@ -63,7 +63,6 @@ func (m *mockService) UnsetTag(ctx context.Context, opts snowflake.UnsetTagOptio
 // Helpers
 // --------------------------------------------------------------------------
 
-
 func newTestTA(name, namespace string) *snowplanev1alpha1.TagAssociation {
 	return &snowplanev1alpha1.TagAssociation{
 		ObjectMeta: metav1.ObjectMeta{
@@ -101,20 +100,16 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
 	return &reconciler.GenericReconciler[*snowplanev1alpha1.TagAssociation, Service, *snowflake.TagAssociationObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
-		},
+		Adapter: newAdapter(c, rec, func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
+		}),
 		GVK: snowplanev1alpha1.GroupVersion.WithKind("TagAssociation"),
 	}
 }
@@ -580,7 +575,7 @@ func TestApplyObservation(t *testing.T) {
 		Detail: successfulObservation(),
 	}
 
-	a := &adapter{}
+	a := newAdapter(nil, nil, nil)
 	a.ApplyObservation(ta, obs)
 
 	assert.NotEmpty(t, ta.Status.FullyQualifiedName)
@@ -601,7 +596,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 		Detail: successfulObservation(),
 	}
 
-	a := &adapter{}
+	a := newAdapter(nil, nil, nil)
 	result := a.DetectDrift(ta, obs)
 	assert.False(t, result.HasDrift)
 }
@@ -620,7 +615,7 @@ func TestDetectDrift_TagValueDrift(t *testing.T) {
 		},
 	}
 
-	a := &adapter{}
+	a := newAdapter(nil, nil, nil)
 	result := a.DetectDrift(ta, obs)
 	assert.True(t, result.HasDrift)
 	assert.Contains(t, result.Summary(), "TAG_VALUE")
@@ -639,7 +634,7 @@ func TestBuildAlterOptions_NoChanges(t *testing.T) {
 		Detail: successfulObservation(),
 	}
 
-	a := &adapter{}
+	a := newAdapter(nil, nil, nil)
 	opts, err := a.BuildAlterOptions(context.Background(), ta, nil, obs)
 	require.NoError(t, err)
 	assert.False(t, opts.HasChanges())
@@ -656,7 +651,7 @@ func TestBuildAlterOptions_ValueChanged(t *testing.T) {
 		Detail: successfulObservation(), // TagValue = "production"
 	}
 
-	a := &adapter{}
+	a := newAdapter(nil, nil, nil)
 	opts, err := a.BuildAlterOptions(context.Background(), ta, nil, obs)
 	require.NoError(t, err)
 	assert.True(t, opts.HasChanges())
@@ -695,16 +690,12 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 
 	r := &reconciler.GenericReconciler[*snowplanev1alpha1.TagAssociation, Service, *snowflake.TagAssociationObservation]{
 		Client:   c,
-		Factory:  clientfactory.NewClientFactory(),
+		Factory:  testutil.NewTestClientFactory(),
 		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-				capturedUseRole = useRole
-				return mock, nil, nil
-			},
-		},
+		Adapter: newAdapter(c, rec, func(_ context.Context, _ clientfactory.SnowflakeClient, useRole string) (Service, func(context.Context), error) {
+			capturedUseRole = useRole
+			return mock, nil, nil
+		}),
 		GVK: snowplanev1alpha1.GroupVersion.WithKind("TagAssociation"),
 	}
 

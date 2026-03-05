@@ -82,8 +82,8 @@ func newTestCR(name, namespace string) *snowplanev1alpha1.ProcedurePython {
 			Handler:         "main",
 			RuntimeVersion:  "3.11",
 			SnowparkPackage: "1.14.0",
-			DatabaseRef:     &snowplanev1alpha1.LocalObjectReference{Name: "analytics-db"},
-			SchemaRef:       &snowplanev1alpha1.LocalObjectReference{Name: "public-schema"},
+			DatabaseRef:     &snowplanev1alpha1.ObjectReference{Name: "analytics-db"},
+			SchemaRef:       &snowplanev1alpha1.ObjectReference{Name: "public-schema"},
 		},
 	}
 }
@@ -127,7 +127,7 @@ func newTestSchema(name, namespace string) *snowplanev1alpha1.Schema {
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        "PUBLIC",
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "analytics-db"},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "analytics-db"},
 		},
 		Status: snowplanev1alpha1.SchemaStatus{
 			CommonStatus: snowplanev1alpha1.CommonStatus{
@@ -157,22 +157,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.ProcedurePython, Service, *snowflake.ProcedureObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("ProcedurePython"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("ProcedurePython")
+
+	return r
 }
 
 // --------------------------------------------------------------------------

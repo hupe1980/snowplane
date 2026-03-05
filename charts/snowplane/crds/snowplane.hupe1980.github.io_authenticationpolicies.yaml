@@ -71,6 +71,14 @@ spec:
                   AuthenticationMethods is the list of authentication methods allowed.
                   Valid values include: ALL, SAML, PASSWORD, OAUTH, KEYPAIR, PROGRAMMATIC_ACCESS_TOKEN, WORKLOAD_IDENTITY.
                 items:
+                  enum:
+                  - ALL
+                  - SAML
+                  - PASSWORD
+                  - OAUTH
+                  - KEYPAIR
+                  - PROGRAMMATIC_ACCESS_TOKEN
+                  - WORKLOAD_IDENTITY
                   type: string
                 type: array
               clientTypes:
@@ -78,6 +86,12 @@ spec:
                   ClientTypes is the list of client types allowed.
                   Valid values include: ALL, SNOWFLAKE_UI, DRIVERS, SNOWFLAKE_CLI, SNOWSQL.
                 items:
+                  enum:
+                  - ALL
+                  - SNOWFLAKE_UI
+                  - DRIVERS
+                  - SNOWFLAKE_CLI
+                  - SNOWSQL
                   type: string
                 type: array
               comment:
@@ -88,6 +102,7 @@ spec:
                 description: |-
                   DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
                   Mutually exclusive with DatabaseRef.
+                maxLength: 255
                 minLength: 1
                 type: string
                 x-kubernetes-validations:
@@ -100,7 +115,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -165,6 +187,8 @@ spec:
                     description: AllowedMethods is the list of MFA methods allowed
                       (e.g. "TOTP").
                     items:
+                      enum:
+                      - TOTP
                       type: string
                     type: array
                   enforceMfaOnExternalAuthentication:
@@ -179,6 +203,7 @@ spec:
               name:
                 description: Name is the Snowflake authentication policy name. Immutable
                   after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               patPolicy:
@@ -222,6 +247,7 @@ spec:
                   name:
                     default: default
                     description: Name of the ProviderConfig to use.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   namespace:
@@ -236,6 +262,7 @@ spec:
                   SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
                   The controller constructs the FQN from databaseName + schemaName + name.
                   Mutually exclusive with SchemaRef.
+                maxLength: 255
                 minLength: 1
                 type: string
                 x-kubernetes-validations:
@@ -248,7 +275,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -270,6 +304,7 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                maxLength: 255
                 minLength: 1
                 type: string
               workloadIdentityPolicy:
@@ -298,6 +333,10 @@ spec:
                     description: AllowedProviders is the list of identity providers
                       allowed (e.g. "AWS", "AZURE", "GCP").
                     items:
+                      enum:
+                      - AWS
+                      - AZURE
+                      - GCP
                       type: string
                     type: array
                 type: object
@@ -322,20 +361,20 @@ spec:
                 && has(self.schemaName))
             - message: spec.databaseRef is immutable (delete and recreate the resource
                 to change)
-              rule: '!has(self.databaseRef) || !has(oldSelf.databaseRef) || self.databaseRef
-                == oldSelf.databaseRef'
+              rule: has(oldSelf.databaseRef) == has(self.databaseRef) && (!has(self.databaseRef)
+                || self.databaseRef == oldSelf.databaseRef)
             - message: spec.databaseName is immutable (delete and recreate the resource
                 to change)
-              rule: '!has(self.databaseName) || !has(oldSelf.databaseName) || self.databaseName
-                == oldSelf.databaseName'
+              rule: has(oldSelf.databaseName) == has(self.databaseName) && (!has(self.databaseName)
+                || self.databaseName == oldSelf.databaseName)
             - message: spec.schemaRef is immutable (delete and recreate the resource
                 to change)
-              rule: '!has(self.schemaRef) || !has(oldSelf.schemaRef) || self.schemaRef
-                == oldSelf.schemaRef'
+              rule: has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef)
+                || self.schemaRef == oldSelf.schemaRef)
             - message: spec.schemaName is immutable (delete and recreate the resource
                 to change)
-              rule: '!has(self.schemaName) || !has(oldSelf.schemaName) || self.schemaName
-                == oldSelf.schemaName'
+              rule: has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName)
+                || self.schemaName == oldSelf.schemaName)
             - message: spec.databaseName must be a simple identifier, not a fully-qualified
                 name
               rule: '!has(self.databaseName) || !self.databaseName.contains(''.'')'
@@ -430,6 +469,13 @@ spec:
                   comparing ObservedGeneration vs Generation because metadata-only
                   changes (labels, annotations) increment Generation without changing
                   the spec.
+                type: string
+              lastReconcileTime:
+                description: |-
+                  LastReconcileTime is the timestamp of the most recent successful
+                  reconciliation. Useful for SLO monitoring and diagnosing whether
+                  reconciliation is running for a specific resource.
+                format: date-time
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent metadata.generation

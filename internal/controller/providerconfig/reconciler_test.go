@@ -107,7 +107,7 @@ func newTestReconcilerWithRoles(pingFn PingFunc, allowedRoles map[string]bool, o
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	recorder := record.NewFakeRecorder(100)
 
 	r := &Reconciler{
@@ -661,7 +661,7 @@ func TestIsInUse_AllResourceTypes(t *testing.T) {
 		}},
 		{"Schema", &snowplanev1alpha1.Schema{
 			ObjectMeta: metav1.ObjectMeta{Name: "s", Namespace: "default"},
-			Spec:       snowplanev1alpha1.SchemaSpec{CommonSpec: snowplanev1alpha1.CommonSpec{ProviderRef: snowplanev1alpha1.ProviderReference{Name: "my-pc"}, DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete}, Name: "S", DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "db"}},
+			Spec:       snowplanev1alpha1.SchemaSpec{CommonSpec: snowplanev1alpha1.CommonSpec{ProviderRef: snowplanev1alpha1.ProviderReference{Name: "my-pc"}, DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete}, Name: "S", DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "db"}},
 		}},
 		{"Warehouse", &snowplanev1alpha1.Warehouse{
 			ObjectMeta: metav1.ObjectMeta{Name: "w", Namespace: "default"},
@@ -677,11 +677,11 @@ func TestIsInUse_AllResourceTypes(t *testing.T) {
 		}},
 		{"DatabaseRole", &snowplanev1alpha1.DatabaseRole{
 			ObjectMeta: metav1.ObjectMeta{Name: "dr", Namespace: "default"},
-			Spec:       snowplanev1alpha1.DatabaseRoleSpec{CommonSpec: snowplanev1alpha1.CommonSpec{ProviderRef: snowplanev1alpha1.ProviderReference{Name: "my-pc"}, DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete}, Name: "DR", DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "db"}},
+			Spec:       snowplanev1alpha1.DatabaseRoleSpec{CommonSpec: snowplanev1alpha1.CommonSpec{ProviderRef: snowplanev1alpha1.ProviderReference{Name: "my-pc"}, DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete}, Name: "DR", DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "db"}},
 		}},
-		{"AccountRoleGrant", &snowplanev1alpha1.AccountRoleGrant{
+		{"GrantPrivilegesToAccountRole", &snowplanev1alpha1.GrantPrivilegesToAccountRole{
 			ObjectMeta: metav1.ObjectMeta{Name: "g", Namespace: "default"},
-			Spec:       snowplanev1alpha1.AccountRoleGrantSpec{CommonSpec: snowplanev1alpha1.CommonSpec{ProviderRef: snowplanev1alpha1.ProviderReference{Name: "my-pc"}, DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete}, Privilege: "USAGE", On: snowplanev1alpha1.GrantOn{Account: true}, AccountRole: testutil.Ptr("R")},
+			Spec:       snowplanev1alpha1.GrantPrivilegesToAccountRoleSpec{CommonSpec: snowplanev1alpha1.CommonSpec{ProviderRef: snowplanev1alpha1.ProviderReference{Name: "my-pc"}, DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete}, Privilege: "USAGE", On: snowplanev1alpha1.GrantOn{Account: true}, AccountRole: testutil.Ptr("R")},
 		}},
 	}
 
@@ -857,7 +857,7 @@ func (m *mockClient) Exec(_ context.Context, _ string, _ ...any) (sql.Result, er
 	return nil, nil
 }
 func (m *mockClient) QueryRow(_ context.Context, _ string, _ ...any) *snowflake.Row {
-	return nil
+	return snowflake.NewErrorRow(fmt.Errorf("mock: no real connection"))
 }
 
 // --------------------------------------------------------------------------
@@ -916,9 +916,9 @@ func TestListLen_AllTypes(t *testing.T) {
 	assert.Equal(t, 1, listLen(&snowplanev1alpha1.TableList{Items: []snowplanev1alpha1.Table{{}}}))
 	assert.Equal(t, 1, listLen(&snowplanev1alpha1.ViewList{Items: []snowplanev1alpha1.View{{}}}))
 	assert.Equal(t, 1, listLen(&snowplanev1alpha1.StageList{Items: []snowplanev1alpha1.Stage{{}}}))
-	assert.Equal(t, 1, listLen(&snowplanev1alpha1.AccountRoleGrantList{Items: []snowplanev1alpha1.AccountRoleGrant{{}}}))
-	assert.Equal(t, 1, listLen(&snowplanev1alpha1.DatabaseRoleGrantList{Items: []snowplanev1alpha1.DatabaseRoleGrant{{}}}))
-	assert.Equal(t, 1, listLen(&snowplanev1alpha1.ShareGrantList{Items: []snowplanev1alpha1.ShareGrant{{}}}))
+	assert.Equal(t, 1, listLen(&snowplanev1alpha1.GrantPrivilegesToAccountRoleList{Items: []snowplanev1alpha1.GrantPrivilegesToAccountRole{{}}}))
+	assert.Equal(t, 1, listLen(&snowplanev1alpha1.GrantPrivilegesToDatabaseRoleList{Items: []snowplanev1alpha1.GrantPrivilegesToDatabaseRole{{}}}))
+	assert.Equal(t, 1, listLen(&snowplanev1alpha1.GrantPrivilegesToShareList{Items: []snowplanev1alpha1.GrantPrivilegesToShare{{}}}))
 }
 
 // --------------------------------------------------------------------------
@@ -1129,10 +1129,10 @@ func TestReconcile_RoleNotAllowed_HealthMetricSetFalse(t *testing.T) {
 }
 
 func (m *mockClient) Query(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
-	return nil, nil
+	return nil, fmt.Errorf("mock: no real connection")
 }
 func (m *mockClient) WithRole(_ context.Context, _ string) (*snowflake.Client, func(context.Context), error) {
-	return nil, nil, nil
+	return nil, func(context.Context) {}, fmt.Errorf("mock: no real connection")
 }
 
 func TestWithSnowflakeOpTimeout(t *testing.T) {

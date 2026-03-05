@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -14,18 +15,7 @@ type DatabaseRoleObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW DATABASE ROLES row.
-	ShowOutput *DatabaseRoleShowOutput
-}
-
-// DatabaseRoleShowOutput contains the fields from SHOW DATABASE ROLES.
-type DatabaseRoleShowOutput struct {
-	CreatedOn      string
-	Name           string
-	DatabaseName   string
-	Comment        string
-	Owner          string
-	GrantedToRoles int32
-	GrantedRoles   int32
+	ShowOutput *v1alpha1.DatabaseRoleShowOutput
 }
 
 // CreateDatabaseRoleOptions holds the parameters for creating a database role.
@@ -162,7 +152,7 @@ func buildShowDatabaseRoleByIDSQL(name DatabaseObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW DATABASE ROLES for a specific role name.
-func (r *DatabaseRoleClient) ShowByID(ctx context.Context, name DatabaseObjectIdentifier) (*DatabaseRoleShowOutput, error) {
+func (r *DatabaseRoleClient) ShowByID(ctx context.Context, name DatabaseObjectIdentifier) (*v1alpha1.DatabaseRoleShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("database role name is required"))
 	}
@@ -194,12 +184,12 @@ func (r *DatabaseRoleClient) Observe(ctx context.Context, name DatabaseObjectIde
 }
 
 // scanDatabaseRoleShowOutput scans SHOW DATABASE ROLES results for a matching row.
-func scanDatabaseRoleShowOutput(rows *sql.Rows, name string) (*DatabaseRoleShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*DatabaseRoleShowOutput, error) {
+func scanDatabaseRoleShowOutput(rows *sql.Rows, name string) (*v1alpha1.DatabaseRoleShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.DatabaseRoleShowOutput, error) {
 		grantedToRoles, _ := parseInt32(m["granted_to_roles"])
 		grantedRoles, _ := parseInt32(m["granted_database_roles"])
 
-		return &DatabaseRoleShowOutput{
+		return &v1alpha1.DatabaseRoleShowOutput{
 			CreatedOn:      m["created_on"],
 			Name:           m["name"],
 			DatabaseName:   m["database_name"],

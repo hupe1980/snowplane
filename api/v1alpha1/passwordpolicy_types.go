@@ -28,7 +28,7 @@ type PasswordPolicySpec struct {
 	// Mutually exclusive with DatabaseName.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.databaseRef is immutable"
-	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
+	DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
 	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef.
@@ -42,7 +42,7 @@ type PasswordPolicySpec struct {
 	// Mutually exclusive with SchemaName.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.schemaRef is immutable"
-	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
+	SchemaRef *ObjectReference `json:"schemaRef,omitempty"`
 
 	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// The controller constructs the FQN from databaseName + schemaName + name.

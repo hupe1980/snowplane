@@ -18,6 +18,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	// Automatically set GOMAXPROCS to match the container's CPU quota.
+	// Without this, Go defaults to the host CPU count, causing excessive
+	// goroutine scheduling overhead in containerized deployments.
+	_ "go.uber.org/automaxprocs"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/circuitbreaker"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
@@ -26,11 +31,18 @@ import (
 	apiauthacgctl "github.com/hupe1980/snowplane/internal/controller/apiauthenticationintegrationwithauthorizationcodegrant"
 	apiauthccctl "github.com/hupe1980/snowplane/internal/controller/apiauthenticationintegrationwithclientcredentials"
 	apiauthjwtctl "github.com/hupe1980/snowplane/internal/controller/apiauthenticationintegrationwithjwtbearer"
+	apiintegrationctl "github.com/hupe1980/snowplane/internal/controller/apiintegration"
 	authenticationpolicyctl "github.com/hupe1980/snowplane/internal/controller/authenticationpolicy"
+
+	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
 	database "github.com/hupe1980/snowplane/internal/controller/database"
 	databaserolectl "github.com/hupe1980/snowplane/internal/controller/databaserole"
 	dynamictablectl "github.com/hupe1980/snowplane/internal/controller/dynamictable"
+	externaloauthintegrationctl "github.com/hupe1980/snowplane/internal/controller/externaloauthintegration"
 	externaltablectl "github.com/hupe1980/snowplane/internal/controller/externaltable"
+	failovergroupctl "github.com/hupe1980/snowplane/internal/controller/failovergroup"
 	fieldexportctl "github.com/hupe1980/snowplane/internal/controller/fieldexport"
 	fileformatctl "github.com/hupe1980/snowplane/internal/controller/fileformat"
 	functionjavactl "github.com/hupe1980/snowplane/internal/controller/functionjava"
@@ -60,13 +72,17 @@ import (
 	resourcemonitorctl "github.com/hupe1980/snowplane/internal/controller/resourcemonitor"
 	roleassignmentctl "github.com/hupe1980/snowplane/internal/controller/roleassignment"
 	rowaccesspolicyctl "github.com/hupe1980/snowplane/internal/controller/rowaccesspolicy"
+	saml2integrationctl "github.com/hupe1980/snowplane/internal/controller/saml2integration"
 	schemactl "github.com/hupe1980/snowplane/internal/controller/schema"
+	secondarydatabasectl "github.com/hupe1980/snowplane/internal/controller/secondarydatabase"
 	secretwithauthorizationcodegrantctl "github.com/hupe1980/snowplane/internal/controller/secretwithauthorizationcodegrant"
 	secretwithbasicauthenticationctl "github.com/hupe1980/snowplane/internal/controller/secretwithbasicauthentication"
 	secretwithclientcredentialsctl "github.com/hupe1980/snowplane/internal/controller/secretwithclientcredentials"
 	secretwithgenericstringctl "github.com/hupe1980/snowplane/internal/controller/secretwithgenericstring"
 	securityintegrationctl "github.com/hupe1980/snowplane/internal/controller/securityintegration"
 	sequencectl "github.com/hupe1980/snowplane/internal/controller/sequence"
+	shareddatabasectl "github.com/hupe1980/snowplane/internal/controller/shareddatabase"
+	sqlstatementctl "github.com/hupe1980/snowplane/internal/controller/sqlstatement"
 	stagectl "github.com/hupe1980/snowplane/internal/controller/stage"
 	storageintegrationctl "github.com/hupe1980/snowplane/internal/controller/storageintegration"
 	streamondirectorytablectl "github.com/hupe1980/snowplane/internal/controller/streamondirectorytable"
@@ -84,6 +100,7 @@ import (
 	warehousectl "github.com/hupe1980/snowplane/internal/controller/warehouse"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/utils/sanitize"
+	"github.com/hupe1980/snowplane/internal/webhook"
 
 	// Register Prometheus metrics in controller-runtime's registry.
 	_ "github.com/hupe1980/snowplane/internal/metrics"
@@ -181,6 +198,10 @@ func main() {
 	var cbResetTimeout time.Duration
 	var allowedRoles string
 	var snowflakeOpTimeout time.Duration
+	var enableWebhook bool
+	var webhookPort int
+	var webhookCertDir string
+	var enableSQLStatement bool
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -205,8 +226,8 @@ func main() {
 	flag.BoolVar(&enableAlphaResources, "enable-alpha-resources", true,
 		"Enable controllers for alpha-maturity CRDs. Set to false to skip alpha resources.")
 	flag.StringVar(&disableControllers, "disable-controllers", "",
-		"Comma-separated list of controller names to disable (e.g. \"accountrolegrant,stage,view\"). "+
-			"Valid names: alert, database, schema, warehouse, accountrole, databaserole, accountrolegrant, databaserolegrant, sharegrant, user, table, view, stage, task, streamontable, streamonview, streamonexternaltable, streamondirectorytable, streamondynamictable, tag, networkpolicy, resourcemonitor, maskingpolicy, rowaccesspolicy, grantownership, fieldexport, storageintegration, fileformat, pipe, dynamictable, securityintegration, passwordpolicy, networkrule, accountroleassignment, databaseroleassignment.")
+		"Comma-separated list of controller names to disable (e.g. \"grantprivilegestoaccountrole,stage,view\"). "+
+			"Pass an invalid name to see the full list of valid controller names.")
 	flag.StringVar(&watchNamespaces, "watch-namespaces", "",
 		"Comma-separated list of namespaces to watch. If empty, all namespaces are watched.")
 	flag.StringVar(&leaderElectionID, "leader-election-id", "snowplane-leader-election",
@@ -220,6 +241,15 @@ func main() {
 			"If empty, all roles are allowed. Example: \"SYSADMIN,USERADMIN,DATA_ENGINEER\".")
 	flag.DurationVar(&snowflakeOpTimeout, "snowflake-op-timeout", 60*time.Second,
 		"Per-operation timeout for Snowflake CRUD calls (Observe, Create, Alter, Drop).")
+	flag.BoolVar(&enableSQLStatement, "enable-sql-statement", false,
+		"Enable the SQLStatement escape-hatch controller. "+
+			"This allows executing arbitrary SQL against Snowflake — use with caution.")
+	flag.BoolVar(&enableWebhook, "enable-webhook", false,
+		"Enable the ownership-conflict validating admission webhook.")
+	flag.IntVar(&webhookPort, "webhook-port", 9443,
+		"Port for the webhook server (only used when --enable-webhook is set).")
+	flag.StringVar(&webhookCertDir, "webhook-cert-dir", "/tmp/k8s-webhook-server/serving-certs",
+		"Directory containing TLS cert and key for the webhook server.")
 
 	opts := zap.Options{Development: developmentMode}
 	opts.BindFlags(flag.CommandLine)
@@ -235,6 +265,14 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       leaderElectionID,
+	}
+
+	// Configure the webhook server when the ownership webhook is enabled.
+	if enableWebhook {
+		mgrOpts.WebhookServer = ctrlwebhook.NewServer(ctrlwebhook.Options{
+			Port:    webhookPort,
+			CertDir: webhookCertDir,
+		})
 	}
 
 	// Restrict the cache to specific namespaces if --watch-namespaces is set.
@@ -334,9 +372,9 @@ func main() {
 		{"warehouse", warehousectl.NewReconciler(kc, factory, controllerRec("warehouse"), rl)},
 		{"accountrole", accountrolectl.NewReconciler(kc, factory, controllerRec("accountrole"), rl)},
 		{"databaserole", databaserolectl.NewReconciler(kc, factory, controllerRec("databaserole"), rl)},
-		{"accountrolegrant", grantctl.NewAccountRoleGrantReconciler(kc, factory, controllerRec("accountrolegrant"), rl)},
-		{"databaserolegrant", grantctl.NewDatabaseRoleGrantReconciler(kc, factory, controllerRec("databaserolegrant"), rl)},
-		{"sharegrant", grantctl.NewShareGrantReconciler(kc, factory, controllerRec("sharegrant"), rl)},
+		{"grantprivilegestoaccountrole", grantctl.NewGrantPrivilegesToAccountRoleReconciler(kc, factory, controllerRec("grantprivilegestoaccountrole"), rl)},
+		{"grantprivilegestodatabaserole", grantctl.NewGrantPrivilegesToDatabaseRoleReconciler(kc, factory, controllerRec("grantprivilegestodatabaserole"), rl)},
+		{"grantprivilegestoshare", grantctl.NewGrantPrivilegesToShareReconciler(kc, factory, controllerRec("grantprivilegestoshare"), rl)},
 		{"user", userctl.NewReconciler(kc, factory, controllerRec("user"), rl)},
 		{"table", tablectl.NewReconciler(kc, factory, controllerRec("table"), rl)},
 		{"view", viewctl.NewReconciler(kc, factory, controllerRec("view"), rl)},
@@ -358,6 +396,12 @@ func main() {
 		{"pipe", pipectl.NewReconciler(kc, factory, controllerRec("pipe"), rl)},
 		{"dynamictable", dynamictablectl.NewReconciler(kc, factory, controllerRec("dynamictable"), rl)},
 		{"notificationintegration", notificationintegrationctl.NewReconciler(kc, factory, controllerRec("notificationintegration"), rl)},
+		{"saml2integration", saml2integrationctl.NewReconciler(kc, factory, controllerRec("saml2integration"), rl)},
+		{"externaloauthintegration", externaloauthintegrationctl.NewReconciler(kc, factory, controllerRec("externaloauthintegration"), rl)},
+		{"failovergroup", failovergroupctl.NewReconciler(kc, factory, controllerRec("failovergroup"), rl)},
+		{"apiintegration", apiintegrationctl.NewReconciler(kc, factory, controllerRec("apiintegration"), rl)},
+		{"secondarydatabase", secondarydatabasectl.NewReconciler(kc, factory, controllerRec("secondarydatabase"), rl)},
+		{"shareddatabase", shareddatabasectl.NewReconciler(kc, factory, controllerRec("shareddatabase"), rl)},
 		{"securityintegration", securityintegrationctl.NewReconciler(kc, factory, controllerRec("securityintegration"), rl)},
 		{"passwordpolicy", passwordpolicyctl.NewReconciler(kc, factory, controllerRec("passwordpolicy"), rl)},
 		{"networkrule", networkrulectl.NewReconciler(kc, factory, controllerRec("networkrule"), rl)},
@@ -397,7 +441,8 @@ func main() {
 		controllerNames = append(controllerNames, c.name)
 	}
 
-	controllerNames = append(controllerNames, "fieldexport") // registered standalone below
+	controllerNames = append(controllerNames, "fieldexport")  // registered standalone below
+	controllerNames = append(controllerNames, "sqlstatement") // registered standalone below
 
 	if err := validateDisabledControllers(disabled, controllerNames); err != nil {
 		setupLog.Error(err, "invalid --disable-controllers flag")
@@ -423,6 +468,28 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "FieldExport")
 			os.Exit(1)
 		}
+	}
+
+	// Set up SQLStatement reconciler (standalone — gated behind --enable-sql-statement
+	// due to the inherent security risks of executing arbitrary SQL).
+	if !disabled["sqlstatement"] && enableSQLStatement {
+		sqlstmtCfg := cfg
+		sqlstmtCfg.Disabled = false // already gated by enableSQLStatement flag
+
+		if err := sqlstatementctl.NewReconciler(kc, factory, controllerRec("sqlstatement"), rl).Setup(sqlstmtCfg); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "SQLStatement")
+			os.Exit(1)
+		}
+
+		setupLog.Info("SQLStatement escape-hatch controller enabled")
+	}
+
+	// Register the ownership-conflict validating webhook.
+	if enableWebhook {
+		mgr.GetWebhookServer().Register("/validate-ownership",
+			&admission.Webhook{Handler: &webhook.OwnershipValidator{Client: kc}},
+		)
+		setupLog.Info("ownership webhook registered", "port", webhookPort)
 	}
 
 	// Health checks.

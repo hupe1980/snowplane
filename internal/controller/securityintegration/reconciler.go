@@ -39,14 +39,11 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 
 // NewReconciler returns a new SecurityIntegration reconciler.
 func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.SecurityIntegration, Service, *snowflake.SecurityIntegrationObservation] {
-	a := &adapter{client: c, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.SecurityIntegration, Service, *snowflake.SecurityIntegrationObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewSecurityIntegrationClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
@@ -58,38 +55,76 @@ func NewReconcilerWithServiceFactory(
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.SecurityIntegration, Service, *snowflake.SecurityIntegrationObservation] {
-	a := &adapter{client: c, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.SecurityIntegration, Service, *snowflake.SecurityIntegrationObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, sf))
+}
+
+// newAdapter creates the BaseAdapter for SecurityIntegration resources.
+func newAdapter(c client.Client, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.SecurityIntegration, Service, *snowflake.SecurityIntegrationObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.SecurityIntegration, Service, *snowflake.SecurityIntegrationObservation]{
+		ResourceNameVal:  "securityintegration",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.SecurityIntegration { return &snowplanev1alpha1.SecurityIntegration{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(obj *snowplanev1alpha1.SecurityIntegration) (reconciler.Identifier, error) {
+			return snowflake.NewAccountObjectIdentifier(obj.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) (*snowflake.SecurityIntegrationObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.SecurityIntegrationObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.SecurityIntegration, id snowflake.AccountObjectIdentifier) error {
+			opts, err := buildCreateOptions(ctx, c, obj, id)
+			if err != nil {
+				return err
+			}
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterSecurityIntegrationOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.SecurityIntegration, id snowflake.AccountObjectIdentifier, obs *reconciler.Observation[*snowflake.SecurityIntegrationObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.SecurityIntegration, obs *reconciler.Observation[*snowflake.SecurityIntegrationObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.SecurityIntegration, obs *reconciler.Observation[*snowflake.SecurityIntegrationObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+// validateImmutableFields checks that immutable fields have not changed.
+func validateImmutableFields(_ context.Context, si *snowplanev1alpha1.SecurityIntegration) error {
+	if reconciler.ShouldSkipImmutableValidation(si) {
+		return nil
 	}
 
-	return snowflake.NewSecurityIntegrationClient(sfC), cleanup, nil
+	if si.Status.ShowOutput != nil {
+		if si.Status.ShowOutput.Name != "" && !strings.EqualFold(si.Spec.Name, si.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", si.Status.ShowOutput.Name, si.Spec.Name)
+		}
+
+		if si.Status.ShowOutput.Type != "" && !strings.EqualFold(string(si.Spec.Type), si.Status.ShowOutput.Type) {
+			return fmt.Errorf("spec.type is immutable after creation (current: %q, desired: %q)", si.Status.ShowOutput.Type, si.Spec.Type)
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(si *snowplanev1alpha1.SecurityIntegration, obs *snowflake.SecurityIntegrationObservation) {
 	if obs.ShowOutput != nil {
 		si.Status.FullyQualifiedName = obs.ShowOutput.Name
 
-		si.Status.ShowOutput = &snowplanev1alpha1.SecurityIntegrationShowOutput{
-			CreatedOn: obs.ShowOutput.CreatedOn,
-			Name:      obs.ShowOutput.Name,
-			Type:      obs.ShowOutput.Type,
-			Category:  obs.ShowOutput.Category,
-			Enabled:   obs.ShowOutput.Enabled,
-			Comment:   obs.ShowOutput.Comment,
-		}
+		si.Status.ShowOutput = obs.ShowOutput
 	}
 
 	if obs.DescribeOutput != nil {

@@ -28,7 +28,7 @@ type SequenceSpec struct {
 	// DatabaseRef is a reference to a Database resource in the same namespace.
 	// Mutually exclusive with DatabaseName.
 	// +optional
-	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
+	DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
 	// DatabaseName is the literal Snowflake database name.
 	// Mutually exclusive with DatabaseRef.
@@ -38,7 +38,7 @@ type SequenceSpec struct {
 	// SchemaRef is a reference to a Schema resource in the same namespace.
 	// Mutually exclusive with SchemaName.
 	// +optional
-	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
+	SchemaRef *ObjectReference `json:"schemaRef,omitempty"`
 
 	// SchemaName is the literal Snowflake schema name.
 	// Mutually exclusive with SchemaRef.

@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -26,14 +27,12 @@ func newWarehouse() *snowplanev1alpha1.Warehouse {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newWarehouse()
 		obs := &reconciler.Observation[*snowflake.WarehouseObservation]{
 			Exists: true,
 			Detail: &snowflake.WarehouseObservation{
-				ShowOutput: &snowflake.WarehouseShowOutput{
+				ShowOutput: &snowplanev1alpha1.WarehouseShowOutput{
 					Type:            "STANDARD",
 					Size:            "X-SMALL",
 					MinClusterCount: 1,
@@ -54,11 +53,11 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 
 		assert.Equal(t, snowplanev1alpha1.WarehouseType("STANDARD"), *obj.Spec.WarehouseType)
-		assert.Equal(t, snowplanev1alpha1.WarehouseSize("X-SMALL"), *obj.Spec.WarehouseSize)
+		assert.Equal(t, snowplanev1alpha1.WarehouseSize("XSMALL"), *obj.Spec.WarehouseSize)
 		assert.Equal(t, int32(1), *obj.Spec.MinClusterCount)
 		assert.Equal(t, int32(3), *obj.Spec.MaxClusterCount)
 		assert.Equal(t, snowplanev1alpha1.ScalingPolicy("STANDARD"), *obj.Spec.ScalingPolicy)
@@ -82,7 +81,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.WarehouseObservation]{
 			Exists: true,
 			Detail: &snowflake.WarehouseObservation{
-				ShowOutput: &snowflake.WarehouseShowOutput{
+				ShowOutput: &snowplanev1alpha1.WarehouseShowOutput{
 					Type:    "STANDARD",
 					Size:    "LARGE",
 					Comment: "snowflake comment",
@@ -90,7 +89,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified) // Size was set
 
 		assert.Equal(t, snowplanev1alpha1.WarehouseType("SNOWPARK-OPTIMIZED"), *obj.Spec.WarehouseType)
@@ -121,14 +120,14 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.WarehouseObservation]{
 			Exists: true,
 			Detail: &snowflake.WarehouseObservation{
-				ShowOutput: &snowflake.WarehouseShowOutput{Comment: "other", Size: "XLARGE"},
+				ShowOutput: &snowplanev1alpha1.WarehouseShowOutput{Comment: "other", Size: "XLARGE"},
 				Parameters: &snowflake.WarehouseParameters{
 					MaxConcurrencyLevel: ptr(int32(99)),
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -139,7 +138,7 @@ func TestLateInitialize(t *testing.T) {
 			Detail: nil,
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -153,7 +152,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 }

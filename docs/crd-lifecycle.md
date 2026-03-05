@@ -36,11 +36,11 @@ Every Snowplane CRD carries a maturity label (`snowplane.hupe1980.github.io/matu
 | User | alpha | Secret-referenced credentials |
 | AccountRole | alpha | Simplest resource type |
 | DatabaseRole | alpha | Two-part identifier, parent dependency |
-| AccountRoleGrant | alpha | Grant/Revoke (no ALTER) |
-| DatabaseRoleGrant | alpha | Grant/Revoke (no ALTER) |
+| GrantPrivilegesToAccountRole | alpha | Grant/Revoke (no ALTER) |
+| GrantPrivilegesToDatabaseRole | alpha | Grant/Revoke (no ALTER) |
 | AccountRoleAssignment | alpha | GRANT ROLE TO ROLE/USER (immutable, no ALTER) |
 | DatabaseRoleAssignment | alpha | GRANT DATABASE ROLE TO ROLE/DATABASE ROLE (immutable, no ALTER) |
-| ShareGrant | alpha | Grant/Revoke (no ALTER) |
+| GrantPrivilegesToShare | alpha | Grant/Revoke (no ALTER) |
 | GrantOwnership | alpha | Ownership transfer, no-op on delete |
 | Table | alpha | Column management, schema-level |
 | View | alpha | AS query management, secure views |
@@ -137,7 +137,7 @@ func (src *Database) ConvertTo(dstRaw conversion.Hub) error {
 manager --enable-alpha-resources=false
 
 # Disable specific controllers
-manager --disable-controllers=accountrolegrant,stage,view
+manager --disable-controllers=grantprivilegestoaccountrole,stage,view
 ```
 
 When disabled:

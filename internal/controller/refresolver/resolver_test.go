@@ -55,7 +55,7 @@ func TestResolveDatabaseRef_Happy(t *testing.T) {
 		Build()
 
 	fqn, err := ResolveDatabaseRef(context.Background(), c, "default",
-		snowplanev1alpha1.LocalObjectReference{Name: "my-db"})
+		snowplanev1alpha1.ObjectReference{Name: "my-db"})
 	require.NoError(t, err)
 	assert.Equal(t, `"ANALYTICS"`, fqn)
 }
@@ -66,7 +66,7 @@ func TestResolveDatabaseRef_NotFound(t *testing.T) {
 	c := fake.NewClientBuilder().WithScheme(testScheme()).Build()
 
 	_, err := ResolveDatabaseRef(context.Background(), c, "default",
-		snowplanev1alpha1.LocalObjectReference{Name: "missing"})
+		snowplanev1alpha1.ObjectReference{Name: "missing"})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrReferenceNotFound)
 }
@@ -88,7 +88,7 @@ func TestResolveDatabaseRef_NotReady(t *testing.T) {
 		Build()
 
 	_, err := ResolveDatabaseRef(context.Background(), c, "default",
-		snowplanev1alpha1.LocalObjectReference{Name: "my-db"})
+		snowplanev1alpha1.ObjectReference{Name: "my-db"})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrReferenceNotReady)
 }
@@ -108,7 +108,7 @@ func TestResolveDatabaseRef_EmptyFQN(t *testing.T) {
 		Build()
 
 	_, err := ResolveDatabaseRef(context.Background(), c, "default",
-		snowplanev1alpha1.LocalObjectReference{Name: "my-db"})
+		snowplanev1alpha1.ObjectReference{Name: "my-db"})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrReferenceNotReady)
 }
@@ -196,7 +196,7 @@ func TestResolveLocalRef_Non404Error(t *testing.T) {
 		Build()
 
 	_, err := ResolveDatabaseRef(context.Background(), c, "default",
-		snowplanev1alpha1.LocalObjectReference{Name: "my-db"})
+		snowplanev1alpha1.ObjectReference{Name: "my-db"})
 	require.Error(t, err)
 	// The error should NOT be ErrReferenceNotFound — it wraps the API error.
 	assert.NotErrorIs(t, err, ErrReferenceNotFound)

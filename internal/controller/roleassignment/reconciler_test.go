@@ -12,10 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -49,7 +49,6 @@ func (m *mockService) RevokeRole(ctx context.Context, opts snowflake.RevokeRoleO
 	return nil
 }
 
-
 func newTestARA(name, ns string) *snowplanev1alpha1.AccountRoleAssignment {
 	return &snowplanev1alpha1.AccountRoleAssignment{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns, Generation: 1},
@@ -81,7 +80,7 @@ func newTestDRA(name, ns string) *snowplanev1alpha1.DatabaseRoleAssignment {
 func okAccountObs() *snowflake.RoleAssignmentObservation {
 	return &snowflake.RoleAssignmentObservation{
 		Exists: true,
-		ShowOutput: &snowflake.RoleAssignmentShowOutput{
+		ShowOutput: &snowplanev1alpha1.RoleAssignmentShowOutput{
 			CreatedOn: "2024-01-01", Role: "ANALYST",
 			GrantedTo: "ROLE", GranteeName: "SYSADMIN", GrantedBy: "SECURITYADMIN",
 		},
@@ -91,7 +90,7 @@ func okAccountObs() *snowflake.RoleAssignmentObservation {
 func okDatabaseObs() *snowflake.RoleAssignmentObservation {
 	return &snowflake.RoleAssignmentObservation{
 		Exists: true,
-		ShowOutput: &snowflake.RoleAssignmentShowOutput{
+		ShowOutput: &snowplanev1alpha1.RoleAssignmentShowOutput{
 			CreatedOn: "2024-01-01", Role: "READER",
 			GrantedTo: "ROLE", GranteeName: "SYSADMIN", GrantedBy: "SECURITYADMIN",
 		},
@@ -110,7 +109,7 @@ func araReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Generi
 		cb = cb.WithRuntimeObjects(obj)
 	}
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	recorder := record.NewFakeRecorder(100)
 	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleAssignment, Service, *snowflake.RoleAssignmentObservation]{
 		Client: c, Factory: factory, Recorder: recorder,
@@ -136,7 +135,7 @@ func draReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Generi
 		cb = cb.WithRuntimeObjects(obj)
 	}
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	recorder := record.NewFakeRecorder(100)
 	return &reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRoleAssignment, Service, *snowflake.RoleAssignmentObservation]{
 		Client: c, Factory: factory, Recorder: recorder,
@@ -148,6 +147,49 @@ func draReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Generi
 		},
 		GVK: snowplanev1alpha1.GroupVersion.WithKind("DatabaseRoleAssignment"),
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Standard reconciler suite — covers universal lifecycle tests for both
+// AccountRoleAssignment and DatabaseRoleAssignment.
+// ---------------------------------------------------------------------------
+
+func TestReconcile_StandardSuite(t *testing.T) {
+	t.Parallel()
+
+	t.Run("AccountRoleAssignment", func(t *testing.T) {
+		t.Parallel()
+		testutil.ReconcileSuiteConfig{
+			NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+				r := araReconciler(&mockService{}, objs...)
+				return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+			},
+			NewFixture: func(name, ns string) client.Object {
+				return newTestARA(name, ns)
+			},
+			NewBlankObject: func() client.Object {
+				return &snowplanev1alpha1.AccountRoleAssignment{}
+			},
+			FinalizerName: accountRoleAssignmentFinalizer,
+		}.Run(t)
+	})
+
+	t.Run("DatabaseRoleAssignment", func(t *testing.T) {
+		t.Parallel()
+		testutil.ReconcileSuiteConfig{
+			NewReconciler: func(objs ...runtime.Object) testutil.ReconcilerSetup {
+				r := draReconciler(&mockService{}, objs...)
+				return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
+			},
+			NewFixture: func(name, ns string) client.Object {
+				return newTestDRA(name, ns)
+			},
+			NewBlankObject: func() client.Object {
+				return &snowplanev1alpha1.DatabaseRoleAssignment{}
+			},
+			FinalizerName: databaseRoleAssignmentFinalizer,
+		}.Run(t)
+	})
 }
 
 func TestARA_CRNotFound(t *testing.T) {
@@ -224,7 +266,7 @@ func TestARA_Grant_ToUser(t *testing.T) {
 			}
 			return &snowflake.RoleAssignmentObservation{
 				Exists: true,
-				ShowOutput: &snowflake.RoleAssignmentShowOutput{
+				ShowOutput: &snowplanev1alpha1.RoleAssignmentShowOutput{
 					CreatedOn: "2024-01-01", Role: "ANALYST",
 					GrantedTo: "USER", GranteeName: "john", GrantedBy: "SECURITYADMIN",
 				},
@@ -334,7 +376,7 @@ func TestARA_PreReconcile_RoleRef(t *testing.T) {
 	t.Parallel()
 	obj := newTestARA("my-ara", "default")
 	obj.Spec.RoleName = nil
-	obj.Spec.RoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "my-role-cr"}
+	obj.Spec.RoleRef = &snowplanev1alpha1.ObjectReference{Name: "my-role-cr"}
 	role := readyAccountRole("my-role-cr", "default", "ANALYST")
 	scheme := testutil.TestScheme()
 	c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(obj, role).WithStatusSubresource(
@@ -351,7 +393,7 @@ func TestARA_PreReconcile_RoleRef_NotFound(t *testing.T) {
 	t.Parallel()
 	obj := newTestARA("my-ara", "default")
 	obj.Spec.RoleName = nil
-	obj.Spec.RoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "nonexistent"}
+	obj.Spec.RoleRef = &snowplanev1alpha1.ObjectReference{Name: "nonexistent"}
 	scheme := testutil.TestScheme()
 	c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(obj).WithStatusSubresource(
 		&snowplanev1alpha1.AccountRoleAssignment{},

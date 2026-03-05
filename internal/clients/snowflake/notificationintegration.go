@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -17,20 +18,10 @@ type NotificationIntegrationObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW NOTIFICATION INTEGRATIONS row.
-	ShowOutput *NotificationIntegrationShowOutput
+	ShowOutput *v1alpha1.NotificationIntegrationShowOutput
 
 	// DescribeOutput contains the DESCRIBE INTEGRATION output (key-value pairs).
 	DescribeOutput map[string]string
-}
-
-// NotificationIntegrationShowOutput contains the fields from SHOW NOTIFICATION INTEGRATIONS.
-type NotificationIntegrationShowOutput struct {
-	CreatedOn string
-	Name      string
-	Type      string
-	Category  string
-	Enabled   bool
-	Comment   string
 }
 
 // CreateNotificationIntegrationOptions holds the parameters for creating a notification integration.
@@ -470,7 +461,7 @@ func buildShowNotificationIntegrationByIDSQL(name AccountObjectIdentifier) strin
 }
 
 // ShowByID queries SHOW NOTIFICATION INTEGRATIONS for a specific integration.
-func (ni *NotificationIntegrationClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*NotificationIntegrationShowOutput, error) {
+func (ni *NotificationIntegrationClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*v1alpha1.NotificationIntegrationShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("notification integration name is required"))
 	}
@@ -529,9 +520,9 @@ func (ni *NotificationIntegrationClient) Observe(ctx context.Context, name Accou
 }
 
 // scanNotificationIntegrationShowOutput scans SHOW NOTIFICATION INTEGRATIONS results.
-func scanNotificationIntegrationShowOutput(rows *sql.Rows, name string) (*NotificationIntegrationShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*NotificationIntegrationShowOutput, error) {
-		return &NotificationIntegrationShowOutput{
+func scanNotificationIntegrationShowOutput(rows *sql.Rows, name string) (*v1alpha1.NotificationIntegrationShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.NotificationIntegrationShowOutput, error) {
+		return &v1alpha1.NotificationIntegrationShowOutput{
 			CreatedOn: m["created_on"],
 			Name:      m["name"],
 			Type:      m["type"],

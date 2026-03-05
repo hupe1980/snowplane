@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -26,14 +27,12 @@ func newTask() *snowplanev1alpha1.Task {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newTask()
 		obs := &reconciler.Observation[*snowflake.TaskObservation]{
 			Exists: true,
 			Detail: &snowflake.TaskObservation{
-				ShowOutput: &snowflake.TaskShowOutput{
+				ShowOutput: &snowplanev1alpha1.TaskShowOutput{
 					Schedule:                  "USING CRON 0 9 * * * UTC",
 					Comment:                   "daily etl",
 					AllowOverlappingExecution: true,
@@ -57,7 +56,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 
 		assert.Equal(t, "USING CRON 0 9 * * * UTC", *obj.Spec.Schedule)
@@ -88,7 +87,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.TaskObservation]{
 			Exists: true,
 			Detail: &snowflake.TaskObservation{
-				ShowOutput: &snowflake.TaskShowOutput{
+				ShowOutput: &snowplanev1alpha1.TaskShowOutput{
 					Comment:  "snowflake comment",
 					State:    "suspended",
 					Schedule: "USING CRON 0 * * * * UTC",
@@ -96,7 +95,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified) // Schedule was set
 
 		// Existing fields preserved
@@ -131,7 +130,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.TaskObservation]{
 			Exists: true,
 			Detail: &snowflake.TaskObservation{
-				ShowOutput: &snowflake.TaskShowOutput{Comment: "other", State: "started"},
+				ShowOutput: &snowplanev1alpha1.TaskShowOutput{Comment: "other", State: "started"},
 				Parameters: &snowflake.TaskParameters{
 					UserTaskTimeoutMs: ptr(int32(99)),
 					LogLevel:          "DEBUG",
@@ -139,7 +138,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -150,7 +149,7 @@ func TestLateInitialize(t *testing.T) {
 			Detail: nil,
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -164,7 +163,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -173,13 +172,13 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.TaskObservation]{
 			Exists: true,
 			Detail: &snowflake.TaskObservation{
-				ShowOutput: &snowflake.TaskShowOutput{
+				ShowOutput: &snowplanev1alpha1.TaskShowOutput{
 					State: "started",
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 		assert.Equal(t, false, *obj.Spec.Suspend)
 	})

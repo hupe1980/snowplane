@@ -10,22 +10,6 @@ const (
 	OAuthClientAuthMethodPost  OAuthClientAuthMethod = "CLIENT_SECRET_POST"
 )
 
-// APIAuthenticationIntegrationShowOutput holds the output from SHOW SECURITY INTEGRATIONS.
-type APIAuthenticationIntegrationShowOutput struct {
-	// +optional
-	CreatedOn *string `json:"createdOn,omitempty"`
-	// +optional
-	Name *string `json:"name,omitempty"`
-	// +optional
-	Category *string `json:"category,omitempty"`
-	// +optional
-	IntegrationType *string `json:"integrationType,omitempty"`
-	// +optional
-	Enabled *string `json:"enabled,omitempty"`
-	// +optional
-	Comment *string `json:"comment,omitempty"`
-}
-
 // APIAuthenticationIntegrationDescribeOutput holds the output from DESCRIBE INTEGRATION.
 type APIAuthenticationIntegrationDescribeOutput struct {
 	// +optional

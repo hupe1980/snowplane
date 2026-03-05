@@ -12,6 +12,7 @@ package integration
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
@@ -50,6 +51,9 @@ func resetMocks() {
 	grantOwnershipMockSvc.Reset()
 	roleAssignmentMockSvc.Reset()
 	authenticationPolicyMockSvc.Reset()
+	apiIntegrationMockSvc.Reset()
+	secondaryDatabaseMockSvc.Reset()
+	sharedDatabaseMockSvc.Reset()
 }
 
 // ---------------------------------------------------------------------------
@@ -69,11 +73,11 @@ func (m *mockSnowflakeClient) Exec(_ context.Context, _ string, _ ...any) (sql.R
 }
 
 func (m *mockSnowflakeClient) QueryRow(_ context.Context, _ string, _ ...any) *snowflake.Row {
-	return nil
+	return snowflake.NewErrorRow(fmt.Errorf("mock: no real connection"))
 }
 
 func (m *mockSnowflakeClient) Query(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
-	return nil, nil
+	return nil, fmt.Errorf("mock: no real connection")
 }
 
 func (m *mockSnowflakeClient) WithRole(_ context.Context, _ string) (*snowflake.Client, func(context.Context), error) {

@@ -3,14 +3,20 @@ package databaserole
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/tracked"
@@ -38,14 +44,11 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 
 // NewReconciler returns a new DatabaseRole reconciler backed by the generic framework.
 func NewReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRole, Service, *snowflake.DatabaseRoleObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRole, Service, *snowflake.DatabaseRoleObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewDatabaseRoleClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
@@ -58,24 +61,108 @@ func NewReconcilerWithServiceFactory(
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRole, Service, *snowflake.DatabaseRoleObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.DatabaseRole, Service, *snowflake.DatabaseRoleObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, recorder, sf))
+}
+
+// newAdapter creates the BaseAdapter for DatabaseRole resources.
+func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.DatabaseRole, Service, *snowflake.DatabaseRoleObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.DatabaseRole, Service, *snowflake.DatabaseRoleObservation]{
+		ResourceNameVal:  "databaserole",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.DatabaseRole { return &snowplanev1alpha1.DatabaseRole{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(role *snowplanev1alpha1.DatabaseRole) (reconciler.Identifier, error) {
+			dbName := snowflake.ParseDatabaseNameFromFQN(role.Status.DatabaseName)
+			return snowflake.NewDatabaseObjectIdentifier(dbName, role.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.DatabaseObjectIdentifier) (*snowflake.DatabaseRoleObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.DatabaseRoleObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.DatabaseRole, id snowflake.DatabaseObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterDatabaseRoleOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.DatabaseObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.DatabaseRole, id snowflake.DatabaseObjectIdentifier, obs *reconciler.Observation[*snowflake.DatabaseRoleObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.DatabaseRole, obs *reconciler.Observation[*snowflake.DatabaseRoleObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.DatabaseRole, obs *reconciler.Observation[*snowflake.DatabaseRoleObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		LateInitializeFn: lateInitialize,
+		PreReconcileFn: func(ctx context.Context, role *snowplanev1alpha1.DatabaseRole) error {
+			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, role,
+				role.Namespace, role.Spec.DatabaseRef, role.Spec.DatabaseName, role.Status.DatabaseName)
+			if err != nil {
+				return err
+			}
+
+			role.Status.DatabaseName = dbFQN
+
+			refresolver.SetDatabaseResolvedCondition(role, role.Spec.DatabaseRef, role.Spec.DatabaseName, dbFQN)
+
+			return nil
+		},
+		SetupWatchesFn: func(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.DatabaseRole{},
+				".spec.databaseRef.name",
+				func(o sigs.Object) []string {
+					dr, ok := o.(*snowplanev1alpha1.DatabaseRole)
+					if !ok || dr.Spec.DatabaseRef == nil {
+						return nil
+					}
+
+					return []string{dr.Spec.DatabaseRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.databaseRef.name: %w", err)
+			}
+
+			bldr.Watches(
+				&snowplanev1alpha1.Database{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.DatabaseRoleList{} }, ".spec.databaseRef.name", "listing database roles for database watch")),
+			)
+
+			return nil
+		},
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory used by NewReconciler.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+func validateImmutableFields(_ context.Context, role *snowplanev1alpha1.DatabaseRole) error {
+	if reconciler.ShouldSkipImmutableValidation(role) {
+		return nil
 	}
 
-	return snowflake.NewDatabaseRoleClient(sfC), cleanup, nil
+	if role.Status.ShowOutput != nil {
+		if role.Status.ShowOutput.Name != "" && !strings.EqualFold(role.Spec.Name, role.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", role.Status.ShowOutput.Name, role.Spec.Name)
+		}
+
+		if role.Status.ShowOutput.DatabaseName != "" && role.Status.DatabaseName != "" {
+			resolvedDB := snowflake.ParseDatabaseNameFromFQN(role.Status.DatabaseName)
+			if !strings.EqualFold(resolvedDB, role.Status.ShowOutput.DatabaseName) {
+				return fmt.Errorf("spec.databaseRef is immutable after creation (current database: %q, resolved: %q)", role.Status.ShowOutput.DatabaseName, resolvedDB)
+			}
+		}
+
+	}
+
+	return nil
 }
 
 func applyObservation(role *snowplanev1alpha1.DatabaseRole, obs *snowflake.DatabaseRoleObservation) {
@@ -86,15 +173,7 @@ func applyObservation(role *snowplanev1alpha1.DatabaseRole, obs *snowflake.Datab
 		).FullyQualifiedName()
 		role.Status.DatabaseName = obs.ShowOutput.DatabaseName
 
-		role.Status.ShowOutput = &snowplanev1alpha1.DatabaseRoleShowOutput{
-			CreatedOn:      obs.ShowOutput.CreatedOn,
-			Name:           obs.ShowOutput.Name,
-			DatabaseName:   obs.ShowOutput.DatabaseName,
-			Comment:        obs.ShowOutput.Comment,
-			Owner:          obs.ShowOutput.Owner,
-			GrantedToRoles: obs.ShowOutput.GrantedToRoles,
-			GrantedRoles:   obs.ShowOutput.GrantedRoles,
-		}
+		role.Status.ShowOutput = obs.ShowOutput
 	}
 }
 

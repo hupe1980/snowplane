@@ -78,6 +78,7 @@ spec:
                 description: |-
                   ColumnName is the column in the table to apply the masking policy to.
                   Immutable after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               deletionPolicy:
@@ -133,6 +134,7 @@ spec:
                   PolicyName is the fully qualified Snowflake masking policy name
                   (e.g. "MY_DB"."MY_SCHEMA"."MY_MASKING_POLICY").
                   Mutually exclusive with PolicyRef.
+                maxLength: 255
                 minLength: 1
                 type: string
               policyRef:
@@ -143,7 +145,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -155,6 +164,7 @@ spec:
                   name:
                     default: default
                     description: Name of the ProviderConfig to use.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   namespace:
@@ -169,6 +179,7 @@ spec:
                   TableName is the fully qualified Snowflake table name
                   (e.g. "MY_DB"."MY_SCHEMA"."MY_TABLE").
                   Immutable after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               useRole:
@@ -178,6 +189,7 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                maxLength: 255
                 minLength: 1
                 type: string
               usingColumns:
@@ -298,6 +310,13 @@ spec:
                   comparing ObservedGeneration vs Generation because metadata-only
                   changes (labels, annotations) increment Generation without changing
                   the spec.
+                type: string
+              lastReconcileTime:
+                description: |-
+                  LastReconcileTime is the timestamp of the most recent successful
+                  reconciliation. Useful for SLO monitoring and diagnosing whether
+                  reconciliation is running for a specific resource.
+                format: date-time
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent metadata.generation

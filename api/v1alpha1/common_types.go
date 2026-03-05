@@ -25,12 +25,6 @@ type ObjectReference struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
-// LocalObjectReference is an alias kept for backward compatibility.
-// New code should use ObjectReference directly.
-//
-// Deprecated: Use ObjectReference instead.
-type LocalObjectReference = ObjectReference
-
 // SecretKeyReference contains enough information to locate the referenced
 // Kubernetes Secret and the specific key within it.
 type SecretKeyReference struct {

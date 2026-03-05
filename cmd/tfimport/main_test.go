@@ -322,7 +322,7 @@ func TestConvertDatabaseRole_NilName(t *testing.T) {
 	assert.Equal(t, "", result)
 }
 
-func TestConvertAccountRoleGrant_AccountObject(t *testing.T) {
+func TestConvertGrantPrivilegesToAccountRole_AccountObject(t *testing.T) {
 	t.Parallel()
 
 	attrs := map[string]any{
@@ -336,8 +336,8 @@ func TestConvertAccountRoleGrant_AccountObject(t *testing.T) {
 		},
 	}
 
-	result := convertAccountRoleGrant(attrs, "default", "default")
-	assert.Contains(t, result, "kind: AccountRoleGrant")
+	result := convertGrantPrivilegesToAccountRole(attrs, "default", "default")
+	assert.Contains(t, result, "kind: GrantPrivilegesToAccountRole")
 	assert.Contains(t, result, "privilege: 'USAGE'")
 	assert.Contains(t, result, "accountRole: 'ANALYST'")
 	assert.Contains(t, result, "accountObject:")
@@ -346,7 +346,7 @@ func TestConvertAccountRoleGrant_AccountObject(t *testing.T) {
 	assert.Contains(t, result, "deletionPolicy: Orphan")
 }
 
-func TestConvertAccountRoleGrant_OnAccount(t *testing.T) {
+func TestConvertGrantPrivilegesToAccountRole_OnAccount(t *testing.T) {
 	t.Parallel()
 
 	attrs := map[string]any{
@@ -355,12 +355,12 @@ func TestConvertAccountRoleGrant_OnAccount(t *testing.T) {
 		"on_account":        true,
 	}
 
-	result := convertAccountRoleGrant(attrs, "default", "default")
+	result := convertGrantPrivilegesToAccountRole(attrs, "default", "default")
 	assert.Contains(t, result, "account: true")
 	assert.Contains(t, result, "privilege: 'CREATE DATABASE'")
 }
 
-func TestConvertAccountRoleGrant_WithGrantOption(t *testing.T) {
+func TestConvertGrantPrivilegesToAccountRole_WithGrantOption(t *testing.T) {
 	t.Parallel()
 
 	attrs := map[string]any{
@@ -370,11 +370,11 @@ func TestConvertAccountRoleGrant_WithGrantOption(t *testing.T) {
 		"with_grant_option": true,
 	}
 
-	result := convertAccountRoleGrant(attrs, "default", "default")
+	result := convertGrantPrivilegesToAccountRole(attrs, "default", "default")
 	assert.Contains(t, result, "withGrantOption: true")
 }
 
-func TestConvertAccountRoleGrant_AllPrivileges(t *testing.T) {
+func TestConvertGrantPrivilegesToAccountRole_AllPrivileges(t *testing.T) {
 	t.Parallel()
 
 	attrs := map[string]any{
@@ -383,18 +383,19 @@ func TestConvertAccountRoleGrant_AllPrivileges(t *testing.T) {
 		"on_account":        true,
 	}
 
-	result := convertAccountRoleGrant(attrs, "default", "default")
-	assert.Contains(t, result, "privilege: 'ALL PRIVILEGES'")
+	result := convertGrantPrivilegesToAccountRole(attrs, "default", "default")
+	assert.Contains(t, result, "allPrivileges: true")
+	assert.NotContains(t, result, "privilege:")
 }
 
-func TestConvertAccountRoleGrant_Empty(t *testing.T) {
+func TestConvertGrantPrivilegesToAccountRole_Empty(t *testing.T) {
 	t.Parallel()
 
-	result := convertAccountRoleGrant(map[string]any{}, "default", "default")
+	result := convertGrantPrivilegesToAccountRole(map[string]any{}, "default", "default")
 	assert.Equal(t, "", result)
 }
 
-func TestConvertDatabaseRoleGrant(t *testing.T) {
+func TestConvertGrantPrivilegesToDatabaseRole(t *testing.T) {
 	t.Parallel()
 
 	attrs := map[string]any{
@@ -408,15 +409,15 @@ func TestConvertDatabaseRoleGrant(t *testing.T) {
 		},
 	}
 
-	result := convertDatabaseRoleGrant(attrs, "default", "default")
-	assert.Contains(t, result, "kind: DatabaseRoleGrant")
+	result := convertGrantPrivilegesToDatabaseRole(attrs, "default", "default")
+	assert.Contains(t, result, "kind: GrantPrivilegesToDatabaseRole")
 	assert.Contains(t, result, "privilege: 'SELECT'")
 	assert.Contains(t, result, "databaseRole: 'MY_DB.READER'")
 	assert.Contains(t, result, "schemaObject:")
 	assert.Contains(t, result, "objectType: 'TABLE'")
 }
 
-func TestConvertAccountRoleGrant_FutureGrant(t *testing.T) {
+func TestConvertGrantPrivilegesToAccountRole_FutureGrant(t *testing.T) {
 	t.Parallel()
 
 	attrs := map[string]any{
@@ -434,13 +435,13 @@ func TestConvertAccountRoleGrant_FutureGrant(t *testing.T) {
 		},
 	}
 
-	result := convertAccountRoleGrant(attrs, "default", "default")
+	result := convertGrantPrivilegesToAccountRole(attrs, "default", "default")
 	assert.Contains(t, result, "future:")
 	assert.Contains(t, result, "objectTypePlural: 'TABLES'")
 	assert.Contains(t, result, "inDatabase: 'MY_DB'")
 }
 
-func TestConvertShareGrant(t *testing.T) {
+func TestConvertGrantPrivilegesToShare(t *testing.T) {
 	t.Parallel()
 
 	attrs := map[string]any{
@@ -453,20 +454,175 @@ func TestConvertShareGrant(t *testing.T) {
 		},
 	}
 
-	result := convertShareGrant(attrs, "default", "default")
-	assert.Contains(t, result, "kind: ShareGrant")
+	result := convertGrantPrivilegesToShare(attrs, "default", "default")
+	assert.Contains(t, result, "kind: GrantPrivilegesToShare")
 	assert.Contains(t, result, "privilege: 'USAGE'")
-	assert.Contains(t, result, "objectType: 'DATABASE'")
-	assert.Contains(t, result, "objectName: 'SHARED_DB'")
+	assert.Contains(t, result, "on:\n    database: 'SHARED_DB'")
 	assert.Contains(t, result, "share: 'MY_SHARE'")
 	assert.Contains(t, result, "deletionPolicy: Orphan")
 }
 
-func TestConvertShareGrant_Empty(t *testing.T) {
+func TestConvertGrantPrivilegesToShare_Empty(t *testing.T) {
 	t.Parallel()
 
-	result := convertShareGrant(map[string]any{}, "default", "default")
+	result := convertGrantPrivilegesToShare(map[string]any{}, "default", "default")
 	assert.Equal(t, "", result)
+}
+
+func TestConvertGrantPrivilegesToDatabaseRole_AllPrivileges(t *testing.T) {
+	t.Parallel()
+
+	attrs := map[string]any{
+		"database_role_name": "MY_DB.ADMIN",
+		"all_privileges":     true,
+		"on_database":        "MY_DB",
+	}
+
+	result := convertGrantPrivilegesToDatabaseRole(attrs, "default", "default")
+	assert.Contains(t, result, "allPrivileges: true")
+	assert.NotContains(t, result, "privilege:")
+	assert.Contains(t, result, "databaseRole: 'MY_DB.ADMIN'")
+}
+
+func TestConvertGrantPrivilegesToDatabaseRole_OnDatabase(t *testing.T) {
+	t.Parallel()
+
+	attrs := map[string]any{
+		"database_role_name": "MY_DB.READER",
+		"privileges":         []any{"USAGE"},
+		"on_database":        "MY_DB",
+	}
+
+	result := convertGrantPrivilegesToDatabaseRole(attrs, "default", "default")
+	assert.Contains(t, result, "on:\n    database: 'MY_DB'")
+	assert.NotContains(t, result, "accountObject:")
+}
+
+func TestConvertGrantPrivilegesToDatabaseRole_OnSchema(t *testing.T) {
+	t.Parallel()
+
+	attrs := map[string]any{
+		"database_role_name": "MY_DB.READER",
+		"privileges":         []any{"USAGE"},
+		"on_schema": []any{
+			map[string]any{
+				"schema_name": "MY_DB.PUBLIC",
+			},
+		},
+	}
+
+	result := convertGrantPrivilegesToDatabaseRole(attrs, "default", "default")
+	assert.Contains(t, result, "schema:")
+	assert.Contains(t, result, "schemaName: 'MY_DB.PUBLIC'")
+}
+
+func TestConvertGrantPrivilegesToDatabaseRole_Empty(t *testing.T) {
+	t.Parallel()
+
+	result := convertGrantPrivilegesToDatabaseRole(map[string]any{}, "default", "default")
+	assert.Equal(t, "", result)
+}
+
+func TestConvertGrantPrivilegesToShare_OnSchema(t *testing.T) {
+	t.Parallel()
+
+	attrs := map[string]any{
+		"share_name": "MY_SHARE",
+		"privileges": []any{"USAGE"},
+		"on_schema": []any{
+			map[string]any{
+				"schema_name": "MY_DB.PUBLIC",
+			},
+		},
+	}
+
+	result := convertGrantPrivilegesToShare(attrs, "default", "default")
+	assert.Contains(t, result, "on:\n    schema: 'MY_DB.PUBLIC'")
+}
+
+func TestConvertGrantPrivilegesToShare_OnTable(t *testing.T) {
+	t.Parallel()
+
+	attrs := map[string]any{
+		"share_name": "MY_SHARE",
+		"privileges": []any{"SELECT"},
+		"on_table": []any{
+			map[string]any{
+				"table_name": "MY_DB.PUBLIC.ORDERS",
+			},
+		},
+	}
+
+	result := convertGrantPrivilegesToShare(attrs, "default", "default")
+	assert.Contains(t, result, "on:\n    table: 'MY_DB.PUBLIC.ORDERS'")
+}
+
+func TestConvertGrantPrivilegesToShare_OnView(t *testing.T) {
+	t.Parallel()
+
+	attrs := map[string]any{
+		"share_name": "MY_SHARE",
+		"privileges": []any{"SELECT"},
+		"on_view": []any{
+			map[string]any{
+				"view_name": "MY_DB.PUBLIC.MY_VIEW",
+			},
+		},
+	}
+
+	result := convertGrantPrivilegesToShare(attrs, "default", "default")
+	assert.Contains(t, result, "on:\n    view: 'MY_DB.PUBLIC.MY_VIEW'")
+}
+
+func TestConvertGrantPrivilegesToShare_OnAllTablesInSchema(t *testing.T) {
+	t.Parallel()
+
+	attrs := map[string]any{
+		"share_name": "MY_SHARE",
+		"privileges": []any{"SELECT"},
+		"on_all_tables_in_schema": []any{
+			map[string]any{
+				"schema_name": "MY_DB.PUBLIC",
+			},
+		},
+	}
+
+	result := convertGrantPrivilegesToShare(attrs, "default", "default")
+	assert.Contains(t, result, "on:\n    allTablesInSchema: 'MY_DB.PUBLIC'")
+}
+
+func TestConvertGrantPrivilegesToShare_OnFunction(t *testing.T) {
+	t.Parallel()
+
+	attrs := map[string]any{
+		"share_name": "MY_SHARE",
+		"privileges": []any{"USAGE"},
+		"on_function": []any{
+			map[string]any{
+				"function_name": "MY_DB.PUBLIC.MY_FUNC",
+			},
+		},
+	}
+
+	result := convertGrantPrivilegesToShare(attrs, "default", "default")
+	assert.Contains(t, result, "on:\n    functionName: 'MY_DB.PUBLIC.MY_FUNC'")
+}
+
+func TestConvertGrantPrivilegesToShare_OnTag(t *testing.T) {
+	t.Parallel()
+
+	attrs := map[string]any{
+		"share_name": "MY_SHARE",
+		"privileges": []any{"READ"},
+		"on_tag": []any{
+			map[string]any{
+				"tag_name": "MY_DB.PUBLIC.MY_TAG",
+			},
+		},
+	}
+
+	result := convertGrantPrivilegesToShare(attrs, "default", "default")
+	assert.Contains(t, result, "on:\n    tag: 'MY_DB.PUBLIC.MY_TAG'")
 }
 
 func TestConvertTable(t *testing.T) {

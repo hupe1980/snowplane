@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -27,14 +28,12 @@ func newDynamicTable() *snowplanev1alpha1.DynamicTable {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newDynamicTable()
 		obs := &reconciler.Observation[*snowflake.DynamicTableObservation]{
 			Exists: true,
 			Detail: &snowflake.DynamicTableObservation{
-				ShowOutput: &snowflake.DynamicTableShowOutput{
+				ShowOutput: &snowplanev1alpha1.DynamicTableShowOutput{
 					Comment:     "dt comment",
 					Warehouse:   "COMPUTE_WH",
 					RefreshMode: "INCREMENTAL",
@@ -42,7 +41,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 
 		assert.Equal(t, "dt comment", *obj.Spec.Comment)
@@ -57,7 +56,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.DynamicTableObservation]{
 			Exists: true,
 			Detail: &snowflake.DynamicTableObservation{
-				ShowOutput: &snowflake.DynamicTableShowOutput{
+				ShowOutput: &snowplanev1alpha1.DynamicTableShowOutput{
 					Comment:     "snowflake comment",
 					Warehouse:   "WH",
 					RefreshMode: "FULL",
@@ -65,7 +64,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified) // Warehouse and RefreshMode set
 
 		assert.Equal(t, "user comment", *obj.Spec.Comment)
@@ -79,7 +78,7 @@ func TestLateInitialize(t *testing.T) {
 			Detail: nil,
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -92,7 +91,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 }

@@ -79,11 +79,13 @@ spec:
                       type: string
                     name:
                       description: Name is the argument name.
+                      maxLength: 255
                       minLength: 1
                       type: string
                     type:
                       description: Type is the Snowflake data type (e.g. VARCHAR,
                         NUMBER, TIMESTAMP_NTZ).
+                      maxLength: 255
                       minLength: 1
                       type: string
                   required:
@@ -94,6 +96,7 @@ spec:
               body:
                 description: Body is the SQL procedure body (the AS clause content).
                   Required for SQL procedures.
+                maxLength: 255
                 minLength: 1
                 type: string
               comment:
@@ -102,6 +105,7 @@ spec:
               databaseName:
                 description: DatabaseName is the Snowflake database identifier (e.g.
                   "ANALYTICS").
+                maxLength: 255
                 minLength: 1
                 type: string
               databaseRef:
@@ -109,7 +113,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -165,6 +176,7 @@ spec:
               name:
                 description: Name is the Snowflake procedure name. Immutable after
                   creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               nullInputBehavior:
@@ -189,6 +201,7 @@ spec:
                   name:
                     default: default
                     description: Name of the ProviderConfig to use.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   namespace:
@@ -202,10 +215,12 @@ spec:
                 description: |-
                   Returns is the return type (e.g. "VARCHAR", "TABLE(col1 VARCHAR, col2 NUMBER)").
                   Immutable after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               schemaName:
                 description: SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
+                maxLength: 255
                 minLength: 1
                 type: string
               schemaRef:
@@ -213,7 +228,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -228,6 +250,7 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                maxLength: 255
                 minLength: 1
                 type: string
             required:
@@ -359,6 +382,13 @@ spec:
                   comparing ObservedGeneration vs Generation because metadata-only
                   changes (labels, annotations) increment Generation without changing
                   the spec.
+                type: string
+              lastReconcileTime:
+                description: |-
+                  LastReconcileTime is the timestamp of the most recent successful
+                  reconciliation. Useful for SLO monitoring and diagnosing whether
+                  reconciliation is running for a specific resource.
+                format: date-time
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent metadata.generation

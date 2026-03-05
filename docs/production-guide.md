@@ -26,6 +26,7 @@ Best practices for deploying Snowplane in production environments.
 
 ### Recommended
 
+- [ ] **Ownership webhook** — Enable the validating admission webhook (`webhook.enabled: true`) to reject duplicate Snowflake resource mappings at admission time. Requires cert-manager. See [Architecture — Admission Webhook]({% link architecture.md %}#admission-webhook).
 - [ ] **Multiple replicas** — Run `replicaCount: 2` with leader election (enabled by default).
 - [ ] **Pod topology** — Set `topologySpreadConstraints` or `affinity` for multi-AZ resilience.
 - [ ] **Priority class** — Set `priorityClassName: system-cluster-critical` to prevent eviction.
@@ -67,6 +68,12 @@ networkPolicy:
   # egressCIDRs:
   #   - 52.23.40.0/24    # Snowflake US East
   #   - 10.0.0.1/32      # K8s API server
+
+webhook:
+  enabled: true
+  failurePolicy: Ignore
+  certManager:
+    enabled: true
 
 topologySpreadConstraints:
   - maxSkew: 1
@@ -131,6 +138,23 @@ controller:
 
 ProviderConfigs specifying a role not in the allowlist will be rejected with `Ready=False, reason=RoleNotAllowed`.
 
+### Ownership Webhook
+
+The validating admission webhook intercepts `CREATE` and `UPDATE` requests for all snowplane CRDs, rejecting requests that would create duplicate Snowflake resource mappings. This complements the reconciler-level conflict detection by shifting checks left to admission time.
+
+```yaml
+webhook:
+  enabled: true
+  failurePolicy: Ignore  # Ignore = best-effort, Fail = strict
+  certManager:
+    enabled: true
+```
+
+{: .note }
+> The webhook uses `failurePolicy: Ignore` by default — if the webhook pod is unavailable, requests are allowed through. Set `failurePolicy: Fail` only if you can tolerate API rejections during webhook downtime.
+
+See [Architecture — Admission Webhook]({% link architecture.md %}#admission-webhook) for implementation details.
+
 ### Policy Enforcement
 
 For organizational policy enforcement beyond what the controller provides, deploy [OPA/Gatekeeper](https://open-policy-agent.github.io/gatekeeper/) or [Kyverno](https://kyverno.io/) policies.
@@ -173,11 +197,50 @@ spec:
           kinds:
             - ProviderConfig
       validate:
-        message: "ProviderConfig must specify allowedNamespaces for multi-tenant isolation."
+        message: "ProviderConfig must specify allowedNamespaces or allowedNamespaceSelector for multi-tenant isolation."
         pattern:
           spec:
             allowedNamespaces: "?*"
 ```
+
+### Resource Scoping
+
+ProviderConfig supports restricting which Snowflake databases and schemas resources may target:
+
+```yaml
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: team-a
+spec:
+  # ...credentials...
+  allowedNamespaces:
+    - team-a-ns
+  allowedNamespaceSelector:
+    matchLabels:
+      team: analytics
+  allowedDatabases:
+    - TEAM_A_DB
+    - SHARED_DB
+  allowedSchemas:
+    - TEAM_A_DB.PUBLIC
+    - SHARED_DB.ANALYTICS
+```
+
+- **`allowedDatabases`**: Case-insensitive list. When non-empty, resources using this ProviderConfig can only target listed databases. Empty = all allowed.
+- **`allowedSchemas`**: Supports `"SCHEMA"` (any database) or `"DATABASE.SCHEMA"` format. Empty = all allowed.
+- **`allowedNamespaceSelector`**: Label selector matching namespaces. Used as OR with the static `allowedNamespaces` list — a namespace is permitted if it matches either.
+
+Resources violating these constraints are rejected with `DatabaseNotAllowed` or `SchemaNotAllowed` condition reasons.
+
+### Pre-flight Validation
+
+The controller automatically validates that referenced Snowflake databases and schemas exist before issuing CREATE commands. This prevents opaque SQL errors and provides clear `DependencyNotReady` conditions.
+
+- **CR references** (`databaseRef`/`schemaRef`): Existence is validated during reference resolution — the referenced CR must be `Ready=True`.
+- **Raw strings** (`databaseName`/`schemaName`): The controller issues `SHOW DATABASES LIKE`/`SHOW SCHEMAS LIKE` queries to verify existence before CREATE.
+
+No configuration is needed — pre-flight checks run automatically for all 38 database/schema-scoped resource types.
 
 #### Kyverno Example: Block dangerous grants without annotation
 
@@ -193,8 +256,8 @@ spec:
       match:
         resources:
           kinds:
-            - AccountRoleGrant
-            - DatabaseRoleGrant
+            - GrantPrivilegesToAccountRole
+            - GrantPrivilegesToDatabaseRole
       validate:
         message: "OWNERSHIP grants are prohibited. Use specific privileges instead."
         deny:

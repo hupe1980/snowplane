@@ -3,6 +3,8 @@ package database
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,14 +41,11 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 
 // NewReconciler returns a new Database reconciler backed by the generic framework.
 func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Database, Service, *snowflake.DatabaseObservation] {
-	a := &adapter{newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Database, Service, *snowflake.DatabaseObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewDatabaseClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
@@ -59,38 +58,78 @@ func NewReconcilerWithServiceFactory(
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.Database, Service, *snowflake.DatabaseObservation] {
-	a := &adapter{newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Database, Service, *snowflake.DatabaseObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(sf))
+}
+
+// newAdapter creates the BaseAdapter for Database resources.
+func newAdapter(sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.Database, Service, *snowflake.DatabaseObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.Database, Service, *snowflake.DatabaseObservation]{
+		ResourceNameVal:  "database",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.Database { return &snowplanev1alpha1.Database{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(obj *snowplanev1alpha1.Database) (reconciler.Identifier, error) {
+			return snowflake.NewAccountObjectIdentifier(obj.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) (*snowflake.DatabaseObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.DatabaseObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.Database, id snowflake.AccountObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterDatabaseOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		DropCascadeFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) error {
+			return svc.DropCascade(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.Database, id snowflake.AccountObjectIdentifier, obs *reconciler.Observation[*snowflake.DatabaseObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.Database, obs *reconciler.Observation[*snowflake.DatabaseObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.Database, obs *reconciler.Observation[*snowflake.DatabaseObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		SupportsCoA:      true,
+		LateInitializeFn: lateInitialize,
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory used by NewReconciler.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+func validateImmutableFields(_ context.Context, db *snowplanev1alpha1.Database) error {
+	if reconciler.ShouldSkipImmutableValidation(db) {
+		return nil
 	}
 
-	return snowflake.NewDatabaseClient(sfC), cleanup, nil
+	if db.Status.ShowOutput != nil {
+		isTransient := db.Status.ShowOutput.Kind == "TRANSIENT"
+		if db.Spec.Transient != isTransient {
+			return fmt.Errorf("spec.transient is immutable after creation (current: %v, desired: %v)", isTransient, db.Spec.Transient)
+		}
+
+		if db.Status.ShowOutput.Name != "" && !strings.EqualFold(db.Spec.Name, db.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", db.Status.ShowOutput.Name, db.Spec.Name)
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(db *snowplanev1alpha1.Database, obs *snowflake.DatabaseObservation) {
 	if obs.ShowOutput != nil {
 		db.Status.FullyQualifiedName = snowflake.NewAccountObjectIdentifier(obs.ShowOutput.Name).FullyQualifiedName()
-
-		db.Status.ShowOutput = &snowplanev1alpha1.DatabaseShowOutput{
-			CreatedOn:     obs.ShowOutput.CreatedOn,
-			Name:          obs.ShowOutput.Name,
-			Kind:          obs.ShowOutput.Kind,
-			Comment:       obs.ShowOutput.Comment,
-			Owner:         obs.ShowOutput.Owner,
-			RetentionTime: obs.ShowOutput.RetentionTime,
-		}
+		db.Status.ShowOutput = obs.ShowOutput
 	}
 }
 

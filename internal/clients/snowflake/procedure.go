@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,19 +17,7 @@ type ProcedureObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW PROCEDURES row.
-	ShowOutput *ProcedureShowOutput
-}
-
-// ProcedureShowOutput contains the fields from SHOW PROCEDURES.
-type ProcedureShowOutput struct {
-	CreatedOn    string
-	Name         string
-	DatabaseName string
-	SchemaName   string
-	Arguments    string
-	Description  string
-	IsSecure     bool
-	Owner        string
+	ShowOutput *v1alpha1.ProcedureShowOutput
 }
 
 // ProcedureArgument defines an argument in the procedure signature.
@@ -312,7 +301,7 @@ func buildShowProcedureByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW PROCEDURES for a specific procedure.
-func (p *ProcedureClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier, argTypes []string) (*ProcedureShowOutput, error) {
+func (p *ProcedureClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier, argTypes []string) (*v1alpha1.ProcedureShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("procedure name is required"))
 	}
@@ -389,7 +378,7 @@ func matchProcedureArgTypes(argumentsCol string, name string, argTypes []string)
 }
 
 // scanProcedureShowOutput scans SHOW PROCEDURES results for a matching row.
-func scanProcedureShowOutput(rows *sql.Rows, name string, argTypes []string) (*ProcedureShowOutput, error) {
+func scanProcedureShowOutput(rows *sql.Rows, name string, argTypes []string) (*v1alpha1.ProcedureShowOutput, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, fmt.Errorf("reading columns: %w", err)
@@ -423,7 +412,7 @@ func scanProcedureShowOutput(rows *sql.Rows, name string, argTypes []string) (*P
 			continue
 		}
 
-		return &ProcedureShowOutput{
+		return &v1alpha1.ProcedureShowOutput{
 			CreatedOn:    colMap["created_on"],
 			Name:         colMap["name"],
 			DatabaseName: colMap["catalog_name"],

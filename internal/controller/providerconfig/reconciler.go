@@ -176,9 +176,9 @@ func managedResourceTypes() []managedResourceEntry {
 		{proto: &snowplanev1alpha1.MaskingPolicy{}, newList: func() client.ObjectList { return &snowplanev1alpha1.MaskingPolicyList{} }},
 		{proto: &snowplanev1alpha1.RowAccessPolicy{}, newList: func() client.ObjectList { return &snowplanev1alpha1.RowAccessPolicyList{} }},
 		{proto: &snowplanev1alpha1.GrantOwnership{}, newList: func() client.ObjectList { return &snowplanev1alpha1.GrantOwnershipList{} }},
-		{proto: &snowplanev1alpha1.AccountRoleGrant{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AccountRoleGrantList{} }},
-		{proto: &snowplanev1alpha1.DatabaseRoleGrant{}, newList: func() client.ObjectList { return &snowplanev1alpha1.DatabaseRoleGrantList{} }},
-		{proto: &snowplanev1alpha1.ShareGrant{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ShareGrantList{} }},
+		{proto: &snowplanev1alpha1.GrantPrivilegesToAccountRole{}, newList: func() client.ObjectList { return &snowplanev1alpha1.GrantPrivilegesToAccountRoleList{} }},
+		{proto: &snowplanev1alpha1.GrantPrivilegesToDatabaseRole{}, newList: func() client.ObjectList { return &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleList{} }},
+		{proto: &snowplanev1alpha1.GrantPrivilegesToShare{}, newList: func() client.ObjectList { return &snowplanev1alpha1.GrantPrivilegesToShareList{} }},
 		{proto: &snowplanev1alpha1.StorageIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.StorageIntegrationList{} }},
 		{proto: &snowplanev1alpha1.FileFormat{}, newList: func() client.ObjectList { return &snowplanev1alpha1.FileFormatList{} }},
 		{proto: &snowplanev1alpha1.Pipe{}, newList: func() client.ObjectList { return &snowplanev1alpha1.PipeList{} }},
@@ -186,6 +186,8 @@ func managedResourceTypes() []managedResourceEntry {
 		{proto: &snowplanev1alpha1.Alert{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AlertList{} }},
 		{proto: &snowplanev1alpha1.NotificationIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.NotificationIntegrationList{} }},
 		{proto: &snowplanev1alpha1.SecurityIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SecurityIntegrationList{} }},
+		{proto: &snowplanev1alpha1.SAML2Integration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SAML2IntegrationList{} }},
+		{proto: &snowplanev1alpha1.ExternalOAuthIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ExternalOAuthIntegrationList{} }},
 		{proto: &snowplanev1alpha1.PasswordPolicy{}, newList: func() client.ObjectList { return &snowplanev1alpha1.PasswordPolicyList{} }},
 		{proto: &snowplanev1alpha1.AuthenticationPolicy{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AuthenticationPolicyList{} }},
 		{proto: &snowplanev1alpha1.NetworkRule{}, newList: func() client.ObjectList { return &snowplanev1alpha1.NetworkRuleList{} }},
@@ -220,6 +222,7 @@ func managedResourceTypes() []managedResourceEntry {
 			return &snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrantList{}
 		}},
 		{proto: &snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBearer{}, newList: func() client.ObjectList { return &snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBearerList{} }},
+		{proto: &snowplanev1alpha1.SQLStatement{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SQLStatementList{} }},
 	}
 }
 

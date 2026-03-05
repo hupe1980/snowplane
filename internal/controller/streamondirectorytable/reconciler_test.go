@@ -83,7 +83,7 @@ func newTestStreamOnDirectoryTable(name, namespace string) *snowplanev1alpha1.St
 func successfulObservation() *snowflake.StreamObservation {
 	return &snowflake.StreamObservation{
 		Exists: true,
-		ShowOutput: &snowflake.StreamShowOutput{
+		ShowOutput: &snowplanev1alpha1.StreamShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         "MY_STREAM",
 			DatabaseName: "MY_DB",
@@ -105,21 +105,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 		cb = cb.WithRuntimeObjects(obj)
 	}
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.StreamOnDirectoryTable, Service, *snowflake.StreamObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("StreamOnDirectoryTable"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("StreamOnDirectoryTable")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -272,7 +268,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 		Status: snowplanev1alpha1.StreamOnDirectoryTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", StageName: "MY_STAGE"},
 	}
 	obs := &snowflake.StreamObservation{
-		ShowOutput: &snowflake.StreamShowOutput{
+		ShowOutput: &snowplanev1alpha1.StreamShowOutput{
 			Name: "MY_STREAM", DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA",
 			TableName: "MY_STAGE", Mode: "DEFAULT",
 		},
@@ -288,7 +284,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 		Status: snowplanev1alpha1.StreamOnDirectoryTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", StageName: "MY_STAGE"},
 	}
 	obs := &snowflake.StreamObservation{
-		ShowOutput: &snowflake.StreamShowOutput{
+		ShowOutput: &snowplanev1alpha1.StreamShowOutput{
 			Name: "MY_STREAM", DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA",
 			TableName: "MY_STAGE", Comment: "drifted", Mode: "DEFAULT",
 		},

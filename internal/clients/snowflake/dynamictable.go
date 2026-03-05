@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,24 +17,7 @@ type DynamicTableObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW DYNAMIC TABLES row.
-	ShowOutput *DynamicTableShowOutput
-}
-
-// DynamicTableShowOutput contains the fields from SHOW DYNAMIC TABLES.
-type DynamicTableShowOutput struct {
-	CreatedOn       string
-	Name            string
-	DatabaseName    string
-	SchemaName      string
-	Owner           string
-	Comment         string
-	TargetLag       string
-	Warehouse       string
-	RefreshMode     string
-	Text            string
-	SchedulingState string
-	ClusterBy       string
-	DataTimestamp   string
+	ShowOutput *v1alpha1.DynamicTableShowOutput
 }
 
 // CreateDynamicTableOptions holds the parameters for creating a dynamic table.
@@ -335,7 +319,7 @@ func buildShowDynamicTableByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW DYNAMIC TABLES for a specific table within a schema.
-func (d *DynamicTableClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*DynamicTableShowOutput, error) {
+func (d *DynamicTableClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.DynamicTableShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("dynamic table name is required"))
 	}
@@ -367,9 +351,9 @@ func (d *DynamicTableClient) Observe(ctx context.Context, name SchemaObjectIdent
 }
 
 // scanDynamicTableShowOutput scans SHOW DYNAMIC TABLES results for a matching row.
-func scanDynamicTableShowOutput(rows *sql.Rows, name string) (*DynamicTableShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*DynamicTableShowOutput, error) {
-		return &DynamicTableShowOutput{
+func scanDynamicTableShowOutput(rows *sql.Rows, name string) (*v1alpha1.DynamicTableShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.DynamicTableShowOutput, error) {
+		return &v1alpha1.DynamicTableShowOutput{
 			CreatedOn:       m["created_on"],
 			Name:            m["name"],
 			DatabaseName:    m["database_name"],

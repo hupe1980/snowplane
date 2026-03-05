@@ -55,7 +55,7 @@ type NetworkRuleSpec struct {
 	// Mutually exclusive with DatabaseName. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.databaseRef is immutable"
-	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
+	DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
 	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
@@ -69,7 +69,7 @@ type NetworkRuleSpec struct {
 	// Mutually exclusive with SchemaName. Immutable after creation.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.schemaRef is immutable"
-	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
+	SchemaRef *ObjectReference `json:"schemaRef,omitempty"`
 
 	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// The controller constructs the FQN from databaseName + schemaName + name.

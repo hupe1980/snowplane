@@ -197,6 +197,15 @@ type CreateOrAlterSupporter interface {
 	SupportsCreateOrAlter() bool
 }
 
+// CascadeDropSupporter indicates whether an adapter genuinely supports
+// CASCADE drops. BaseAdapter always satisfies CascadeDropper (for Go
+// interface compatibility) but returns false from SupportsCascadeDrop()
+// when DropCascadeFn is nil. Non-BaseAdapter adapters that implement
+// CascadeDropper are assumed to support cascade.
+type CascadeDropSupporter interface {
+	SupportsCascadeDrop() bool
+}
+
 // CascadeDropper is an optional interface for adapters whose Snowflake
 // resource supports DROP … CASCADE. When implemented and the force-destroy
 // annotation is set on the CR, the reconciler calls DropCascade instead of
@@ -217,6 +226,45 @@ type CascadeDropper[T ManagedResource, S any] interface {
 // Default when absent: no late-initialization.
 type LateInitializer[T ManagedResource, D any] interface {
 	LateInitialize(obj T, obs *Observation[D]) bool
+}
+
+// ScopedResource is an optional interface for CRD types that operate within
+// a specific Snowflake database and/or schema. When implemented, the reconciler
+// validates the resolved database/schema names against the ProviderConfig's
+// AllowedDatabases and AllowedSchemas restrictions after provider resolution.
+//
+// It also exposes the raw spec fields (DatabaseRef/DatabaseName, SchemaRef/SchemaName)
+// so the reconciler can automatically run pre-flight existence checks for raw
+// databaseName/schemaName strings, eliminating the need for per-adapter
+// PreFlightCheckFn closures in the common case.
+type ScopedResource interface {
+	// GetScopeDatabaseName returns status.databaseName (the resolved database FQN).
+	GetScopeDatabaseName() string
+	// GetScopeSchemaName returns status.schemaName (the resolved schema FQN), or "" for database-only resources.
+	GetScopeSchemaName() string
+	// GetSpecDatabaseRef returns spec.databaseRef (nil when using raw name).
+	GetSpecDatabaseRef() *snowplanev1alpha1.ObjectReference
+	// GetSpecDatabaseName returns spec.databaseName (nil when using ref).
+	GetSpecDatabaseName() *string
+	// GetSpecSchemaRef returns spec.schemaRef (nil when using raw name or database-only).
+	GetSpecSchemaRef() *snowplanev1alpha1.ObjectReference
+	// GetSpecSchemaName returns spec.schemaName (nil when using ref or database-only).
+	GetSpecSchemaName() *string
+}
+
+// PreFlightChecker is an optional interface for adapters that need custom
+// pre-flight validation beyond the automatic database/schema existence checks
+// provided by ScopedResource. For most resources, the reconciler detects
+// ScopedResource automatically and runs PreFlightCheckDatabaseExists /
+// PreFlightCheckSchemaExists — no adapter code required.
+//
+// Implement this interface only for resources with non-standard pre-flight
+// requirements (e.g., checking warehouse existence, verifying source table
+// for streams).
+//
+// The check runs after ServiceFromClient but before Observe.
+type PreFlightChecker[T ManagedResource] interface {
+	PreFlightCheck(ctx context.Context, sfClient clientfactory.SnowflakeClient, obj T) error
 }
 
 // SetupWatchesFunc is a callback used during SetupWithManager to add

@@ -104,7 +104,7 @@ func newTestDB(name, namespace string) *snowplanev1alpha1.Database {
 func successfulObservation() *snowflake.DatabaseObservation {
 	return &snowflake.DatabaseObservation{
 		Exists: true,
-		ShowOutput: &snowflake.DatabaseShowOutput{
+		ShowOutput: &snowplanev1alpha1.DatabaseShowOutput{
 			CreatedOn:     "2024-01-01",
 			Name:          "ANALYTICS",
 			Kind:          "STANDARD",
@@ -136,19 +136,16 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Database, Service, *snowflake.DatabaseObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: record.NewFakeRecorder(100),
-		Adapter: &adapter{
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, record.NewFakeRecorder(100), nil,
+		func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("Database"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("Database")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -884,7 +881,7 @@ func TestBuildAlterOptions_NilParameters(t *testing.T) {
 	id := snowflake.NewAccountObjectIdentifier("ANALYTICS")
 	obs := &snowflake.DatabaseObservation{
 		Exists:     true,
-		ShowOutput: &snowflake.DatabaseShowOutput{Name: "ANALYTICS"},
+		ShowOutput: &snowplanev1alpha1.DatabaseShowOutput{Name: "ANALYTICS"},
 		Parameters: nil, // nil → early return
 	}
 
@@ -1046,7 +1043,7 @@ func TestValidateImmutableFields_FirstReconcile(t *testing.T) {
 	db := newTestDB("mydb", "default")
 	db.Status.ObservedGeneration = 0
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), db)
+	err := validateImmutableFields(context.Background(), db)
 	assert.NoError(t, err, "should skip on first reconcile")
 }
 
@@ -1058,7 +1055,7 @@ func TestValidateImmutableFields_TransientChanged(t *testing.T) {
 	db.Spec.Transient = true
 	db.Status.ShowOutput = &snowplanev1alpha1.DatabaseShowOutput{Kind: "STANDARD"}
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), db)
+	err := validateImmutableFields(context.Background(), db)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.transient is immutable")
 }
@@ -1071,7 +1068,7 @@ func TestValidateImmutableFields_TransientUnchanged(t *testing.T) {
 	db.Spec.Transient = true
 	db.Status.ShowOutput = &snowplanev1alpha1.DatabaseShowOutput{Kind: "TRANSIENT"}
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), db)
+	err := validateImmutableFields(context.Background(), db)
 	assert.NoError(t, err)
 }
 
@@ -1082,7 +1079,7 @@ func TestValidateImmutableFields_NoShowOutput(t *testing.T) {
 	db.Status.ObservedGeneration = 1
 	db.Status.ShowOutput = nil // not yet observed
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), db)
+	err := validateImmutableFields(context.Background(), db)
 	assert.NoError(t, err, "should skip when showOutput is nil")
 }
 
@@ -1735,7 +1732,7 @@ func TestDetectDatabaseDrift_NoDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.DatabaseObservation{
-		ShowOutput: &snowflake.DatabaseShowOutput{Comment: "test"},
+		ShowOutput: &snowplanev1alpha1.DatabaseShowOutput{Comment: "test"},
 		Parameters: &snowflake.DatabaseParameters{
 			DataRetentionTimeInDays: testutil.Ptr(int32(1)),
 		},
@@ -1757,7 +1754,7 @@ func TestDetectDatabaseDrift_WithDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.DatabaseObservation{
-		ShowOutput: &snowflake.DatabaseShowOutput{Comment: "drifted"},
+		ShowOutput: &snowplanev1alpha1.DatabaseShowOutput{Comment: "drifted"},
 		Parameters: &snowflake.DatabaseParameters{
 			DataRetentionTimeInDays: testutil.Ptr(int32(1)),
 		},
@@ -1787,7 +1784,7 @@ func TestBuildAlterOptions_UnsetComputedWhenParamsNil(t *testing.T) {
 	id := snowflake.NewAccountObjectIdentifier("DB")
 	obs := &snowflake.DatabaseObservation{
 		Exists:     true,
-		ShowOutput: &snowflake.DatabaseShowOutput{Name: "DB"},
+		ShowOutput: &snowplanev1alpha1.DatabaseShowOutput{Name: "DB"},
 		Parameters: nil, // Parameters are nil
 	}
 
@@ -1830,18 +1827,13 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 
 	rec := record.NewFakeRecorder(100)
 
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Database, Service, *snowflake.DatabaseObservation]{
-		Client:   c,
-		Factory:  clientfactory.NewClientFactory(),
-		Recorder: rec,
-		Adapter: &adapter{
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-				capturedUseRole = useRole
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, testutil.NewTestClientFactory(), rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, useRole string) (Service, func(context.Context), error) {
+			capturedUseRole = useRole
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("Database"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("Database")
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "default"))
 	require.NoError(t, err)
@@ -1868,7 +1860,7 @@ func TestValidateImmutableFields_ForceNewBypass(t *testing.T) {
 		Kind: "STANDARD",
 	}
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), db)
+	err := validateImmutableFields(context.Background(), db)
 	assert.NoError(t, err, "force-new should bypass immutable checks")
 }
 
@@ -1886,7 +1878,7 @@ func TestValidateImmutableFields_ForceNewFalse_StillRejects(t *testing.T) {
 		Kind: "STANDARD",
 	}
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), db)
+	err := validateImmutableFields(context.Background(), db)
 	assert.Error(t, err, "force-new=false should still reject immutable changes")
 	assert.Contains(t, err.Error(), "spec.name is immutable")
 }

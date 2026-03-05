@@ -44,7 +44,7 @@ Every step needed to add a new Snowflake resource to Snowplane — from CRD type
 | **Account** | None | Database, Warehouse, AccountRole, User |
 | **Database** | `databaseRef` / `databaseName` | Schema, DatabaseRole |
 | **Schema** | `databaseRef` + `schemaRef` | Table, View, Stage, Task, Stream |
-| **Grant** | Role ref or inline | AccountRoleGrant, DatabaseRoleGrant |
+| **Grant** | Role ref or inline | GrantPrivilegesToAccountRole, GrantPrivilegesToDatabaseRole |
 | **Assignment** | Role ref, target ref | AccountRoleAssignment, DatabaseRoleAssignment |
 
 ---
@@ -260,7 +260,7 @@ metadata:
 
 Create `internal/clients/snowflake/<resource>.go` with:
 
-1. **Observation type** — holds SHOW output
+1. **Observation type** — holds SHOW output. The `ShowOutput` field reuses the API type directly (`*v1alpha1.ThingShowOutput`) — do **not** define a separate internal ShowOutput struct.
 2. **Options types** — `Create` and `Alter` options (implement `HasChanges() bool`)
 3. **Client type** — `Observe`, `Create`, `Alter`, `Drop` methods
 
@@ -302,25 +302,13 @@ type Service interface {
 // ServiceFactory creates a Service from a Snowflake client.
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
-// defaultServiceFactory is the production ServiceFactory used by NewReconciler.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-    sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-    if err != nil {
-        return nil, nil, err
-    }
-    return snowflake.NewThingClient(sfC), cleanup, nil
-}
-
 // NewReconciler returns a new Thing reconciler backed by the generic framework.
 func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*v1alpha1.Thing, Service, *snowflake.ThingObservation] {
-    a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-    return &reconciler.GenericReconciler[*v1alpha1.Thing, Service, *snowflake.ThingObservation]{
-        Client:      c,
-        Factory:     factory,
-        Recorder:    recorder,
-        RateLimiter: rl,
-        Adapter:     a,
-    }
+    return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+        reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+            return snowflake.NewThingClient(exec)
+        }),
+    )
 }
 
 // NewReconcilerWithServiceFactory lets callers inject a custom ServiceFactory
@@ -329,20 +317,60 @@ func NewReconcilerWithServiceFactory(
     c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder,
     rl *ratelimit.Limiter, sf ServiceFactory,
 ) *reconciler.GenericReconciler[*v1alpha1.Thing, Service, *snowflake.ThingObservation] {
-    a := &adapter{client: c, recorder: recorder, newService: sf}
-    return &reconciler.GenericReconciler[*v1alpha1.Thing, Service, *snowflake.ThingObservation]{
-        Client:      c,
-        Factory:     factory,
-        Recorder:    recorder,
-        RateLimiter: rl,
-        Adapter:     a,
+    return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, recorder, sf))
+}
+
+// newAdapter creates a BaseAdapter with resource-specific closures.
+func newAdapter(c client.Client, recorder record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*v1alpha1.Thing, Service, *snowflake.ThingObservation] {
+    return &reconciler.BaseAdapter[*v1alpha1.Thing, Service, *snowflake.ThingObservation]{
+        ResourceNameVal:  "thing",
+        FinalizerNameVal: finalizerName,
+        NewObjectFn:      func() *v1alpha1.Thing { return &v1alpha1.Thing{} },
+        ServiceFactoryFn: sf,
+        BuildIdentifierFn: func(obj *v1alpha1.Thing) (reconciler.Identifier, error) {
+            return snowflake.NewSchemaObjectIdentifier(obj.Status.DatabaseName, obj.Status.SchemaName, obj.Spec.Name), nil
+        },
+        ObserveFn: reconciler.MakeObserve(
+            func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) (*snowflake.ThingObservation, error) {
+                return svc.Observe(ctx, id)
+            },
+            func(obs *snowflake.ThingObservation) bool { return obs.Exists },
+        ),
+        CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *v1alpha1.Thing, id snowflake.SchemaObjectIdentifier) error {
+            opts := buildCreateOptions(obj, id)
+            opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
+            return svc.Create(ctx, opts)
+        }),
+        AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterThingOptions) error {
+            return svc.Alter(ctx, *opts)
+        }),
+        DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) error {
+            return svc.Drop(ctx, id)
+        }),
+        ValidateImmutableFn: validateImmutableFields,
+        BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *v1alpha1.Thing, id snowflake.SchemaObjectIdentifier, obs *reconciler.Observation[*snowflake.ThingObservation]) (reconciler.AlterOptions, error) {
+            opts := buildAlterOptions(obj, id, obs.Detail)
+            return &opts, nil
+        }),
+        ApplyObservationFn: func(obj *v1alpha1.Thing, obs *reconciler.Observation[*snowflake.ThingObservation]) {
+            applyObservation(obj, obs.Detail)
+        },
+        DetectDriftFn: func(obj *v1alpha1.Thing, obs *reconciler.Observation[*snowflake.ThingObservation]) *drift.Result {
+            return detectDrift(obj, obs.Detail)
+        },
+        SupportsCoA: true,
+        // Optional: PreReconcile for reference resolution
+        PreReconcileFn: func(ctx context.Context, thing *v1alpha1.Thing) error {
+            dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, thing, ...)
+            // ...
+        },
     }
 }
 ```
 
-### `adapter.go`
+### BaseAdapter Configuration
 
-The adapter implements the **required** `ResourceAdapter[T, S, D]` interface:
+The `newAdapter` function configures a `BaseAdapter[T, S, D]` with resource-specific closures. The `BaseAdapter` implements the **required** `ResourceAdapter[T, S, D]` interface:
 
 | Method | Purpose |
 |:-------|:--------|
@@ -357,7 +385,7 @@ The adapter implements the **required** `ResourceAdapter[T, S, D]` interface:
 | `Drop` | Drops the resource from Snowflake |
 | `ValidateImmutableFields` | Checks resource-specific immutability |
 | `BuildAlterOptions` | Diffs spec vs observation → alter options |
-| `ApplyObservation` | Maps observation into the CR status |
+| `ApplyObservation` | Maps observation into the CR status (ShowOutput is assigned directly since both layers share the same type) |
 | `ComputeTrackedParameters` | Returns actively-managed field names (via `tracked.ComputeTracked`) |
 | `DetectDrift` | Compares spec vs observation for reporting |
 
@@ -373,13 +401,7 @@ type ThingSpec struct {
 }
 ```
 
-Then in your adapter:
-
-```go
-func (a *adapter) ComputeTrackedParameters(obj *v1alpha1.Thing) []string {
-    return tracked.ComputeTracked(&obj.Spec)
-}
-```
+Then `BaseAdapter` handles this automatically via reflection — no need to set `TrackedParamsFn` unless you need custom behavior.
 
 And in your reconciler's `buildAlterOptions`:
 
@@ -399,35 +421,33 @@ opts.UnsetFields = tracked.ComputeUnset(&thing.Spec, thing.Status.TrackedParamet
 
 Nested struct-pointer fields (union types like `spec.Email *EmailConfig`) are recursed into automatically when non-nil.
 
-In addition, there are **optional interfaces** the reconciler detects via type assertion. Adapters that don't implement them get sensible defaults (no-op):
+In addition, `BaseAdapter` supports **optional capabilities** via function fields. Set the corresponding field to opt in (nil = disabled):
 
-| Optional Interface | Method | When Needed |
-|:-------------------|:-------|:------------|
-| `PreReconciler[T]` | `PreReconcile(ctx, obj)` | Reference resolution (database/schema-level resources) |
-| `WatchConfigurer` | `SetupWatches()` | Add watches for parent resources (e.g. Schema watches Database) |
-| `PostCreateHook[T]` | `PostCreate(obj)` | Logic after successful create, before status patch |
-| `PostUpdateHook[T]` | `PostUpdate(obj, altered, alterOpts)` | Logic after successful update (e.g. hash password) |
-| `CreateOrAlterSupporter` | `SupportsCreateOrAlter()` | Enable `CREATE OR ALTER` SQL syntax |
+| BaseAdapter Field | Optional Interface | When Needed |
+|:------------------|:-------------------|:------------|
+| `PreReconcileFn` | `PreReconciler[T]` | Reference resolution (database/schema-level resources) |
+| `SetupWatchesFn` | `WatchConfigurer` | Add watches for parent resources (e.g. Schema watches Database) |
+| `PostCreateFn` | `PostCreateHook[T]` | Logic after successful create, before status patch |
+| `PostUpdateFn` | `PostUpdateHook[T]` | Logic after successful update (e.g. hash password) |
+| `SupportsCoA` | `CreateOrAlterSupporter` | Enable `CREATE OR ALTER` SQL syntax |
+| `DropCascadeFn` | `CascadeDropper[T,S]` + `CascadeDropSupporter` | Enable `DROP ... CASCADE` support |
+| `LateInitializeFn` | `LateInitializer[T,D]` | Fill unset spec fields from observed state |
 
-For database-level resources, use shared reference resolution helpers:
+For database-level resources, capture `c` and `recorder` in the `PreReconcileFn` closure:
 
 ```go
-func (a *adapter) PreReconcile(ctx context.Context, thing *v1alpha1.Thing) error {
-    dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, a.client, a.recorder, thing,
+PreReconcileFn: func(ctx context.Context, thing *v1alpha1.Thing) error {
+    dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, thing,
         thing.Namespace, thing.Spec.DatabaseRef, thing.Spec.DatabaseName, thing.Status.DatabaseName)
     if err != nil {
         return err
     }
     thing.Status.DatabaseName = dbFQN
     return nil
-}
+},
 ```
 
-Always add the interface assertion:
-
-```go
-var _ reconciler.ResourceAdapter[*v1alpha1.Thing, Service, *snowflake.ThingObservation] = (*adapter)(nil)
-```
+Interface assertion is provided by BaseAdapter itself — no per-resource assertion needed.
 
 ---
 
@@ -610,11 +630,10 @@ Update these docs to include the new resource:
 - [ ] Type registered in `hack/gen-accessors/main.go`, `just generate` run
 - [ ] CRD manifest with maturity label (`just sync-crds` — copies to Helm chart)
 - [ ] Snowflake client with Observe/Create/Alter/Drop (use `sqlbuilder/`)
-- [ ] `ResourceAdapter` with all required methods
-- [ ] Optional adapter interfaces as needed (`PreReconciler`, `WatchConfigurer`, `CreateOrAlterSupporter`, etc.)
-- [ ] `defaultServiceFactory` + `NewReconcilerWithServiceFactory` for test injection
-- [ ] Interface assertion: `var _ reconciler.ResourceAdapter[...] = (*adapter)(nil)`
-- [ ] Safe type assertions via `reconciler.AssertIdentifier[I]` / `AssertAlterOptions[A]`
+- [ ] `newAdapter()` returning `*reconciler.BaseAdapter[...]` with all closures
+- [ ] Optional capabilities via function fields (`PreReconcileFn`, `SetupWatchesFn`, `SupportsCoA`, etc.)
+- [ ] `NewReconciler` / `NewReconcilerWithServiceFactory` using `reconciler.NewGenericReconciler`
+- [ ] CRUD helpers: `MakeObserve`, `MakeCreate`, `MakeAlter`, `MakeDrop`, `MakeBuildAlterOpts`
 - [ ] Manager wiring: RBAC markers, registration table entry
 - [ ] Kustomize RBAC: all three resource blocks in `config/rbac/role.yaml`
 - [ ] FieldExport registration: `ValidFieldExportSourceKinds`, CEL whitelist, `sourceResourceTypes()`

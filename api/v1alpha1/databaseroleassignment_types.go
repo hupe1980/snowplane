@@ -40,7 +40,7 @@ type DatabaseRoleAssignmentSpec struct {
 	// When set, the database role name is resolved from the CR's fullyQualifiedName.
 	// Mutually exclusive with DatabaseRoleName.
 	// +optional
-	DatabaseRoleRef *LocalObjectReference `json:"databaseRoleRef,omitempty"`
+	DatabaseRoleRef *ObjectReference `json:"databaseRoleRef,omitempty"`
 
 	// ToRole is the name of the account role to assign the database role to.
 	// Mutually exclusive with ToRoleRef, ToDatabaseRole, ToDatabaseRoleRef.
@@ -53,7 +53,7 @@ type DatabaseRoleAssignmentSpec struct {
 	// When set, the target role name is resolved from the CR's spec.name.
 	// Mutually exclusive with ToRole, ToDatabaseRole, ToDatabaseRoleRef.
 	// +optional
-	ToRoleRef *LocalObjectReference `json:"toRoleRef,omitempty"`
+	ToRoleRef *ObjectReference `json:"toRoleRef,omitempty"`
 
 	// ToDatabaseRole is the fully qualified name of the database role to assign to (e.g. MY_DB.MY_ROLE).
 	// Mutually exclusive with ToDatabaseRoleRef, ToRole, ToRoleRef.
@@ -66,7 +66,7 @@ type DatabaseRoleAssignmentSpec struct {
 	// When set, the target database role name is resolved from the CR's fullyQualifiedName.
 	// Mutually exclusive with ToDatabaseRole, ToRole, ToRoleRef.
 	// +optional
-	ToDatabaseRoleRef *LocalObjectReference `json:"toDatabaseRoleRef,omitempty"`
+	ToDatabaseRoleRef *ObjectReference `json:"toDatabaseRoleRef,omitempty"`
 }
 
 // DatabaseRoleAssignmentStatus defines the observed state of a DatabaseRoleAssignment.

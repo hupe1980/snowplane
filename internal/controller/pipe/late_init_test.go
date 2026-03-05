@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -27,21 +28,19 @@ func newPipe() *snowplanev1alpha1.Pipe {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newPipe()
 		obs := &reconciler.Observation[*snowflake.PipeObservation]{
 			Exists: true,
 			Detail: &snowflake.PipeObservation{
-				ShowOutput: &snowflake.PipeShowOutput{
+				ShowOutput: &snowplanev1alpha1.PipeShowOutput{
 					Comment:          "pipe comment",
 					ErrorIntegration: "MY_ERROR_INT",
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 		assert.Equal(t, "pipe comment", *obj.Spec.Comment)
 		assert.Equal(t, "MY_ERROR_INT", *obj.Spec.ErrorIntegrationName)
@@ -55,14 +54,14 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.PipeObservation]{
 			Exists: true,
 			Detail: &snowflake.PipeObservation{
-				ShowOutput: &snowflake.PipeShowOutput{
+				ShowOutput: &snowplanev1alpha1.PipeShowOutput{
 					Comment:          "snowflake comment",
 					ErrorIntegration: "SF_ERR_INT",
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 		assert.Equal(t, "user comment", *obj.Spec.Comment)
 		assert.Equal(t, "USER_ERR_INT", *obj.Spec.ErrorIntegrationName)
@@ -71,7 +70,7 @@ func TestLateInitialize(t *testing.T) {
 	t.Run("returns false when detail is nil", func(t *testing.T) {
 		obj := newPipe()
 
-		modified := a.LateInitialize(obj, &reconciler.Observation[*snowflake.PipeObservation]{
+		modified := lateInitialize(obj, &reconciler.Observation[*snowflake.PipeObservation]{
 			Exists: true,
 			Detail: nil,
 		})
@@ -84,14 +83,14 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.PipeObservation]{
 			Exists: true,
 			Detail: &snowflake.PipeObservation{
-				ShowOutput: &snowflake.PipeShowOutput{
+				ShowOutput: &snowplanev1alpha1.PipeShowOutput{
 					Comment:          "",
 					ErrorIntegration: "",
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 }

@@ -40,14 +40,11 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 
 // NewReconciler returns a new ResourceMonitor reconciler backed by the generic framework.
 func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.ResourceMonitor, Service, *snowflake.ResourceMonitorObservation] {
-	a := &adapter{newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.ResourceMonitor, Service, *snowflake.ResourceMonitorObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewResourceMonitorClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
@@ -59,45 +56,70 @@ func NewReconcilerWithServiceFactory(
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.ResourceMonitor, Service, *snowflake.ResourceMonitorObservation] {
-	a := &adapter{newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.ResourceMonitor, Service, *snowflake.ResourceMonitorObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(sf))
+}
+
+// newAdapter creates the BaseAdapter for ResourceMonitor resources.
+func newAdapter(sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.ResourceMonitor, Service, *snowflake.ResourceMonitorObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.ResourceMonitor, Service, *snowflake.ResourceMonitorObservation]{
+		ResourceNameVal:  "resourcemonitor",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.ResourceMonitor { return &snowplanev1alpha1.ResourceMonitor{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(obj *snowplanev1alpha1.ResourceMonitor) (reconciler.Identifier, error) {
+			return snowflake.NewAccountObjectIdentifier(obj.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) (*snowflake.ResourceMonitorObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.ResourceMonitorObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.ResourceMonitor, id snowflake.AccountObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterResourceMonitorOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.ResourceMonitor, id snowflake.AccountObjectIdentifier, obs *reconciler.Observation[*snowflake.ResourceMonitorObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.ResourceMonitor, obs *reconciler.Observation[*snowflake.ResourceMonitorObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.ResourceMonitor, obs *reconciler.Observation[*snowflake.ResourceMonitorObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		LateInitializeFn: lateInitialize,
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+// validateImmutableFields checks that immutable fields have not been changed.
+func validateImmutableFields(_ context.Context, rm *snowplanev1alpha1.ResourceMonitor) error {
+	if reconciler.ShouldSkipImmutableValidation(rm) {
+		return nil
 	}
 
-	return snowflake.NewResourceMonitorClient(sfC), cleanup, nil
+	if rm.Status.ShowOutput != nil {
+		if rm.Status.ShowOutput.Name != "" && !strings.EqualFold(rm.Spec.Name, rm.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", rm.Status.ShowOutput.Name, rm.Spec.Name)
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(rm *snowplanev1alpha1.ResourceMonitor, obs *snowflake.ResourceMonitorObservation) {
 	if obs.ShowOutput != nil {
 		rm.Status.FullyQualifiedName = obs.ShowOutput.Name
 
-		rm.Status.ShowOutput = &snowplanev1alpha1.ResourceMonitorShowOutput{
-			CreatedOn:            obs.ShowOutput.CreatedOn,
-			Name:                 obs.ShowOutput.Name,
-			CreditQuota:          obs.ShowOutput.CreditQuota,
-			UsedCredits:          obs.ShowOutput.UsedCredits,
-			RemainingCredits:     obs.ShowOutput.RemainingCredits,
-			Level:                obs.ShowOutput.Level,
-			Frequency:            obs.ShowOutput.Frequency,
-			StartTime:            obs.ShowOutput.StartTime,
-			EndTime:              obs.ShowOutput.EndTime,
-			NotifyAt:             obs.ShowOutput.NotifyAt,
-			SuspendAt:            obs.ShowOutput.SuspendAt,
-			SuspendImmediatelyAt: obs.ShowOutput.SuspendImmediatelyAt,
-			NotifyUsers:          obs.ShowOutput.NotifyUsers,
-		}
+		rm.Status.ShowOutput = obs.ShowOutput
 	}
 }
 
@@ -228,7 +250,7 @@ func normalizeTriggers(triggers []snowplanev1alpha1.ResourceMonitorTrigger) stri
 // buildObservedTriggers reconstructs trigger info from SHOW output columns.
 // SHOW RESOURCE MONITORS returns: notify_at (comma-separated percentages),
 // suspend_at (single percentage), suspend_immediately_at (single percentage).
-func buildObservedTriggers(show *snowflake.ResourceMonitorShowOutput) string {
+func buildObservedTriggers(show *snowplanev1alpha1.ResourceMonitorShowOutput) string {
 	var parts []string
 
 	// Parse notify_at: comma-separated percentages.

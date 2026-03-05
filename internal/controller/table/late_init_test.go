@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -26,14 +27,12 @@ func newTable() *snowplanev1alpha1.Table {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newTable()
 		obs := &reconciler.Observation[*snowflake.TableObservation]{
 			Exists: true,
 			Detail: &snowflake.TableObservation{
-				ShowOutput: &snowflake.TableShowOutput{
+				ShowOutput: &snowplanev1alpha1.TableShowOutput{
 					Comment:               "table comment",
 					RetentionTime:         14,
 					ChangeTracking:        true,
@@ -42,7 +41,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 
 		assert.Equal(t, "table comment", *obj.Spec.Comment)
@@ -59,7 +58,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.TableObservation]{
 			Exists: true,
 			Detail: &snowflake.TableObservation{
-				ShowOutput: &snowflake.TableShowOutput{
+				ShowOutput: &snowplanev1alpha1.TableShowOutput{
 					Comment:        "snowflake comment",
 					RetentionTime:  14,
 					ChangeTracking: true,
@@ -67,7 +66,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified) // ChangeTracking was set
 
 		assert.Equal(t, "user comment", *obj.Spec.Comment)
@@ -85,14 +84,14 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.TableObservation]{
 			Exists: true,
 			Detail: &snowflake.TableObservation{
-				ShowOutput: &snowflake.TableShowOutput{
+				ShowOutput: &snowplanev1alpha1.TableShowOutput{
 					Comment:       "other",
 					RetentionTime: 99,
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -103,7 +102,7 @@ func TestLateInitialize(t *testing.T) {
 			Detail: nil,
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -116,7 +115,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 }

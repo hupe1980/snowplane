@@ -42,7 +42,6 @@ All metrics use the `snowplane_` namespace and are exposed on the controller's m
 
 | Metric | Type | Labels | Description |
 |:-------|:-----|:-------|:------------|
-| `snowplane_managed_resources` | Gauge | `controller`, `state` | Resources by controller and state |
 | `snowplane_adoption_total` | Counter | `controller`, `result` | Resource adoption outcomes |
 | `snowplane_drift_detected_total` | Counter | `controller` | Drift detection events |
 | `snowplane_orphaned_resources_total` | Counter | `controller` | Orphan-policy deletions |
@@ -65,12 +64,25 @@ All metrics use the `snowplane_` namespace and are exposed on the controller's m
 
 | Metric | Type | Labels | Description |
 |:-------|:-----|:-------|:------------|
-| `snowplane_db_max_open_conns` | Gauge | `provider` | Maximum open connections allowed |
-| `snowplane_db_open_conns` | Gauge | `provider` | Current open connections |
-| `snowplane_db_in_use_conns` | Gauge | `provider` | Connections currently in use |
-| `snowplane_db_idle_conns` | Gauge | `provider` | Connections currently idle |
-| `snowplane_db_wait_count` | Gauge | `provider` | Total connections waited for |
-| `snowplane_db_wait_duration_seconds` | Gauge | `provider` | Time blocked waiting for connections |
+| `snowplane_db_max_open_connections` | Gauge | `provider` | Maximum open connections allowed |
+| `snowplane_db_open_connections` | Gauge | `provider` | Current open connections |
+| `snowplane_db_in_use_connections` | Gauge | `provider` | Connections currently in use |
+| `snowplane_db_idle_connections` | Gauge | `provider` | Connections currently idle |
+| `snowplane_db_wait_count_total` | Gauge | `provider` | Total connections waited for |
+| `snowplane_db_wait_duration_seconds_total` | Gauge | `provider` | Time blocked waiting for connections |
+
+### Webhook (controller-runtime)
+
+When the validating admission webhook is enabled (`webhook.enabled: true`), controller-runtime exposes additional metrics:
+
+| Metric | Type | Labels | Description |
+|:-------|:-----|:-------|:------------|
+| `controller_runtime_webhook_requests_total` | Counter | `webhook`, `code` | Total admission requests by HTTP status code |
+| `controller_runtime_webhook_requests_in_flight` | Gauge | `webhook` | Currently processing admission requests |
+| `controller_runtime_webhook_latency_seconds` | Histogram | `webhook` | Admission request processing latency |
+
+{: .note }
+> These metrics use the `controller_runtime_` prefix (not `snowplane_`) because they are emitted by the controller-runtime framework, not Snowplane directly.
 
 ---
 
@@ -158,22 +170,45 @@ All log output is sanitized:
 
 | Reason | Description |
 |:-------|:------------|
-| `Created` | Resource created in Snowflake |
-| `Updated` | Resource updated (spec change applied) |
-| `Deleted` / `Orphaned` | Resource dropped or orphaned |
-| `AdoptedExisting` | Pre-existing resource adopted |
-| `DriftCorrected` | Out-of-band change corrected |
+| `ReconcileSuccess` | Reconciliation completed successfully (create, update, or no-op) |
+| `Creating` | Resource is being created in Snowflake |
+| `Deleting` | Resource is being deleted/dropped from Snowflake |
+| `Adopted` | Pre-existing Snowflake resource adopted by operator |
+| `DriftCorrected` | Out-of-band change detected and corrected |
+| `ReconcilePaused` | Reconciliation paused via `spec.paused: true` |
+| `FinalizerRemoved` | Finalizer removed from resource |
+| `CredentialsRotated` | Snowflake credentials rotated successfully |
+| `ForceNewActive` | Force-new annotation triggered delete+recreate |
+| `CreateOrAlterFallback` | CREATE OR ALTER used as alter fallback |
 
 ### Warning Events
 
 | Reason | Description |
 |:-------|:------------|
-| `DriftDetected` | Out-of-band change detected |
+| `DriftDetected` | Out-of-band change detected (before correction) |
 | `ReconcileError` | Transient error (will be retried) |
+| `RecoverableError` | Recoverable Snowflake error (will be retried with backoff) |
 | `TerminalError` | Non-retryable error (reconciliation stopped, no further requeues) |
-| `DependencyNotReady` | ProviderConfig or parent not ready |
+| `DependencyNotReady` | Pre-flight or pre-reconcile dependency not satisfied |
+| `DependencyWait` | Waiting for a dependency to become ready |
 | `ImmutableField` | Attempt to modify an immutable field |
+| `ValidationFailed` | Spec validation failed |
 | `ConflictDetected` | Another CR manages the same Snowflake object |
+| `OrphanedResource` | Resource orphaned per orphan deletion policy |
+| `DeleteBlocked` | Deletion blocked (e.g., resource still in use) |
+| `InUse` | Resource is in use by dependents |
+| `CredentialsError` | Snowflake credential retrieval failed |
+| `SecretNotFound` | Referenced Kubernetes Secret not found |
+| `InvalidConfig` | ProviderConfig configuration invalid |
+| `ClientCreationFailed` | Snowflake client creation failed |
+| `PingFailed` | Snowflake connection health check failed |
+| `ResourceAlreadyExists` | Snowflake resource already exists (name collision) |
+| `NamespaceNotAllowed` | CR namespace not in the ProviderConfig allowlist |
+| `DatabaseNotAllowed` | Target database not in the ProviderConfig allowlist |
+| `SchemaNotAllowed` | Target schema not in the ProviderConfig allowlist |
+| `RoleNotAllowed` | Requested role not in the ProviderConfig allowlist |
+| `UnsupportedAnnotation` | Unrecognized annotation on the CR |
+| `RefResolutionFailed` | Cross-resource reference could not be resolved |
 
 All event messages pass through `SafeRecorder`, which sanitizes via `ForEvent()` before emitting.
 
@@ -218,8 +253,9 @@ grafana:
 - **Rate Limit Waits** — Throttling frequency
 - **Drift Detection Frequency** — Events per controller
 - **Adoption Outcomes** — Adopted/rejected
-- **Managed Resources** — By controller and state
 - **Circuit Breaker State** — Current state per provider
+- **ProviderConfig Health** — Connection health per provider/account
+- **Connection Pool** — Open, in-use, idle connections per provider
 
 ### Manual Installation
 

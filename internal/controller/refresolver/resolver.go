@@ -4,6 +4,7 @@ package refresolver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -17,13 +18,13 @@ import (
 )
 
 // ErrReferenceNotFound indicates the referenced resource does not exist.
-var ErrReferenceNotFound = fmt.Errorf("referenced resource not found")
+var ErrReferenceNotFound = errors.New("referenced resource not found")
 
 // ErrReferenceNotReady indicates the referenced resource exists but is not Ready.
-var ErrReferenceNotReady = fmt.Errorf("referenced resource is not ready")
+var ErrReferenceNotReady = errors.New("referenced resource is not ready")
 
 // ErrNeitherRefNorNameSet indicates neither a reference nor a raw name was provided.
-var ErrNeitherRefNorNameSet = fmt.Errorf("neither ref nor name is set")
+var ErrNeitherRefNorNameSet = errors.New("neither ref nor name is set")
 
 // ReferableObject is a Kubernetes object that exposes conditions and a
 // fully qualified Snowflake name in its status.
@@ -80,13 +81,13 @@ func ResolveLocalRef(
 	return fqn, nil
 }
 
-// ResolveDatabaseRef resolves a LocalObjectReference to a Database CR, returning
+// ResolveDatabaseRef resolves a ObjectReference to a Database CR, returning
 // the Snowflake fully qualified database name.
 func ResolveDatabaseRef(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
-	ref snowplanev1alpha1.LocalObjectReference,
+	ref snowplanev1alpha1.ObjectReference,
 ) (string, error) {
 	return ResolveLocalRef(ctx, c, namespace, ref.Name, ref.Namespace, func() ReferableObject {
 		db := &snowplanev1alpha1.Database{}
@@ -100,13 +101,13 @@ func ResolveDatabaseRef(
 	})
 }
 
-// ResolveSchemaRef resolves a LocalObjectReference to a Schema CR, returning
+// ResolveSchemaRef resolves a ObjectReference to a Schema CR, returning
 // the Snowflake fully qualified schema name (e.g. "DB"."SCHEMA").
 func ResolveSchemaRef(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
-	ref snowplanev1alpha1.LocalObjectReference,
+	ref snowplanev1alpha1.ObjectReference,
 ) (string, error) {
 	return ResolveLocalRef(ctx, c, namespace, ref.Name, ref.Namespace, func() ReferableObject {
 		s := &snowplanev1alpha1.Schema{}
@@ -120,13 +121,13 @@ func ResolveSchemaRef(
 	})
 }
 
-// ResolveAccountRoleRef resolves a LocalObjectReference to an AccountRole CR,
+// ResolveAccountRoleRef resolves a ObjectReference to an AccountRole CR,
 // returning the Snowflake role name from the CR's fullyQualifiedName.
 func ResolveAccountRoleRef(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
-	ref snowplanev1alpha1.LocalObjectReference,
+	ref snowplanev1alpha1.ObjectReference,
 ) (string, error) {
 	return ResolveLocalRef(ctx, c, namespace, ref.Name, ref.Namespace, func() ReferableObject {
 		r := &snowplanev1alpha1.AccountRole{}
@@ -140,13 +141,13 @@ func ResolveAccountRoleRef(
 	})
 }
 
-// ResolveDatabaseRoleRef resolves a LocalObjectReference to a DatabaseRole CR,
+// ResolveDatabaseRoleRef resolves a ObjectReference to a DatabaseRole CR,
 // returning the Snowflake fully qualified database role name.
 func ResolveDatabaseRoleRef(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
-	ref snowplanev1alpha1.LocalObjectReference,
+	ref snowplanev1alpha1.ObjectReference,
 ) (string, error) {
 	return ResolveLocalRef(ctx, c, namespace, ref.Name, ref.Namespace, func() ReferableObject {
 		r := &snowplanev1alpha1.DatabaseRole{}
@@ -160,13 +161,13 @@ func ResolveDatabaseRoleRef(
 	})
 }
 
-// ResolveUserRef resolves a LocalObjectReference to a User CR,
+// ResolveUserRef resolves a ObjectReference to a User CR,
 // returning the Snowflake user name from the CR's fullyQualifiedName.
 func ResolveUserRef(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
-	ref snowplanev1alpha1.LocalObjectReference,
+	ref snowplanev1alpha1.ObjectReference,
 ) (string, error) {
 	return ResolveLocalRef(ctx, c, namespace, ref.Name, ref.Namespace, func() ReferableObject {
 		u := &snowplanev1alpha1.User{}
@@ -221,7 +222,7 @@ func ResolveDatabaseSource(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
-	ref *snowplanev1alpha1.LocalObjectReference,
+	ref *snowplanev1alpha1.ObjectReference,
 	rawName *string,
 ) (string, error) {
 	if ref != nil {
@@ -243,7 +244,7 @@ func ResolveSchemaSource(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
-	ref *snowplanev1alpha1.LocalObjectReference,
+	ref *snowplanev1alpha1.ObjectReference,
 	rawName *string,
 ) (string, error) {
 	if ref != nil {
@@ -260,7 +261,7 @@ func ResolveSchemaSource(
 // SourceName returns a human-readable display name for log/event messages
 // describing whether a reference or an inline name is used. It works for
 // both database and schema references (R9-5).
-func SourceName(ref *snowplanev1alpha1.LocalObjectReference, name *string) string {
+func SourceName(ref *snowplanev1alpha1.ObjectReference, name *string) string {
 	if ref != nil {
 		return fmt.Sprintf("%q (ref)", ref.Name)
 	}

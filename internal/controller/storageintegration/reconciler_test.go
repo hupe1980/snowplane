@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -97,7 +96,7 @@ func newTestStorageIntegration(name, namespace string) *snowplanev1alpha1.Storag
 func successfulObservation() *snowflake.StorageIntegrationObservation {
 	return &snowflake.StorageIntegrationObservation{
 		Exists: true,
-		ShowOutput: &snowflake.StorageIntegrationShowOutput{
+		ShowOutput: &snowplanev1alpha1.StorageIntegrationShowOutput{
 			CreatedOn: "2024-01-01",
 			Name:      "MY_INT",
 			Type:      "EXTERNAL_STAGE",
@@ -123,20 +122,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.StorageIntegration, Service, *snowflake.StorageIntegrationObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("StorageIntegration"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("StorageIntegration")
+
+	return r
 }
 
 // --------------------------------------------------------------------------

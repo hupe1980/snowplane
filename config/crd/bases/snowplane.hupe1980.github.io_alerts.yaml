@@ -67,6 +67,7 @@ spec:
               action:
                 description: Action is the SQL statement executed when the alert condition
                   is met.
+                maxLength: 255
                 minLength: 1
                 type: string
               comment:
@@ -77,12 +78,14 @@ spec:
                   Condition is the SQL expression evaluated by the alert.
                   Must be a SELECT, SHOW, or CALL statement. The alert fires when the
                   condition returns at least one row.
+                maxLength: 255
                 minLength: 1
                 type: string
               databaseName:
                 description: |-
                   DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
                   Mutually exclusive with DatabaseRef. Immutable after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               databaseRef:
@@ -92,7 +95,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -140,6 +150,7 @@ spec:
                 type: object
               name:
                 description: Name is the Snowflake alert name. Immutable after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               paused:
@@ -156,6 +167,7 @@ spec:
                   name:
                     default: default
                     description: Name of the ProviderConfig to use.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   namespace:
@@ -175,6 +187,7 @@ spec:
                 description: |-
                   SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
                   Mutually exclusive with SchemaRef. Immutable after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               schemaRef:
@@ -184,7 +197,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -202,12 +222,14 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                maxLength: 255
                 minLength: 1
                 type: string
               warehouseName:
                 description: |-
                   WarehouseName is the Snowflake warehouse identifier (e.g. "COMPUTE_WH").
                   Mutually exclusive with WarehouseRef. Omit for serverless alerts.
+                maxLength: 255
                 minLength: 1
                 type: string
               warehouseRef:
@@ -217,7 +239,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -349,6 +378,13 @@ spec:
                   comparing ObservedGeneration vs Generation because metadata-only
                   changes (labels, annotations) increment Generation without changing
                   the spec.
+                type: string
+              lastReconcileTime:
+                description: |-
+                  LastReconcileTime is the timestamp of the most recent successful
+                  reconciliation. Useful for SLO monitoring and diagnosing whether
+                  reconciliation is running for a specific resource.
+                format: date-time
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent metadata.generation

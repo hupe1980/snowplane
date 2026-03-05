@@ -1,0 +1,12 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: SecondaryDatabase
+metadata:
+  name: my-replica-db
+  namespace: default
+spec:
+  providerRef:
+    name: default-pc
+  name: MY_PRIMARY_DB
+  asReplicaOf: myorg.myaccount.MY_PRIMARY_DB
+  dataRetentionTimeInDays: 7
+  comment: "Secondary replica for DR"

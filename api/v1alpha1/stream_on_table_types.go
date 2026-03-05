@@ -31,7 +31,7 @@ type StreamOnTableSpec struct {
 	// DatabaseRef references a Database CR in the same namespace.
 	// Mutually exclusive with DatabaseName. Immutable after creation.
 	// +optional
-	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
+	DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
 	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
@@ -43,7 +43,7 @@ type StreamOnTableSpec struct {
 	// SchemaRef references a Schema CR in the same namespace.
 	// Mutually exclusive with SchemaName. Immutable after creation.
 	// +optional
-	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
+	SchemaRef *ObjectReference `json:"schemaRef,omitempty"`
 
 	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// Mutually exclusive with SchemaRef. Immutable after creation.
@@ -55,7 +55,7 @@ type StreamOnTableSpec struct {
 	// TableRef references a Table CR in the same namespace.
 	// Mutually exclusive with TableName. Immutable after creation.
 	// +optional
-	TableRef *LocalObjectReference `json:"tableRef,omitempty"`
+	TableRef *ObjectReference `json:"tableRef,omitempty"`
 
 	// TableName is the Snowflake table identifier (e.g. "MY_TABLE").
 	// Mutually exclusive with TableRef. Immutable after creation.

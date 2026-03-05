@@ -1,0 +1,12 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: GrantPrivilegesToAccountRole
+metadata:
+  name: create-database-on-account
+  namespace: default
+spec:
+  privilege: CREATE DATABASE
+  on:
+    account: true
+  accountRole: SYSADMIN
+  providerRef:
+    name: default

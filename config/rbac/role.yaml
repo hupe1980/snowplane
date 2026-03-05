@@ -56,9 +56,9 @@ rules:
   - warehouses
   - accountroles
   - databaseroles
-  - accountrolegrants
-  - databaserolegrants
-  - sharegrants
+  - grantprivilegestoaccountroles
+  - grantprivilegestodatabaseroles
+  - grantprivilegestoshares
   - grantownerships
   - users
   - tables
@@ -83,6 +83,12 @@ rules:
   - pipes
   - storageintegrations
   - securityintegrations
+  - saml2integrations
+  - externaloauthintegrations
+  - apiintegrations
+  - secondarydatabases
+  - shareddatabases
+  - failovergroups
   - secretwithclientcredentials
   - secretwithauthorizationcodegrants
   - secretwithbasicauthentications
@@ -114,6 +120,7 @@ rules:
   - functionpythons
   - functionjavas
   - functionscalas
+  - sqlstatements
   verbs:
   - get
   - list
@@ -130,9 +137,9 @@ rules:
   - warehouses/status
   - accountroles/status
   - databaseroles/status
-  - accountrolegrants/status
-  - databaserolegrants/status
-  - sharegrants/status
+  - grantprivilegestoaccountroles/status
+  - grantprivilegestodatabaseroles/status
+  - grantprivilegestoshares/status
   - grantownerships/status
   - users/status
   - tables/status
@@ -157,6 +164,12 @@ rules:
   - pipes/status
   - storageintegrations/status
   - securityintegrations/status
+  - saml2integrations/status
+  - externaloauthintegrations/status
+  - apiintegrations/status
+  - secondarydatabases/status
+  - shareddatabases/status
+  - failovergroups/status
   - secretwithclientcredentials/status
   - secretwithauthorizationcodegrants/status
   - secretwithbasicauthentications/status
@@ -188,6 +201,7 @@ rules:
   - functionpythons/status
   - functionjavas/status
   - functionscalas/status
+  - sqlstatements/status
   verbs:
   - get
   - patch
@@ -200,9 +214,9 @@ rules:
   - warehouses/finalizers
   - accountroles/finalizers
   - databaseroles/finalizers
-  - accountrolegrants/finalizers
-  - databaserolegrants/finalizers
-  - sharegrants/finalizers
+  - grantprivilegestoaccountroles/finalizers
+  - grantprivilegestodatabaseroles/finalizers
+  - grantprivilegestoshares/finalizers
   - grantownerships/finalizers
   - users/finalizers
   - tables/finalizers
@@ -227,6 +241,12 @@ rules:
   - pipes/finalizers
   - storageintegrations/finalizers
   - securityintegrations/finalizers
+  - saml2integrations/finalizers
+  - externaloauthintegrations/finalizers
+  - apiintegrations/finalizers
+  - secondarydatabases/finalizers
+  - shareddatabases/finalizers
+  - failovergroups/finalizers
   - secretwithclientcredentials/finalizers
   - secretwithauthorizationcodegrants/finalizers
   - secretwithbasicauthentications/finalizers
@@ -258,5 +278,6 @@ rules:
   - functionpythons/finalizers
   - functionjavas/finalizers
   - functionscalas/finalizers
+  - sqlstatements/finalizers
   verbs:
   - update

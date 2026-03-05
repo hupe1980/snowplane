@@ -6,9 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -40,6 +43,14 @@ type ResolvedProvider struct {
 	CacheKey string // Namespace-qualified key (e.g. "system/default") for cache/metrics
 	Name     string // ProviderConfig name (e.g. "default")
 	Account  string // Snowflake account identifier (e.g. "orgname-accountname")
+
+	// AllowedDatabases is the ProviderConfig's database restriction list.
+	// Empty means all databases are allowed.
+	AllowedDatabases []string
+
+	// AllowedSchemas is the ProviderConfig's schema restriction list.
+	// Empty means all schemas are allowed. Entries may be "SCHEMA" or "DATABASE.SCHEMA".
+	AllowedSchemas []string
 }
 
 // ResolveClient resolves the Snowflake client for a managed resource by
@@ -81,8 +92,14 @@ func ResolveClient(
 		return nil, fmt.Errorf("fetching ProviderConfig: %w", err)
 	}
 
-	// Enforce AllowedNamespaces: reject if resource namespace is not permitted.
-	if !pc.Spec.IsNamespaceAllowed(namespace) {
+	// Enforce namespace restrictions: check static AllowedNamespaces list
+	// and AllowedNamespaceSelector (OR semantics).
+	if allowed, err := isNamespacePermitted(ctx, c, &pc.Spec, namespace); err != nil {
+		msg := fmt.Sprintf("namespace evaluation error for ProviderConfig %q: %v", providerRef.Name, err)
+		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonNamespaceNotAllowed, msg)
+
+		return nil, fmt.Errorf("namespace evaluation failed: %w", err)
+	} else if !allowed {
 		msg := fmt.Sprintf("namespace %q is not allowed to use ProviderConfig %q", namespace, providerRef.Name)
 		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonNamespaceNotAllowed, msg)
 
@@ -186,9 +203,111 @@ func ResolveClient(
 	}
 
 	return &ResolvedProvider{
-		Client:   sfClient,
-		CacheKey: cacheKey,
-		Name:     pc.Name,
-		Account:  pc.Spec.Account,
+		Client:           sfClient,
+		CacheKey:         cacheKey,
+		Name:             pc.Name,
+		Account:          pc.Spec.Account,
+		AllowedDatabases: pc.Spec.AllowedDatabases,
+		AllowedSchemas:   pc.Spec.AllowedSchemas,
 	}, nil
+}
+
+// isNamespacePermitted checks whether a namespace is permitted to reference a
+// ProviderConfig, evaluating both the static AllowedNamespaces list and the
+// AllowedNamespaceSelector label selector with OR semantics.
+//
+// Rules:
+//   - Neither AllowedNamespaces nor AllowedNamespaceSelector set → allow all
+//   - AllowedNamespaces matches (static list or "*") → allow
+//   - AllowedNamespaceSelector matches namespace labels → allow
+//   - Otherwise → deny
+func isNamespacePermitted(
+	ctx context.Context,
+	c client.Client,
+	spec *snowplanev1alpha1.ProviderConfigSpec,
+	namespace string,
+) (bool, error) {
+	hasStaticList := len(spec.AllowedNamespaces) > 0
+	hasSelector := spec.AllowedNamespaceSelector != nil
+
+	// No restrictions configured — allow all (backward compatible).
+	if !hasStaticList && !hasSelector {
+		return true, nil
+	}
+
+	// Check static list (no API call needed).
+	if hasStaticList {
+		for _, ns := range spec.AllowedNamespaces {
+			if ns == "*" || ns == namespace {
+				return true, nil
+			}
+		}
+	}
+
+	// Check label selector (requires Namespace object lookup).
+	if hasSelector {
+		ns := &corev1.Namespace{}
+		if err := c.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+			return false, fmt.Errorf("fetching namespace %q for selector evaluation: %w", namespace, err)
+		}
+
+		selector, err := metav1.LabelSelectorAsSelector(spec.AllowedNamespaceSelector)
+		if err != nil {
+			return false, fmt.Errorf("invalid AllowedNamespaceSelector: %w", err)
+		}
+
+		if selector.Matches(labels.Set(ns.Labels)) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// IsDatabaseAllowed checks whether a resolved database name is permitted by
+// the ProviderConfig's AllowedDatabases restriction.
+func IsDatabaseAllowed(resolved *ResolvedProvider, database string) bool {
+	if len(resolved.AllowedDatabases) == 0 {
+		return true
+	}
+
+	for _, db := range resolved.AllowedDatabases {
+		if db == "*" {
+			return true
+		}
+
+		if strings.EqualFold(db, database) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsSchemaAllowed checks whether a resolved schema name is permitted by
+// the ProviderConfig's AllowedSchemas restriction. Entries may be:
+//   - "SCHEMA" — matches the schema name in any database (case-insensitive)
+//   - "DATABASE.SCHEMA" — matches the fully-qualified name (case-insensitive)
+func IsSchemaAllowed(resolved *ResolvedProvider, database, schemaName string) bool {
+	if len(resolved.AllowedSchemas) == 0 {
+		return true
+	}
+
+	for _, entry := range resolved.AllowedSchemas {
+		if entry == "*" {
+			return true
+		}
+
+		if parts := strings.SplitN(entry, ".", 2); len(parts) == 2 {
+			if strings.EqualFold(parts[0], database) && strings.EqualFold(parts[1], schemaName) {
+				return true
+			}
+		} else {
+			if strings.EqualFold(entry, schemaName) {
+				return true
+			}
+		}
+	}
+
+	return false
 }

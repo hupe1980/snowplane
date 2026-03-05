@@ -1,0 +1,41 @@
+{{- if .Values.webhook.enabled }}
+{{- if and (not .Values.webhook.certManager.enabled) (not .Values.webhook.caBundle) }}
+  {{- fail "webhook.caBundle is required when webhook.enabled=true and webhook.certManager.enabled=false" }}
+{{- end }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "snowplane.fullname" . }}-ownership
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+  {{- if .Values.webhook.certManager.enabled }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "snowplane.fullname" . }}-webhook-cert
+  {{- end }}
+spec:
+  webhooks:
+    - name: ownership.snowplane.hupe1980.github.io
+      admissionReviewVersions: ["v1"]
+      sideEffects: None
+      matchPolicy: Equivalent
+      failurePolicy: {{ .Values.webhook.failurePolicy }}
+      timeoutSeconds: {{ .Values.webhook.timeoutSeconds }}
+      clientConfig:
+        service:
+          name: {{ include "snowplane.fullname" . }}-webhook
+          namespace: {{ .Release.Namespace }}
+          path: /validate-ownership
+        {{- if and (not .Values.webhook.certManager.enabled) .Values.webhook.caBundle }}
+        caBundle: {{ .Values.webhook.caBundle }}
+        {{- end }}
+      {{- if .Values.webhook.namespaceSelector }}
+      namespaceSelector:
+        {{- toYaml .Values.webhook.namespaceSelector | nindent 8 }}
+      {{- end }}
+      rules:
+        - apiGroups: ["snowplane.hupe1980.github.io"]
+          apiVersions: ["v1alpha1"]
+          operations: ["CREATE", "UPDATE"]
+          resources: ["*"]
+          scope: "Namespaced"
+{{- end }}

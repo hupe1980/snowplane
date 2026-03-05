@@ -157,18 +157,41 @@ func (c *Config) ZeroizeCredentials() {
 // This ensures that Snowflake driver errors are automatically mapped to
 // sentinel errors (e.g. ErrObjectNotExistOrNotAuthorized), matching the
 // error-mapping behavior of Exec and Query.
+//
+// When err is set (via NewErrorRow), Scan and Err return that error
+// without touching the underlying sql.Row. This allows test mocks to
+// return a safe Row that reports a fixed error instead of returning nil.
 type Row struct {
 	row *sql.Row
+	err error // preset error — returned by Scan/Err when non-nil
+}
+
+// NewErrorRow returns a Row that always returns the given error from
+// Scan and Err. Use this in test mocks instead of returning nil from
+// QueryRow, which would cause nil-pointer panics in callers that chain
+// QueryRow(...).Scan(...).
+func NewErrorRow(err error) *Row {
+	return &Row{err: err}
 }
 
 // Scan delegates to the underlying sql.Row.Scan and maps any Snowflake
-// driver error to the corresponding sentinel error.
+// driver error to the corresponding sentinel error. If the Row was
+// created via NewErrorRow, the preset error is returned directly.
 func (r *Row) Scan(dest ...any) error {
+	if r.err != nil {
+		return r.err
+	}
+
 	return MapSnowflakeError(r.row.Scan(dest...))
 }
 
-// Err delegates to the underlying sql.Row.Err.
+// Err delegates to the underlying sql.Row.Err. If the Row was created
+// via NewErrorRow, the preset error is returned directly.
 func (r *Row) Err() error {
+	if r.err != nil {
+		return r.err
+	}
+
 	return MapSnowflakeError(r.row.Err())
 }
 
@@ -411,8 +434,15 @@ func (c *Client) WithRole(ctx context.Context, role string) (*Client, func(conte
 	}
 
 	cleanup := func(ctx context.Context) {
+		// Use a detached context so role restoration completes even when the
+		// parent context is cancelled (e.g., reconciler returned early).
+		// Without this, a cancelled context would cause the USE ROLE restore
+		// to fail, leaving the pooled connection with the wrong role active.
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+
 		// Restore the original role so the pooled connection is returned in a clean state.
-		if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE ROLE %s", quoteIdentifier(originalRole))); err != nil {
+		if _, err := conn.ExecContext(cleanupCtx, fmt.Sprintf("USE ROLE %s", quoteIdentifier(originalRole))); err != nil {
 			slog.Debug("error restoring role on pooled connection", "role", originalRole, "error", err)
 		}
 

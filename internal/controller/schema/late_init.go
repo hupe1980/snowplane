@@ -6,9 +6,9 @@ import (
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 )
 
-// LateInitialize fills nil spec fields from the observed Snowflake state.
+// lateInitialize fills nil spec fields from the observed Snowflake state.
 // Only called during adoption (adoptionPolicy=adopt, first reconcile).
-func (a *adapter) LateInitialize(obj *snowplanev1alpha1.Schema, obs *reconciler.Observation[*snowflake.SchemaObservation]) bool {
+func lateInitialize(obj *snowplanev1alpha1.Schema, obs *reconciler.Observation[*snowflake.SchemaObservation]) bool {
 	detail := obs.Detail
 	if detail == nil {
 		return false
@@ -71,4 +71,4 @@ func (a *adapter) LateInitialize(obj *snowplanev1alpha1.Schema, obs *reconciler.
 	return modified
 }
 
-var _ reconciler.LateInitializer[*snowplanev1alpha1.Schema, *snowflake.SchemaObservation] = (*adapter)(nil)
+var _ reconciler.LateInitializer[*snowplanev1alpha1.Schema, *snowflake.SchemaObservation] = (*reconciler.BaseAdapter[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation])(nil)

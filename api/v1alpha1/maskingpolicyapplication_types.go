@@ -39,7 +39,7 @@ type MaskingPolicyApplicationSpec struct {
 	// When set, the policy name is resolved from the CR's fullyQualifiedName.
 	// Mutually exclusive with PolicyName.
 	// +optional
-	PolicyRef *LocalObjectReference `json:"policyRef,omitempty"`
+	PolicyRef *ObjectReference `json:"policyRef,omitempty"`
 
 	// TableName is the fully qualified Snowflake table name
 	// (e.g. "MY_DB"."MY_SCHEMA"."MY_TABLE").

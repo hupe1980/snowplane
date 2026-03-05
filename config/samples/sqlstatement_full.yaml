@@ -1,0 +1,25 @@
+# SQLStatement with observe, expectations, and revert.
+# Full lifecycle: execute on create, observe for drift detection, revert on delete.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: SQLStatement
+metadata:
+  name: grant-select-on-analytics
+  namespace: snowplane-system
+spec:
+  providerRef:
+    name: default
+  # The SQL to execute when the resource is created.
+  execute: |
+    GRANT SELECT ON ALL TABLES IN SCHEMA MY_DB.ANALYTICS TO ROLE ANALYST_ROLE
+  # The SQL to run on delete to undo the execute.
+  revert: |
+    REVOKE SELECT ON ALL TABLES IN SCHEMA MY_DB.ANALYTICS FROM ROLE ANALYST_ROLE
+  # The SQL to run periodically to check if the executed state still holds.
+  observe: |
+    SHOW GRANTS ON SCHEMA MY_DB.ANALYTICS
+  # Expectations that the observe query result must satisfy.
+  observeExpect:
+    - column: privilege
+      value: SELECT
+    - column: grantee_name
+      value: ANALYST_ROLE

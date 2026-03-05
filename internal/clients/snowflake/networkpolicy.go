@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -14,16 +15,7 @@ type NetworkPolicyObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW NETWORK POLICIES row.
-	ShowOutput *NetworkPolicyShowOutput
-}
-
-// NetworkPolicyShowOutput contains the fields from SHOW NETWORK POLICIES.
-type NetworkPolicyShowOutput struct {
-	CreatedOn              string
-	Name                   string
-	Comment                string
-	EntriesInAllowedIPList string
-	EntriesInBlockedIPList string
+	ShowOutput *v1alpha1.NetworkPolicyShowOutput
 }
 
 // CreateNetworkPolicyOptions holds the parameters for creating a network policy.
@@ -192,7 +184,7 @@ func buildShowNetworkPolicyByIDSQL(name AccountObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW NETWORK POLICIES for a specific policy.
-func (np *NetworkPolicyClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*NetworkPolicyShowOutput, error) {
+func (np *NetworkPolicyClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*v1alpha1.NetworkPolicyShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("network policy name is required"))
 	}
@@ -224,9 +216,9 @@ func (np *NetworkPolicyClient) Observe(ctx context.Context, name AccountObjectId
 }
 
 // scanNetworkPolicyShowOutput scans SHOW NETWORK POLICIES results for a matching row.
-func scanNetworkPolicyShowOutput(rows *sql.Rows, name string) (*NetworkPolicyShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*NetworkPolicyShowOutput, error) {
-		return &NetworkPolicyShowOutput{
+func scanNetworkPolicyShowOutput(rows *sql.Rows, name string) (*v1alpha1.NetworkPolicyShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.NetworkPolicyShowOutput, error) {
+		return &v1alpha1.NetworkPolicyShowOutput{
 			CreatedOn:              m["created_on"],
 			Name:                   m["name"],
 			Comment:                m["comment"],

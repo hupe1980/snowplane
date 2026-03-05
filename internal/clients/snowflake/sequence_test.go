@@ -87,6 +87,38 @@ func TestCreateSequenceOptions_Validate(t *testing.T) {
 		opts := CreateSequenceOptions{}
 		require.Error(t, opts.Validate())
 	})
+
+	t.Run("ValidOrdering_ORDER", func(t *testing.T) {
+		t.Parallel()
+		ordering := "ORDER"
+		opts := CreateSequenceOptions{
+			Name:     NewSchemaObjectIdentifier("DB", "SCH", "SEQ"),
+			Ordering: &ordering,
+		}
+		require.NoError(t, opts.Validate())
+	})
+
+	t.Run("ValidOrdering_NOORDER", func(t *testing.T) {
+		t.Parallel()
+		ordering := "NOORDER"
+		opts := CreateSequenceOptions{
+			Name:     NewSchemaObjectIdentifier("DB", "SCH", "SEQ"),
+			Ordering: &ordering,
+		}
+		require.NoError(t, opts.Validate())
+	})
+
+	t.Run("InvalidOrdering", func(t *testing.T) {
+		t.Parallel()
+		ordering := "INVALID"
+		opts := CreateSequenceOptions{
+			Name:     NewSchemaObjectIdentifier("DB", "SCH", "SEQ"),
+			Ordering: &ordering,
+		}
+		err := opts.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid ordering")
+	})
 }
 
 func TestBuildAlterSequenceStatements(t *testing.T) {
@@ -160,6 +192,18 @@ func TestAlterSequenceOptions_Validate(t *testing.T) {
 		t.Parallel()
 		opts := AlterSequenceOptions{}
 		require.Error(t, opts.Validate())
+	})
+
+	t.Run("InvalidOrdering", func(t *testing.T) {
+		t.Parallel()
+		ordering := "DROP"
+		opts := AlterSequenceOptions{
+			Name:     NewSchemaObjectIdentifier("DB", "SCH", "SEQ"),
+			Ordering: &ordering,
+		}
+		err := opts.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid ordering")
 	})
 }
 

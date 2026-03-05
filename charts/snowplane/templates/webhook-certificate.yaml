@@ -1,0 +1,36 @@
+{{- if and .Values.webhook.enabled .Values.webhook.certManager.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "snowplane.fullname" . }}-selfsigned
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "snowplane.fullname" . }}-webhook-cert
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "snowplane.fullname" . }}-webhook-cert
+  duration: {{ .Values.webhook.certManager.duration | default "2160h" }}
+  renewBefore: {{ .Values.webhook.certManager.renewBefore | default "720h" }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    {{- if .Values.webhook.certManager.issuerRef }}
+    {{- toYaml .Values.webhook.certManager.issuerRef | nindent 4 }}
+    {{- else }}
+    name: {{ include "snowplane.fullname" . }}-selfsigned
+    kind: Issuer
+    {{- end }}
+  dnsNames:
+    - {{ include "snowplane.fullname" . }}-webhook.{{ .Release.Namespace }}.svc
+    - {{ include "snowplane.fullname" . }}-webhook.{{ .Release.Namespace }}.svc.cluster.local
+{{- end }}

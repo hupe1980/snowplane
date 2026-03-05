@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -27,7 +28,7 @@ type APIAuthenticationIntegrationObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW SECURITY INTEGRATIONS row.
-	ShowOutput *SecurityIntegrationShowOutput
+	ShowOutput *v1alpha1.SecurityIntegrationShowOutput
 
 	// DescribeOutput contains the DESCRIBE INTEGRATION output (key-value pairs).
 	DescribeOutput map[string]string
@@ -318,7 +319,7 @@ func (c *APIAuthenticationIntegrationClient) Drop(ctx context.Context, name Acco
 }
 
 // ShowByID queries SHOW SECURITY INTEGRATIONS for a specific API authentication integration.
-func (c *APIAuthenticationIntegrationClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*SecurityIntegrationShowOutput, error) {
+func (c *APIAuthenticationIntegrationClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*v1alpha1.SecurityIntegrationShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("API authentication integration name is required"))
 	}

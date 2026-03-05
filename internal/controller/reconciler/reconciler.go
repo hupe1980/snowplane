@@ -2,6 +2,7 @@ package reconciler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/circuitbreaker"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/metrics"
 	"github.com/hupe1980/snowplane/internal/provider"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
@@ -197,7 +199,10 @@ func (r *GenericReconciler[T, S, D]) SetupWithManager(mgr ctrl.Manager, maxConcu
 	// Let the adapter add resource-specific watches (e.g., Schema -> Database).
 	if wc, ok := r.Adapter.(WatchConfigurer); ok {
 		if fn := wc.SetupWatches(); fn != nil {
-			if err := fn(context.Background(), mgr, bldr); err != nil {
+			setupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			if err := fn(setupCtx, mgr, bldr); err != nil {
 				return fmt.Errorf("setting up watches for %s: %w", r.Adapter.ResourceName(), err)
 			}
 		}
@@ -224,6 +229,8 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 			reconcileResult = "error"
 		} else if conditions.IsTerminal(obj) {
 			reconcileResult = "terminal"
+		} else if obj.GetPaused() {
+			reconcileResult = "paused"
 		}
 
 		metrics.RecordReconcile(resName, reconcileResult)
@@ -258,6 +265,8 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 		logger.Info("reconciliation paused", "name", obj.GetName(), resName, obj.GetSpecName())
 		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonReconcilePaused,
 			"Reconciliation is paused via spec.paused — no Snowflake operations will be performed")
+		r.Recorder.Event(obj, corev1.EventTypeNormal, snowplanev1alpha1.ReasonReconcilePaused,
+			fmt.Sprintf("%s %q reconciliation paused", resName, obj.GetSpecName()))
 		r.bestEffortPatchStatus(ctx, obj)
 
 		return ctrl.Result{}, nil
@@ -271,6 +280,8 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 			logger.Info("pre-reconcile failed, will retry", "error", err)
 			conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDependencyNotReady, fmt.Sprintf("pre-reconcile failed: %v", err))
 			conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonDependencyNotReady, err.Error())
+			r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonDependencyNotReady,
+				fmt.Sprintf("Pre-reconcile failed for %s %q: %v", resName, obj.GetSpecName(), err))
 			r.bestEffortPatchStatus(ctx, obj)
 			// Return the error to controller-runtime for exponential backoff
 			// instead of a fixed 10s requeue interval.
@@ -319,6 +330,32 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 	// L-3: Enrich logger with provider metadata for multi-account log correlation.
 	logger = logger.WithValues("provider", resolved.Name, "account", resolved.Account)
 
+	// F7: Enforce AllowedDatabases / AllowedSchemas restrictions from the ProviderConfig.
+	// Only runs for resources that implement ScopedResource (schema-scoped CRDs).
+	if scoped, ok := any(obj).(ScopedResource); ok {
+		if dbName := scoped.GetScopeDatabaseName(); dbName != "" {
+			if !provider.IsDatabaseAllowed(resolved, dbName) {
+				msg := fmt.Sprintf("database %q is not allowed by ProviderConfig %q", dbName, resolved.Name)
+				conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDatabaseNotAllowed, msg)
+				conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonDatabaseNotAllowed, msg)
+				r.bestEffortPatchStatus(ctx, obj)
+
+				return ctrl.Result{}, fmt.Errorf("database not allowed: %s", msg)
+			}
+
+			if schemaName := scoped.GetScopeSchemaName(); schemaName != "" {
+				if !provider.IsSchemaAllowed(resolved, dbName, schemaName) {
+					msg := fmt.Sprintf("schema %q.%q is not allowed by ProviderConfig %q", dbName, schemaName, resolved.Name)
+					conditions.SetNotReady(obj, snowplanev1alpha1.ReasonSchemaNotAllowed, msg)
+					conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonSchemaNotAllowed, msg)
+					r.bestEffortPatchStatus(ctx, obj)
+
+					return ctrl.Result{}, fmt.Errorf("schema not allowed: %s", msg)
+				}
+			}
+		}
+	}
+
 	// Resolve use role.
 	useRole := ""
 	if or := obj.GetUseRole(); or != nil {
@@ -343,6 +380,23 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 
 	if cleanup != nil {
 		defer cleanup(ctx)
+	}
+
+	// F8: Pre-flight existence check for raw databaseName/schemaName.
+	// Runs after ServiceFromClient so a Snowflake client is available.
+	// For any ScopedResource (38 types), the reconciler automatically
+	// checks database/schema existence when raw names are used (ref-based
+	// resolution already validates existence via CR readiness).
+	// Adapters can also implement PreFlightChecker for custom checks.
+	if err := r.runPreFlightChecks(ctx, logger, sfClient, obj); err != nil {
+		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDependencyNotReady,
+			fmt.Sprintf("pre-flight check failed: %v", err))
+		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonDependencyNotReady, err.Error())
+		r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonDependencyNotReady,
+			fmt.Sprintf("Pre-flight check failed for %s %q: %v", resName, obj.GetSpecName(), err))
+		r.bestEffortPatchStatus(ctx, obj)
+
+		return ctrl.Result{}, err
 	}
 
 	id, err := r.Adapter.BuildIdentifier(obj)
@@ -459,6 +513,62 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 	return r.reconcileUpdate(ctx, obj, svc, id, obs)
 }
 
+// runPreFlightChecks verifies that prerequisite Snowflake resources exist
+// before the main reconciliation begins. It supports two mechanisms:
+//
+//  1. Automatic checks: If the managed resource implements ScopedResource,
+//     the reconciler automatically verifies database/schema existence when
+//     raw databaseName/schemaName strings are used (ref-based resolution
+//     already validates existence via CR readiness in PreReconcile).
+//
+//  2. Adapter-specific checks: If the adapter implements PreFlightChecker,
+//     its PreFlightCheck method is called after the automatic checks.
+//     This is for non-standard pre-flight requirements only.
+//
+// Definitive "not found" errors (ErrDatabaseNotFound, ErrSchemaNotFound)
+// cause a hard failure. Non-definitive errors (connection timeouts, etc.)
+// are logged and skipped — the subsequent service creation will surface
+// the same connectivity issues with proper error handling.
+func (r *GenericReconciler[T, S, D]) runPreFlightChecks(ctx context.Context, logger logr.Logger, sfClient clientfactory.SnowflakeClient, obj T) error {
+	// Automatic pre-flight for all ScopedResource types (38 types).
+	if scoped, ok := any(obj).(ScopedResource); ok {
+		if err := refresolver.PreFlightCheckDatabaseExists(ctx, sfClient, scoped.GetSpecDatabaseRef(), scoped.GetSpecDatabaseName()); err != nil {
+			if errors.Is(err, refresolver.ErrDatabaseNotFound) {
+				logger.Info("pre-flight database check failed", "error", err)
+				return err
+			}
+
+			logger.V(1).Info("pre-flight database check skipped (non-definitive error)", "error", err)
+		}
+
+		if scoped.GetSpecSchemaName() != nil {
+			dbName := ""
+			if n := scoped.GetSpecDatabaseName(); n != nil {
+				dbName = *n
+			}
+
+			if err := refresolver.PreFlightCheckSchemaExists(ctx, sfClient, dbName, scoped.GetSpecSchemaRef(), scoped.GetSpecSchemaName()); err != nil {
+				if errors.Is(err, refresolver.ErrSchemaNotFound) {
+					logger.Info("pre-flight schema check failed", "error", err)
+					return err
+				}
+
+				logger.V(1).Info("pre-flight schema check skipped (non-definitive error)", "error", err)
+			}
+		}
+	}
+
+	// Adapter-specific pre-flight checks (non-standard requirements).
+	if pfc, ok := r.Adapter.(PreFlightChecker[T]); ok {
+		if err := pfc.PreFlightCheck(ctx, sfClient, obj); err != nil {
+			logger.Info("adapter pre-flight check failed", "error", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T, statusBase T, svc S, id Identifier) (ctrl.Result, error) {
 	resName := r.Adapter.ResourceName()
 	logger := log.FromContext(ctx)
@@ -470,9 +580,18 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 	if !hasCreationInitiated(obj) {
 		setCreationInitiated(obj)
 
-		// Stamp ownership label for same-cluster conflict detection.
+		// Stamp ownership label and check for same-cluster conflicts
+		// before issuing the Snowflake CREATE.
 		fqn := id.FullyQualifiedName()
-		setExternalNameLabel(obj, ComputeExternalNameHash(fqn))
+		hash := ComputeExternalNameHash(fqn)
+
+		if conflict, err := r.checkOwnershipConflict(ctx, obj, hash); err != nil {
+			return ctrl.Result{}, fmt.Errorf("checking ownership conflict during create: %w", err)
+		} else if conflict {
+			return ctrl.Result{}, nil // Terminal — do not requeue; ConflictDetected condition is set.
+		}
+
+		setExternalNameLabel(obj, hash)
 
 		// PATCH a copy rather than obj so that in-memory status mutations
 		// from PreReconcile (e.g. Schema.Status.DatabaseName) are preserved.
@@ -547,7 +666,7 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 		var e error
 		postObs, e = r.Adapter.Observe(opCtx, svc, id)
 		return e
-	}); err != nil || !postObs.Exists {
+	}); err != nil || postObs == nil || !postObs.Exists {
 		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonCreating, resName+" created but not yet observable")
 		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonCreating, "awaiting post-create verification")
 
@@ -766,7 +885,7 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 			var e error
 			reObs, e = r.Adapter.Observe(opCtx, svc, id)
 			return e
-		}); err == nil && reObs.Exists {
+		}); err == nil && reObs != nil && reObs.Exists {
 			r.Adapter.ApplyObservation(obj, reObs)
 		}
 	}
@@ -978,7 +1097,19 @@ func (r *GenericReconciler[T, S, D]) reconcileDelete(ctx context.Context, obj T,
 			if err := metrics.ObserveSnowflakeOp(resName, "drop", func() error {
 				return sfretry.Do(opCtx, sfretry.DefaultOptions(), func() error {
 					if cascade {
-						if cd, ok := any(r.Adapter).(CascadeDropper[T, S]); ok {
+						// Determine cascade support. CascadeDropSupporter
+						// (implemented by BaseAdapter) gives an explicit answer.
+						// Non-BaseAdapter adapters that implement CascadeDropper
+						// are assumed to support cascade.
+						supportsCascade := false
+						if cds, ok := any(r.Adapter).(CascadeDropSupporter); ok {
+							supportsCascade = cds.SupportsCascadeDrop()
+						} else if _, ok := any(r.Adapter).(CascadeDropper[T, S]); ok {
+							supportsCascade = true
+						}
+
+						if supportsCascade {
+							cd := any(r.Adapter).(CascadeDropper[T, S]) // guaranteed by SupportsCascadeDrop
 							logger.Info("cascade DROP requested via force-destroy annotation",
 								"resource", resName, "name", obj.GetSpecName())
 							r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonDeleting,

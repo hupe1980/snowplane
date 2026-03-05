@@ -3,14 +3,20 @@ package fileformat
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	sigs "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/tracked"
@@ -35,44 +41,166 @@ type Service interface {
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
 // NewReconciler returns a new FileFormat reconciler.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.FileFormat, Service, *snowflake.FileFormatObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.FileFormat, Service, *snowflake.FileFormatObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+func NewReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.FileFormat, Service, *snowflake.FileFormatObservation] {
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewFileFormatClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
 // supply a custom ServiceFactory for testing.
 func NewReconcilerWithServiceFactory(
-	c client.Client,
+	c sigs.Client,
 	factory *clientfactory.ClientFactory,
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.FileFormat, Service, *snowflake.FileFormatObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.FileFormat, Service, *snowflake.FileFormatObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, recorder, sf))
+}
+
+// newAdapter creates the BaseAdapter for FileFormat resources.
+func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.FileFormat, Service, *snowflake.FileFormatObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.FileFormat, Service, *snowflake.FileFormatObservation]{
+		ResourceNameVal:  "fileformat",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.FileFormat { return &snowplanev1alpha1.FileFormat{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(ff *snowplanev1alpha1.FileFormat) (reconciler.Identifier, error) {
+			dbName := snowflake.ParseDatabaseNameFromFQN(ff.Status.DatabaseName)
+			schemaName := snowflake.ParseSchemaNameFromFQN(ff.Status.SchemaName)
+			return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, ff.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) (*snowflake.FileFormatObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.FileFormatObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.FileFormat, id snowflake.SchemaObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterFileFormatOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.FileFormat, id snowflake.SchemaObjectIdentifier, obs *reconciler.Observation[*snowflake.FileFormatObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.FileFormat, obs *reconciler.Observation[*snowflake.FileFormatObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.FileFormat, obs *reconciler.Observation[*snowflake.FileFormatObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		SupportsCoA: true,
+		PreReconcileFn: func(ctx context.Context, ff *snowplanev1alpha1.FileFormat) error {
+			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, ff,
+				ff.Namespace, ff.Spec.DatabaseRef, ff.Spec.DatabaseName, ff.Status.DatabaseName)
+			if err != nil {
+				return err
+			}
+
+			ff.Status.DatabaseName = dbFQN
+
+			schemaFQN, err := refresolver.PreReconcileSchemaRef(ctx, c, recorder, ff,
+				ff.Namespace, ff.Spec.SchemaRef, ff.Spec.SchemaName, ff.Status.SchemaName)
+			if err != nil {
+				return err
+			}
+
+			ff.Status.SchemaName = schemaFQN
+
+			refresolver.SetDatabaseAndSchemaResolvedCondition(ff, ff.Spec.DatabaseRef, ff.Spec.DatabaseName, ff.Spec.SchemaRef, ff.Spec.SchemaName)
+
+			return nil
+		},
+		SetupWatchesFn: func(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.FileFormat{},
+				".spec.databaseRef.name",
+				func(o sigs.Object) []string {
+					s, ok := o.(*snowplanev1alpha1.FileFormat)
+					if !ok || s.Spec.DatabaseRef == nil {
+						return nil
+					}
+
+					return []string{s.Spec.DatabaseRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.databaseRef.name: %w", err)
+			}
+
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.FileFormat{},
+				".spec.schemaRef.name",
+				func(o sigs.Object) []string {
+					s, ok := o.(*snowplanev1alpha1.FileFormat)
+					if !ok || s.Spec.SchemaRef == nil {
+						return nil
+					}
+
+					return []string{s.Spec.SchemaRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.schemaRef.name: %w", err)
+			}
+
+			bldr.Watches(
+				&snowplanev1alpha1.Database{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.FileFormatList{} }, ".spec.databaseRef.name", "listing fileformats for database watch")),
+			)
+
+			bldr.Watches(
+				&snowplanev1alpha1.Schema{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.FileFormatList{} }, ".spec.schemaRef.name", "listing fileformats for schema watch")),
+			)
+
+			return nil
+		},
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+func validateImmutableFields(_ context.Context, ff *snowplanev1alpha1.FileFormat) error {
+	if reconciler.ShouldSkipImmutableValidation(ff) {
+		return nil
 	}
 
-	return snowflake.NewFileFormatClient(sfC), cleanup, nil
+	if ff.Status.ShowOutput != nil {
+		if ff.Status.ShowOutput.Name != "" && !strings.EqualFold(ff.Spec.Name, ff.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", ff.Status.ShowOutput.Name, ff.Spec.Name)
+		}
+
+		if ff.Status.ShowOutput.DatabaseName != "" && ff.Status.DatabaseName != "" {
+			resolvedDB := snowflake.ParseDatabaseNameFromFQN(ff.Status.DatabaseName)
+			if !strings.EqualFold(resolvedDB, ff.Status.ShowOutput.DatabaseName) {
+				return fmt.Errorf("spec.databaseRef is immutable after creation (current database: %q, resolved: %q)", ff.Status.ShowOutput.DatabaseName, resolvedDB)
+			}
+		}
+
+		if ff.Status.ShowOutput.SchemaName != "" && ff.Status.SchemaName != "" {
+			resolvedSchema := snowflake.ParseSchemaNameFromFQN(ff.Status.SchemaName)
+			if !strings.EqualFold(resolvedSchema, ff.Status.ShowOutput.SchemaName) {
+				return fmt.Errorf("spec.schemaRef is immutable after creation (current schema: %q, resolved: %q)", ff.Status.ShowOutput.SchemaName, resolvedSchema)
+			}
+		}
+
+		if ff.Status.ShowOutput.Type != "" && !strings.EqualFold(string(ff.Spec.Type), ff.Status.ShowOutput.Type) {
+			return fmt.Errorf("spec.type is immutable after creation (current: %q, desired: %q)", ff.Status.ShowOutput.Type, ff.Spec.Type)
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(ff *snowplanev1alpha1.FileFormat, obs *snowflake.FileFormatObservation) {
@@ -85,15 +213,7 @@ func applyObservation(ff *snowplanev1alpha1.FileFormat, obs *snowflake.FileForma
 		ff.Status.DatabaseName = obs.ShowOutput.DatabaseName
 		ff.Status.SchemaName = obs.ShowOutput.SchemaName
 
-		ff.Status.ShowOutput = &snowplanev1alpha1.FileFormatShowOutput{
-			CreatedOn:    obs.ShowOutput.CreatedOn,
-			Name:         obs.ShowOutput.Name,
-			DatabaseName: obs.ShowOutput.DatabaseName,
-			SchemaName:   obs.ShowOutput.SchemaName,
-			Owner:        obs.ShowOutput.Owner,
-			Comment:      obs.ShowOutput.Comment,
-			Type:         obs.ShowOutput.Type,
-		}
+		ff.Status.ShowOutput = obs.ShowOutput
 	}
 }
 

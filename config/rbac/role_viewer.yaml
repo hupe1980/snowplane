@@ -15,9 +15,9 @@ rules:
   - warehouses
   - accountroles
   - databaseroles
-  - accountrolegrants
-  - databaserolegrants
-  - sharegrants
+  - grantprivilegestoaccountroles
+  - grantprivilegestodatabaseroles
+  - grantprivilegestoshares
   - grantownerships
   - users
   - tables
@@ -42,6 +42,12 @@ rules:
   - pipes
   - storageintegrations
   - securityintegrations
+  - saml2integrations
+  - externaloauthintegrations
+  - apiintegrations
+  - secondarydatabases
+  - shareddatabases
+  - failovergroups
   - passwordpolicies
   - authenticationpolicies
   - networkrules
@@ -66,6 +72,7 @@ rules:
   - functionpythons
   - functionjavas
   - functionscalas
+  - sqlstatements
   - secretwithclientcredentials
   - secretwithauthorizationcodegrants
   - secretwithbasicauthentications
@@ -85,9 +92,9 @@ rules:
   - warehouses/status
   - accountroles/status
   - databaseroles/status
-  - accountrolegrants/status
-  - databaserolegrants/status
-  - sharegrants/status
+  - grantprivilegestoaccountroles/status
+  - grantprivilegestodatabaseroles/status
+  - grantprivilegestoshares/status
   - grantownerships/status
   - users/status
   - tables/status
@@ -112,6 +119,12 @@ rules:
   - pipes/status
   - storageintegrations/status
   - securityintegrations/status
+  - saml2integrations/status
+  - externaloauthintegrations/status
+  - apiintegrations/status
+  - secondarydatabases/status
+  - shareddatabases/status
+  - failovergroups/status
   - passwordpolicies/status
   - authenticationpolicies/status
   - networkrules/status
@@ -136,6 +149,7 @@ rules:
   - functionpythons/status
   - functionjavas/status
   - functionscalas/status
+  - sqlstatements/status
   - secretwithclientcredentials/status
   - secretwithauthorizationcodegrants/status
   - secretwithbasicauthentications/status

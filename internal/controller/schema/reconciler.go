@@ -3,14 +3,20 @@ package schema
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	sigs "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/tracked"
@@ -38,45 +44,136 @@ type Service interface {
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
 // NewReconciler returns a new Schema reconciler backed by the generic framework.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+func NewReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation] {
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewSchemaClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
 // supply a custom ServiceFactory. This is intended for integration tests that
 // inject mock Snowflake services while still going through SetupWithManager.
 func NewReconcilerWithServiceFactory(
-	c client.Client,
+	c sigs.Client,
 	factory *clientfactory.ClientFactory,
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, recorder, sf))
+}
+
+// newAdapter creates the BaseAdapter for Schema resources.
+func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation]{
+		ResourceNameVal:  "schema",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.Schema { return &snowplanev1alpha1.Schema{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(schema *snowplanev1alpha1.Schema) (reconciler.Identifier, error) {
+			dbName := snowflake.ParseDatabaseNameFromFQN(schema.Status.DatabaseName)
+			return snowflake.NewDatabaseObjectIdentifier(dbName, schema.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.DatabaseObjectIdentifier) (*snowflake.SchemaObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.SchemaObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.Schema, id snowflake.DatabaseObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterSchemaOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.DatabaseObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		DropCascadeFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.DatabaseObjectIdentifier) error {
+			return svc.DropCascade(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.Schema, id snowflake.DatabaseObjectIdentifier, obs *reconciler.Observation[*snowflake.SchemaObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.Schema, obs *reconciler.Observation[*snowflake.SchemaObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.Schema, obs *reconciler.Observation[*snowflake.SchemaObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		SupportsCoA:      true,
+		LateInitializeFn: lateInitialize,
+		PreReconcileFn: func(ctx context.Context, schema *snowplanev1alpha1.Schema) error {
+			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, schema,
+				schema.Namespace, schema.Spec.DatabaseRef, schema.Spec.DatabaseName, schema.Status.DatabaseName)
+			if err != nil {
+				return err
+			}
+
+			schema.Status.DatabaseName = dbFQN
+
+			refresolver.SetDatabaseResolvedCondition(schema, schema.Spec.DatabaseRef, schema.Spec.DatabaseName, dbFQN)
+
+			return nil
+		},
+		SetupWatchesFn: func(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.Schema{},
+				".spec.databaseRef.name",
+				func(o sigs.Object) []string {
+					sch, ok := o.(*snowplanev1alpha1.Schema)
+					if !ok || sch.Spec.DatabaseRef == nil {
+						return nil
+					}
+
+					return []string{sch.Spec.DatabaseRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.databaseRef.name: %w", err)
+			}
+
+			bldr.Watches(
+				&snowplanev1alpha1.Database{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.SchemaList{} }, ".spec.databaseRef.name", "listing schemas for database watch")),
+			)
+
+			return nil
+		},
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory used by NewReconciler.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+func validateImmutableFields(_ context.Context, schema *snowplanev1alpha1.Schema) error {
+	if reconciler.ShouldSkipImmutableValidation(schema) {
+		return nil
 	}
 
-	return snowflake.NewSchemaClient(sfC), cleanup, nil
+	if schema.Status.ShowOutput != nil {
+		isTransient := schema.Status.ShowOutput.Kind == "TRANSIENT"
+		if schema.Spec.Transient != isTransient {
+			return fmt.Errorf("spec.transient is immutable after creation (current: %v, desired: %v)", isTransient, schema.Spec.Transient)
+		}
+
+		if schema.Status.ShowOutput.Name != "" && !strings.EqualFold(schema.Spec.Name, schema.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", schema.Status.ShowOutput.Name, schema.Spec.Name)
+		}
+
+		if schema.Status.ShowOutput.DatabaseName != "" && schema.Status.DatabaseName != "" {
+			resolvedDB := snowflake.ParseDatabaseNameFromFQN(schema.Status.DatabaseName)
+			if !strings.EqualFold(resolvedDB, schema.Status.ShowOutput.DatabaseName) {
+				return fmt.Errorf("spec.databaseRef is immutable after creation (current database: %q, resolved: %q)", schema.Status.ShowOutput.DatabaseName, resolvedDB)
+			}
+		}
+
+	}
+
+	return nil
 }
 
 func applyObservation(schema *snowplanev1alpha1.Schema, obs *snowflake.SchemaObservation) {
@@ -87,16 +184,7 @@ func applyObservation(schema *snowplanev1alpha1.Schema, obs *snowflake.SchemaObs
 		).FullyQualifiedName()
 		schema.Status.DatabaseName = obs.ShowOutput.DatabaseName
 
-		schema.Status.ShowOutput = &snowplanev1alpha1.SchemaShowOutput{
-			CreatedOn:     obs.ShowOutput.CreatedOn,
-			Name:          obs.ShowOutput.Name,
-			DatabaseName:  obs.ShowOutput.DatabaseName,
-			Kind:          obs.ShowOutput.Kind,
-			Comment:       obs.ShowOutput.Comment,
-			Owner:         obs.ShowOutput.Owner,
-			RetentionTime: obs.ShowOutput.RetentionTime,
-			Options:       obs.ShowOutput.Options,
-		}
+		schema.Status.ShowOutput = obs.ShowOutput
 	}
 }
 
@@ -151,7 +239,7 @@ func buildAlterOptions(schema *snowplanev1alpha1.Schema, id snowflake.DatabaseOb
 
 	// Diff ManagedAccess: compare desired vs observed.
 	if obs.ShowOutput != nil {
-		observed := obs.ShowOutput.IsManagedAccess()
+		observed := snowflake.IsManagedAccess(obs.ShowOutput)
 		if schema.Spec.ManagedAccess != observed {
 			opts.SetManagedAccess = &schema.Spec.ManagedAccess
 		}
@@ -231,7 +319,7 @@ func detectDrift(schema *snowplanev1alpha1.Schema, obs *snowflake.SchemaObservat
 
 		// Mutable fields.
 		d.CompareString("COMMENT", schema.Spec.Comment, obs.ShowOutput.Comment, false)
-		d.CompareBoolValue("MANAGED_ACCESS", schema.Spec.ManagedAccess, obs.ShowOutput.IsManagedAccess(), false)
+		d.CompareBoolValue("MANAGED_ACCESS", schema.Spec.ManagedAccess, snowflake.IsManagedAccess(obs.ShowOutput), false)
 	}
 
 	if obs.Parameters != nil {

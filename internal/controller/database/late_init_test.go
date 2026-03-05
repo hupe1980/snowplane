@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -26,14 +27,12 @@ func newDatabase() *snowplanev1alpha1.Database {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newDatabase()
 		obs := &reconciler.Observation[*snowflake.DatabaseObservation]{
 			Exists: true,
 			Detail: &snowflake.DatabaseObservation{
-				ShowOutput: &snowflake.DatabaseShowOutput{
+				ShowOutput: &snowplanev1alpha1.DatabaseShowOutput{
 					Comment: "existing comment",
 				},
 				Parameters: &snowflake.DatabaseParameters{
@@ -51,7 +50,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 
 		assert.Equal(t, "existing comment", *obj.Spec.Comment)
@@ -75,7 +74,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.DatabaseObservation]{
 			Exists: true,
 			Detail: &snowflake.DatabaseObservation{
-				ShowOutput: &snowflake.DatabaseShowOutput{
+				ShowOutput: &snowplanev1alpha1.DatabaseShowOutput{
 					Comment: "snowflake comment",
 				},
 				Parameters: &snowflake.DatabaseParameters{
@@ -85,7 +84,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified) // MaxDataExtensionTimeInDays was set
 
 		// Existing fields preserved
@@ -117,7 +116,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.DatabaseObservation]{
 			Exists: true,
 			Detail: &snowflake.DatabaseObservation{
-				ShowOutput: &snowflake.DatabaseShowOutput{Comment: "other"},
+				ShowOutput: &snowplanev1alpha1.DatabaseShowOutput{Comment: "other"},
 				Parameters: &snowflake.DatabaseParameters{
 					DataRetentionTimeInDays: ptr(int32(99)),
 					LogLevel:                "INFO",
@@ -125,7 +124,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -136,7 +135,7 @@ func TestLateInitialize(t *testing.T) {
 			Detail: nil,
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -150,7 +149,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 }

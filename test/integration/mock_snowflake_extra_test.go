@@ -1635,3 +1635,318 @@ func (m *mockAuthenticationPolicyService) Reset() {
 	m.alterFn = nil
 	m.dropFn = nil
 }
+
+// ---------------------------------------------------------------------------
+// mockAPIIntegrationService — thread-safe mock for APIIntegration Snowflake operations
+// ---------------------------------------------------------------------------
+
+type mockAPIIntegrationService struct {
+	mu        sync.Mutex
+	observeFn func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.APIIntegrationObservation, error)
+	createFn  func(ctx context.Context, opts snowflake.CreateAPIIntegrationOptions) error
+	alterFn   func(ctx context.Context, opts snowflake.AlterAPIIntegrationOptions) error
+	dropFn    func(ctx context.Context, name snowflake.AccountObjectIdentifier) error
+}
+
+func (m *mockAPIIntegrationService) Observe(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.APIIntegrationObservation, error) {
+	m.mu.Lock()
+	fn := m.observeFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, name)
+	}
+
+	return &snowflake.APIIntegrationObservation{Exists: false}, nil
+}
+
+func (m *mockAPIIntegrationService) Create(ctx context.Context, opts snowflake.CreateAPIIntegrationOptions) error {
+	m.mu.Lock()
+	fn := m.createFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, opts)
+	}
+
+	return nil
+}
+
+func (m *mockAPIIntegrationService) Alter(ctx context.Context, opts snowflake.AlterAPIIntegrationOptions) error {
+	m.mu.Lock()
+	fn := m.alterFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, opts)
+	}
+
+	return nil
+}
+
+func (m *mockAPIIntegrationService) Drop(ctx context.Context, name snowflake.AccountObjectIdentifier) error {
+	m.mu.Lock()
+	fn := m.dropFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, name)
+	}
+
+	return nil
+}
+
+func (m *mockAPIIntegrationService) SetObserve(fn func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.APIIntegrationObservation, error)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.observeFn = fn
+}
+
+func (m *mockAPIIntegrationService) SetCreate(fn func(ctx context.Context, opts snowflake.CreateAPIIntegrationOptions) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.createFn = fn
+}
+
+func (m *mockAPIIntegrationService) SetAlter(fn func(ctx context.Context, opts snowflake.AlterAPIIntegrationOptions) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.alterFn = fn
+}
+
+func (m *mockAPIIntegrationService) SetDrop(fn func(ctx context.Context, name snowflake.AccountObjectIdentifier) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.dropFn = fn
+}
+
+func (m *mockAPIIntegrationService) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.observeFn = nil
+	m.createFn = nil
+	m.alterFn = nil
+	m.dropFn = nil
+}
+
+// ---------------------------------------------------------------------------
+// mockSecondaryDatabaseService — thread-safe mock for SecondaryDatabase Snowflake operations
+// ---------------------------------------------------------------------------
+
+type mockSecondaryDatabaseService struct {
+	mu        sync.Mutex
+	observeFn func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.SecondaryDatabaseObservation, error)
+	createFn  func(ctx context.Context, opts snowflake.CreateSecondaryDatabaseOptions) error
+	alterFn   func(ctx context.Context, opts snowflake.AlterSecondaryDatabaseOptions) error
+	refreshFn func(ctx context.Context, name snowflake.AccountObjectIdentifier) error
+	dropFn    func(ctx context.Context, name snowflake.AccountObjectIdentifier) error
+}
+
+func (m *mockSecondaryDatabaseService) Observe(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.SecondaryDatabaseObservation, error) {
+	m.mu.Lock()
+	fn := m.observeFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, name)
+	}
+
+	return &snowflake.SecondaryDatabaseObservation{Exists: false}, nil
+}
+
+func (m *mockSecondaryDatabaseService) Create(ctx context.Context, opts snowflake.CreateSecondaryDatabaseOptions) error {
+	m.mu.Lock()
+	fn := m.createFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, opts)
+	}
+
+	return nil
+}
+
+func (m *mockSecondaryDatabaseService) Alter(ctx context.Context, opts snowflake.AlterSecondaryDatabaseOptions) error {
+	m.mu.Lock()
+	fn := m.alterFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, opts)
+	}
+
+	return nil
+}
+
+func (m *mockSecondaryDatabaseService) Refresh(ctx context.Context, name snowflake.AccountObjectIdentifier) error {
+	m.mu.Lock()
+	fn := m.refreshFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, name)
+	}
+
+	return nil
+}
+
+func (m *mockSecondaryDatabaseService) Drop(ctx context.Context, name snowflake.AccountObjectIdentifier) error {
+	m.mu.Lock()
+	fn := m.dropFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, name)
+	}
+
+	return nil
+}
+
+func (m *mockSecondaryDatabaseService) SetObserve(fn func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.SecondaryDatabaseObservation, error)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.observeFn = fn
+}
+
+func (m *mockSecondaryDatabaseService) SetCreate(fn func(ctx context.Context, opts snowflake.CreateSecondaryDatabaseOptions) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.createFn = fn
+}
+
+func (m *mockSecondaryDatabaseService) SetAlter(fn func(ctx context.Context, opts snowflake.AlterSecondaryDatabaseOptions) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.alterFn = fn
+}
+
+func (m *mockSecondaryDatabaseService) SetRefresh(fn func(ctx context.Context, name snowflake.AccountObjectIdentifier) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.refreshFn = fn
+}
+
+func (m *mockSecondaryDatabaseService) SetDrop(fn func(ctx context.Context, name snowflake.AccountObjectIdentifier) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.dropFn = fn
+}
+
+func (m *mockSecondaryDatabaseService) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.observeFn = nil
+	m.createFn = nil
+	m.alterFn = nil
+	m.refreshFn = nil
+	m.dropFn = nil
+}
+
+// ---------------------------------------------------------------------------
+// mockSharedDatabaseService — thread-safe mock for SharedDatabase Snowflake operations
+// ---------------------------------------------------------------------------
+
+type mockSharedDatabaseService struct {
+	mu        sync.Mutex
+	observeFn func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.SharedDatabaseObservation, error)
+	createFn  func(ctx context.Context, opts snowflake.CreateSharedDatabaseOptions) error
+	alterFn   func(ctx context.Context, opts snowflake.AlterSharedDatabaseOptions) error
+	dropFn    func(ctx context.Context, name snowflake.AccountObjectIdentifier) error
+}
+
+func (m *mockSharedDatabaseService) Observe(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.SharedDatabaseObservation, error) {
+	m.mu.Lock()
+	fn := m.observeFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, name)
+	}
+
+	return &snowflake.SharedDatabaseObservation{Exists: false}, nil
+}
+
+func (m *mockSharedDatabaseService) Create(ctx context.Context, opts snowflake.CreateSharedDatabaseOptions) error {
+	m.mu.Lock()
+	fn := m.createFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, opts)
+	}
+
+	return nil
+}
+
+func (m *mockSharedDatabaseService) Alter(ctx context.Context, opts snowflake.AlterSharedDatabaseOptions) error {
+	m.mu.Lock()
+	fn := m.alterFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, opts)
+	}
+
+	return nil
+}
+
+func (m *mockSharedDatabaseService) Drop(ctx context.Context, name snowflake.AccountObjectIdentifier) error {
+	m.mu.Lock()
+	fn := m.dropFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, name)
+	}
+
+	return nil
+}
+
+func (m *mockSharedDatabaseService) SetObserve(fn func(ctx context.Context, name snowflake.AccountObjectIdentifier) (*snowflake.SharedDatabaseObservation, error)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.observeFn = fn
+}
+
+func (m *mockSharedDatabaseService) SetCreate(fn func(ctx context.Context, opts snowflake.CreateSharedDatabaseOptions) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.createFn = fn
+}
+
+func (m *mockSharedDatabaseService) SetAlter(fn func(ctx context.Context, opts snowflake.AlterSharedDatabaseOptions) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.alterFn = fn
+}
+
+func (m *mockSharedDatabaseService) SetDrop(fn func(ctx context.Context, name snowflake.AccountObjectIdentifier) error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.dropFn = fn
+}
+
+func (m *mockSharedDatabaseService) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.observeFn = nil
+	m.createFn = nil
+	m.alterFn = nil
+	m.dropFn = nil
+}

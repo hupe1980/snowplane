@@ -103,7 +103,7 @@ func TestBuildCreateNetworkRuleSQL_CreateOrAlter(t *testing.T) {
 		UseCreateOrAlter: true,
 	}
 	got, err := buildCreateNetworkRuleSQL(opts)
-		require.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, got, `CREATE OR ALTER NETWORK RULE "DB"."SCH"."MY_RULE"`)
 	assert.NotContains(t, got, "IF NOT EXISTS")
 	assert.Contains(t, got, "TYPE = IPV4")

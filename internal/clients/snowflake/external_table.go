@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,30 +17,7 @@ type ExternalTableObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW EXTERNAL TABLES row.
-	ShowOutput *ExternalTableShowOutput
-}
-
-// ExternalTableShowOutput contains the fields from SHOW EXTERNAL TABLES.
-type ExternalTableShowOutput struct {
-	CreatedOn           string
-	Name                string
-	DatabaseName        string
-	SchemaName          string
-	Invalid             string
-	InvalidReason       string
-	Owner               string
-	Comment             string
-	Stage               string
-	Location            string
-	FileFormatName      string
-	FileFormatType      string
-	Cloud               string
-	Region              string
-	NotificationChannel string
-	LastRefreshedOn     string
-	TableFormat         string
-	LastRefreshDetails  string
-	OwnerRoleType       string
+	ShowOutput *v1alpha1.ExternalTableShowOutput
 }
 
 // ExternalTableColumnOpt represents a column definition for CREATE EXTERNAL TABLE.
@@ -323,7 +301,7 @@ func (c *ExternalTableClient) Drop(ctx context.Context, name SchemaObjectIdentif
 }
 
 // ShowByID queries SHOW EXTERNAL TABLES for a specific external table.
-func (c *ExternalTableClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*ExternalTableShowOutput, error) {
+func (c *ExternalTableClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.ExternalTableShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("external table name is required"))
 	}
@@ -360,9 +338,9 @@ func (c *ExternalTableClient) Observe(ctx context.Context, name SchemaObjectIden
 }
 
 // scanExternalTableShowOutput scans SHOW EXTERNAL TABLES results for a matching row.
-func scanExternalTableShowOutput(rows *sql.Rows, name string) (*ExternalTableShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*ExternalTableShowOutput, error) {
-		return &ExternalTableShowOutput{
+func scanExternalTableShowOutput(rows *sql.Rows, name string) (*v1alpha1.ExternalTableShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.ExternalTableShowOutput, error) {
+		return &v1alpha1.ExternalTableShowOutput{
 			CreatedOn:           m["created_on"],
 			Name:                m["name"],
 			DatabaseName:        m["database_name"],

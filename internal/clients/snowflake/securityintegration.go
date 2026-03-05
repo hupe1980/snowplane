@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,20 +17,10 @@ type SecurityIntegrationObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW SECURITY INTEGRATIONS row.
-	ShowOutput *SecurityIntegrationShowOutput
+	ShowOutput *v1alpha1.SecurityIntegrationShowOutput
 
 	// DescribeOutput contains the DESCRIBE INTEGRATION output (key-value pairs).
 	DescribeOutput map[string]string
-}
-
-// SecurityIntegrationShowOutput contains the fields from SHOW SECURITY INTEGRATIONS.
-type SecurityIntegrationShowOutput struct {
-	CreatedOn string
-	Name      string
-	Type      string
-	Category  string
-	Enabled   bool
-	Comment   string
 }
 
 // CreateSecurityIntegrationOptions holds the parameters for creating a security integration.
@@ -543,7 +534,7 @@ func buildShowSecurityIntegrationByIDSQL(name AccountObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW SECURITY INTEGRATIONS for a specific integration.
-func (si *SecurityIntegrationClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*SecurityIntegrationShowOutput, error) {
+func (si *SecurityIntegrationClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*v1alpha1.SecurityIntegrationShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("security integration name is required"))
 	}
@@ -602,9 +593,9 @@ func (si *SecurityIntegrationClient) Observe(ctx context.Context, name AccountOb
 }
 
 // scanSecurityIntegrationShowOutput scans SHOW SECURITY INTEGRATIONS results.
-func scanSecurityIntegrationShowOutput(rows *sql.Rows, name string) (*SecurityIntegrationShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*SecurityIntegrationShowOutput, error) {
-		return &SecurityIntegrationShowOutput{
+func scanSecurityIntegrationShowOutput(rows *sql.Rows, name string) (*v1alpha1.SecurityIntegrationShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.SecurityIntegrationShowOutput, error) {
+		return &v1alpha1.SecurityIntegrationShowOutput{
 			CreatedOn: m["created_on"],
 			Name:      m["name"],
 			Type:      m["type"],

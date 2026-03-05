@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -92,7 +91,7 @@ func newTestRole(name, namespace string) *snowplanev1alpha1.AccountRole {
 func successfulObservation() *snowflake.AccountRoleObservation {
 	return &snowflake.AccountRoleObservation{
 		Exists: true,
-		ShowOutput: &snowflake.AccountRoleShowOutput{
+		ShowOutput: &snowplanev1alpha1.AccountRoleShowOutput{
 			CreatedOn:      "2024-01-01",
 			Name:           "DATA_ANALYST",
 			Comment:        "",
@@ -114,19 +113,16 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRole, Service, *snowflake.AccountRoleObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: record.NewFakeRecorder(100),
-		Adapter: &adapter{
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, record.NewFakeRecorder(100), nil,
+		func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("AccountRole"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("AccountRole")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -698,10 +694,10 @@ func TestReconcile_ImmutableName(t *testing.T) {
 func TestValidateImmutableFields_FirstReconcile(t *testing.T) {
 	t.Parallel()
 
-	role := newTestRole("myrole", "default")
-	role.Status.ObservedGeneration = 0
+	erole := newTestRole("myrole", "default")
+	erole.Status.ObservedGeneration = 0
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), role)
+	err := validateImmutableFields(context.Background(), erole)
 	assert.NoError(t, err, "should skip on first reconcile")
 }
 
@@ -712,7 +708,7 @@ func TestValidateImmutableFields_NoShowOutput(t *testing.T) {
 	role.Status.ObservedGeneration = 1
 	role.Status.ShowOutput = nil
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), role)
+	err := validateImmutableFields(context.Background(), role)
 	assert.NoError(t, err, "should skip when showOutput is nil")
 }
 
@@ -861,7 +857,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.AccountRoleObservation{
-		ShowOutput: &snowflake.AccountRoleShowOutput{Comment: "test"},
+		ShowOutput: &snowplanev1alpha1.AccountRoleShowOutput{Comment: "test"},
 	}
 
 	result := detectDrift(role, obs)
@@ -879,7 +875,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.AccountRoleObservation{
-		ShowOutput: &snowflake.AccountRoleShowOutput{Comment: "drifted"},
+		ShowOutput: &snowplanev1alpha1.AccountRoleShowOutput{Comment: "drifted"},
 	}
 
 	result := detectDrift(role, obs)
@@ -1219,18 +1215,13 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 		WithRuntimeObjects(role, testutil.NewTestPC("default"), testutil.NewTestSecret("default")).
 		Build()
 
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRole, Service, *snowflake.AccountRoleObservation]{
-		Client:   c,
-		Factory:  clientfactory.NewClientFactory(),
-		Recorder: record.NewFakeRecorder(100),
-		Adapter: &adapter{
-			newService: func(_ context.Context, _ SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-				capturedUseRole = useRole
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, testutil.NewTestClientFactory(), record.NewFakeRecorder(100), nil,
+		func(_ context.Context, _ SnowflakeClient, useRole string) (Service, func(context.Context), error) {
+			capturedUseRole = useRole
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("AccountRole"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("AccountRole")
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myrole", "default"))
 	require.NoError(t, err)

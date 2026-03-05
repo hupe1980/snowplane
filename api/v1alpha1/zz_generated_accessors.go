@@ -196,6 +196,24 @@ func (s *Schema) SetTrackedParametersList(val []string) {
 	s.Status.TrackedParameters = val
 }
 
+func (s *Schema) GetScopeDatabaseName() string {
+	return s.Status.DatabaseName
+}
+
+func (s *Schema) GetSpecDatabaseRef() *ObjectReference {
+	return s.Spec.DatabaseRef
+}
+
+func (s *Schema) GetSpecDatabaseName() *string {
+	return s.Spec.DatabaseName
+}
+
+func (s *Schema) GetScopeSchemaName() string { return "" }
+
+func (s *Schema) GetSpecSchemaRef() *ObjectReference { return nil }
+
+func (s *Schema) GetSpecSchemaName() *string { return nil }
+
 // ---------------------------------------------------------------------------
 // Warehouse
 // ---------------------------------------------------------------------------
@@ -580,6 +598,24 @@ func (r *DatabaseRole) SetTrackedParametersList(val []string) {
 	r.Status.TrackedParameters = val
 }
 
+func (r *DatabaseRole) GetScopeDatabaseName() string {
+	return r.Status.DatabaseName
+}
+
+func (r *DatabaseRole) GetSpecDatabaseRef() *ObjectReference {
+	return r.Spec.DatabaseRef
+}
+
+func (r *DatabaseRole) GetSpecDatabaseName() *string {
+	return r.Spec.DatabaseName
+}
+
+func (r *DatabaseRole) GetScopeSchemaName() string { return "" }
+
+func (r *DatabaseRole) GetSpecSchemaRef() *ObjectReference { return nil }
+
+func (r *DatabaseRole) GetSpecSchemaName() *string { return nil }
+
 // ---------------------------------------------------------------------------
 // Tag
 // ---------------------------------------------------------------------------
@@ -674,6 +710,30 @@ func (t *Tag) GetTrackedParametersList() []string {
 
 func (t *Tag) SetTrackedParametersList(val []string) {
 	t.Status.TrackedParameters = val
+}
+
+func (t *Tag) GetScopeDatabaseName() string {
+	return t.Status.DatabaseName
+}
+
+func (t *Tag) GetSpecDatabaseRef() *ObjectReference {
+	return t.Spec.DatabaseRef
+}
+
+func (t *Tag) GetSpecDatabaseName() *string {
+	return t.Spec.DatabaseName
+}
+
+func (t *Tag) GetScopeSchemaName() string {
+	return t.Status.SchemaName
+}
+
+func (t *Tag) GetSpecSchemaRef() *ObjectReference {
+	return t.Spec.SchemaRef
+}
+
+func (t *Tag) GetSpecSchemaName() *string {
+	return t.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -772,6 +832,30 @@ func (mp *MaskingPolicy) SetTrackedParametersList(val []string) {
 	mp.Status.TrackedParameters = val
 }
 
+func (mp *MaskingPolicy) GetScopeDatabaseName() string {
+	return mp.Status.DatabaseName
+}
+
+func (mp *MaskingPolicy) GetSpecDatabaseRef() *ObjectReference {
+	return mp.Spec.DatabaseRef
+}
+
+func (mp *MaskingPolicy) GetSpecDatabaseName() *string {
+	return mp.Spec.DatabaseName
+}
+
+func (mp *MaskingPolicy) GetScopeSchemaName() string {
+	return mp.Status.SchemaName
+}
+
+func (mp *MaskingPolicy) GetSpecSchemaRef() *ObjectReference {
+	return mp.Spec.SchemaRef
+}
+
+func (mp *MaskingPolicy) GetSpecSchemaName() *string {
+	return mp.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // RowAccessPolicy
 // ---------------------------------------------------------------------------
@@ -866,6 +950,30 @@ func (rap *RowAccessPolicy) GetTrackedParametersList() []string {
 
 func (rap *RowAccessPolicy) SetTrackedParametersList(val []string) {
 	rap.Status.TrackedParameters = val
+}
+
+func (rap *RowAccessPolicy) GetScopeDatabaseName() string {
+	return rap.Status.DatabaseName
+}
+
+func (rap *RowAccessPolicy) GetSpecDatabaseRef() *ObjectReference {
+	return rap.Spec.DatabaseRef
+}
+
+func (rap *RowAccessPolicy) GetSpecDatabaseName() *string {
+	return rap.Spec.DatabaseName
+}
+
+func (rap *RowAccessPolicy) GetScopeSchemaName() string {
+	return rap.Status.SchemaName
+}
+
+func (rap *RowAccessPolicy) GetSpecSchemaRef() *ObjectReference {
+	return rap.Spec.SchemaRef
+}
+
+func (rap *RowAccessPolicy) GetSpecSchemaName() *string {
+	return rap.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -964,6 +1072,30 @@ func (s *Stage) SetTrackedParametersList(val []string) {
 	s.Status.TrackedParameters = val
 }
 
+func (s *Stage) GetScopeDatabaseName() string {
+	return s.Status.DatabaseName
+}
+
+func (s *Stage) GetSpecDatabaseRef() *ObjectReference {
+	return s.Spec.DatabaseRef
+}
+
+func (s *Stage) GetSpecDatabaseName() *string {
+	return s.Spec.DatabaseName
+}
+
+func (s *Stage) GetScopeSchemaName() string {
+	return s.Status.SchemaName
+}
+
+func (s *Stage) GetSpecSchemaRef() *ObjectReference {
+	return s.Spec.SchemaRef
+}
+
+func (s *Stage) GetSpecSchemaName() *string {
+	return s.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // StreamOnTable
 // ---------------------------------------------------------------------------
@@ -1058,6 +1190,30 @@ func (s *StreamOnTable) GetTrackedParametersList() []string {
 
 func (s *StreamOnTable) SetTrackedParametersList(val []string) {
 	s.Status.TrackedParameters = val
+}
+
+func (s *StreamOnTable) GetScopeDatabaseName() string {
+	return s.Status.DatabaseName
+}
+
+func (s *StreamOnTable) GetSpecDatabaseRef() *ObjectReference {
+	return s.Spec.DatabaseRef
+}
+
+func (s *StreamOnTable) GetSpecDatabaseName() *string {
+	return s.Spec.DatabaseName
+}
+
+func (s *StreamOnTable) GetScopeSchemaName() string {
+	return s.Status.SchemaName
+}
+
+func (s *StreamOnTable) GetSpecSchemaRef() *ObjectReference {
+	return s.Spec.SchemaRef
+}
+
+func (s *StreamOnTable) GetSpecSchemaName() *string {
+	return s.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -1156,6 +1312,30 @@ func (s *StreamOnView) SetTrackedParametersList(val []string) {
 	s.Status.TrackedParameters = val
 }
 
+func (s *StreamOnView) GetScopeDatabaseName() string {
+	return s.Status.DatabaseName
+}
+
+func (s *StreamOnView) GetSpecDatabaseRef() *ObjectReference {
+	return s.Spec.DatabaseRef
+}
+
+func (s *StreamOnView) GetSpecDatabaseName() *string {
+	return s.Spec.DatabaseName
+}
+
+func (s *StreamOnView) GetScopeSchemaName() string {
+	return s.Status.SchemaName
+}
+
+func (s *StreamOnView) GetSpecSchemaRef() *ObjectReference {
+	return s.Spec.SchemaRef
+}
+
+func (s *StreamOnView) GetSpecSchemaName() *string {
+	return s.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // StreamOnExternalTable
 // ---------------------------------------------------------------------------
@@ -1250,6 +1430,30 @@ func (s *StreamOnExternalTable) GetTrackedParametersList() []string {
 
 func (s *StreamOnExternalTable) SetTrackedParametersList(val []string) {
 	s.Status.TrackedParameters = val
+}
+
+func (s *StreamOnExternalTable) GetScopeDatabaseName() string {
+	return s.Status.DatabaseName
+}
+
+func (s *StreamOnExternalTable) GetSpecDatabaseRef() *ObjectReference {
+	return s.Spec.DatabaseRef
+}
+
+func (s *StreamOnExternalTable) GetSpecDatabaseName() *string {
+	return s.Spec.DatabaseName
+}
+
+func (s *StreamOnExternalTable) GetScopeSchemaName() string {
+	return s.Status.SchemaName
+}
+
+func (s *StreamOnExternalTable) GetSpecSchemaRef() *ObjectReference {
+	return s.Spec.SchemaRef
+}
+
+func (s *StreamOnExternalTable) GetSpecSchemaName() *string {
+	return s.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -1348,6 +1552,30 @@ func (s *StreamOnDirectoryTable) SetTrackedParametersList(val []string) {
 	s.Status.TrackedParameters = val
 }
 
+func (s *StreamOnDirectoryTable) GetScopeDatabaseName() string {
+	return s.Status.DatabaseName
+}
+
+func (s *StreamOnDirectoryTable) GetSpecDatabaseRef() *ObjectReference {
+	return s.Spec.DatabaseRef
+}
+
+func (s *StreamOnDirectoryTable) GetSpecDatabaseName() *string {
+	return s.Spec.DatabaseName
+}
+
+func (s *StreamOnDirectoryTable) GetScopeSchemaName() string {
+	return s.Status.SchemaName
+}
+
+func (s *StreamOnDirectoryTable) GetSpecSchemaRef() *ObjectReference {
+	return s.Spec.SchemaRef
+}
+
+func (s *StreamOnDirectoryTable) GetSpecSchemaName() *string {
+	return s.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // StreamOnDynamicTable
 // ---------------------------------------------------------------------------
@@ -1442,6 +1670,30 @@ func (s *StreamOnDynamicTable) GetTrackedParametersList() []string {
 
 func (s *StreamOnDynamicTable) SetTrackedParametersList(val []string) {
 	s.Status.TrackedParameters = val
+}
+
+func (s *StreamOnDynamicTable) GetScopeDatabaseName() string {
+	return s.Status.DatabaseName
+}
+
+func (s *StreamOnDynamicTable) GetSpecDatabaseRef() *ObjectReference {
+	return s.Spec.DatabaseRef
+}
+
+func (s *StreamOnDynamicTable) GetSpecDatabaseName() *string {
+	return s.Spec.DatabaseName
+}
+
+func (s *StreamOnDynamicTable) GetScopeSchemaName() string {
+	return s.Status.SchemaName
+}
+
+func (s *StreamOnDynamicTable) GetSpecSchemaRef() *ObjectReference {
+	return s.Spec.SchemaRef
+}
+
+func (s *StreamOnDynamicTable) GetSpecSchemaName() *string {
+	return s.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -1540,6 +1792,30 @@ func (t *Task) SetTrackedParametersList(val []string) {
 	t.Status.TrackedParameters = val
 }
 
+func (t *Task) GetScopeDatabaseName() string {
+	return t.Status.DatabaseName
+}
+
+func (t *Task) GetSpecDatabaseRef() *ObjectReference {
+	return t.Spec.DatabaseRef
+}
+
+func (t *Task) GetSpecDatabaseName() *string {
+	return t.Spec.DatabaseName
+}
+
+func (t *Task) GetScopeSchemaName() string {
+	return t.Status.SchemaName
+}
+
+func (t *Task) GetSpecSchemaRef() *ObjectReference {
+	return t.Spec.SchemaRef
+}
+
+func (t *Task) GetSpecSchemaName() *string {
+	return t.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // Alert
 // ---------------------------------------------------------------------------
@@ -1634,6 +1910,30 @@ func (a *Alert) GetTrackedParametersList() []string {
 
 func (a *Alert) SetTrackedParametersList(val []string) {
 	a.Status.TrackedParameters = val
+}
+
+func (a *Alert) GetScopeDatabaseName() string {
+	return a.Status.DatabaseName
+}
+
+func (a *Alert) GetSpecDatabaseRef() *ObjectReference {
+	return a.Spec.DatabaseRef
+}
+
+func (a *Alert) GetSpecDatabaseName() *string {
+	return a.Spec.DatabaseName
+}
+
+func (a *Alert) GetScopeSchemaName() string {
+	return a.Status.SchemaName
+}
+
+func (a *Alert) GetSpecSchemaRef() *ObjectReference {
+	return a.Spec.SchemaRef
+}
+
+func (a *Alert) GetSpecSchemaName() *string {
+	return a.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -1732,6 +2032,30 @@ func (v *View) SetTrackedParametersList(val []string) {
 	v.Status.TrackedParameters = val
 }
 
+func (v *View) GetScopeDatabaseName() string {
+	return v.Status.DatabaseName
+}
+
+func (v *View) GetSpecDatabaseRef() *ObjectReference {
+	return v.Spec.DatabaseRef
+}
+
+func (v *View) GetSpecDatabaseName() *string {
+	return v.Spec.DatabaseName
+}
+
+func (v *View) GetScopeSchemaName() string {
+	return v.Status.SchemaName
+}
+
+func (v *View) GetSpecSchemaRef() *ObjectReference {
+	return v.Spec.SchemaRef
+}
+
+func (v *View) GetSpecSchemaName() *string {
+	return v.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // Table
 // ---------------------------------------------------------------------------
@@ -1826,6 +2150,30 @@ func (t *Table) GetTrackedParametersList() []string {
 
 func (t *Table) SetTrackedParametersList(val []string) {
 	t.Status.TrackedParameters = val
+}
+
+func (t *Table) GetScopeDatabaseName() string {
+	return t.Status.DatabaseName
+}
+
+func (t *Table) GetSpecDatabaseRef() *ObjectReference {
+	return t.Spec.DatabaseRef
+}
+
+func (t *Table) GetSpecDatabaseName() *string {
+	return t.Spec.DatabaseName
+}
+
+func (t *Table) GetScopeSchemaName() string {
+	return t.Status.SchemaName
+}
+
+func (t *Table) GetSpecSchemaRef() *ObjectReference {
+	return t.Spec.SchemaRef
+}
+
+func (t *Table) GetSpecSchemaName() *string {
+	return t.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -2203,6 +2551,30 @@ func (ff *FileFormat) SetTrackedParametersList(val []string) {
 	ff.Status.TrackedParameters = val
 }
 
+func (ff *FileFormat) GetScopeDatabaseName() string {
+	return ff.Status.DatabaseName
+}
+
+func (ff *FileFormat) GetSpecDatabaseRef() *ObjectReference {
+	return ff.Spec.DatabaseRef
+}
+
+func (ff *FileFormat) GetSpecDatabaseName() *string {
+	return ff.Spec.DatabaseName
+}
+
+func (ff *FileFormat) GetScopeSchemaName() string {
+	return ff.Status.SchemaName
+}
+
+func (ff *FileFormat) GetSpecSchemaRef() *ObjectReference {
+	return ff.Spec.SchemaRef
+}
+
+func (ff *FileFormat) GetSpecSchemaName() *string {
+	return ff.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // Pipe
 // ---------------------------------------------------------------------------
@@ -2299,6 +2671,30 @@ func (p *Pipe) SetTrackedParametersList(val []string) {
 	p.Status.TrackedParameters = val
 }
 
+func (p *Pipe) GetScopeDatabaseName() string {
+	return p.Status.DatabaseName
+}
+
+func (p *Pipe) GetSpecDatabaseRef() *ObjectReference {
+	return p.Spec.DatabaseRef
+}
+
+func (p *Pipe) GetSpecDatabaseName() *string {
+	return p.Spec.DatabaseName
+}
+
+func (p *Pipe) GetScopeSchemaName() string {
+	return p.Status.SchemaName
+}
+
+func (p *Pipe) GetSpecSchemaRef() *ObjectReference {
+	return p.Spec.SchemaRef
+}
+
+func (p *Pipe) GetSpecSchemaName() *string {
+	return p.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // DynamicTable
 // ---------------------------------------------------------------------------
@@ -2393,6 +2789,30 @@ func (dt *DynamicTable) GetTrackedParametersList() []string {
 
 func (dt *DynamicTable) SetTrackedParametersList(val []string) {
 	dt.Status.TrackedParameters = val
+}
+
+func (dt *DynamicTable) GetScopeDatabaseName() string {
+	return dt.Status.DatabaseName
+}
+
+func (dt *DynamicTable) GetSpecDatabaseRef() *ObjectReference {
+	return dt.Spec.DatabaseRef
+}
+
+func (dt *DynamicTable) GetSpecDatabaseName() *string {
+	return dt.Spec.DatabaseName
+}
+
+func (dt *DynamicTable) GetScopeSchemaName() string {
+	return dt.Status.SchemaName
+}
+
+func (dt *DynamicTable) GetSpecSchemaRef() *ObjectReference {
+	return dt.Spec.SchemaRef
+}
+
+func (dt *DynamicTable) GetSpecSchemaName() *string {
+	return dt.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -2582,6 +3002,573 @@ func (si *SecurityIntegration) SetTrackedParametersList(val []string) {
 }
 
 // ---------------------------------------------------------------------------
+// SAML2Integration
+// ---------------------------------------------------------------------------
+
+func (si *SAML2Integration) GetConditions() []metav1.Condition {
+	return si.Status.Conditions
+}
+
+func (si *SAML2Integration) SetConditions(conditions []metav1.Condition) {
+	si.Status.Conditions = conditions
+}
+
+func (si *SAML2Integration) GetDeletionPolicy() DeletionPolicy {
+	if si.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return si.Spec.DeletionPolicy
+}
+
+func (si *SAML2Integration) GetFullyQualifiedName() string {
+	return si.Status.FullyQualifiedName
+}
+
+func (si *SAML2Integration) GetProviderRef() ProviderReference {
+	return si.Spec.ProviderRef
+}
+
+func (si *SAML2Integration) GetSpecName() string {
+	return si.Spec.Name
+}
+
+func (si *SAML2Integration) GetUseRole() *string {
+	return si.Spec.UseRole
+}
+
+func (si *SAML2Integration) GetPaused() bool {
+	return si.Spec.Paused
+}
+
+func (si *SAML2Integration) GetManagementPolicies() ManagementPolicies {
+	return si.Spec.ManagementPolicies
+}
+
+func (si *SAML2Integration) SetCreateOrAlter(val *bool) {
+	si.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (si *SAML2Integration) GetObservedGeneration() int64 {
+	return si.Status.ObservedGeneration
+}
+
+func (si *SAML2Integration) SetObservedGeneration(val int64) {
+	si.Status.ObservedGeneration = val
+}
+
+func (si *SAML2Integration) GetLastAppliedSpecHash() string {
+	return si.Status.LastAppliedSpecHash
+}
+
+func (si *SAML2Integration) SetLastAppliedSpecHash(val string) {
+	si.Status.LastAppliedSpecHash = val
+}
+
+func (si *SAML2Integration) GetLastReconcileTime() *metav1.Time {
+	return si.Status.LastReconcileTime
+}
+
+func (si *SAML2Integration) SetLastReconcileTime(val *metav1.Time) {
+	si.Status.LastReconcileTime = val
+}
+
+func (si *SAML2Integration) ValidateSpec() error {
+	return si.Spec.Validate()
+}
+
+func (si *SAML2Integration) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(si.Spec)
+}
+
+func (si *SAML2Integration) GetOwner() string {
+	// SHOW SECURITY INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (si *SAML2Integration) GetTrackedParametersList() []string {
+	return si.Status.TrackedParameters
+}
+
+func (si *SAML2Integration) SetTrackedParametersList(val []string) {
+	si.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// ExternalOAuthIntegration
+// ---------------------------------------------------------------------------
+
+func (eoi *ExternalOAuthIntegration) GetConditions() []metav1.Condition {
+	return eoi.Status.Conditions
+}
+
+func (eoi *ExternalOAuthIntegration) SetConditions(conditions []metav1.Condition) {
+	eoi.Status.Conditions = conditions
+}
+
+func (eoi *ExternalOAuthIntegration) GetDeletionPolicy() DeletionPolicy {
+	if eoi.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return eoi.Spec.DeletionPolicy
+}
+
+func (eoi *ExternalOAuthIntegration) GetFullyQualifiedName() string {
+	return eoi.Status.FullyQualifiedName
+}
+
+func (eoi *ExternalOAuthIntegration) GetProviderRef() ProviderReference {
+	return eoi.Spec.ProviderRef
+}
+
+func (eoi *ExternalOAuthIntegration) GetSpecName() string {
+	return eoi.Spec.Name
+}
+
+func (eoi *ExternalOAuthIntegration) GetUseRole() *string {
+	return eoi.Spec.UseRole
+}
+
+func (eoi *ExternalOAuthIntegration) GetPaused() bool {
+	return eoi.Spec.Paused
+}
+
+func (eoi *ExternalOAuthIntegration) GetManagementPolicies() ManagementPolicies {
+	return eoi.Spec.ManagementPolicies
+}
+
+func (eoi *ExternalOAuthIntegration) SetCreateOrAlter(val *bool) {
+	eoi.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (eoi *ExternalOAuthIntegration) GetObservedGeneration() int64 {
+	return eoi.Status.ObservedGeneration
+}
+
+func (eoi *ExternalOAuthIntegration) SetObservedGeneration(val int64) {
+	eoi.Status.ObservedGeneration = val
+}
+
+func (eoi *ExternalOAuthIntegration) GetLastAppliedSpecHash() string {
+	return eoi.Status.LastAppliedSpecHash
+}
+
+func (eoi *ExternalOAuthIntegration) SetLastAppliedSpecHash(val string) {
+	eoi.Status.LastAppliedSpecHash = val
+}
+
+func (eoi *ExternalOAuthIntegration) GetLastReconcileTime() *metav1.Time {
+	return eoi.Status.LastReconcileTime
+}
+
+func (eoi *ExternalOAuthIntegration) SetLastReconcileTime(val *metav1.Time) {
+	eoi.Status.LastReconcileTime = val
+}
+
+func (eoi *ExternalOAuthIntegration) ValidateSpec() error {
+	return eoi.Spec.Validate()
+}
+
+func (eoi *ExternalOAuthIntegration) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(eoi.Spec)
+}
+
+func (eoi *ExternalOAuthIntegration) GetOwner() string {
+	// SHOW SECURITY INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (eoi *ExternalOAuthIntegration) GetTrackedParametersList() []string {
+	return eoi.Status.TrackedParameters
+}
+
+func (eoi *ExternalOAuthIntegration) SetTrackedParametersList(val []string) {
+	eoi.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// FailoverGroup
+// ---------------------------------------------------------------------------
+
+func (fg *FailoverGroup) GetConditions() []metav1.Condition {
+	return fg.Status.Conditions
+}
+
+func (fg *FailoverGroup) SetConditions(conditions []metav1.Condition) {
+	fg.Status.Conditions = conditions
+}
+
+func (fg *FailoverGroup) GetDeletionPolicy() DeletionPolicy {
+	if fg.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return fg.Spec.DeletionPolicy
+}
+
+func (fg *FailoverGroup) GetFullyQualifiedName() string {
+	return fg.Status.FullyQualifiedName
+}
+
+func (fg *FailoverGroup) GetProviderRef() ProviderReference {
+	return fg.Spec.ProviderRef
+}
+
+func (fg *FailoverGroup) GetSpecName() string {
+	return fg.Spec.Name
+}
+
+func (fg *FailoverGroup) GetUseRole() *string {
+	return fg.Spec.UseRole
+}
+
+func (fg *FailoverGroup) GetPaused() bool {
+	return fg.Spec.Paused
+}
+
+func (fg *FailoverGroup) GetManagementPolicies() ManagementPolicies {
+	return fg.Spec.ManagementPolicies
+}
+
+func (fg *FailoverGroup) SetCreateOrAlter(val *bool) {
+	fg.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (fg *FailoverGroup) GetObservedGeneration() int64 {
+	return fg.Status.ObservedGeneration
+}
+
+func (fg *FailoverGroup) SetObservedGeneration(val int64) {
+	fg.Status.ObservedGeneration = val
+}
+
+func (fg *FailoverGroup) GetLastAppliedSpecHash() string {
+	return fg.Status.LastAppliedSpecHash
+}
+
+func (fg *FailoverGroup) SetLastAppliedSpecHash(val string) {
+	fg.Status.LastAppliedSpecHash = val
+}
+
+func (fg *FailoverGroup) GetLastReconcileTime() *metav1.Time {
+	return fg.Status.LastReconcileTime
+}
+
+func (fg *FailoverGroup) SetLastReconcileTime(val *metav1.Time) {
+	fg.Status.LastReconcileTime = val
+}
+
+func (fg *FailoverGroup) ValidateSpec() error {
+	return fg.Spec.Validate()
+}
+
+func (fg *FailoverGroup) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(fg.Spec)
+}
+
+func (fg *FailoverGroup) GetOwner() string {
+	if fg.Status.ShowOutput != nil {
+		return fg.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (fg *FailoverGroup) GetTrackedParametersList() []string {
+	return fg.Status.TrackedParameters
+}
+
+func (fg *FailoverGroup) SetTrackedParametersList(val []string) {
+	fg.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// APIIntegration
+// ---------------------------------------------------------------------------
+
+func (ai *APIIntegration) GetConditions() []metav1.Condition {
+	return ai.Status.Conditions
+}
+
+func (ai *APIIntegration) SetConditions(conditions []metav1.Condition) {
+	ai.Status.Conditions = conditions
+}
+
+func (ai *APIIntegration) GetDeletionPolicy() DeletionPolicy {
+	if ai.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return ai.Spec.DeletionPolicy
+}
+
+func (ai *APIIntegration) GetFullyQualifiedName() string {
+	return ai.Status.FullyQualifiedName
+}
+
+func (ai *APIIntegration) GetProviderRef() ProviderReference {
+	return ai.Spec.ProviderRef
+}
+
+func (ai *APIIntegration) GetSpecName() string {
+	return ai.Spec.Name
+}
+
+func (ai *APIIntegration) GetUseRole() *string {
+	return ai.Spec.UseRole
+}
+
+func (ai *APIIntegration) GetPaused() bool {
+	return ai.Spec.Paused
+}
+
+func (ai *APIIntegration) GetManagementPolicies() ManagementPolicies {
+	return ai.Spec.ManagementPolicies
+}
+
+func (ai *APIIntegration) SetCreateOrAlter(val *bool) {
+	ai.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (ai *APIIntegration) GetObservedGeneration() int64 {
+	return ai.Status.ObservedGeneration
+}
+
+func (ai *APIIntegration) SetObservedGeneration(val int64) {
+	ai.Status.ObservedGeneration = val
+}
+
+func (ai *APIIntegration) GetLastAppliedSpecHash() string {
+	return ai.Status.LastAppliedSpecHash
+}
+
+func (ai *APIIntegration) SetLastAppliedSpecHash(val string) {
+	ai.Status.LastAppliedSpecHash = val
+}
+
+func (ai *APIIntegration) GetLastReconcileTime() *metav1.Time {
+	return ai.Status.LastReconcileTime
+}
+
+func (ai *APIIntegration) SetLastReconcileTime(val *metav1.Time) {
+	ai.Status.LastReconcileTime = val
+}
+
+func (ai *APIIntegration) ValidateSpec() error {
+	return ai.Spec.Validate()
+}
+
+func (ai *APIIntegration) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(ai.Spec)
+}
+
+func (ai *APIIntegration) GetOwner() string {
+	// SHOW API INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (ai *APIIntegration) GetTrackedParametersList() []string {
+	return ai.Status.TrackedParameters
+}
+
+func (ai *APIIntegration) SetTrackedParametersList(val []string) {
+	ai.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// SecondaryDatabase
+// ---------------------------------------------------------------------------
+
+func (sd *SecondaryDatabase) GetConditions() []metav1.Condition {
+	return sd.Status.Conditions
+}
+
+func (sd *SecondaryDatabase) SetConditions(conditions []metav1.Condition) {
+	sd.Status.Conditions = conditions
+}
+
+func (sd *SecondaryDatabase) GetDeletionPolicy() DeletionPolicy {
+	if sd.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return sd.Spec.DeletionPolicy
+}
+
+func (sd *SecondaryDatabase) GetFullyQualifiedName() string {
+	return sd.Status.FullyQualifiedName
+}
+
+func (sd *SecondaryDatabase) GetProviderRef() ProviderReference {
+	return sd.Spec.ProviderRef
+}
+
+func (sd *SecondaryDatabase) GetSpecName() string {
+	return sd.Spec.Name
+}
+
+func (sd *SecondaryDatabase) GetUseRole() *string {
+	return sd.Spec.UseRole
+}
+
+func (sd *SecondaryDatabase) GetPaused() bool {
+	return sd.Spec.Paused
+}
+
+func (sd *SecondaryDatabase) GetManagementPolicies() ManagementPolicies {
+	return sd.Spec.ManagementPolicies
+}
+
+func (sd *SecondaryDatabase) SetCreateOrAlter(val *bool) {
+	sd.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (sd *SecondaryDatabase) GetObservedGeneration() int64 {
+	return sd.Status.ObservedGeneration
+}
+
+func (sd *SecondaryDatabase) SetObservedGeneration(val int64) {
+	sd.Status.ObservedGeneration = val
+}
+
+func (sd *SecondaryDatabase) GetLastAppliedSpecHash() string {
+	return sd.Status.LastAppliedSpecHash
+}
+
+func (sd *SecondaryDatabase) SetLastAppliedSpecHash(val string) {
+	sd.Status.LastAppliedSpecHash = val
+}
+
+func (sd *SecondaryDatabase) GetLastReconcileTime() *metav1.Time {
+	return sd.Status.LastReconcileTime
+}
+
+func (sd *SecondaryDatabase) SetLastReconcileTime(val *metav1.Time) {
+	sd.Status.LastReconcileTime = val
+}
+
+func (sd *SecondaryDatabase) ValidateSpec() error {
+	return sd.Spec.Validate()
+}
+
+func (sd *SecondaryDatabase) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(sd.Spec)
+}
+
+func (sd *SecondaryDatabase) GetOwner() string {
+	if sd.Status.ShowOutput != nil {
+		return sd.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (sd *SecondaryDatabase) GetTrackedParametersList() []string {
+	return sd.Status.TrackedParameters
+}
+
+func (sd *SecondaryDatabase) SetTrackedParametersList(val []string) {
+	sd.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// SharedDatabase
+// ---------------------------------------------------------------------------
+
+func (shd *SharedDatabase) GetConditions() []metav1.Condition {
+	return shd.Status.Conditions
+}
+
+func (shd *SharedDatabase) SetConditions(conditions []metav1.Condition) {
+	shd.Status.Conditions = conditions
+}
+
+func (shd *SharedDatabase) GetDeletionPolicy() DeletionPolicy {
+	if shd.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return shd.Spec.DeletionPolicy
+}
+
+func (shd *SharedDatabase) GetFullyQualifiedName() string {
+	return shd.Status.FullyQualifiedName
+}
+
+func (shd *SharedDatabase) GetProviderRef() ProviderReference {
+	return shd.Spec.ProviderRef
+}
+
+func (shd *SharedDatabase) GetSpecName() string {
+	return shd.Spec.Name
+}
+
+func (shd *SharedDatabase) GetUseRole() *string {
+	return shd.Spec.UseRole
+}
+
+func (shd *SharedDatabase) GetPaused() bool {
+	return shd.Spec.Paused
+}
+
+func (shd *SharedDatabase) GetManagementPolicies() ManagementPolicies {
+	return shd.Spec.ManagementPolicies
+}
+
+func (shd *SharedDatabase) SetCreateOrAlter(val *bool) {
+	shd.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (shd *SharedDatabase) GetObservedGeneration() int64 {
+	return shd.Status.ObservedGeneration
+}
+
+func (shd *SharedDatabase) SetObservedGeneration(val int64) {
+	shd.Status.ObservedGeneration = val
+}
+
+func (shd *SharedDatabase) GetLastAppliedSpecHash() string {
+	return shd.Status.LastAppliedSpecHash
+}
+
+func (shd *SharedDatabase) SetLastAppliedSpecHash(val string) {
+	shd.Status.LastAppliedSpecHash = val
+}
+
+func (shd *SharedDatabase) GetLastReconcileTime() *metav1.Time {
+	return shd.Status.LastReconcileTime
+}
+
+func (shd *SharedDatabase) SetLastReconcileTime(val *metav1.Time) {
+	shd.Status.LastReconcileTime = val
+}
+
+func (shd *SharedDatabase) ValidateSpec() error {
+	return shd.Spec.Validate()
+}
+
+func (shd *SharedDatabase) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(shd.Spec)
+}
+
+func (shd *SharedDatabase) GetOwner() string {
+	if shd.Status.ShowOutput != nil {
+		return shd.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (shd *SharedDatabase) GetTrackedParametersList() []string {
+	return shd.Status.TrackedParameters
+}
+
+func (shd *SharedDatabase) SetTrackedParametersList(val []string) {
+	shd.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
 // PasswordPolicy
 // ---------------------------------------------------------------------------
 
@@ -2675,6 +3662,30 @@ func (pp *PasswordPolicy) GetTrackedParametersList() []string {
 
 func (pp *PasswordPolicy) SetTrackedParametersList(val []string) {
 	pp.Status.TrackedParameters = val
+}
+
+func (pp *PasswordPolicy) GetScopeDatabaseName() string {
+	return pp.Status.DatabaseName
+}
+
+func (pp *PasswordPolicy) GetSpecDatabaseRef() *ObjectReference {
+	return pp.Spec.DatabaseRef
+}
+
+func (pp *PasswordPolicy) GetSpecDatabaseName() *string {
+	return pp.Spec.DatabaseName
+}
+
+func (pp *PasswordPolicy) GetScopeSchemaName() string {
+	return pp.Status.SchemaName
+}
+
+func (pp *PasswordPolicy) GetSpecSchemaRef() *ObjectReference {
+	return pp.Spec.SchemaRef
+}
+
+func (pp *PasswordPolicy) GetSpecSchemaName() *string {
+	return pp.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -2773,6 +3784,30 @@ func (ap *AuthenticationPolicy) SetTrackedParametersList(val []string) {
 	ap.Status.TrackedParameters = val
 }
 
+func (ap *AuthenticationPolicy) GetScopeDatabaseName() string {
+	return ap.Status.DatabaseName
+}
+
+func (ap *AuthenticationPolicy) GetSpecDatabaseRef() *ObjectReference {
+	return ap.Spec.DatabaseRef
+}
+
+func (ap *AuthenticationPolicy) GetSpecDatabaseName() *string {
+	return ap.Spec.DatabaseName
+}
+
+func (ap *AuthenticationPolicy) GetScopeSchemaName() string {
+	return ap.Status.SchemaName
+}
+
+func (ap *AuthenticationPolicy) GetSpecSchemaRef() *ObjectReference {
+	return ap.Spec.SchemaRef
+}
+
+func (ap *AuthenticationPolicy) GetSpecSchemaName() *string {
+	return ap.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // NetworkRule
 // ---------------------------------------------------------------------------
@@ -2867,6 +3902,30 @@ func (nr *NetworkRule) GetTrackedParametersList() []string {
 
 func (nr *NetworkRule) SetTrackedParametersList(val []string) {
 	nr.Status.TrackedParameters = val
+}
+
+func (nr *NetworkRule) GetScopeDatabaseName() string {
+	return nr.Status.DatabaseName
+}
+
+func (nr *NetworkRule) GetSpecDatabaseRef() *ObjectReference {
+	return nr.Spec.DatabaseRef
+}
+
+func (nr *NetworkRule) GetSpecDatabaseName() *string {
+	return nr.Spec.DatabaseName
+}
+
+func (nr *NetworkRule) GetScopeSchemaName() string {
+	return nr.Status.SchemaName
+}
+
+func (nr *NetworkRule) GetSpecSchemaRef() *ObjectReference {
+	return nr.Spec.SchemaRef
+}
+
+func (nr *NetworkRule) GetSpecSchemaName() *string {
+	return nr.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -2965,6 +4024,30 @@ func (seq *Sequence) SetTrackedParametersList(val []string) {
 	seq.Status.TrackedParameters = val
 }
 
+func (seq *Sequence) GetScopeDatabaseName() string {
+	return seq.Status.DatabaseName
+}
+
+func (seq *Sequence) GetSpecDatabaseRef() *ObjectReference {
+	return seq.Spec.DatabaseRef
+}
+
+func (seq *Sequence) GetSpecDatabaseName() *string {
+	return seq.Spec.DatabaseName
+}
+
+func (seq *Sequence) GetScopeSchemaName() string {
+	return seq.Status.SchemaName
+}
+
+func (seq *Sequence) GetSpecSchemaRef() *ObjectReference {
+	return seq.Spec.SchemaRef
+}
+
+func (seq *Sequence) GetSpecSchemaName() *string {
+	return seq.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // ExternalTable
 // ---------------------------------------------------------------------------
@@ -3059,6 +4142,30 @@ func (et *ExternalTable) GetTrackedParametersList() []string {
 
 func (et *ExternalTable) SetTrackedParametersList(val []string) {
 	et.Status.TrackedParameters = val
+}
+
+func (et *ExternalTable) GetScopeDatabaseName() string {
+	return et.Status.DatabaseName
+}
+
+func (et *ExternalTable) GetSpecDatabaseRef() *ObjectReference {
+	return et.Spec.DatabaseRef
+}
+
+func (et *ExternalTable) GetSpecDatabaseName() *string {
+	return et.Spec.DatabaseName
+}
+
+func (et *ExternalTable) GetScopeSchemaName() string {
+	return et.Status.SchemaName
+}
+
+func (et *ExternalTable) GetSpecSchemaRef() *ObjectReference {
+	return et.Spec.SchemaRef
+}
+
+func (et *ExternalTable) GetSpecSchemaName() *string {
+	return et.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -3157,6 +4264,30 @@ func (mv *MaterializedView) SetTrackedParametersList(val []string) {
 	mv.Status.TrackedParameters = val
 }
 
+func (mv *MaterializedView) GetScopeDatabaseName() string {
+	return mv.Status.DatabaseName
+}
+
+func (mv *MaterializedView) GetSpecDatabaseRef() *ObjectReference {
+	return mv.Spec.DatabaseRef
+}
+
+func (mv *MaterializedView) GetSpecDatabaseName() *string {
+	return mv.Spec.DatabaseName
+}
+
+func (mv *MaterializedView) GetScopeSchemaName() string {
+	return mv.Status.SchemaName
+}
+
+func (mv *MaterializedView) GetSpecSchemaRef() *ObjectReference {
+	return mv.Spec.SchemaRef
+}
+
+func (mv *MaterializedView) GetSpecSchemaName() *string {
+	return mv.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // ProcedureSQL
 // ---------------------------------------------------------------------------
@@ -3251,6 +4382,30 @@ func (p *ProcedureSQL) GetTrackedParametersList() []string {
 
 func (p *ProcedureSQL) SetTrackedParametersList(val []string) {
 	p.Status.TrackedParameters = val
+}
+
+func (p *ProcedureSQL) GetScopeDatabaseName() string {
+	return p.Status.DatabaseName
+}
+
+func (p *ProcedureSQL) GetSpecDatabaseRef() *ObjectReference {
+	return p.Spec.DatabaseRef
+}
+
+func (p *ProcedureSQL) GetSpecDatabaseName() *string {
+	return p.Spec.DatabaseName
+}
+
+func (p *ProcedureSQL) GetScopeSchemaName() string {
+	return p.Status.SchemaName
+}
+
+func (p *ProcedureSQL) GetSpecSchemaRef() *ObjectReference {
+	return p.Spec.SchemaRef
+}
+
+func (p *ProcedureSQL) GetSpecSchemaName() *string {
+	return p.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -3349,6 +4504,30 @@ func (p *ProcedureJavascript) SetTrackedParametersList(val []string) {
 	p.Status.TrackedParameters = val
 }
 
+func (p *ProcedureJavascript) GetScopeDatabaseName() string {
+	return p.Status.DatabaseName
+}
+
+func (p *ProcedureJavascript) GetSpecDatabaseRef() *ObjectReference {
+	return p.Spec.DatabaseRef
+}
+
+func (p *ProcedureJavascript) GetSpecDatabaseName() *string {
+	return p.Spec.DatabaseName
+}
+
+func (p *ProcedureJavascript) GetScopeSchemaName() string {
+	return p.Status.SchemaName
+}
+
+func (p *ProcedureJavascript) GetSpecSchemaRef() *ObjectReference {
+	return p.Spec.SchemaRef
+}
+
+func (p *ProcedureJavascript) GetSpecSchemaName() *string {
+	return p.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // ProcedurePython
 // ---------------------------------------------------------------------------
@@ -3443,6 +4622,30 @@ func (p *ProcedurePython) GetTrackedParametersList() []string {
 
 func (p *ProcedurePython) SetTrackedParametersList(val []string) {
 	p.Status.TrackedParameters = val
+}
+
+func (p *ProcedurePython) GetScopeDatabaseName() string {
+	return p.Status.DatabaseName
+}
+
+func (p *ProcedurePython) GetSpecDatabaseRef() *ObjectReference {
+	return p.Spec.DatabaseRef
+}
+
+func (p *ProcedurePython) GetSpecDatabaseName() *string {
+	return p.Spec.DatabaseName
+}
+
+func (p *ProcedurePython) GetScopeSchemaName() string {
+	return p.Status.SchemaName
+}
+
+func (p *ProcedurePython) GetSpecSchemaRef() *ObjectReference {
+	return p.Spec.SchemaRef
+}
+
+func (p *ProcedurePython) GetSpecSchemaName() *string {
+	return p.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -3541,6 +4744,30 @@ func (p *ProcedureJava) SetTrackedParametersList(val []string) {
 	p.Status.TrackedParameters = val
 }
 
+func (p *ProcedureJava) GetScopeDatabaseName() string {
+	return p.Status.DatabaseName
+}
+
+func (p *ProcedureJava) GetSpecDatabaseRef() *ObjectReference {
+	return p.Spec.DatabaseRef
+}
+
+func (p *ProcedureJava) GetSpecDatabaseName() *string {
+	return p.Spec.DatabaseName
+}
+
+func (p *ProcedureJava) GetScopeSchemaName() string {
+	return p.Status.SchemaName
+}
+
+func (p *ProcedureJava) GetSpecSchemaRef() *ObjectReference {
+	return p.Spec.SchemaRef
+}
+
+func (p *ProcedureJava) GetSpecSchemaName() *string {
+	return p.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // ProcedureScala
 // ---------------------------------------------------------------------------
@@ -3635,6 +4862,30 @@ func (p *ProcedureScala) GetTrackedParametersList() []string {
 
 func (p *ProcedureScala) SetTrackedParametersList(val []string) {
 	p.Status.TrackedParameters = val
+}
+
+func (p *ProcedureScala) GetScopeDatabaseName() string {
+	return p.Status.DatabaseName
+}
+
+func (p *ProcedureScala) GetSpecDatabaseRef() *ObjectReference {
+	return p.Spec.DatabaseRef
+}
+
+func (p *ProcedureScala) GetSpecDatabaseName() *string {
+	return p.Spec.DatabaseName
+}
+
+func (p *ProcedureScala) GetScopeSchemaName() string {
+	return p.Status.SchemaName
+}
+
+func (p *ProcedureScala) GetSpecSchemaRef() *ObjectReference {
+	return p.Spec.SchemaRef
+}
+
+func (p *ProcedureScala) GetSpecSchemaName() *string {
+	return p.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -3733,6 +4984,30 @@ func (f *FunctionSQL) SetTrackedParametersList(val []string) {
 	f.Status.TrackedParameters = val
 }
 
+func (f *FunctionSQL) GetScopeDatabaseName() string {
+	return f.Status.DatabaseName
+}
+
+func (f *FunctionSQL) GetSpecDatabaseRef() *ObjectReference {
+	return f.Spec.DatabaseRef
+}
+
+func (f *FunctionSQL) GetSpecDatabaseName() *string {
+	return f.Spec.DatabaseName
+}
+
+func (f *FunctionSQL) GetScopeSchemaName() string {
+	return f.Status.SchemaName
+}
+
+func (f *FunctionSQL) GetSpecSchemaRef() *ObjectReference {
+	return f.Spec.SchemaRef
+}
+
+func (f *FunctionSQL) GetSpecSchemaName() *string {
+	return f.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // FunctionJavascript
 // ---------------------------------------------------------------------------
@@ -3827,6 +5102,30 @@ func (f *FunctionJavascript) GetTrackedParametersList() []string {
 
 func (f *FunctionJavascript) SetTrackedParametersList(val []string) {
 	f.Status.TrackedParameters = val
+}
+
+func (f *FunctionJavascript) GetScopeDatabaseName() string {
+	return f.Status.DatabaseName
+}
+
+func (f *FunctionJavascript) GetSpecDatabaseRef() *ObjectReference {
+	return f.Spec.DatabaseRef
+}
+
+func (f *FunctionJavascript) GetSpecDatabaseName() *string {
+	return f.Spec.DatabaseName
+}
+
+func (f *FunctionJavascript) GetScopeSchemaName() string {
+	return f.Status.SchemaName
+}
+
+func (f *FunctionJavascript) GetSpecSchemaRef() *ObjectReference {
+	return f.Spec.SchemaRef
+}
+
+func (f *FunctionJavascript) GetSpecSchemaName() *string {
+	return f.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -3925,6 +5224,30 @@ func (f *FunctionPython) SetTrackedParametersList(val []string) {
 	f.Status.TrackedParameters = val
 }
 
+func (f *FunctionPython) GetScopeDatabaseName() string {
+	return f.Status.DatabaseName
+}
+
+func (f *FunctionPython) GetSpecDatabaseRef() *ObjectReference {
+	return f.Spec.DatabaseRef
+}
+
+func (f *FunctionPython) GetSpecDatabaseName() *string {
+	return f.Spec.DatabaseName
+}
+
+func (f *FunctionPython) GetScopeSchemaName() string {
+	return f.Status.SchemaName
+}
+
+func (f *FunctionPython) GetSpecSchemaRef() *ObjectReference {
+	return f.Spec.SchemaRef
+}
+
+func (f *FunctionPython) GetSpecSchemaName() *string {
+	return f.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // FunctionJava
 // ---------------------------------------------------------------------------
@@ -4019,6 +5342,30 @@ func (f *FunctionJava) GetTrackedParametersList() []string {
 
 func (f *FunctionJava) SetTrackedParametersList(val []string) {
 	f.Status.TrackedParameters = val
+}
+
+func (f *FunctionJava) GetScopeDatabaseName() string {
+	return f.Status.DatabaseName
+}
+
+func (f *FunctionJava) GetSpecDatabaseRef() *ObjectReference {
+	return f.Spec.DatabaseRef
+}
+
+func (f *FunctionJava) GetSpecDatabaseName() *string {
+	return f.Spec.DatabaseName
+}
+
+func (f *FunctionJava) GetScopeSchemaName() string {
+	return f.Status.SchemaName
+}
+
+func (f *FunctionJava) GetSpecSchemaRef() *ObjectReference {
+	return f.Spec.SchemaRef
+}
+
+func (f *FunctionJava) GetSpecSchemaName() *string {
+	return f.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -4117,6 +5464,30 @@ func (f *FunctionScala) SetTrackedParametersList(val []string) {
 	f.Status.TrackedParameters = val
 }
 
+func (f *FunctionScala) GetScopeDatabaseName() string {
+	return f.Status.DatabaseName
+}
+
+func (f *FunctionScala) GetSpecDatabaseRef() *ObjectReference {
+	return f.Spec.DatabaseRef
+}
+
+func (f *FunctionScala) GetSpecDatabaseName() *string {
+	return f.Spec.DatabaseName
+}
+
+func (f *FunctionScala) GetScopeSchemaName() string {
+	return f.Status.SchemaName
+}
+
+func (f *FunctionScala) GetSpecSchemaRef() *ObjectReference {
+	return f.Spec.SchemaRef
+}
+
+func (f *FunctionScala) GetSpecSchemaName() *string {
+	return f.Spec.SchemaName
+}
+
 // ---------------------------------------------------------------------------
 // SecretWithClientCredentials
 // ---------------------------------------------------------------------------
@@ -4198,8 +5569,8 @@ func (s *SecretWithClientCredentials) ComputeSpecHash() (string, error) {
 }
 
 func (s *SecretWithClientCredentials) GetOwner() string {
-	if s.Status.ShowOutput != nil && s.Status.ShowOutput.Owner != nil {
-		return *s.Status.ShowOutput.Owner
+	if s.Status.ShowOutput != nil {
+		return s.Status.ShowOutput.Owner
 	}
 
 	return ""
@@ -4211,6 +5582,30 @@ func (s *SecretWithClientCredentials) GetTrackedParametersList() []string {
 
 func (s *SecretWithClientCredentials) SetTrackedParametersList(val []string) {
 	s.Status.TrackedParameters = val
+}
+
+func (s *SecretWithClientCredentials) GetScopeDatabaseName() string {
+	return s.Status.DatabaseName
+}
+
+func (s *SecretWithClientCredentials) GetSpecDatabaseRef() *ObjectReference {
+	return s.Spec.DatabaseRef
+}
+
+func (s *SecretWithClientCredentials) GetSpecDatabaseName() *string {
+	return s.Spec.DatabaseName
+}
+
+func (s *SecretWithClientCredentials) GetScopeSchemaName() string {
+	return s.Status.SchemaName
+}
+
+func (s *SecretWithClientCredentials) GetSpecSchemaRef() *ObjectReference {
+	return s.Spec.SchemaRef
+}
+
+func (s *SecretWithClientCredentials) GetSpecSchemaName() *string {
+	return s.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -4294,8 +5689,8 @@ func (s *SecretWithAuthorizationCodeGrant) ComputeSpecHash() (string, error) {
 }
 
 func (s *SecretWithAuthorizationCodeGrant) GetOwner() string {
-	if s.Status.ShowOutput != nil && s.Status.ShowOutput.Owner != nil {
-		return *s.Status.ShowOutput.Owner
+	if s.Status.ShowOutput != nil {
+		return s.Status.ShowOutput.Owner
 	}
 
 	return ""
@@ -4307,6 +5702,30 @@ func (s *SecretWithAuthorizationCodeGrant) GetTrackedParametersList() []string {
 
 func (s *SecretWithAuthorizationCodeGrant) SetTrackedParametersList(val []string) {
 	s.Status.TrackedParameters = val
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetScopeDatabaseName() string {
+	return s.Status.DatabaseName
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetSpecDatabaseRef() *ObjectReference {
+	return s.Spec.DatabaseRef
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetSpecDatabaseName() *string {
+	return s.Spec.DatabaseName
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetScopeSchemaName() string {
+	return s.Status.SchemaName
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetSpecSchemaRef() *ObjectReference {
+	return s.Spec.SchemaRef
+}
+
+func (s *SecretWithAuthorizationCodeGrant) GetSpecSchemaName() *string {
+	return s.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -4390,8 +5809,8 @@ func (s *SecretWithBasicAuthentication) ComputeSpecHash() (string, error) {
 }
 
 func (s *SecretWithBasicAuthentication) GetOwner() string {
-	if s.Status.ShowOutput != nil && s.Status.ShowOutput.Owner != nil {
-		return *s.Status.ShowOutput.Owner
+	if s.Status.ShowOutput != nil {
+		return s.Status.ShowOutput.Owner
 	}
 
 	return ""
@@ -4403,6 +5822,30 @@ func (s *SecretWithBasicAuthentication) GetTrackedParametersList() []string {
 
 func (s *SecretWithBasicAuthentication) SetTrackedParametersList(val []string) {
 	s.Status.TrackedParameters = val
+}
+
+func (s *SecretWithBasicAuthentication) GetScopeDatabaseName() string {
+	return s.Status.DatabaseName
+}
+
+func (s *SecretWithBasicAuthentication) GetSpecDatabaseRef() *ObjectReference {
+	return s.Spec.DatabaseRef
+}
+
+func (s *SecretWithBasicAuthentication) GetSpecDatabaseName() *string {
+	return s.Spec.DatabaseName
+}
+
+func (s *SecretWithBasicAuthentication) GetScopeSchemaName() string {
+	return s.Status.SchemaName
+}
+
+func (s *SecretWithBasicAuthentication) GetSpecSchemaRef() *ObjectReference {
+	return s.Spec.SchemaRef
+}
+
+func (s *SecretWithBasicAuthentication) GetSpecSchemaName() *string {
+	return s.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -4486,8 +5929,8 @@ func (s *SecretWithGenericString) ComputeSpecHash() (string, error) {
 }
 
 func (s *SecretWithGenericString) GetOwner() string {
-	if s.Status.ShowOutput != nil && s.Status.ShowOutput.Owner != nil {
-		return *s.Status.ShowOutput.Owner
+	if s.Status.ShowOutput != nil {
+		return s.Status.ShowOutput.Owner
 	}
 
 	return ""
@@ -4499,6 +5942,30 @@ func (s *SecretWithGenericString) GetTrackedParametersList() []string {
 
 func (s *SecretWithGenericString) SetTrackedParametersList(val []string) {
 	s.Status.TrackedParameters = val
+}
+
+func (s *SecretWithGenericString) GetScopeDatabaseName() string {
+	return s.Status.DatabaseName
+}
+
+func (s *SecretWithGenericString) GetSpecDatabaseRef() *ObjectReference {
+	return s.Spec.DatabaseRef
+}
+
+func (s *SecretWithGenericString) GetSpecDatabaseName() *string {
+	return s.Spec.DatabaseName
+}
+
+func (s *SecretWithGenericString) GetScopeSchemaName() string {
+	return s.Status.SchemaName
+}
+
+func (s *SecretWithGenericString) GetSpecSchemaRef() *ObjectReference {
+	return s.Spec.SchemaRef
+}
+
+func (s *SecretWithGenericString) GetSpecSchemaName() *string {
+	return s.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -4781,18 +6248,18 @@ func (a *APIAuthenticationIntegrationWithJWTBearer) SetTrackedParametersList(val
 }
 
 // ---------------------------------------------------------------------------
-// AccountRoleGrant
+// GrantPrivilegesToAccountRole
 // ---------------------------------------------------------------------------
 
-func (r *AccountRoleGrant) GetConditions() []metav1.Condition {
+func (r *GrantPrivilegesToAccountRole) GetConditions() []metav1.Condition {
 	return r.Status.Conditions
 }
 
-func (r *AccountRoleGrant) SetConditions(conditions []metav1.Condition) {
+func (r *GrantPrivilegesToAccountRole) SetConditions(conditions []metav1.Condition) {
 	r.Status.Conditions = conditions
 }
 
-func (r *AccountRoleGrant) GetDeletionPolicy() DeletionPolicy {
+func (r *GrantPrivilegesToAccountRole) GetDeletionPolicy() DeletionPolicy {
 	if r.Spec.DeletionPolicy == "" {
 		return DeletionPolicyDelete
 	}
@@ -4800,63 +6267,63 @@ func (r *AccountRoleGrant) GetDeletionPolicy() DeletionPolicy {
 	return r.Spec.DeletionPolicy
 }
 
-func (r *AccountRoleGrant) GetFullyQualifiedName() string {
+func (r *GrantPrivilegesToAccountRole) GetFullyQualifiedName() string {
 	return r.Status.FullyQualifiedName
 }
 
-func (r *AccountRoleGrant) GetProviderRef() ProviderReference {
+func (r *GrantPrivilegesToAccountRole) GetProviderRef() ProviderReference {
 	return r.Spec.ProviderRef
 }
 
-func (r *AccountRoleGrant) GetUseRole() *string {
+func (r *GrantPrivilegesToAccountRole) GetUseRole() *string {
 	return r.Spec.UseRole
 }
 
-func (r *AccountRoleGrant) GetPaused() bool {
+func (r *GrantPrivilegesToAccountRole) GetPaused() bool {
 	return r.Spec.Paused
 }
 
-func (r *AccountRoleGrant) GetManagementPolicies() ManagementPolicies {
+func (r *GrantPrivilegesToAccountRole) GetManagementPolicies() ManagementPolicies {
 	return r.Spec.ManagementPolicies
 }
 
-func (r *AccountRoleGrant) SetCreateOrAlter(val *bool) {
+func (r *GrantPrivilegesToAccountRole) SetCreateOrAlter(val *bool) {
 	r.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
-func (r *AccountRoleGrant) GetObservedGeneration() int64 {
+func (r *GrantPrivilegesToAccountRole) GetObservedGeneration() int64 {
 	return r.Status.ObservedGeneration
 }
 
-func (r *AccountRoleGrant) SetObservedGeneration(val int64) {
+func (r *GrantPrivilegesToAccountRole) SetObservedGeneration(val int64) {
 	r.Status.ObservedGeneration = val
 }
 
-func (r *AccountRoleGrant) GetLastAppliedSpecHash() string {
+func (r *GrantPrivilegesToAccountRole) GetLastAppliedSpecHash() string {
 	return r.Status.LastAppliedSpecHash
 }
 
-func (r *AccountRoleGrant) SetLastAppliedSpecHash(val string) {
+func (r *GrantPrivilegesToAccountRole) SetLastAppliedSpecHash(val string) {
 	r.Status.LastAppliedSpecHash = val
 }
 
-func (r *AccountRoleGrant) GetLastReconcileTime() *metav1.Time {
+func (r *GrantPrivilegesToAccountRole) GetLastReconcileTime() *metav1.Time {
 	return r.Status.LastReconcileTime
 }
 
-func (r *AccountRoleGrant) SetLastReconcileTime(val *metav1.Time) {
+func (r *GrantPrivilegesToAccountRole) SetLastReconcileTime(val *metav1.Time) {
 	r.Status.LastReconcileTime = val
 }
 
-func (r *AccountRoleGrant) ValidateSpec() error {
+func (r *GrantPrivilegesToAccountRole) ValidateSpec() error {
 	return r.Spec.Validate()
 }
 
-func (r *AccountRoleGrant) ComputeSpecHash() (string, error) {
+func (r *GrantPrivilegesToAccountRole) ComputeSpecHash() (string, error) {
 	return ComputeSpecHash(r.Spec)
 }
 
-func (r *AccountRoleGrant) GetOwner() string {
+func (r *GrantPrivilegesToAccountRole) GetOwner() string {
 	if r.Status.ShowOutput != nil {
 		return r.Status.ShowOutput.GrantedBy
 	}
@@ -4864,23 +6331,23 @@ func (r *AccountRoleGrant) GetOwner() string {
 	return ""
 }
 
-func (r *AccountRoleGrant) GetTrackedParametersList() []string { return nil }
+func (r *GrantPrivilegesToAccountRole) GetTrackedParametersList() []string { return nil }
 
-func (r *AccountRoleGrant) SetTrackedParametersList(_ []string) {}
+func (r *GrantPrivilegesToAccountRole) SetTrackedParametersList(_ []string) {}
 
 // ---------------------------------------------------------------------------
-// DatabaseRoleGrant
+// GrantPrivilegesToDatabaseRole
 // ---------------------------------------------------------------------------
 
-func (r *DatabaseRoleGrant) GetConditions() []metav1.Condition {
+func (r *GrantPrivilegesToDatabaseRole) GetConditions() []metav1.Condition {
 	return r.Status.Conditions
 }
 
-func (r *DatabaseRoleGrant) SetConditions(conditions []metav1.Condition) {
+func (r *GrantPrivilegesToDatabaseRole) SetConditions(conditions []metav1.Condition) {
 	r.Status.Conditions = conditions
 }
 
-func (r *DatabaseRoleGrant) GetDeletionPolicy() DeletionPolicy {
+func (r *GrantPrivilegesToDatabaseRole) GetDeletionPolicy() DeletionPolicy {
 	if r.Spec.DeletionPolicy == "" {
 		return DeletionPolicyDelete
 	}
@@ -4888,63 +6355,63 @@ func (r *DatabaseRoleGrant) GetDeletionPolicy() DeletionPolicy {
 	return r.Spec.DeletionPolicy
 }
 
-func (r *DatabaseRoleGrant) GetFullyQualifiedName() string {
+func (r *GrantPrivilegesToDatabaseRole) GetFullyQualifiedName() string {
 	return r.Status.FullyQualifiedName
 }
 
-func (r *DatabaseRoleGrant) GetProviderRef() ProviderReference {
+func (r *GrantPrivilegesToDatabaseRole) GetProviderRef() ProviderReference {
 	return r.Spec.ProviderRef
 }
 
-func (r *DatabaseRoleGrant) GetUseRole() *string {
+func (r *GrantPrivilegesToDatabaseRole) GetUseRole() *string {
 	return r.Spec.UseRole
 }
 
-func (r *DatabaseRoleGrant) GetPaused() bool {
+func (r *GrantPrivilegesToDatabaseRole) GetPaused() bool {
 	return r.Spec.Paused
 }
 
-func (r *DatabaseRoleGrant) GetManagementPolicies() ManagementPolicies {
+func (r *GrantPrivilegesToDatabaseRole) GetManagementPolicies() ManagementPolicies {
 	return r.Spec.ManagementPolicies
 }
 
-func (r *DatabaseRoleGrant) SetCreateOrAlter(val *bool) {
+func (r *GrantPrivilegesToDatabaseRole) SetCreateOrAlter(val *bool) {
 	r.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
-func (r *DatabaseRoleGrant) GetObservedGeneration() int64 {
+func (r *GrantPrivilegesToDatabaseRole) GetObservedGeneration() int64 {
 	return r.Status.ObservedGeneration
 }
 
-func (r *DatabaseRoleGrant) SetObservedGeneration(val int64) {
+func (r *GrantPrivilegesToDatabaseRole) SetObservedGeneration(val int64) {
 	r.Status.ObservedGeneration = val
 }
 
-func (r *DatabaseRoleGrant) GetLastAppliedSpecHash() string {
+func (r *GrantPrivilegesToDatabaseRole) GetLastAppliedSpecHash() string {
 	return r.Status.LastAppliedSpecHash
 }
 
-func (r *DatabaseRoleGrant) SetLastAppliedSpecHash(val string) {
+func (r *GrantPrivilegesToDatabaseRole) SetLastAppliedSpecHash(val string) {
 	r.Status.LastAppliedSpecHash = val
 }
 
-func (r *DatabaseRoleGrant) GetLastReconcileTime() *metav1.Time {
+func (r *GrantPrivilegesToDatabaseRole) GetLastReconcileTime() *metav1.Time {
 	return r.Status.LastReconcileTime
 }
 
-func (r *DatabaseRoleGrant) SetLastReconcileTime(val *metav1.Time) {
+func (r *GrantPrivilegesToDatabaseRole) SetLastReconcileTime(val *metav1.Time) {
 	r.Status.LastReconcileTime = val
 }
 
-func (r *DatabaseRoleGrant) ValidateSpec() error {
+func (r *GrantPrivilegesToDatabaseRole) ValidateSpec() error {
 	return r.Spec.Validate()
 }
 
-func (r *DatabaseRoleGrant) ComputeSpecHash() (string, error) {
+func (r *GrantPrivilegesToDatabaseRole) ComputeSpecHash() (string, error) {
 	return ComputeSpecHash(r.Spec)
 }
 
-func (r *DatabaseRoleGrant) GetOwner() string {
+func (r *GrantPrivilegesToDatabaseRole) GetOwner() string {
 	if r.Status.ShowOutput != nil {
 		return r.Status.ShowOutput.GrantedBy
 	}
@@ -4952,23 +6419,23 @@ func (r *DatabaseRoleGrant) GetOwner() string {
 	return ""
 }
 
-func (r *DatabaseRoleGrant) GetTrackedParametersList() []string { return nil }
+func (r *GrantPrivilegesToDatabaseRole) GetTrackedParametersList() []string { return nil }
 
-func (r *DatabaseRoleGrant) SetTrackedParametersList(_ []string) {}
+func (r *GrantPrivilegesToDatabaseRole) SetTrackedParametersList(_ []string) {}
 
 // ---------------------------------------------------------------------------
-// ShareGrant
+// GrantPrivilegesToShare
 // ---------------------------------------------------------------------------
 
-func (r *ShareGrant) GetConditions() []metav1.Condition {
+func (r *GrantPrivilegesToShare) GetConditions() []metav1.Condition {
 	return r.Status.Conditions
 }
 
-func (r *ShareGrant) SetConditions(conditions []metav1.Condition) {
+func (r *GrantPrivilegesToShare) SetConditions(conditions []metav1.Condition) {
 	r.Status.Conditions = conditions
 }
 
-func (r *ShareGrant) GetDeletionPolicy() DeletionPolicy {
+func (r *GrantPrivilegesToShare) GetDeletionPolicy() DeletionPolicy {
 	if r.Spec.DeletionPolicy == "" {
 		return DeletionPolicyDelete
 	}
@@ -4976,63 +6443,63 @@ func (r *ShareGrant) GetDeletionPolicy() DeletionPolicy {
 	return r.Spec.DeletionPolicy
 }
 
-func (r *ShareGrant) GetFullyQualifiedName() string {
+func (r *GrantPrivilegesToShare) GetFullyQualifiedName() string {
 	return r.Status.FullyQualifiedName
 }
 
-func (r *ShareGrant) GetProviderRef() ProviderReference {
+func (r *GrantPrivilegesToShare) GetProviderRef() ProviderReference {
 	return r.Spec.ProviderRef
 }
 
-func (r *ShareGrant) GetUseRole() *string {
+func (r *GrantPrivilegesToShare) GetUseRole() *string {
 	return r.Spec.UseRole
 }
 
-func (r *ShareGrant) GetPaused() bool {
+func (r *GrantPrivilegesToShare) GetPaused() bool {
 	return r.Spec.Paused
 }
 
-func (r *ShareGrant) GetManagementPolicies() ManagementPolicies {
+func (r *GrantPrivilegesToShare) GetManagementPolicies() ManagementPolicies {
 	return r.Spec.ManagementPolicies
 }
 
-func (r *ShareGrant) SetCreateOrAlter(val *bool) {
+func (r *GrantPrivilegesToShare) SetCreateOrAlter(val *bool) {
 	r.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
-func (r *ShareGrant) GetObservedGeneration() int64 {
+func (r *GrantPrivilegesToShare) GetObservedGeneration() int64 {
 	return r.Status.ObservedGeneration
 }
 
-func (r *ShareGrant) SetObservedGeneration(val int64) {
+func (r *GrantPrivilegesToShare) SetObservedGeneration(val int64) {
 	r.Status.ObservedGeneration = val
 }
 
-func (r *ShareGrant) GetLastAppliedSpecHash() string {
+func (r *GrantPrivilegesToShare) GetLastAppliedSpecHash() string {
 	return r.Status.LastAppliedSpecHash
 }
 
-func (r *ShareGrant) SetLastAppliedSpecHash(val string) {
+func (r *GrantPrivilegesToShare) SetLastAppliedSpecHash(val string) {
 	r.Status.LastAppliedSpecHash = val
 }
 
-func (r *ShareGrant) GetLastReconcileTime() *metav1.Time {
+func (r *GrantPrivilegesToShare) GetLastReconcileTime() *metav1.Time {
 	return r.Status.LastReconcileTime
 }
 
-func (r *ShareGrant) SetLastReconcileTime(val *metav1.Time) {
+func (r *GrantPrivilegesToShare) SetLastReconcileTime(val *metav1.Time) {
 	r.Status.LastReconcileTime = val
 }
 
-func (r *ShareGrant) ValidateSpec() error {
+func (r *GrantPrivilegesToShare) ValidateSpec() error {
 	return r.Spec.Validate()
 }
 
-func (r *ShareGrant) ComputeSpecHash() (string, error) {
+func (r *GrantPrivilegesToShare) ComputeSpecHash() (string, error) {
 	return ComputeSpecHash(r.Spec)
 }
 
-func (r *ShareGrant) GetOwner() string {
+func (r *GrantPrivilegesToShare) GetOwner() string {
 	if r.Status.ShowOutput != nil {
 		return r.Status.ShowOutput.GrantedBy
 	}
@@ -5040,9 +6507,9 @@ func (r *ShareGrant) GetOwner() string {
 	return ""
 }
 
-func (r *ShareGrant) GetTrackedParametersList() []string { return nil }
+func (r *GrantPrivilegesToShare) GetTrackedParametersList() []string { return nil }
 
-func (r *ShareGrant) SetTrackedParametersList(_ []string) {}
+func (r *GrantPrivilegesToShare) SetTrackedParametersList(_ []string) {}
 
 // ---------------------------------------------------------------------------
 // GrantOwnership
@@ -5728,3 +7195,88 @@ func (tc *TableConstraint) GetOwner() string {
 func (tc *TableConstraint) GetTrackedParametersList() []string { return nil }
 
 func (tc *TableConstraint) SetTrackedParametersList(_ []string) {}
+
+// ---------------------------------------------------------------------------
+// SQLStatement
+// ---------------------------------------------------------------------------
+
+func (s *SQLStatement) GetConditions() []metav1.Condition {
+	return s.Status.Conditions
+}
+
+func (s *SQLStatement) SetConditions(conditions []metav1.Condition) {
+	s.Status.Conditions = conditions
+}
+
+func (s *SQLStatement) GetDeletionPolicy() DeletionPolicy {
+	if s.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return s.Spec.DeletionPolicy
+}
+
+func (s *SQLStatement) GetFullyQualifiedName() string {
+	return s.Status.FullyQualifiedName
+}
+
+func (s *SQLStatement) GetProviderRef() ProviderReference {
+	return s.Spec.ProviderRef
+}
+
+func (s *SQLStatement) GetUseRole() *string {
+	return s.Spec.UseRole
+}
+
+func (s *SQLStatement) GetPaused() bool {
+	return s.Spec.Paused
+}
+
+func (s *SQLStatement) GetManagementPolicies() ManagementPolicies {
+	return s.Spec.ManagementPolicies
+}
+
+func (s *SQLStatement) SetCreateOrAlter(val *bool) {
+	s.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (s *SQLStatement) GetObservedGeneration() int64 {
+	return s.Status.ObservedGeneration
+}
+
+func (s *SQLStatement) SetObservedGeneration(val int64) {
+	s.Status.ObservedGeneration = val
+}
+
+func (s *SQLStatement) GetLastAppliedSpecHash() string {
+	return s.Status.LastAppliedSpecHash
+}
+
+func (s *SQLStatement) SetLastAppliedSpecHash(val string) {
+	s.Status.LastAppliedSpecHash = val
+}
+
+func (s *SQLStatement) GetLastReconcileTime() *metav1.Time {
+	return s.Status.LastReconcileTime
+}
+
+func (s *SQLStatement) SetLastReconcileTime(val *metav1.Time) {
+	s.Status.LastReconcileTime = val
+}
+
+func (s *SQLStatement) ValidateSpec() error {
+	return s.Spec.Validate()
+}
+
+func (s *SQLStatement) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(s.Spec)
+}
+
+func (s *SQLStatement) GetOwner() string {
+	// SQLStatement executes arbitrary SQL and has no Snowflake owner.
+	return ""
+}
+
+func (s *SQLStatement) GetTrackedParametersList() []string { return nil }
+
+func (s *SQLStatement) SetTrackedParametersList(_ []string) {}

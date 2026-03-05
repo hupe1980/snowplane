@@ -3,6 +3,7 @@ package snowflake
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -278,7 +279,7 @@ func (m *testSQLExec) Exec(ctx context.Context, query string, args ...any) (sql.
 }
 
 func (m *testSQLExec) QueryRow(_ context.Context, _ string, _ ...any) *Row {
-	return nil
+	return NewErrorRow(fmt.Errorf("test: not connected"))
 }
 
 func (m *testSQLExec) Query(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {

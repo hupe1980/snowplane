@@ -3,6 +3,7 @@ package notificationintegration
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"k8s.io/client-go/tools/record"
@@ -37,14 +38,11 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 
 // NewReconciler returns a new NotificationIntegration reconciler.
 func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.NotificationIntegration, Service, *snowflake.NotificationIntegrationObservation] {
-	a := &adapter{newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.NotificationIntegration, Service, *snowflake.NotificationIntegrationObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewNotificationIntegrationClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
@@ -56,38 +54,74 @@ func NewReconcilerWithServiceFactory(
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.NotificationIntegration, Service, *snowflake.NotificationIntegrationObservation] {
-	a := &adapter{newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.NotificationIntegration, Service, *snowflake.NotificationIntegrationObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(sf))
+}
+
+// newAdapter creates the BaseAdapter for NotificationIntegration resources.
+func newAdapter(sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.NotificationIntegration, Service, *snowflake.NotificationIntegrationObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.NotificationIntegration, Service, *snowflake.NotificationIntegrationObservation]{
+		ResourceNameVal:  "notificationintegration",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.NotificationIntegration { return &snowplanev1alpha1.NotificationIntegration{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(obj *snowplanev1alpha1.NotificationIntegration) (reconciler.Identifier, error) {
+			return snowflake.NewAccountObjectIdentifier(obj.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) (*snowflake.NotificationIntegrationObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.NotificationIntegrationObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.NotificationIntegration, id snowflake.AccountObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterNotificationIntegrationOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.NotificationIntegration, id snowflake.AccountObjectIdentifier, obs *reconciler.Observation[*snowflake.NotificationIntegrationObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.NotificationIntegration, obs *reconciler.Observation[*snowflake.NotificationIntegrationObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.NotificationIntegration, obs *reconciler.Observation[*snowflake.NotificationIntegrationObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		LateInitializeFn: lateInitialize,
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+// validateImmutableFields checks that immutable fields have not been changed.
+func validateImmutableFields(_ context.Context, ni *snowplanev1alpha1.NotificationIntegration) error {
+	if reconciler.ShouldSkipImmutableValidation(ni) {
+		return nil
 	}
 
-	return snowflake.NewNotificationIntegrationClient(sfC), cleanup, nil
+	if ni.Status.ShowOutput != nil {
+		if ni.Status.ShowOutput.Name != "" && !strings.EqualFold(ni.Spec.Name, ni.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", ni.Status.ShowOutput.Name, ni.Spec.Name)
+		}
+
+		if ni.Status.ShowOutput.Type != "" && !strings.EqualFold(string(ni.Spec.Type), ni.Status.ShowOutput.Type) {
+			return fmt.Errorf("spec.type is immutable after creation (current: %q, desired: %q)", ni.Status.ShowOutput.Type, ni.Spec.Type)
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(ni *snowplanev1alpha1.NotificationIntegration, obs *snowflake.NotificationIntegrationObservation) {
 	if obs.ShowOutput != nil {
 		ni.Status.FullyQualifiedName = obs.ShowOutput.Name
 
-		ni.Status.ShowOutput = &snowplanev1alpha1.NotificationIntegrationShowOutput{
-			CreatedOn: obs.ShowOutput.CreatedOn,
-			Name:      obs.ShowOutput.Name,
-			Type:      obs.ShowOutput.Type,
-			Category:  obs.ShowOutput.Category,
-			Enabled:   obs.ShowOutput.Enabled,
-			Comment:   obs.ShowOutput.Comment,
-		}
+		ni.Status.ShowOutput = obs.ShowOutput
 	}
 
 	if obs.DescribeOutput != nil {

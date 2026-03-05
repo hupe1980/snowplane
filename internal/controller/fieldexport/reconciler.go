@@ -610,9 +610,9 @@ func sourceResourceTypes() []client.Object {
 		&snowplanev1alpha1.AccountRole{},
 		&snowplanev1alpha1.DatabaseRole{},
 		&snowplanev1alpha1.User{},
-		&snowplanev1alpha1.AccountRoleGrant{},
-		&snowplanev1alpha1.DatabaseRoleGrant{},
-		&snowplanev1alpha1.ShareGrant{},
+		&snowplanev1alpha1.GrantPrivilegesToAccountRole{},
+		&snowplanev1alpha1.GrantPrivilegesToDatabaseRole{},
+		&snowplanev1alpha1.GrantPrivilegesToShare{},
 		&snowplanev1alpha1.AccountRoleAssignment{},
 		&snowplanev1alpha1.DatabaseRoleAssignment{},
 		&snowplanev1alpha1.GrantOwnership{},
@@ -638,6 +638,12 @@ func sourceResourceTypes() []client.Object {
 		&snowplanev1alpha1.Pipe{},
 		&snowplanev1alpha1.StorageIntegration{},
 		&snowplanev1alpha1.SecurityIntegration{},
+		&snowplanev1alpha1.SAML2Integration{},
+		&snowplanev1alpha1.ExternalOAuthIntegration{},
+		&snowplanev1alpha1.APIIntegration{},
+		&snowplanev1alpha1.SecondaryDatabase{},
+		&snowplanev1alpha1.SharedDatabase{},
+		&snowplanev1alpha1.FailoverGroup{},
 		&snowplanev1alpha1.NotificationIntegration{},
 		&snowplanev1alpha1.TagAssociation{},
 		&snowplanev1alpha1.NetworkPolicyAttachment{},
@@ -664,6 +670,7 @@ func sourceResourceTypes() []client.Object {
 		&snowplanev1alpha1.APIAuthenticationIntegrationWithClientCredentials{},
 		&snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant{},
 		&snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBearer{},
+		&snowplanev1alpha1.SQLStatement{},
 	}
 }
 

@@ -39,7 +39,7 @@ type TaskSpec struct {
 	// DatabaseRef references a Database CR in the same namespace.
 	// Mutually exclusive with DatabaseName. Immutable after creation.
 	// +optional
-	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
+	DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
 	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
@@ -51,7 +51,7 @@ type TaskSpec struct {
 	// SchemaRef references a Schema CR in the same namespace.
 	// Mutually exclusive with SchemaName. Immutable after creation.
 	// +optional
-	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
+	SchemaRef *ObjectReference `json:"schemaRef,omitempty"`
 
 	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// Mutually exclusive with SchemaRef. Immutable after creation.
@@ -63,7 +63,7 @@ type TaskSpec struct {
 	// WarehouseRef references a Warehouse CR in the same namespace.
 	// Mutually exclusive with WarehouseName and UserTaskManagedInitialWarehouseSize.
 	// +optional
-	WarehouseRef *LocalObjectReference `json:"warehouseRef,omitempty"`
+	WarehouseRef *ObjectReference `json:"warehouseRef,omitempty"`
 
 	// WarehouseName is the Snowflake warehouse identifier (e.g. "COMPUTE_WH").
 	// Mutually exclusive with WarehouseRef and UserTaskManagedInitialWarehouseSize.
@@ -121,7 +121,7 @@ type TaskSpec struct {
 	// ErrorIntegrationRef references a NotificationIntegration CR for error notifications.
 	// Mutually exclusive with ErrorIntegrationName.
 	// +optional
-	ErrorIntegrationRef *LocalObjectReference `json:"errorIntegrationRef,omitempty"`
+	ErrorIntegrationRef *ObjectReference `json:"errorIntegrationRef,omitempty"`
 
 	// ErrorIntegrationName is the Snowflake notification integration identifier for error notifications.
 	// Mutually exclusive with ErrorIntegrationRef.
@@ -133,7 +133,7 @@ type TaskSpec struct {
 	// SuccessIntegrationRef references a NotificationIntegration CR for success notifications.
 	// Mutually exclusive with SuccessIntegrationName.
 	// +optional
-	SuccessIntegrationRef *LocalObjectReference `json:"successIntegrationRef,omitempty"`
+	SuccessIntegrationRef *ObjectReference `json:"successIntegrationRef,omitempty"`
 
 	// SuccessIntegrationName is the Snowflake notification integration identifier for success notifications.
 	// Mutually exclusive with SuccessIntegrationRef.
@@ -163,7 +163,7 @@ type TaskSpec struct {
 	// Finalizer tasks run after all other tasks in the task graph complete.
 	// Mutually exclusive with FinalizeName, Schedule, and After.
 	// +optional
-	FinalizeRef *LocalObjectReference `json:"finalizeRef,omitempty"`
+	FinalizeRef *ObjectReference `json:"finalizeRef,omitempty"`
 
 	// FinalizeName is the name of a root task that this finalizer task is
 	// associated with. Finalizer tasks run after all other tasks in the task
@@ -207,7 +207,7 @@ type TaskSpec struct {
 type TaskPredecessor struct {
 	// Ref references a Task CR in the same namespace.
 	// +optional
-	Ref *LocalObjectReference `json:"ref,omitempty"`
+	Ref *ObjectReference `json:"ref,omitempty"`
 
 	// Name is the Snowflake task identifier.
 	// +optional

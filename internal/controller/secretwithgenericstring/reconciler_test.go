@@ -16,7 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -93,7 +92,7 @@ func newTestSecret(name, namespace string) *snowplanev1alpha1.SecretWithGenericS
 func successfulObservation() *snowflake.SecretObservation {
 	return &snowflake.SecretObservation{
 		Exists: true,
-		ShowOutput: &snowflake.SecretShowOutput{
+		ShowOutput: &snowplanev1alpha1.SecretShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         "MY_SECRET",
 			DatabaseName: "MY_DB",
@@ -118,21 +117,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.SecretWithGenericString, Service, *snowflake.SecretObservation]{
-		Client:   c,
-		Factory:  clientfactory.NewClientFactory(),
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("SecretWithGenericString"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("SecretWithGenericString")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -449,9 +444,9 @@ func TestReconcile_ImmutableName(t *testing.T) {
 	obj.Status.SchemaName = "MY_SCHEMA"
 	obj.Spec.Name = "RENAMED_SECRET"
 	obj.Status.ShowOutput = &snowplanev1alpha1.SecretShowOutput{
-		Name:         testutil.Ptr("MY_SECRET"),
-		DatabaseName: testutil.Ptr("MY_DB"),
-		SchemaName:   testutil.Ptr("MY_SCHEMA"),
+		Name:         "MY_SECRET",
+		DatabaseName: "MY_DB",
+		SchemaName:   "MY_SCHEMA",
 	}
 
 	obs := successfulObservation()
@@ -515,7 +510,7 @@ func TestApplyObservation(t *testing.T) {
 
 	assert.Equal(t, "\"MY_DB\".\"MY_SCHEMA\".\"MY_SECRET\"", obj.Status.FullyQualifiedName)
 	require.NotNil(t, obj.Status.ShowOutput)
-	assert.Equal(t, "MY_SECRET", *obj.Status.ShowOutput.Name)
+	assert.Equal(t, "MY_SECRET", obj.Status.ShowOutput.Name)
 	require.NotNil(t, obj.Status.DescribeOutput)
 	assert.Equal(t, "GENERIC_STRING", *obj.Status.DescribeOutput.SecretType)
 }
@@ -534,7 +529,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.SecretObservation{
-		ShowOutput: &snowflake.SecretShowOutput{
+		ShowOutput: &snowplanev1alpha1.SecretShowOutput{
 			Name: "MY_SECRET",
 		},
 	}
@@ -554,7 +549,7 @@ func TestDetectDrift_CommentChanged(t *testing.T) {
 	}
 
 	obs := &snowflake.SecretObservation{
-		ShowOutput: &snowflake.SecretShowOutput{
+		ShowOutput: &snowplanev1alpha1.SecretShowOutput{
 			Name:    "MY_SECRET",
 			Comment: "old comment",
 		},

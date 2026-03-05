@@ -107,7 +107,7 @@ func TestBuildCreateMaskingPolicySQL_CreateOrAlter(t *testing.T) {
 		UseCreateOrAlter: true,
 	}
 	got, err := buildCreateMaskingPolicySQL(opts)
-		require.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, got, `CREATE OR ALTER MASKING POLICY "DB"."SCH"."MASK_EMAIL"`)
 	assert.NotContains(t, got, "IF NOT EXISTS")
 	assert.Contains(t, got, `AS ("val" VARCHAR) RETURNS VARCHAR`)

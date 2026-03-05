@@ -82,11 +82,38 @@ type ProviderConfigSpec struct {
 	WorkloadIdentity *WorkloadIdentitySpec `json:"workloadIdentity,omitempty"`
 
 	// AllowedNamespaces restricts which namespaces may reference this ProviderConfig.
-	// An empty list means all namespaces are allowed.
+	// An empty list means all namespaces are allowed (unless AllowedNamespaceSelector is set).
 	// A list containing "*" means all namespaces are allowed.
 	// If set to specific namespace names, only resources in those namespaces can use this ProviderConfig.
+	// When both AllowedNamespaces and AllowedNamespaceSelector are set, a namespace is
+	// allowed if it matches either the static list or the label selector (OR semantics).
 	// +optional
 	AllowedNamespaces []string `json:"allowedNamespaces,omitempty"`
+
+	// AllowedNamespaceSelector restricts which namespaces may reference this ProviderConfig
+	// using Kubernetes label matching. A namespace is allowed if its labels match this selector.
+	// This field uses OR semantics with AllowedNamespaces — a namespace is allowed if it
+	// matches either the static list or the label selector.
+	// If both AllowedNamespaces and AllowedNamespaceSelector are nil/empty, all namespaces
+	// are allowed.
+	// +optional
+	AllowedNamespaceSelector *metav1.LabelSelector `json:"allowedNamespaceSelector,omitempty"`
+
+	// AllowedDatabases restricts which Snowflake databases may be targeted by resources
+	// using this ProviderConfig. An empty list means all databases are allowed.
+	// Entries are matched case-insensitively against the resolved database name.
+	// A list containing "*" means all databases are allowed.
+	// +optional
+	AllowedDatabases []string `json:"allowedDatabases,omitempty"`
+
+	// AllowedSchemas restricts which Snowflake schemas may be targeted by resources
+	// using this ProviderConfig. Entries use "DATABASE.SCHEMA" format for fully-qualified
+	// matching, or just "SCHEMA" for name-only matching across all databases.
+	// A list containing "*" means all schemas are allowed.
+	// An empty list means all schemas are allowed.
+	// Entries are matched case-insensitively.
+	// +optional
+	AllowedSchemas []string `json:"allowedSchemas,omitempty"`
 }
 
 // ProviderCredentials references the Secret(s) holding authentication data.
@@ -265,17 +292,68 @@ func (pc *ProviderConfig) SetConditions(conditions []metav1.Condition) {
 	pc.Status.Conditions = conditions
 }
 
-// IsNamespaceAllowed returns true if the given namespace is allowed to reference
-// this ProviderConfig. An empty AllowedNamespaces list or a list containing "*"
-// means all namespaces are allowed.
+// IsNamespaceAllowed checks the static AllowedNamespaces list.
+// It returns true if the static list is unset/empty and no label selector is configured
+// (backward compatible: no restrictions = all allowed).
+// It does NOT evaluate AllowedNamespaceSelector — use the provider resolver's
+// isNamespacePermitted for the full check including label selectors.
 func (s *ProviderConfigSpec) IsNamespaceAllowed(namespace string) bool {
 	if len(s.AllowedNamespaces) == 0 {
-		return true
+		// No static list: allow-all only if no selector is configured either.
+		return s.AllowedNamespaceSelector == nil
 	}
 
 	for _, ns := range s.AllowedNamespaces {
 		if ns == "*" || ns == namespace {
 			return true
+		}
+	}
+
+	return false
+}
+
+// IsDatabaseAllowed returns true if the given database name is permitted by
+// this ProviderConfig's AllowedDatabases restriction. An empty list or a list
+// containing "*" means all databases are allowed. Matching is case-insensitive.
+func (s *ProviderConfigSpec) IsDatabaseAllowed(database string) bool {
+	if len(s.AllowedDatabases) == 0 {
+		return true
+	}
+
+	for _, db := range s.AllowedDatabases {
+		if db == "*" || strings.EqualFold(db, database) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsSchemaAllowed returns true if the given schema is permitted by this
+// ProviderConfig's AllowedSchemas restriction. An empty list or a list
+// containing "*" means all schemas are allowed. Entries may be:
+//   - "SCHEMA" — matches the schema name in any database (case-insensitive)
+//   - "DATABASE.SCHEMA" — matches the fully-qualified name (case-insensitive)
+func (s *ProviderConfigSpec) IsSchemaAllowed(database, schemaName string) bool {
+	if len(s.AllowedSchemas) == 0 {
+		return true
+	}
+
+	for _, entry := range s.AllowedSchemas {
+		if entry == "*" {
+			return true
+		}
+
+		if parts := strings.SplitN(entry, ".", 2); len(parts) == 2 {
+			// Fully-qualified: DATABASE.SCHEMA
+			if strings.EqualFold(parts[0], database) && strings.EqualFold(parts[1], schemaName) {
+				return true
+			}
+		} else {
+			// Schema-name-only: matches in any database
+			if strings.EqualFold(entry, schemaName) {
+				return true
+			}
 		}
 	}
 

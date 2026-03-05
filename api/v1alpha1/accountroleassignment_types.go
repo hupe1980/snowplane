@@ -40,7 +40,7 @@ type AccountRoleAssignmentSpec struct {
 	// When set, the role name is resolved from the CR's spec.name.
 	// Mutually exclusive with RoleName.
 	// +optional
-	RoleRef *LocalObjectReference `json:"roleRef,omitempty"`
+	RoleRef *ObjectReference `json:"roleRef,omitempty"`
 
 	// ToRole is the name of the parent account role to assign the role to.
 	// Mutually exclusive with ToRoleRef, ToUser, ToUserRef.
@@ -53,7 +53,7 @@ type AccountRoleAssignmentSpec struct {
 	// When set, the target role name is resolved from the CR's spec.name.
 	// Mutually exclusive with ToRole, ToUser, ToUserRef.
 	// +optional
-	ToRoleRef *LocalObjectReference `json:"toRoleRef,omitempty"`
+	ToRoleRef *ObjectReference `json:"toRoleRef,omitempty"`
 
 	// ToUser is the name of the user to assign the role to.
 	// Mutually exclusive with ToUserRef, ToRole, ToRoleRef.
@@ -66,7 +66,7 @@ type AccountRoleAssignmentSpec struct {
 	// When set, the user name is resolved from the CR's spec.name.
 	// Mutually exclusive with ToUser, ToRole, ToRoleRef.
 	// +optional
-	ToUserRef *LocalObjectReference `json:"toUserRef,omitempty"`
+	ToUserRef *ObjectReference `json:"toUserRef,omitempty"`
 }
 
 // AccountRoleAssignmentStatus defines the observed state of an AccountRoleAssignment.

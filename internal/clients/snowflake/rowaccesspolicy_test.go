@@ -74,7 +74,7 @@ func TestBuildCreateRowAccessPolicySQL_CreateOrAlter(t *testing.T) {
 		UseCreateOrAlter: true,
 	}
 	got, err := buildCreateRowAccessPolicySQL(opts)
-		require.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, got, `CREATE OR ALTER ROW ACCESS POLICY "DB"."SCH"."RAP_REGION"`)
 	assert.NotContains(t, got, "IF NOT EXISTS")
 	assert.Contains(t, got, "AS (region VARCHAR) RETURNS BOOLEAN")

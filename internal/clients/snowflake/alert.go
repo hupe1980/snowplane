@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,22 +17,7 @@ type AlertObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW ALERTS row.
-	ShowOutput *AlertShowOutput
-}
-
-// AlertShowOutput contains the fields from SHOW ALERTS.
-type AlertShowOutput struct {
-	CreatedOn    string
-	Name         string
-	DatabaseName string
-	SchemaName   string
-	Owner        string
-	Comment      string
-	Warehouse    string
-	Schedule     string
-	State        string // started, suspended
-	Condition    string
-	Action       string
+	ShowOutput *v1alpha1.AlertShowOutput
 }
 
 // CreateAlertOptions holds the parameters for creating an alert.
@@ -257,7 +243,7 @@ func buildShowAlertByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW ALERTS for a specific alert name within a schema.
-func (a *AlertClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*AlertShowOutput, error) {
+func (a *AlertClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.AlertShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("alert name is required"))
 	}
@@ -289,9 +275,9 @@ func (a *AlertClient) Observe(ctx context.Context, name SchemaObjectIdentifier) 
 }
 
 // scanAlertShowOutput scans SHOW ALERTS results for a matching row.
-func scanAlertShowOutput(rows *sql.Rows, name string) (*AlertShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*AlertShowOutput, error) {
-		return &AlertShowOutput{
+func scanAlertShowOutput(rows *sql.Rows, name string) (*v1alpha1.AlertShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.AlertShowOutput, error) {
+		return &v1alpha1.AlertShowOutput{
 			CreatedOn:    m["created_on"],
 			Name:         m["name"],
 			DatabaseName: m["database_name"],

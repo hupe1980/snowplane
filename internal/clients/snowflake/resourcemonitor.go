@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -15,24 +16,7 @@ type ResourceMonitorObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW RESOURCE MONITORS row.
-	ShowOutput *ResourceMonitorShowOutput
-}
-
-// ResourceMonitorShowOutput contains the fields from SHOW RESOURCE MONITORS.
-type ResourceMonitorShowOutput struct {
-	CreatedOn            string
-	Name                 string
-	CreditQuota          string
-	UsedCredits          string
-	RemainingCredits     string
-	Level                string
-	Frequency            string
-	StartTime            string
-	EndTime              string
-	NotifyAt             string
-	SuspendAt            string
-	SuspendImmediatelyAt string
-	NotifyUsers          string
+	ShowOutput *v1alpha1.ResourceMonitorShowOutput
 }
 
 // ResourceMonitorTrigger defines a trigger for the resource monitor.
@@ -285,7 +269,7 @@ func buildShowResourceMonitorByIDSQL(name AccountObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW RESOURCE MONITORS for a specific monitor.
-func (rm *ResourceMonitorClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*ResourceMonitorShowOutput, error) {
+func (rm *ResourceMonitorClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*v1alpha1.ResourceMonitorShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("resource monitor name is required"))
 	}
@@ -317,9 +301,9 @@ func (rm *ResourceMonitorClient) Observe(ctx context.Context, name AccountObject
 }
 
 // scanResourceMonitorShowOutput scans SHOW RESOURCE MONITORS results for a matching row.
-func scanResourceMonitorShowOutput(rows *sql.Rows, name string) (*ResourceMonitorShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*ResourceMonitorShowOutput, error) {
-		return &ResourceMonitorShowOutput{
+func scanResourceMonitorShowOutput(rows *sql.Rows, name string) (*v1alpha1.ResourceMonitorShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.ResourceMonitorShowOutput, error) {
+		return &v1alpha1.ResourceMonitorShowOutput{
 			CreatedOn:            m["created_on"],
 			Name:                 m["name"],
 			CreditQuota:          m["credit_quota"],

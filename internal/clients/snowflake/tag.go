@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -15,18 +16,7 @@ type TagObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW TAGS row.
-	ShowOutput *TagShowOutput
-}
-
-// TagShowOutput contains the fields from SHOW TAGS.
-type TagShowOutput struct {
-	CreatedOn     string
-	Name          string
-	DatabaseName  string
-	SchemaName    string
-	Owner         string
-	Comment       string
-	AllowedValues string // comma-separated
+	ShowOutput *v1alpha1.TagShowOutput
 }
 
 // CreateTagOptions holds the parameters for creating a tag.
@@ -215,7 +205,7 @@ func buildShowTagByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW TAGS for a specific tag within a schema.
-func (t *TagClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*TagShowOutput, error) {
+func (t *TagClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.TagShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("tag name is required"))
 	}
@@ -247,9 +237,9 @@ func (t *TagClient) Observe(ctx context.Context, name SchemaObjectIdentifier) (*
 }
 
 // scanTagShowOutput scans SHOW TAGS results for a matching row.
-func scanTagShowOutput(rows *sql.Rows, name string) (*TagShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*TagShowOutput, error) {
-		return &TagShowOutput{
+func scanTagShowOutput(rows *sql.Rows, name string) (*v1alpha1.TagShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.TagShowOutput, error) {
+		return &v1alpha1.TagShowOutput{
 			CreatedOn:     m["created_on"],
 			Name:          m["name"],
 			DatabaseName:  m["database_name"],

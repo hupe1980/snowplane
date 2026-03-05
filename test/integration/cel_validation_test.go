@@ -190,7 +190,7 @@ func TestCEL_Schema_ImmutableDatabaseRef(t *testing.T) {
 		},
 		Spec: snowplanev1alpha1.SchemaSpec{
 			Name:        "MY_SCHEMA",
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "db1"},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "db1"},
 		},
 	}
 
@@ -198,7 +198,7 @@ func TestCEL_Schema_ImmutableDatabaseRef(t *testing.T) {
 	t.Cleanup(func() { _ = k8sClient.Delete(ctx, sch) })
 
 	err := updateWithCELCheck(t, types.NamespacedName{Name: sch.Name, Namespace: sch.Namespace}, sch, func() {
-		sch.Spec.DatabaseRef = &snowplanev1alpha1.LocalObjectReference{Name: "db2"}
+		sch.Spec.DatabaseRef = &snowplanev1alpha1.ObjectReference{Name: "db2"}
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.databaseRef is immutable")
@@ -331,16 +331,16 @@ func TestCEL_ProviderConfig_ImmutableAccount(t *testing.T) {
 	assert.Contains(t, err.Error(), "spec.account is immutable")
 }
 
-// TestCEL_AccountRoleGrant_ImmutablePrivilege verifies that grant fields are immutable.
-func TestCEL_AccountRoleGrant_ImmutablePrivilege(t *testing.T) {
+// TestCEL_GrantPrivilegesToAccountRole_ImmutablePrivilege verifies that grant fields are immutable.
+func TestCEL_GrantPrivilegesToAccountRole_ImmutablePrivilege(t *testing.T) {
 	t.Parallel()
 
-	grant := &snowplanev1alpha1.AccountRoleGrant{
+	grant := &snowplanev1alpha1.GrantPrivilegesToAccountRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cel-grant-immutable",
 			Namespace: testNamespace,
 		},
-		Spec: snowplanev1alpha1.AccountRoleGrantSpec{
+		Spec: snowplanev1alpha1.GrantPrivilegesToAccountRoleSpec{
 			Privilege:   "SELECT",
 			AccountRole: ptr("MY_ROLE"),
 			On: snowplanev1alpha1.GrantOn{
@@ -630,23 +630,20 @@ func TestCEL_RowAccessPolicy_BodyBlocklist(t *testing.T) {
 	assert.Contains(t, err.Error(), "blocked SQL pattern")
 }
 
-// TestCEL_DatabaseRoleGrant_ImmutableDatabaseRoleRef verifies that spec.databaseRoleRef is immutable.
-func TestCEL_DatabaseRoleGrant_ImmutableDatabaseRoleRef(t *testing.T) {
+// TestCEL_GrantPrivilegesToDatabaseRole_ImmutableDatabaseRoleRef verifies that spec.databaseRoleRef is immutable.
+func TestCEL_GrantPrivilegesToDatabaseRole_ImmutableDatabaseRoleRef(t *testing.T) {
 	t.Parallel()
 
-	grant := &snowplanev1alpha1.DatabaseRoleGrant{
+	grant := &snowplanev1alpha1.GrantPrivilegesToDatabaseRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cel-drg-immutable-ref",
 			Namespace: testNamespace,
 		},
-		Spec: snowplanev1alpha1.DatabaseRoleGrantSpec{
+		Spec: snowplanev1alpha1.GrantPrivilegesToDatabaseRoleSpec{
 			Privilege:       "USAGE",
-			DatabaseRoleRef: &snowplanev1alpha1.LocalObjectReference{Name: "role1"},
-			On: snowplanev1alpha1.GrantOn{
-				AccountObject: &snowplanev1alpha1.GrantOnAccountObject{
-					ObjectType: "DATABASE",
-					ObjectName: "MY_DB",
-				},
+			DatabaseRoleRef: &snowplanev1alpha1.ObjectReference{Name: "role1"},
+			On: snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+				Database: ptr("MY_DB"),
 			},
 		},
 	}
@@ -655,24 +652,24 @@ func TestCEL_DatabaseRoleGrant_ImmutableDatabaseRoleRef(t *testing.T) {
 	t.Cleanup(func() { _ = k8sClient.Delete(ctx, grant) })
 
 	err := updateWithCELCheck(t, types.NamespacedName{Name: grant.Name, Namespace: grant.Namespace}, grant, func() {
-		grant.Spec.DatabaseRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "role2"}
+		grant.Spec.DatabaseRoleRef = &snowplanev1alpha1.ObjectReference{Name: "role2"}
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.databaseRoleRef is immutable")
 }
 
-// TestCEL_AccountRoleGrant_ImmutableAccountRoleRef verifies that spec.accountRoleRef is immutable.
-func TestCEL_AccountRoleGrant_ImmutableAccountRoleRef(t *testing.T) {
+// TestCEL_GrantPrivilegesToAccountRole_ImmutableAccountRoleRef verifies that spec.accountRoleRef is immutable.
+func TestCEL_GrantPrivilegesToAccountRole_ImmutableAccountRoleRef(t *testing.T) {
 	t.Parallel()
 
-	grant := &snowplanev1alpha1.AccountRoleGrant{
+	grant := &snowplanev1alpha1.GrantPrivilegesToAccountRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cel-arg-immutable-ref",
 			Namespace: testNamespace,
 		},
-		Spec: snowplanev1alpha1.AccountRoleGrantSpec{
+		Spec: snowplanev1alpha1.GrantPrivilegesToAccountRoleSpec{
 			Privilege:      "SELECT",
-			AccountRoleRef: &snowplanev1alpha1.LocalObjectReference{Name: "role1"},
+			AccountRoleRef: &snowplanev1alpha1.ObjectReference{Name: "role1"},
 			On: snowplanev1alpha1.GrantOn{
 				AccountObject: &snowplanev1alpha1.GrantOnAccountObject{
 					ObjectType: "DATABASE",
@@ -686,7 +683,7 @@ func TestCEL_AccountRoleGrant_ImmutableAccountRoleRef(t *testing.T) {
 	t.Cleanup(func() { _ = k8sClient.Delete(ctx, grant) })
 
 	err := updateWithCELCheck(t, types.NamespacedName{Name: grant.Name, Namespace: grant.Namespace}, grant, func() {
-		grant.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "role2"}
+		grant.Spec.AccountRoleRef = &snowplanev1alpha1.ObjectReference{Name: "role2"}
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.accountRoleRef is immutable")

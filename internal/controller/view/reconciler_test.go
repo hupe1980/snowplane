@@ -83,8 +83,8 @@ func newTestView(name, namespace string) *snowplanev1alpha1.View {
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        "ACTIVE_USERS",
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "analytics-db"},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: "public-schema"},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "analytics-db"},
+			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: "public-schema"},
 			Statement:   "SELECT * FROM users WHERE active = TRUE",
 		},
 	}
@@ -127,7 +127,7 @@ func newTestSchema(name, namespace string) *snowplanev1alpha1.Schema {
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        "PUBLIC",
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "analytics-db"},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "analytics-db"},
 		},
 		Status: snowplanev1alpha1.SchemaStatus{
 			CommonStatus: snowplanev1alpha1.CommonStatus{
@@ -145,7 +145,7 @@ func newTestSchema(name, namespace string) *snowplanev1alpha1.Schema {
 func successfulObservation() *snowflake.ViewObservation {
 	return &snowflake.ViewObservation{
 		Exists: true,
-		ShowOutput: &snowflake.ViewShowOutput{
+		ShowOutput: &snowplanev1alpha1.ViewShowOutput{
 			CreatedOn:      "2024-01-01",
 			Name:           "ACTIVE_USERS",
 			DatabaseName:   "ANALYTICS",
@@ -174,22 +174,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.View, Service, *snowflake.ViewObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("View"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("View")
+
+	return r
 }
 
 func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.View, Service, *snowflake.ViewObservation] {
@@ -223,22 +218,17 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.View, Service, *snowflake.ViewObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("View"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("View")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -445,7 +435,6 @@ func TestReconcile_DeleteView(t *testing.T) {
 func TestValidateImmutableFields_NameChanged(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{}
 	view := newTestView("myview", "default")
 	view.Status.ObservedGeneration = 1
 	view.Status.ShowOutput = &snowplanev1alpha1.ViewShowOutput{
@@ -454,7 +443,7 @@ func TestValidateImmutableFields_NameChanged(t *testing.T) {
 		SchemaName:   "PUBLIC",
 	}
 	view.Spec.Name = "INACTIVE_USERS"
-	err := a.ValidateImmutableFields(context.Background(), view)
+	err := validateImmutableFields(context.Background(), view)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.name is immutable")
 }
@@ -462,13 +451,12 @@ func TestValidateImmutableFields_NameChanged(t *testing.T) {
 func TestValidateImmutableFields_ForceNew(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{}
 	view := newTestView("myview", "default")
 	view.Status.ObservedGeneration = 1
 	view.Status.ShowOutput = &snowplanev1alpha1.ViewShowOutput{Name: "ACTIVE_USERS"}
 	view.Annotations = map[string]string{snowplanev1alpha1.AnnotationForceNew: "true"}
 	view.Spec.Name = "DIFFERENT"
-	err := a.ValidateImmutableFields(context.Background(), view)
+	err := validateImmutableFields(context.Background(), view)
 	require.NoError(t, err)
 }
 
@@ -561,7 +549,7 @@ func TestDetectDrift_CommentDrift(t *testing.T) {
 
 	obs := &snowflake.ViewObservation{
 		Exists: true,
-		ShowOutput: &snowflake.ViewShowOutput{
+		ShowOutput: &snowplanev1alpha1.ViewShowOutput{
 			Comment: "actual",
 		},
 	}
@@ -578,7 +566,7 @@ func TestDetectDrift_StatementDrift(t *testing.T) {
 
 	obs := &snowflake.ViewObservation{
 		Exists: true,
-		ShowOutput: &snowflake.ViewShowOutput{
+		ShowOutput: &snowplanev1alpha1.ViewShowOutput{
 			Text: "SELECT * FROM old_users", // externally changed
 		},
 	}
@@ -596,7 +584,7 @@ func TestDetectDrift_StatementMatch(t *testing.T) {
 
 	obs := &snowflake.ViewObservation{
 		Exists: true,
-		ShowOutput: &snowflake.ViewShowOutput{
+		ShowOutput: &snowplanev1alpha1.ViewShowOutput{
 			Text: "SELECT * FROM users WHERE active = TRUE",
 		},
 	}

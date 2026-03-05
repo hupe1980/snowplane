@@ -1,0 +1,11 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: SharedDatabase
+metadata:
+  name: my-shared-db
+  namespace: default
+spec:
+  providerRef:
+    name: default-pc
+  name: SHARED_DB
+  fromShare: ab67890.sales_s
+  comment: "Database from external share"

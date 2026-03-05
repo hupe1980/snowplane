@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -59,7 +58,6 @@ func (m *mockService) Drop(ctx context.Context, id snowflake.GrantOwnershipIdent
 // Helpers
 // --------------------------------------------------------------------------
 
-
 func newTestGrantOwnership(name, namespace string) *snowplanev1alpha1.GrantOwnership {
 	return &snowplanev1alpha1.GrantOwnership{
 		ObjectMeta: metav1.ObjectMeta{
@@ -82,7 +80,7 @@ func newTestGrantOwnership(name, namespace string) *snowplanev1alpha1.GrantOwner
 func successfulObservation() *snowflake.GrantOwnershipObservation {
 	return &snowflake.GrantOwnershipObservation{
 		Exists: true,
-		ShowOutput: &snowflake.GrantOwnershipShowOutput{
+		ShowOutput: &snowplanev1alpha1.GrantOwnershipShowOutput{
 			CreatedOn:   "2024-01-01",
 			Privilege:   "OWNERSHIP",
 			GrantedOn:   "DATABASE",
@@ -103,20 +101,16 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
 	return &reconciler.GenericReconciler[*snowplanev1alpha1.GrantOwnership, Service, *snowflake.GrantOwnershipObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
-		},
+		Adapter: newAdapter(c, rec, func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
+		}),
 		GVK: snowplanev1alpha1.GroupVersion.WithKind("GrantOwnership"),
 	}
 }
@@ -525,7 +519,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.GrantOwnershipObservation{
-		ShowOutput: &snowflake.GrantOwnershipShowOutput{
+		ShowOutput: &snowplanev1alpha1.GrantOwnershipShowOutput{
 			GranteeName: "DATA_ADMIN",
 		},
 	}
@@ -544,7 +538,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.GrantOwnershipObservation{
-		ShowOutput: &snowflake.GrantOwnershipShowOutput{
+		ShowOutput: &snowplanev1alpha1.GrantOwnershipShowOutput{
 			GranteeName: "OTHER_ROLE",
 		},
 	}

@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -26,21 +27,19 @@ func newNotificationIntegration() *snowplanev1alpha1.NotificationIntegration {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newNotificationIntegration()
 		obs := &reconciler.Observation[*snowflake.NotificationIntegrationObservation]{
 			Exists: true,
 			Detail: &snowflake.NotificationIntegrationObservation{
-				ShowOutput: &snowflake.NotificationIntegrationShowOutput{
+				ShowOutput: &snowplanev1alpha1.NotificationIntegrationShowOutput{
 					Comment: "ni comment",
 					Enabled: true,
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 		assert.Equal(t, "ni comment", *obj.Spec.Comment)
 		assert.Equal(t, true, *obj.Spec.Enabled)
@@ -54,14 +53,14 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.NotificationIntegrationObservation]{
 			Exists: true,
 			Detail: &snowflake.NotificationIntegrationObservation{
-				ShowOutput: &snowflake.NotificationIntegrationShowOutput{
+				ShowOutput: &snowplanev1alpha1.NotificationIntegrationShowOutput{
 					Comment: "sf comment",
 					Enabled: true,
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 		assert.Equal(t, "user comment", *obj.Spec.Comment)
 		assert.Equal(t, false, *obj.Spec.Enabled)
@@ -70,7 +69,7 @@ func TestLateInitialize(t *testing.T) {
 	t.Run("returns false when detail is nil", func(t *testing.T) {
 		obj := newNotificationIntegration()
 
-		modified := a.LateInitialize(obj, &reconciler.Observation[*snowflake.NotificationIntegrationObservation]{
+		modified := lateInitialize(obj, &reconciler.Observation[*snowflake.NotificationIntegrationObservation]{
 			Exists: true,
 			Detail: nil,
 		})
@@ -83,14 +82,14 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.NotificationIntegrationObservation]{
 			Exists: true,
 			Detail: &snowflake.NotificationIntegrationObservation{
-				ShowOutput: &snowflake.NotificationIntegrationShowOutput{
+				ShowOutput: &snowplanev1alpha1.NotificationIntegrationShowOutput{
 					Comment: "",
 					Enabled: false,
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified) // Enabled was set
 		assert.Nil(t, obj.Spec.Comment)
 		assert.Equal(t, false, *obj.Spec.Enabled)

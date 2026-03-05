@@ -12,9 +12,9 @@
 | `snowflake_user` | User |
 | `snowflake_account_role` / `snowflake_role` | AccountRole |
 | `snowflake_database_role` | DatabaseRole |
-| `snowflake_grant_privileges_to_account_role` | AccountRoleGrant |
-| `snowflake_grant_privileges_to_database_role` | DatabaseRoleGrant |
-| `snowflake_grant_privileges_to_share` | ShareGrant |
+| `snowflake_grant_privileges_to_account_role` | GrantPrivilegesToAccountRole |
+| `snowflake_grant_privileges_to_database_role` | GrantPrivilegesToDatabaseRole |
+| `snowflake_grant_privileges_to_share` | GrantPrivilegesToShare |
 | `snowflake_table` | Table |
 | `snowflake_view` | View |
 | `snowflake_stage` | Stage |

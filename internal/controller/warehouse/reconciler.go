@@ -3,6 +3,7 @@ package warehouse
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"k8s.io/client-go/tools/record"
@@ -39,14 +40,11 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 
 // NewReconciler returns a new Warehouse reconciler backed by the generic framework.
 func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation] {
-	a := &adapter{newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewWarehouseClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
@@ -59,24 +57,103 @@ func NewReconcilerWithServiceFactory(
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation] {
-	a := &adapter{newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(sf))
+}
+
+// newAdapter creates the BaseAdapter for Warehouse resources.
+func newAdapter(sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation]{
+		ResourceNameVal:  "warehouse",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.Warehouse { return &snowplanev1alpha1.Warehouse{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(obj *snowplanev1alpha1.Warehouse) (reconciler.Identifier, error) {
+			return snowflake.NewAccountObjectIdentifier(obj.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) (*snowflake.WarehouseObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.WarehouseObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.Warehouse, id snowflake.AccountObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
+
+			if err := svc.Create(ctx, opts); err != nil {
+				return err
+			}
+
+			// Track resource constraint and generation for change detection on future reconciles.
+			if obj.Spec.ResourceConstraint != nil {
+				obj.Status.LastAppliedResourceConstraint = string(*obj.Spec.ResourceConstraint)
+			}
+
+			if obj.Spec.Generation != nil {
+				obj.Status.LastAppliedGeneration = *obj.Spec.Generation
+			}
+
+			return nil
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterWarehouseOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.Warehouse, id snowflake.AccountObjectIdentifier, obs *reconciler.Observation[*snowflake.WarehouseObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.Warehouse, obs *reconciler.Observation[*snowflake.WarehouseObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.Warehouse, obs *reconciler.Observation[*snowflake.WarehouseObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		SupportsCoA:      true,
+		LateInitializeFn: lateInitialize,
+		PostUpdateFn: func(wh *snowplanev1alpha1.Warehouse, altered bool, alterOpts reconciler.AlterOptions) {
+			// Commit resource constraint and generation only after a successful ALTER,
+			// reading from the per-reconciliation AlterOptions (no shared mutable state).
+			if altered {
+				if opts, ok := alterOpts.(*snowflake.AlterWarehouseOptions); ok {
+					if opts.ResourceConstraint != nil {
+						wh.Status.LastAppliedResourceConstraint = *opts.ResourceConstraint
+					}
+
+					if opts.Generation != nil {
+						wh.Status.LastAppliedGeneration = *opts.Generation
+					}
+				}
+			}
+
+			// Clear tracked values when fields are removed from spec.
+			if wh.Spec.ResourceConstraint == nil {
+				wh.Status.LastAppliedResourceConstraint = ""
+			}
+
+			if wh.Spec.Generation == nil {
+				wh.Status.LastAppliedGeneration = ""
+			}
+		},
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory used by NewReconciler.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+func validateImmutableFields(_ context.Context, wh *snowplanev1alpha1.Warehouse) error {
+	if reconciler.ShouldSkipImmutableValidation(wh) {
+		return nil
 	}
 
-	return snowflake.NewWarehouseClient(sfC), cleanup, nil
+	if wh.Status.ShowOutput != nil {
+		if wh.Status.ShowOutput.Name != "" && !strings.EqualFold(wh.Spec.Name, wh.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", wh.Status.ShowOutput.Name, wh.Spec.Name)
+		}
+
+	}
+
+	return nil
 }
 
 func applyObservation(wh *snowplanev1alpha1.Warehouse, obs *snowflake.WarehouseObservation) {
@@ -84,21 +161,7 @@ func applyObservation(wh *snowplanev1alpha1.Warehouse, obs *snowflake.WarehouseO
 		wh.Status.FullyQualifiedName = snowflake.NewAccountObjectIdentifier(obs.ShowOutput.Name).FullyQualifiedName()
 		wh.Status.State = obs.ShowOutput.State
 
-		wh.Status.ShowOutput = &snowplanev1alpha1.WarehouseShowOutput{
-			CreatedOn:       obs.ShowOutput.CreatedOn,
-			Name:            obs.ShowOutput.Name,
-			State:           obs.ShowOutput.State,
-			Type:            obs.ShowOutput.Type,
-			Size:            obs.ShowOutput.Size,
-			Comment:         obs.ShowOutput.Comment,
-			Owner:           obs.ShowOutput.Owner,
-			AutoSuspend:     obs.ShowOutput.AutoSuspend,
-			AutoResume:      obs.ShowOutput.AutoResume,
-			MinClusterCount: obs.ShowOutput.MinClusterCount,
-			MaxClusterCount: obs.ShowOutput.MaxClusterCount,
-			ScalingPolicy:   obs.ShowOutput.ScalingPolicy,
-			ResourceMonitor: obs.ShowOutput.ResourceMonitor,
-		}
+		wh.Status.ShowOutput = obs.ShowOutput
 	}
 }
 
@@ -167,7 +230,7 @@ func buildAlterOptions(wh *snowplanev1alpha1.Warehouse, id snowflake.AccountObje
 
 	if wh.Spec.WarehouseSize != nil {
 		s := string(*wh.Spec.WarehouseSize)
-		if obs.ShowOutput == nil || !strings.EqualFold(s, obs.ShowOutput.Size) {
+		if obs.ShowOutput == nil || !strings.EqualFold(s, string(normalizeWarehouseSize(obs.ShowOutput.Size))) {
 			opts.WarehouseSize = &s
 		}
 	}
@@ -294,7 +357,7 @@ func detectDrift(wh *snowplanev1alpha1.Warehouse, obs *snowflake.WarehouseObserv
 
 		if wh.Spec.WarehouseSize != nil {
 			s := string(*wh.Spec.WarehouseSize)
-			d.CompareStringValueFold("WAREHOUSE_SIZE", s, obs.ShowOutput.Size, false)
+			d.CompareStringValueFold("WAREHOUSE_SIZE", s, string(normalizeWarehouseSize(obs.ShowOutput.Size)), false)
 		}
 
 		if wh.Spec.AutoSuspend != nil {

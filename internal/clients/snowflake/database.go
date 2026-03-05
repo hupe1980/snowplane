@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -99,20 +100,10 @@ type DatabaseObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW DATABASES row.
-	ShowOutput *DatabaseShowOutput
+	ShowOutput *v1alpha1.DatabaseShowOutput
 
 	// Parameters contains the database-level parameters from SHOW PARAMETERS.
 	Parameters *DatabaseParameters
-}
-
-// DatabaseShowOutput contains the fields from SHOW DATABASES.
-type DatabaseShowOutput struct {
-	CreatedOn     string
-	Name          string
-	Kind          string // STANDARD or TRANSIENT
-	Comment       string
-	Owner         string
-	RetentionTime int32
 }
 
 // DatabaseParameters contains relevant database parameters from SHOW PARAMETERS IN DATABASE.
@@ -359,7 +350,7 @@ func buildShowByIDSQL(name AccountObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW DATABASES for a specific database name.
-func (d *DatabaseClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*DatabaseShowOutput, error) {
+func (d *DatabaseClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*v1alpha1.DatabaseShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("database name is required"))
 	}
@@ -417,11 +408,11 @@ func (d *DatabaseClient) Observe(ctx context.Context, name AccountObjectIdentifi
 }
 
 // scanDatabaseShowOutput scans SHOW DATABASES results for a matching row.
-func scanDatabaseShowOutput(rows *sql.Rows, name string) (*DatabaseShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*DatabaseShowOutput, error) {
+func scanDatabaseShowOutput(rows *sql.Rows, name string) (*v1alpha1.DatabaseShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.DatabaseShowOutput, error) {
 		rt, _ := parseInt32(m["retention_time"])
 
-		return &DatabaseShowOutput{
+		return &v1alpha1.DatabaseShowOutput{
 			CreatedOn:     m["created_on"],
 			Name:          m["name"],
 			Kind:          m["kind"],

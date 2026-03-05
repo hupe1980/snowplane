@@ -501,7 +501,7 @@ func TestSchema_ImmutableDatabaseRef(t *testing.T) {
 			return getErr
 		}
 
-		current.Spec.DatabaseRef = &snowplanev1alpha1.LocalObjectReference{Name: dbName2}
+		current.Spec.DatabaseRef = &snowplanev1alpha1.ObjectReference{Name: dbName2}
 
 		return k8sClient.Update(ctx, &current)
 	})

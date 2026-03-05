@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -28,22 +29,7 @@ type StreamObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW STREAMS row.
-	ShowOutput *StreamShowOutput
-}
-
-// StreamShowOutput contains the fields from SHOW STREAMS.
-type StreamShowOutput struct {
-	CreatedOn    string
-	Name         string
-	DatabaseName string
-	SchemaName   string
-	Owner        string
-	Comment      string
-	TableName    string // fully qualified source object name
-	SourceType   string // TABLE, VIEW, STAGE, etc.
-	Mode         string // DEFAULT, APPEND_ONLY, INSERT_ONLY
-	Stale        bool
-	StaleAfter   string
+	ShowOutput *v1alpha1.StreamShowOutput
 }
 
 // CreateStreamOptions holds the parameters for creating a stream.
@@ -228,7 +214,7 @@ func buildShowStreamByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW STREAMS for a specific stream within a schema.
-func (s *StreamClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*StreamShowOutput, error) {
+func (s *StreamClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.StreamShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("stream name is required"))
 	}
@@ -260,9 +246,9 @@ func (s *StreamClient) Observe(ctx context.Context, name SchemaObjectIdentifier)
 }
 
 // scanStreamShowOutput scans SHOW STREAMS results for a matching row.
-func scanStreamShowOutput(rows *sql.Rows, name string) (*StreamShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*StreamShowOutput, error) {
-		return &StreamShowOutput{
+func scanStreamShowOutput(rows *sql.Rows, name string) (*v1alpha1.StreamShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.StreamShowOutput, error) {
+		return &v1alpha1.StreamShowOutput{
 			CreatedOn:    m["created_on"],
 			Name:         m["name"],
 			DatabaseName: m["database_name"],

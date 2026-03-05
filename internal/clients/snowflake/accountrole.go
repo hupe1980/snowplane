@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -14,17 +15,7 @@ type AccountRoleObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW ROLES row.
-	ShowOutput *AccountRoleShowOutput
-}
-
-// AccountRoleShowOutput contains the fields from SHOW ROLES.
-type AccountRoleShowOutput struct {
-	CreatedOn      string
-	Name           string
-	Comment        string
-	Owner          string
-	GrantedToRoles int32
-	GrantedRoles   int32
+	ShowOutput *v1alpha1.AccountRoleShowOutput
 }
 
 // CreateAccountRoleOptions holds the parameters for creating a role.
@@ -161,7 +152,7 @@ func buildShowAccountRoleByIDSQL(name AccountObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW ROLES for a specific role name.
-func (r *AccountRoleClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*AccountRoleShowOutput, error) {
+func (r *AccountRoleClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*v1alpha1.AccountRoleShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("role name is required"))
 	}
@@ -193,12 +184,12 @@ func (r *AccountRoleClient) Observe(ctx context.Context, name AccountObjectIdent
 }
 
 // scanAccountRoleShowOutput scans SHOW ROLES results for a matching row.
-func scanAccountRoleShowOutput(rows *sql.Rows, name string) (*AccountRoleShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*AccountRoleShowOutput, error) {
+func scanAccountRoleShowOutput(rows *sql.Rows, name string) (*v1alpha1.AccountRoleShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.AccountRoleShowOutput, error) {
 		grantedToRoles, _ := parseInt32(m["granted_to_roles"])
 		grantedRoles, _ := parseInt32(m["granted_roles"])
 
-		return &AccountRoleShowOutput{
+		return &v1alpha1.AccountRoleShowOutput{
 			CreatedOn:      m["created_on"],
 			Name:           m["name"],
 			Comment:        m["comment"],

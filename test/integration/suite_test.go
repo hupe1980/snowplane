@@ -20,6 +20,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	accountrolectl "github.com/hupe1980/snowplane/internal/controller/accountrole"
 	alertctl "github.com/hupe1980/snowplane/internal/controller/alert"
+	apiintegrationctl "github.com/hupe1980/snowplane/internal/controller/apiintegration"
 	authenticationpolicyctl "github.com/hupe1980/snowplane/internal/controller/authenticationpolicy"
 	database "github.com/hupe1980/snowplane/internal/controller/database"
 	databaserolectl "github.com/hupe1980/snowplane/internal/controller/databaserole"
@@ -37,7 +38,9 @@ import (
 	roleassignmentctl "github.com/hupe1980/snowplane/internal/controller/roleassignment"
 	rowaccesspolicyctl "github.com/hupe1980/snowplane/internal/controller/rowaccesspolicy"
 	schemactl "github.com/hupe1980/snowplane/internal/controller/schema"
+	secondarydatabasectl "github.com/hupe1980/snowplane/internal/controller/secondarydatabase"
 	securityintegrationctl "github.com/hupe1980/snowplane/internal/controller/securityintegration"
+	shareddatabasectl "github.com/hupe1980/snowplane/internal/controller/shareddatabase"
 	stagectl "github.com/hupe1980/snowplane/internal/controller/stage"
 	storageintegrationctl "github.com/hupe1980/snowplane/internal/controller/storageintegration"
 	tablectl "github.com/hupe1980/snowplane/internal/controller/table"
@@ -83,6 +86,9 @@ var (
 	roleAssignmentMockSvc          *mockRoleAssignmentService
 	notificationIntegrationMockSvc *mockNotificationIntegrationService
 	authenticationPolicyMockSvc    *mockAuthenticationPolicyService
+	apiIntegrationMockSvc          *mockAPIIntegrationService
+	secondaryDatabaseMockSvc       *mockSecondaryDatabaseService
+	sharedDatabaseMockSvc          *mockSharedDatabaseService
 )
 
 const (
@@ -308,7 +314,7 @@ func TestMain(m *testing.M) {
 		return grantMockSvc, func(context.Context) {}, nil
 	}
 
-	grantReconciler := grantctl.NewAccountRoleGrantReconcilerWithServiceFactory(
+	grantReconciler := grantctl.NewGrantPrivilegesToAccountRoleReconcilerWithServiceFactory(
 		mgr.GetClient(), factory, recorder, rl, grantServiceFactory,
 	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
 
@@ -588,6 +594,51 @@ func TestMain(m *testing.M) {
 
 	if err := databaseRoleAssignmentReconciler.SetupWithManager(mgr, 1); err != nil {
 		panic("failed to setup databaseroleassignment controller: " + err.Error())
+	}
+
+	// --- APIIntegration controller ---
+	apiIntegrationMockSvc = &mockAPIIntegrationService{}
+
+	apiIntegrationServiceFactory := func(_ context.Context, _ apiintegrationctl.SnowflakeClient, _ string) (apiintegrationctl.Service, func(context.Context), error) {
+		return apiIntegrationMockSvc, func(context.Context) {}, nil
+	}
+
+	apiIntegrationReconciler := apiintegrationctl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, apiIntegrationServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := apiIntegrationReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup apiintegration controller: " + err.Error())
+	}
+
+	// --- SecondaryDatabase controller ---
+	secondaryDatabaseMockSvc = &mockSecondaryDatabaseService{}
+
+	secondaryDatabaseServiceFactory := func(_ context.Context, _ secondarydatabasectl.SnowflakeClient, _ string) (secondarydatabasectl.Service, func(context.Context), error) {
+		return secondaryDatabaseMockSvc, func(context.Context) {}, nil
+	}
+
+	secondaryDatabaseReconciler := secondarydatabasectl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, secondaryDatabaseServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := secondaryDatabaseReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup secondarydatabase controller: " + err.Error())
+	}
+
+	// --- SharedDatabase controller ---
+	sharedDatabaseMockSvc = &mockSharedDatabaseService{}
+
+	sharedDatabaseServiceFactory := func(_ context.Context, _ shareddatabasectl.SnowflakeClient, _ string) (shareddatabasectl.Service, func(context.Context), error) {
+		return sharedDatabaseMockSvc, func(context.Context) {}, nil
+	}
+
+	sharedDatabaseReconciler := shareddatabasectl.NewReconcilerWithServiceFactory(
+		mgr.GetClient(), factory, recorder, rl, sharedDatabaseServiceFactory,
+	).WithRequeueInterval(500 * time.Millisecond).WithAlphaEnabled(true)
+
+	if err := sharedDatabaseReconciler.SetupWithManager(mgr, 1); err != nil {
+		panic("failed to setup shareddatabase controller: " + err.Error())
 	}
 
 	// Start the manager in a goroutine.

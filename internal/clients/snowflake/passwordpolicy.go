@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -14,20 +15,10 @@ type PasswordPolicyObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW PASSWORD POLICIES row.
-	ShowOutput *PasswordPolicyShowOutput
+	ShowOutput *v1alpha1.PasswordPolicyShowOutput
 
 	// DescribeOutput contains the DESCRIBE PASSWORD POLICY output (key-value pairs).
 	DescribeOutput map[string]string
-}
-
-// PasswordPolicyShowOutput contains the fields from SHOW PASSWORD POLICIES.
-type PasswordPolicyShowOutput struct {
-	CreatedOn    string
-	Name         string
-	DatabaseName string
-	SchemaName   string
-	Owner        string
-	Comment      string
 }
 
 // CreatePasswordPolicyOptions holds the parameters for creating a password policy.
@@ -228,7 +219,7 @@ func buildShowPasswordPolicyByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW PASSWORD POLICIES for a specific policy.
-func (pp *PasswordPolicyClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*PasswordPolicyShowOutput, error) {
+func (pp *PasswordPolicyClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.PasswordPolicyShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("password policy name is required"))
 	}
@@ -287,9 +278,9 @@ func (pp *PasswordPolicyClient) Observe(ctx context.Context, name SchemaObjectId
 }
 
 // scanPasswordPolicyShowOutput scans SHOW PASSWORD POLICIES results for a matching row.
-func scanPasswordPolicyShowOutput(rows *sql.Rows, name string) (*PasswordPolicyShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*PasswordPolicyShowOutput, error) {
-		return &PasswordPolicyShowOutput{
+func scanPasswordPolicyShowOutput(rows *sql.Rows, name string) (*v1alpha1.PasswordPolicyShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.PasswordPolicyShowOutput, error) {
+		return &v1alpha1.PasswordPolicyShowOutput{
 			CreatedOn:    m["created_on"],
 			Name:         m["name"],
 			DatabaseName: m["database_name"],

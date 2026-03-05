@@ -1,0 +1,18 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: SAML2Integration
+metadata:
+  name: my-saml2-sso
+spec:
+  providerRef:
+    name: default
+  name: MY_SAML2_SSO
+  issuer: "https://idp.example.com"
+  ssoURL: "https://idp.example.com/saml/sso"
+  provider: "CUSTOM"
+  x509Cert: "MIICpDCCAYwCCQC7... (Base64-encoded IdP certificate)"
+  enabled: true
+  allowedEmailPatterns:
+    - "*@example.com"
+  allowedUserDomains:
+    - "example.com"
+  comment: "SAML2 SSO integration managed by Snowplane"

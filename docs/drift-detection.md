@@ -66,6 +66,9 @@ All resource types support drift detection:
 | FileFormat | `name`, `database`, `schema`, `type` |
 | Pipe | `name`, `database`, `schema`, `definition`, `integration` |
 | DynamicTable | `name`, `database`, `schema`, `query`, `refreshMode` |
+| APIIntegration | `name`, `googleAudience`, `azureTenantId` |
+| SecondaryDatabase | `name` |
+| SharedDatabase | `name` |
 
 ---
 
@@ -198,6 +201,41 @@ After successful correction, the condition is cleared.
 |:------|:-----|:-----|
 | `DriftDetected` | Warning | Drift found during reconciliation |
 | `DriftCorrected` | Normal | Drift successfully corrected |
+
+---
+
+## Spec Hash — Distinguishing User Edits from External Drift
+
+A key challenge in drift detection is distinguishing between a user editing the CR spec (intentional change) and Snowflake-side drift (unintentional external change). Snowplane uses a **spec hash** mechanism stored in `status.lastAppliedSpecHash` to solve this problem.
+
+### How It Works
+
+1. After every successful `CREATE` or `ALTER`, the reconciler computes a SHA-256 hash of the full spec and stores it in `status.lastAppliedSpecHash`
+2. On the next reconciliation, the reconciler compares the current spec hash against the stored hash
+3. If the hash **changed** → the user edited the spec → apply the spec change via `ALTER` (not drift)
+4. If the hash is **unchanged** but `alterOpts.HasChanges()` is true → the change came from Snowflake's side → this is real drift
+
+### Why Not Use `metadata.generation`?
+
+Kubernetes increments `metadata.generation` when the spec changes, but this has limitations:
+
+- The generation counter can be stale if status updates race with spec updates
+- It doesn't detect field *removals* (removing a field from the spec is still a spec change)
+- A hash of the full spec is deterministic and captures all changes, including field additions and removals
+
+### Spec Hash API
+
+```go
+// Compute a SHA-256 hash of any spec struct
+hash, err := v1alpha1.ComputeSpecHash(obj.Spec)
+
+// Stored in status
+obj.Status.LastAppliedSpecHash = hash
+
+// Accessors on every ManagedResource
+hash := obj.GetLastAppliedSpecHash()
+obj.SetLastAppliedSpecHash(hash)
+```
 
 ---
 

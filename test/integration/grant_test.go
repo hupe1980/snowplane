@@ -50,7 +50,7 @@ func TestGrant_CreateLifecycle(t *testing.T) {
 	key := types.NamespacedName{Name: grantK8s, Namespace: testNamespace}
 
 	require.Eventually(t, func() bool {
-		var obj snowplanev1alpha1.AccountRoleGrant
+		var obj snowplanev1alpha1.GrantPrivilegesToAccountRole
 		if err := k8sClient.Get(ctx, key, &obj); err != nil {
 			return false
 		}
@@ -59,7 +59,7 @@ func TestGrant_CreateLifecycle(t *testing.T) {
 			conditions.IsTrue(&obj, snowplanev1alpha1.TypeSynced)
 	}, defaultTimeout, defaultInterval, "grant should become Ready")
 
-	var result snowplanev1alpha1.AccountRoleGrant
+	var result snowplanev1alpha1.GrantPrivilegesToAccountRole
 	require.NoError(t, k8sClient.Get(ctx, key, &result))
 
 	assert.True(t, granted.Load(), "Snowflake GRANT should have been called")
@@ -69,7 +69,7 @@ func TestGrant_CreateLifecycle(t *testing.T) {
 	assert.NotEmpty(t, result.Status.FullyQualifiedName)
 	assert.NotEmpty(t, result.Status.LastAppliedSpecHash)
 	assert.Equal(t, result.Generation, result.Status.ObservedGeneration)
-	assert.Contains(t, result.Finalizers, "snowplane.hupe1980.github.io/accountrolegrant")
+	assert.Contains(t, result.Finalizers, "snowplane.hupe1980.github.io/grantprivilegestoaccountrole")
 
 	// Cleanup — revoke on delete.
 	grantMockSvc.SetRevoke(func(_ context.Context, opts snowflake.RevokeGrantOptions) error {
@@ -82,7 +82,7 @@ func TestGrant_CreateLifecycle(t *testing.T) {
 	require.NoError(t, k8sClient.Delete(ctx, &result))
 
 	require.Eventually(t, func() bool {
-		var obj snowplanev1alpha1.AccountRoleGrant
+		var obj snowplanev1alpha1.GrantPrivilegesToAccountRole
 		return k8sClient.Get(ctx, key, &obj) != nil
 	}, defaultTimeout, defaultInterval, "grant should be cleaned up")
 }
@@ -120,7 +120,7 @@ func TestGrant_WithGrantOption(t *testing.T) {
 	key := types.NamespacedName{Name: grantK8s, Namespace: testNamespace}
 
 	require.Eventually(t, func() bool {
-		var obj snowplanev1alpha1.AccountRoleGrant
+		var obj snowplanev1alpha1.GrantPrivilegesToAccountRole
 		if err := k8sClient.Get(ctx, key, &obj); err != nil {
 			return false
 		}
@@ -128,7 +128,7 @@ func TestGrant_WithGrantOption(t *testing.T) {
 		return conditions.IsTrue(&obj, snowplanev1alpha1.TypeReady)
 	}, defaultTimeout, defaultInterval, "grant should become Ready")
 
-	var result snowplanev1alpha1.AccountRoleGrant
+	var result snowplanev1alpha1.GrantPrivilegesToAccountRole
 	require.NoError(t, k8sClient.Get(ctx, key, &result))
 
 	assert.True(t, result.Status.ShowOutput.GrantOption, "status should reflect GrantOption=true")
@@ -138,7 +138,7 @@ func TestGrant_WithGrantOption(t *testing.T) {
 	require.NoError(t, k8sClient.Delete(ctx, &result))
 
 	require.Eventually(t, func() bool {
-		var obj snowplanev1alpha1.AccountRoleGrant
+		var obj snowplanev1alpha1.GrantPrivilegesToAccountRole
 		return k8sClient.Get(ctx, key, &obj) != nil
 	}, defaultTimeout, defaultInterval)
 }
@@ -182,7 +182,7 @@ func TestGrant_DeleteWithOrphanPolicy(t *testing.T) {
 	key := types.NamespacedName{Name: grantK8s, Namespace: testNamespace}
 
 	require.Eventually(t, func() bool {
-		var obj snowplanev1alpha1.AccountRoleGrant
+		var obj snowplanev1alpha1.GrantPrivilegesToAccountRole
 		if err := k8sClient.Get(ctx, key, &obj); err != nil {
 			return false
 		}
@@ -190,12 +190,12 @@ func TestGrant_DeleteWithOrphanPolicy(t *testing.T) {
 		return conditions.IsTrue(&obj, snowplanev1alpha1.TypeReady)
 	}, defaultTimeout, defaultInterval)
 
-	var current snowplanev1alpha1.AccountRoleGrant
+	var current snowplanev1alpha1.GrantPrivilegesToAccountRole
 	require.NoError(t, k8sClient.Get(ctx, key, &current))
 	require.NoError(t, k8sClient.Delete(ctx, &current))
 
 	require.Eventually(t, func() bool {
-		var obj snowplanev1alpha1.AccountRoleGrant
+		var obj snowplanev1alpha1.GrantPrivilegesToAccountRole
 		return k8sClient.Get(ctx, key, &obj) != nil
 	}, defaultTimeout, defaultInterval)
 

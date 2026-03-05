@@ -54,8 +54,17 @@ func DefaultOptions() Options {
 	}
 }
 
-// New creates a new hierarchical rate limiter.
+// New creates a new hierarchical rate limiter. Burst values are clamped to
+// at least 1 when QPS > 0 to prevent creating limiters that reject all requests.
 func New(opts Options) *Limiter {
+	if opts.QPS > 0 && opts.Burst < 1 {
+		opts.Burst = 1
+	}
+
+	if opts.AccountQPS > 0 && opts.AccountBurst < 1 {
+		opts.AccountBurst = 1
+	}
+
 	return &Limiter{
 		limiters:        make(map[string]*rate.Limiter),
 		accountLimiters: make(map[string]*rate.Limiter),

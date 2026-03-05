@@ -370,3 +370,29 @@ func TestWait_BothLimitsActive_ControllerIsBottleneck(t *testing.T) {
 	_, _, err = l.Wait(ctx, "prov", "database")
 	assert.Error(t, err, "should fail: per-controller burst exhausted")
 }
+
+func TestNew_ClampsBurstToMinimumOne(t *testing.T) {
+	t.Parallel()
+
+	// With QPS > 0 and Burst = 0, Burst should be clamped to 1 to avoid
+	// creating a limiter that rejects all requests.
+	l := New(Options{QPS: 10, Burst: 0, AccountQPS: 50, AccountBurst: 0})
+
+	// Should not panic or reject — burst was clamped to 1.
+	cw, aw, err := l.Wait(context.Background(), "prov", "ctrl")
+	assert.NoError(t, err)
+	assert.False(t, cw, "first request should not wait (within clamped burst)")
+	assert.False(t, aw, "first request should not wait (within clamped burst)")
+}
+
+func TestNew_NoClamping_WhenQPSZero(t *testing.T) {
+	t.Parallel()
+
+	// When QPS is 0 (disabled), Burst = 0 is fine — no limiter is created.
+	l := New(Options{QPS: 0, Burst: 0, AccountQPS: 0, AccountBurst: 0})
+
+	cw, aw, err := l.Wait(context.Background(), "prov", "ctrl")
+	assert.NoError(t, err)
+	assert.False(t, cw, "disabled limiter should not wait")
+	assert.False(t, aw, "disabled limiter should not wait")
+}

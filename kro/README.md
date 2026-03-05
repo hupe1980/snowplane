@@ -17,10 +17,10 @@ helm install kro oci://registry.k8s.io/kro/charts/kro \
 
 | RGD | Custom Kind | Resources Created | Key Feature |
 |:----|:------------|:------------------|:------------|
-| [snowflake-project.yaml](snowflake-project.yaml) | `SnowflakeProject` | Database, Schema, Warehouse, AccountRole, AccountRoleGrant | Project bootstrap |
+| [snowflake-project.yaml](snowflake-project.yaml) | `SnowflakeProject` | Database, Schema, Warehouse, AccountRole, GrantPrivilegesToAccountRole | Project bootstrap |
 | [tagged-table.yaml](tagged-table.yaml) | `TaggedTable` | Table, N × TagAssociation | `forEach` collections |
 | [data-pipeline.yaml](data-pipeline.yaml) | `SnowflakePipeline` | Table, StreamOnTable, Task | Conditional resources |
-| [rbac-stack.yaml](rbac-stack.yaml) | `SnowflakeRBAC` | AccountRole, N × AccountRoleGrant, AccountRoleAssignment | `forEach` grants |
+| [rbac-stack.yaml](rbac-stack.yaml) | `SnowflakeRBAC` | AccountRole, N × GrantPrivilegesToAccountRole, AccountRoleAssignment | `forEach` grants |
 
 ## Quick Start
 
@@ -45,7 +45,7 @@ spec:
 EOF
 
 # 4. Watch all resources come up
-kubectl get databases,schemas,warehouses,accountroles,accountrolegrants -n data-team
+kubectl get databases,schemas,warehouses,accountroles,grantprivilegestoaccountroles -n data-team
 
 # 5. Clean up — deletes all managed resources in correct order
 kubectl delete snowflakeproject analytics -n data-team

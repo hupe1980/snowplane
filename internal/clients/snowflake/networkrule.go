@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -15,22 +16,10 @@ type NetworkRuleObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW NETWORK RULES row.
-	ShowOutput *NetworkRuleShowOutput
+	ShowOutput *v1alpha1.NetworkRuleShowOutput
 
 	// DescribeOutput contains the DESCRIBE NETWORK RULE output (key-value pairs).
 	DescribeOutput map[string]string
-}
-
-// NetworkRuleShowOutput contains the fields from SHOW NETWORK RULES.
-type NetworkRuleShowOutput struct {
-	CreatedOn    string
-	Name         string
-	DatabaseName string
-	SchemaName   string
-	Owner        string
-	Type         string
-	Mode         string
-	Comment      string
 }
 
 // CreateNetworkRuleOptions holds the parameters for creating a network rule.
@@ -225,7 +214,7 @@ func buildShowNetworkRuleByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW NETWORK RULES for a specific rule.
-func (nr *NetworkRuleClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*NetworkRuleShowOutput, error) {
+func (nr *NetworkRuleClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.NetworkRuleShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("network rule name is required"))
 	}
@@ -284,9 +273,9 @@ func (nr *NetworkRuleClient) Observe(ctx context.Context, name SchemaObjectIdent
 }
 
 // scanNetworkRuleShowOutput scans SHOW NETWORK RULES results for a matching row.
-func scanNetworkRuleShowOutput(rows *sql.Rows, name string) (*NetworkRuleShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*NetworkRuleShowOutput, error) {
-		return &NetworkRuleShowOutput{
+func scanNetworkRuleShowOutput(rows *sql.Rows, name string) (*v1alpha1.NetworkRuleShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.NetworkRuleShowOutput, error) {
+		return &v1alpha1.NetworkRuleShowOutput{
 			CreatedOn:    m["created_on"],
 			Name:         m["name"],
 			DatabaseName: m["database_name"],

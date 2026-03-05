@@ -83,7 +83,7 @@ func newTestStreamOnDynamicTable(name, namespace string) *snowplanev1alpha1.Stre
 func successfulObservation() *snowflake.StreamObservation {
 	return &snowflake.StreamObservation{
 		Exists: true,
-		ShowOutput: &snowflake.StreamShowOutput{
+		ShowOutput: &snowplanev1alpha1.StreamShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         "MY_STREAM",
 			DatabaseName: "MY_DB",
@@ -105,21 +105,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 		cb = cb.WithRuntimeObjects(obj)
 	}
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.StreamOnDynamicTable, Service, *snowflake.StreamObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("StreamOnDynamicTable"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("StreamOnDynamicTable")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -274,7 +270,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 		Status: snowplanev1alpha1.StreamOnDynamicTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", DynamicTableName: "MY_DYN_TABLE"},
 	}
 	obs := &snowflake.StreamObservation{
-		ShowOutput: &snowflake.StreamShowOutput{
+		ShowOutput: &snowplanev1alpha1.StreamShowOutput{
 			Name: "MY_STREAM", DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA",
 			TableName: "MY_DYN_TABLE", Mode: "DEFAULT",
 		},
@@ -290,7 +286,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 		Status: snowplanev1alpha1.StreamOnDynamicTableStatus{DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA", DynamicTableName: "MY_DYN_TABLE"},
 	}
 	obs := &snowflake.StreamObservation{
-		ShowOutput: &snowflake.StreamShowOutput{
+		ShowOutput: &snowplanev1alpha1.StreamShowOutput{
 			Name: "MY_STREAM", DatabaseName: "MY_DB", SchemaName: "MY_SCHEMA",
 			TableName: "MY_DYN_TABLE", Comment: "drifted", Mode: "DEFAULT",
 		},

@@ -30,12 +30,14 @@ func (f *fakeClient) Close() error {
 func (f *fakeClient) Exec(_ context.Context, _ string, _ ...any) (sql.Result, error) {
 	return nil, nil
 }
-func (f *fakeClient) QueryRow(_ context.Context, _ string, _ ...any) *snowflake.Row { return nil }
+func (f *fakeClient) QueryRow(_ context.Context, _ string, _ ...any) *snowflake.Row {
+	return snowflake.NewErrorRow(fmt.Errorf("fake: no real connection"))
+}
 func (f *fakeClient) Query(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
-	return nil, nil
+	return nil, fmt.Errorf("fake: no real connection")
 }
 func (f *fakeClient) WithRole(_ context.Context, _ string) (*snowflake.Client, func(context.Context), error) {
-	return nil, nil, nil
+	return nil, func(context.Context) {}, fmt.Errorf("fake: no real connection")
 }
 
 type unhealthyFakeClient struct {

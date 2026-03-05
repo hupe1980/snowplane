@@ -1,0 +1,14 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: APIIntegration
+metadata:
+  name: my-api-integration
+spec:
+  providerRef:
+    name: default
+  name: MY_API_INTEGRATION
+  apiProvider: aws_api_gateway
+  enabled: true
+  apiAllowedPrefixes:
+    - "https://api.example.com/v1/"
+  apiAwsRoleArn: "arn:aws:iam::123456789012:role/my-snowflake-role"
+  comment: "API integration for external functions"

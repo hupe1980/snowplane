@@ -84,8 +84,8 @@ func newTestMaterializedView(name, namespace string) *snowplanev1alpha1.Material
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        "DAILY_SALES",
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "analytics-db"},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: "public-schema"},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "analytics-db"},
+			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: "public-schema"},
 			Statement:   "SELECT sale_date, SUM(amount) AS total FROM sales GROUP BY sale_date",
 		},
 	}
@@ -130,7 +130,7 @@ func newTestSchema(name, namespace string) *snowplanev1alpha1.Schema {
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        "PUBLIC",
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "analytics-db"},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "analytics-db"},
 		},
 		Status: snowplanev1alpha1.SchemaStatus{
 			CommonStatus: snowplanev1alpha1.CommonStatus{
@@ -148,7 +148,7 @@ func newTestSchema(name, namespace string) *snowplanev1alpha1.Schema {
 func successfulObservation() *snowflake.MaterializedViewObservation {
 	return &snowflake.MaterializedViewObservation{
 		Exists: true,
-		ShowOutput: &snowflake.MaterializedViewShowOutput{
+		ShowOutput: &snowplanev1alpha1.MaterializedViewShowOutput{
 			CreatedOn:          "2024-01-01",
 			Name:               "DAILY_SALES",
 			DatabaseName:       "ANALYTICS",
@@ -179,22 +179,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.MaterializedView, Service, *snowflake.MaterializedViewObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("MaterializedView"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("MaterializedView")
+
+	return r
 }
 
 func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.MaterializedView, Service, *snowflake.MaterializedViewObservation] {
@@ -228,22 +223,17 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.MaterializedView, Service, *snowflake.MaterializedViewObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("MaterializedView"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("MaterializedView")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -487,7 +477,6 @@ func TestReconcile_DeleteMaterializedView(t *testing.T) {
 func TestValidateImmutableFields_NameChanged(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{}
 	mv := newTestMaterializedView("mymv", "default")
 	mv.Status.ObservedGeneration = 1
 	mv.Status.ShowOutput = &snowplanev1alpha1.MaterializedViewShowOutput{
@@ -496,7 +485,7 @@ func TestValidateImmutableFields_NameChanged(t *testing.T) {
 		SchemaName:   "PUBLIC",
 	}
 	mv.Spec.Name = "MONTHLY_SALES"
-	err := a.ValidateImmutableFields(context.Background(), mv)
+	err := validateImmutableFields(context.Background(), mv)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.name is immutable")
 }
@@ -504,20 +493,18 @@ func TestValidateImmutableFields_NameChanged(t *testing.T) {
 func TestValidateImmutableFields_ForceNew(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{}
 	mv := newTestMaterializedView("mymv", "default")
 	mv.Status.ObservedGeneration = 1
 	mv.Status.ShowOutput = &snowplanev1alpha1.MaterializedViewShowOutput{Name: "DAILY_SALES"}
 	mv.Annotations = map[string]string{snowplanev1alpha1.AnnotationForceNew: "true"}
 	mv.Spec.Name = "DIFFERENT"
-	err := a.ValidateImmutableFields(context.Background(), mv)
+	err := validateImmutableFields(context.Background(), mv)
 	require.NoError(t, err)
 }
 
 func TestValidateImmutableFields_DatabaseChanged(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{}
 	mv := newTestMaterializedView("mymv", "default")
 	mv.Status.ObservedGeneration = 1
 	mv.Status.DatabaseName = `"NEWDB"`
@@ -526,7 +513,7 @@ func TestValidateImmutableFields_DatabaseChanged(t *testing.T) {
 		DatabaseName: "ANALYTICS",
 		SchemaName:   "PUBLIC",
 	}
-	err := a.ValidateImmutableFields(context.Background(), mv)
+	err := validateImmutableFields(context.Background(), mv)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.databaseRef is immutable")
 }
@@ -627,7 +614,7 @@ func TestDetectDrift_CommentDrift(t *testing.T) {
 
 	obs := &snowflake.MaterializedViewObservation{
 		Exists: true,
-		ShowOutput: &snowflake.MaterializedViewShowOutput{
+		ShowOutput: &snowplanev1alpha1.MaterializedViewShowOutput{
 			Comment: "actual",
 		},
 	}
@@ -645,7 +632,7 @@ func TestDetectDrift_SecureDrift(t *testing.T) {
 
 	obs := &snowflake.MaterializedViewObservation{
 		Exists: true,
-		ShowOutput: &snowflake.MaterializedViewShowOutput{
+		ShowOutput: &snowplanev1alpha1.MaterializedViewShowOutput{
 			IsSecure: "false",
 		},
 	}
@@ -662,7 +649,7 @@ func TestDetectDrift_StatementDrift(t *testing.T) {
 
 	obs := &snowflake.MaterializedViewObservation{
 		Exists: true,
-		ShowOutput: &snowflake.MaterializedViewShowOutput{
+		ShowOutput: &snowplanev1alpha1.MaterializedViewShowOutput{
 			Text: "SELECT * FROM old_sales", // externally changed
 		},
 	}
@@ -680,7 +667,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 
 	obs := &snowflake.MaterializedViewObservation{
 		Exists: true,
-		ShowOutput: &snowflake.MaterializedViewShowOutput{
+		ShowOutput: &snowplanev1alpha1.MaterializedViewShowOutput{
 			Name:     "DAILY_SALES",
 			IsSecure: "false",
 			Text:     mv.Spec.Statement,
@@ -698,7 +685,7 @@ func TestDetectDrift_ImmutableNameChanged(t *testing.T) {
 
 	obs := &snowflake.MaterializedViewObservation{
 		Exists: true,
-		ShowOutput: &snowflake.MaterializedViewShowOutput{
+		ShowOutput: &snowplanev1alpha1.MaterializedViewShowOutput{
 			Name: "DIFFERENT_NAME",
 		},
 	}
@@ -748,6 +735,6 @@ func TestMapSchemaToMaterializedViews(t *testing.T) {
 func TestAdapter_SupportsCreateOrAlter(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{}
+	a := newAdapter(nil, nil, nil)
 	assert.False(t, a.SupportsCreateOrAlter(), "materialized views do not support CREATE OR ALTER")
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	gosnowflake "github.com/snowflakedb/gosnowflake"
@@ -41,17 +43,17 @@ func (m *mockSnowflakeClient) Exec(_ context.Context, _ string, _ ...any) (sql.R
 	return nil, nil
 }
 func (m *mockSnowflakeClient) QueryRow(_ context.Context, _ string, _ ...any) *snowflake.Row {
-	return nil
+	return snowflake.NewErrorRow(fmt.Errorf("mock: no real connection"))
 }
 func (m *mockSnowflakeClient) Query(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
-	return nil, nil
+	return nil, fmt.Errorf("mock: no real connection")
 }
 func (m *mockSnowflakeClient) WithRole(ctx context.Context, role string) (*snowflake.Client, func(context.Context), error) {
 	if m.withRoleFn != nil {
 		return m.withRoleFn(ctx, role)
 	}
 
-	return nil, nil, nil
+	return nil, func(context.Context) {}, fmt.Errorf("mock: no real connection")
 }
 
 // ---------------------------------------------------------------------------
@@ -1139,6 +1141,66 @@ func TestReconcile_PostCreateObserve_NotExists(t *testing.T) {
 // Tests: Ownership drift condition (F16)
 // ---------------------------------------------------------------------------
 
+func TestReconcile_Create_OwnershipConflict_BlocksCreate(t *testing.T) {
+	t.Parallel()
+
+	// Create two Database CRs targeting the same Snowflake FQN ("test-id").
+	// The first should stamp the label; the second should detect the conflict
+	// during its create path.
+	db1 := newTestDB()
+	db1.Name = "db-owner"
+	db1.UID = "uid-owner"
+	db1.Finalizers = []string{"snowplane.test/database"}
+	// Pre-stamp the ownership label as if db1 already went through create.
+	fqn := "test-id"
+	hash := reconciler.ComputeExternalNameHash(fqn)
+	db1.Labels = map[string]string{
+		snowplanev1alpha1.LabelExternalNameHash: hash,
+	}
+
+	db2 := newTestDB()
+	db2.Name = "db-duplicate"
+	db2.UID = "uid-duplicate"
+
+	adapter := &mockAdapter{
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: false}, nil // not found → create path
+		},
+	}
+
+	recorder := record.NewFakeRecorder(100)
+	r := newTestReconciler(adapter, db1, db2, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r.Recorder = recorder
+
+	// First reconcile: adds finalizer.
+	_, err := r.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: client.ObjectKeyFromObject(db2),
+	})
+	require.NoError(t, err)
+
+	// Second reconcile: create path detects ownership conflict.
+	_, err = r.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: client.ObjectKeyFromObject(db2),
+	})
+	// Should not return error — conflict is terminal.
+	require.NoError(t, err)
+
+	// Verify ConflictDetected event was emitted.
+	found := false
+
+	close(recorder.Events)
+
+	for event := range recorder.Events {
+		if strings.Contains(event, snowplanev1alpha1.ReasonConflictDetected) {
+			found = true
+
+			break
+		}
+	}
+
+	assert.True(t, found, "should emit ConflictDetected event when another CR owns the same Snowflake resource")
+}
+
 // ---------------------------------------------------------------------------
 // Tests: Terminal create error classification (F17)
 // ---------------------------------------------------------------------------
@@ -1861,4 +1923,148 @@ func TestReconcile_NilObservation_ReturnsError(t *testing.T) {
 	_, err := r.Reconcile(context.Background(), reconcileReq())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "nil observation")
+}
+
+// ---------------------------------------------------------------------------
+// Tests: R-12 nil-guard and event emission hardening
+// ---------------------------------------------------------------------------
+
+func TestReconcile_PostCreate_NilObservation_Requeues(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	callCount := 0
+
+	adapter := &mockAdapter{
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			callCount++
+			if callCount == 1 {
+				return &reconciler.Observation[any]{Exists: false}, nil // first call: not found → create
+			}
+
+			return nil, nil // post-create: adapter returns nil observation
+		},
+	}
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	result, err := r.Reconcile(context.Background(), reconcileReq())
+	// Should requeue with 5s interval for post-create verification.
+	assert.Equal(t, 5*time.Second, result.RequeueAfter, "should requeue after 5s for post-create verification")
+	// err may or may not be set (nil observation without error is non-fatal).
+	_ = err
+}
+
+func TestReconcile_PreReconcile_Failure_EmitsEvent(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+
+	adapter := &mockAdapter{
+		preReconcileFn: func(_ context.Context, _ *snowplanev1alpha1.Database) error {
+			return errors.New("database ref not ready")
+		},
+	}
+	recorder := record.NewFakeRecorder(100)
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r.Recorder = recorder
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.Error(t, err)
+
+	// Verify the DependencyNotReady event was emitted.
+	found := false
+
+	close(recorder.Events)
+
+	for event := range recorder.Events {
+		if strings.Contains(event, snowplanev1alpha1.ReasonDependencyNotReady) &&
+			strings.Contains(event, "Pre-reconcile failed") {
+			found = true
+
+			break
+		}
+	}
+
+	assert.True(t, found, "should emit DependencyNotReady event for pre-reconcile failure")
+}
+
+func TestReconcile_Paused_EmitsEvent(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.Spec.Paused = true
+
+	adapter := &mockAdapter{}
+	recorder := record.NewFakeRecorder(100)
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r.Recorder = recorder
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+
+	// Verify the ReconcilePaused event was emitted.
+	found := false
+
+	close(recorder.Events)
+
+	for event := range recorder.Events {
+		if strings.Contains(event, snowplanev1alpha1.ReasonReconcilePaused) {
+			found = true
+
+			break
+		}
+	}
+
+	assert.True(t, found, "should emit ReconcilePaused event when resource is paused")
+}
+
+// mockPreFlightAdapter embeds mockAdapter and implements PreFlightChecker.
+type mockPreFlightAdapter struct {
+	mockAdapter
+	preFlightCheckFn func(ctx context.Context, sfClient clientfactory.SnowflakeClient, obj *snowplanev1alpha1.Database) error
+}
+
+func (m *mockPreFlightAdapter) PreFlightCheck(ctx context.Context, sfClient clientfactory.SnowflakeClient, obj *snowplanev1alpha1.Database) error {
+	if m.preFlightCheckFn != nil {
+		return m.preFlightCheckFn(ctx, sfClient, obj)
+	}
+	return nil
+}
+
+var _ reconciler.PreFlightChecker[*snowplanev1alpha1.Database] = (*mockPreFlightAdapter)(nil)
+
+func TestReconcile_PreFlight_Failure_EmitsEvent(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+
+	adapter := &mockPreFlightAdapter{
+		preFlightCheckFn: func(_ context.Context, _ clientfactory.SnowflakeClient, _ *snowplanev1alpha1.Database) error {
+			return errors.New("warehouse COMPUTE_WH does not exist")
+		},
+	}
+
+	recorder := record.NewFakeRecorder(100)
+	r := buildTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r.Recorder = recorder
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "warehouse COMPUTE_WH does not exist")
+
+	// Verify the DependencyNotReady event was emitted.
+	found := false
+
+	close(recorder.Events)
+
+	for event := range recorder.Events {
+		if strings.Contains(event, snowplanev1alpha1.ReasonDependencyNotReady) &&
+			strings.Contains(event, "Pre-flight check failed") {
+			found = true
+
+			break
+		}
+	}
+
+	assert.True(t, found, "should emit DependencyNotReady event for pre-flight failure")
 }

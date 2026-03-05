@@ -113,7 +113,7 @@ func TestGeneratedTypeHeaders(t *testing.T) {
 		"View", "Table", "NetworkPolicy", "ResourceMonitor", "StorageIntegration",
 		"FileFormat", "Pipe", "DynamicTable",
 		"SecurityIntegration", "NotificationIntegration", "PasswordPolicy", "NetworkRule",
-		"AccountRoleGrant", "DatabaseRoleGrant", "ShareGrant", "GrantOwnership",
+		"GrantPrivilegesToAccountRole", "GrantPrivilegesToDatabaseRole", "GrantPrivilegesToShare", "GrantOwnership",
 		"AccountRoleAssignment", "DatabaseRoleAssignment",
 	}
 
@@ -184,7 +184,7 @@ func TestGeneratedGetSpecNameSkipped(t *testing.T) {
 	content := string(src)
 
 	// Grant types should NOT have generated GetSpecName (they have custom implementations).
-	skipTypes := []string{"AccountRoleGrant", "DatabaseRoleGrant", "ShareGrant", "GrantOwnership"}
+	skipTypes := []string{"GrantPrivilegesToAccountRole", "GrantPrivilegesToDatabaseRole", "GrantPrivilegesToShare", "GrantOwnership"}
 	for _, typeName := range skipTypes {
 		section := extractSection(t, content, typeName)
 		assert.NotContains(t, section, "GetSpecName", "GetSpecName should be skipped for %s", typeName)
@@ -229,8 +229,8 @@ func TestGeneratedTrackedParamsPatterns(t *testing.T) {
 	assert.Contains(t, content, "d.Status.TrackedParameters", "Database should use Status.TrackedParameters")
 
 	// B types return nil for tracked params.
-	section := extractSection(t, content, "AccountRoleGrant")
-	assert.Contains(t, section, "return nil", "AccountRoleGrant should return nil for tracked params")
+	section := extractSection(t, content, "GrantPrivilegesToAccountRole")
+	assert.Contains(t, section, "return nil", "GrantPrivilegesToAccountRole should return nil for tracked params")
 }
 
 // TestGeneratedHeader verifies the generated file header.

@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -26,14 +27,12 @@ func newSchema() *snowplanev1alpha1.Schema {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newSchema()
 		obs := &reconciler.Observation[*snowflake.SchemaObservation]{
 			Exists: true,
 			Detail: &snowflake.SchemaObservation{
-				ShowOutput: &snowflake.SchemaShowOutput{
+				ShowOutput: &snowplanev1alpha1.SchemaShowOutput{
 					Comment: "schema comment",
 				},
 				Parameters: &snowflake.SchemaParameters{
@@ -49,7 +48,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 
 		assert.Equal(t, "schema comment", *obj.Spec.Comment)
@@ -71,7 +70,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.SchemaObservation]{
 			Exists: true,
 			Detail: &snowflake.SchemaObservation{
-				ShowOutput: &snowflake.SchemaShowOutput{
+				ShowOutput: &snowplanev1alpha1.SchemaShowOutput{
 					Comment: "snowflake comment",
 				},
 				Parameters: &snowflake.SchemaParameters{
@@ -81,7 +80,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 
 		assert.Equal(t, "user comment", *obj.Spec.Comment)
@@ -108,7 +107,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.SchemaObservation]{
 			Exists: true,
 			Detail: &snowflake.SchemaObservation{
-				ShowOutput: &snowflake.SchemaShowOutput{Comment: "other"},
+				ShowOutput: &snowplanev1alpha1.SchemaShowOutput{Comment: "other"},
 				Parameters: &snowflake.SchemaParameters{
 					DataRetentionTimeInDays: ptr(int32(99)),
 					LogLevel:                "INFO",
@@ -116,7 +115,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -127,7 +126,7 @@ func TestLateInitialize(t *testing.T) {
 			Detail: nil,
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -141,7 +140,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 }

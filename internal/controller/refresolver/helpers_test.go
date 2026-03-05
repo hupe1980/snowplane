@@ -74,7 +74,7 @@ func TestResolveDatabaseRefWithConditions_Success(t *testing.T) {
 	target := &snowplanev1alpha1.Database{
 		ObjectMeta: metav1.ObjectMeta{Name: "caller", Namespace: "default"},
 	}
-	ref := &snowplanev1alpha1.LocalObjectReference{Name: "my-db"}
+	ref := &snowplanev1alpha1.ObjectReference{Name: "my-db"}
 
 	fqn, err := ResolveDatabaseRefWithConditions(context.Background(), c, recorder, target, "default", ref, nil)
 	require.NoError(t, err)
@@ -94,7 +94,7 @@ func TestResolveDatabaseRefWithConditions_Error(t *testing.T) {
 	target := &snowplanev1alpha1.Database{
 		ObjectMeta: metav1.ObjectMeta{Name: "caller", Namespace: "default"},
 	}
-	ref := &snowplanev1alpha1.LocalObjectReference{Name: "missing"}
+	ref := &snowplanev1alpha1.ObjectReference{Name: "missing"}
 
 	_, err := ResolveDatabaseRefWithConditions(context.Background(), c, recorder, target, "default", ref, nil)
 	require.Error(t, err)
@@ -143,7 +143,7 @@ func TestResolveSchemaRefWithConditions_Success(t *testing.T) {
 	target := &snowplanev1alpha1.Database{
 		ObjectMeta: metav1.ObjectMeta{Name: "caller", Namespace: "default"},
 	}
-	ref := &snowplanev1alpha1.LocalObjectReference{Name: "my-schema"}
+	ref := &snowplanev1alpha1.ObjectReference{Name: "my-schema"}
 
 	fqn, err := ResolveSchemaRefWithConditions(context.Background(), c, recorder, target, "default", ref, nil)
 	require.NoError(t, err)
@@ -163,7 +163,7 @@ func TestResolveSchemaRefWithConditions_Error(t *testing.T) {
 	target := &snowplanev1alpha1.Database{
 		ObjectMeta: metav1.ObjectMeta{Name: "caller", Namespace: "default"},
 	}
-	ref := &snowplanev1alpha1.LocalObjectReference{Name: "missing"}
+	ref := &snowplanev1alpha1.ObjectReference{Name: "missing"}
 
 	_, err := ResolveSchemaRefWithConditions(context.Background(), c, recorder, target, "default", ref, nil)
 	require.Error(t, err)
@@ -184,7 +184,7 @@ func TestSetDatabaseResolvedCondition(t *testing.T) {
 	db := &snowplanev1alpha1.Database{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-db", Namespace: "default"},
 	}
-	ref := &snowplanev1alpha1.LocalObjectReference{Name: "my-ref"}
+	ref := &snowplanev1alpha1.ObjectReference{Name: "my-ref"}
 	SetDatabaseResolvedCondition(db, ref, nil, `"ANALYTICS"`)
 
 	refCond := conditions.Get(db, snowplanev1alpha1.TypeReferencesResolved)
@@ -203,7 +203,7 @@ func TestSetDatabaseAndSchemaResolvedCondition(t *testing.T) {
 	db := &snowplanev1alpha1.Database{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-db", Namespace: "default"},
 	}
-	dbRef := &snowplanev1alpha1.LocalObjectReference{Name: "db-ref"}
+	dbRef := &snowplanev1alpha1.ObjectReference{Name: "db-ref"}
 	schemaName := "PUBLIC"
 	SetDatabaseAndSchemaResolvedCondition(db, dbRef, nil, nil, &schemaName)
 

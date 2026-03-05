@@ -99,14 +99,14 @@ var (
 	gvrFieldExport = schema.GroupVersionResource{
 		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "fieldexports",
 	}
-	gvrAccountRoleGrant = schema.GroupVersionResource{
-		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "accountrolegrants",
+	gvrGrantPrivilegesToAccountRole = schema.GroupVersionResource{
+		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "grantprivilegestoaccountroles",
 	}
-	gvrDatabaseRoleGrant = schema.GroupVersionResource{
-		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "databaserolegrants",
+	gvrGrantPrivilegesToDatabaseRole = schema.GroupVersionResource{
+		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "grantprivilegestodatabaseroles",
 	}
-	gvrShareGrant = schema.GroupVersionResource{
-		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "sharegrants",
+	gvrGrantPrivilegesToShare = schema.GroupVersionResource{
+		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "grantprivilegestoshares",
 	}
 	gvrNetworkPolicy = schema.GroupVersionResource{
 		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "networkpolicies",
@@ -125,6 +125,9 @@ var (
 	}
 	gvrStreamOnTable = schema.GroupVersionResource{
 		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "streamontables",
+	}
+	gvrAPIIntegration = schema.GroupVersionResource{
+		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "apiintegrations",
 	}
 )
 
@@ -641,15 +644,16 @@ func cleanupK8sCRs() {
 	// Delete in dependency order: children first, then parents.
 	gvrs := []schema.GroupVersionResource{
 		gvrFieldExport,
-		gvrAccountRoleGrant,
-		gvrDatabaseRoleGrant,
-		gvrShareGrant,
+		gvrGrantPrivilegesToAccountRole,
+		gvrGrantPrivilegesToDatabaseRole,
+		gvrGrantPrivilegesToShare,
 		gvrStreamOnTable,
 		gvrTask,
 		gvrMaskingPolicy,
 		gvrPasswordPolicy,
 		gvrTag,
 		gvrNetworkPolicy,
+		gvrAPIIntegration,
 		gvrStage,
 		gvrView,
 		gvrTable,
@@ -686,7 +690,7 @@ func cleanupK8sCRs() {
 func cleanupSnowflake() {
 	cleanCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	resourceTypes := []string{"STREAMS", "TASKS", "MASKING POLICIES", "PASSWORD POLICIES", "TAGS", "VIEWS", "TABLES", "STAGES", "SCHEMAS", "NETWORK POLICIES", "DATABASES", "WAREHOUSES", "USERS", "ROLES"}
+	resourceTypes := []string{"STREAMS", "TASKS", "MASKING POLICIES", "PASSWORD POLICIES", "TAGS", "VIEWS", "TABLES", "STAGES", "SCHEMAS", "NETWORK POLICIES", "INTEGRATIONS", "DATABASES", "WAREHOUSES", "USERS", "ROLES"}
 	for _, rt := range resourceTypes {
 		rows, err := sfDB.QueryContext(cleanCtx, fmt.Sprintf("SHOW %s LIKE '%s%%'", rt, sqlbuilder.EscapeLikePattern(sfPrefix)))
 		if err != nil {
@@ -1147,11 +1151,11 @@ func newFieldExportCR(name, sourceKind, sourceName, path, targetKind, targetName
 	}
 }
 
-func newAccountRoleGrantCR(name, privilege, accountRole string, on map[string]interface{}) *unstructured.Unstructured {
+func newGrantPrivilegesToAccountRoleCR(name, privilege, accountRole string, on map[string]interface{}) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
-			"kind":       "AccountRoleGrant",
+			"kind":       "GrantPrivilegesToAccountRole",
 			"metadata": map[string]interface{}{
 				"name":      name,
 				"namespace": testNamespace,
@@ -1168,11 +1172,11 @@ func newAccountRoleGrantCR(name, privilege, accountRole string, on map[string]in
 	}
 }
 
-func newDatabaseRoleGrantCR(name, privilege, databaseRole string, on map[string]interface{}) *unstructured.Unstructured {
+func newGrantPrivilegesToDatabaseRoleCR(name, privilege, databaseRole string, on map[string]interface{}) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
-			"kind":       "DatabaseRoleGrant",
+			"kind":       "GrantPrivilegesToDatabaseRole",
 			"metadata": map[string]interface{}{
 				"name":      name,
 				"namespace": testNamespace,
@@ -1350,6 +1354,34 @@ func newStreamOnTableCR(name, sfName, dbRefName, schemaRefName, table string) *u
 					"name": providerName,
 				},
 			},
+		},
+	}
+}
+
+func newAPIIntegrationCR(name, sfName string, allowedPrefixes []interface{}, comment string) *unstructured.Unstructured {
+	spec := map[string]interface{}{
+		"name":               sfName,
+		"apiProvider":        "git_https_api",
+		"apiAllowedPrefixes": allowedPrefixes,
+		"enabled":            true,
+		"providerRef": map[string]interface{}{
+			"name": providerName,
+		},
+	}
+
+	if comment != "" {
+		spec["comment"] = comment
+	}
+
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
+			"kind":       "APIIntegration",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": testNamespace,
+			},
+			"spec": spec,
 		},
 	}
 }

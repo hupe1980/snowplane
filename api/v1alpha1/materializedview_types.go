@@ -28,7 +28,7 @@ type MaterializedViewSpec struct {
 
 	// DatabaseRef is a reference to a Database CR. Mutually exclusive with databaseName.
 	// +optional
-	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
+	DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
 	// DatabaseName is the Snowflake database identifier (e.g. ANALYTICS). Mutually exclusive with databaseRef.
 	// +optional
@@ -38,7 +38,7 @@ type MaterializedViewSpec struct {
 
 	// SchemaRef is a reference to a Schema CR. Mutually exclusive with schemaName.
 	// +optional
-	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
+	SchemaRef *ObjectReference `json:"schemaRef,omitempty"`
 
 	// SchemaName is the Snowflake schema identifier (e.g. PUBLIC). Mutually exclusive with schemaRef.
 	// +optional

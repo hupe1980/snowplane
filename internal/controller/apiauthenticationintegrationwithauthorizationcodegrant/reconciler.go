@@ -5,6 +5,7 @@ package apiauthenticationintegrationwithauthorizationcodegrant
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,53 +40,89 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 
 // NewReconciler returns a new APIAuthenticationIntegrationWithAuthorizationCodeGrant reconciler.
 func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, Service, *snowflake.APIAuthenticationIntegrationObservation] {
-	a := &adapter{client: c, newService: defaultServiceFactory}
-
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, Service, *snowflake.APIAuthenticationIntegrationObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewAPIAuthenticationIntegrationClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
 // supply a custom ServiceFactory for testing.
-func NewReconcilerWithServiceFactory(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter, sf ServiceFactory) *reconciler.GenericReconciler[*snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, Service, *snowflake.APIAuthenticationIntegrationObservation] {
-	a := &adapter{client: c, newService: sf}
+func NewReconcilerWithServiceFactory(
+	c client.Client,
+	factory *clientfactory.ClientFactory,
+	recorder record.EventRecorder,
+	rl *ratelimit.Limiter,
+	sf ServiceFactory,
+) *reconciler.GenericReconciler[*snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, Service, *snowflake.APIAuthenticationIntegrationObservation] {
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, sf))
+}
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, Service, *snowflake.APIAuthenticationIntegrationObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+// newAdapter creates the BaseAdapter for APIAuthenticationIntegrationWithAuthorizationCodeGrant resources.
+func newAdapter(c client.Client, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, Service, *snowflake.APIAuthenticationIntegrationObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, Service, *snowflake.APIAuthenticationIntegrationObservation]{
+		ResourceNameVal:  "apiauthenticationintegrationwithauthorizationcodegrant",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn: func() *snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant {
+			return &snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant{}
+		},
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant) (reconciler.Identifier, error) {
+			return snowflake.NewAccountObjectIdentifier(obj.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) (*snowflake.APIAuthenticationIntegrationObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.APIAuthenticationIntegrationObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, id snowflake.AccountObjectIdentifier) error {
+			opts, err := buildCreateOptions(ctx, c, obj, id)
+			if err != nil {
+				return err
+			}
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterAPIAuthenticationIntegrationOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, id snowflake.AccountObjectIdentifier, obs *reconciler.Observation[*snowflake.APIAuthenticationIntegrationObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, obs *reconciler.Observation[*snowflake.APIAuthenticationIntegrationObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, obs *reconciler.Observation[*snowflake.APIAuthenticationIntegrationObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
 	}
 }
 
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+// validateImmutableFields checks that immutable fields have not changed.
+func validateImmutableFields(_ context.Context, obj *snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant) error {
+	if reconciler.ShouldSkipImmutableValidation(obj) {
+		return nil
 	}
 
-	return snowflake.NewAPIAuthenticationIntegrationClient(sfC), cleanup, nil
+	if obj.Status.ShowOutput != nil && obj.Status.ShowOutput.Name != "" {
+		if !strings.EqualFold(obj.Spec.Name, obj.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", obj.Status.ShowOutput.Name, obj.Spec.Name)
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant, obs *snowflake.APIAuthenticationIntegrationObservation) {
 	if obs.ShowOutput != nil {
 		obj.Status.FullyQualifiedName = obs.ShowOutput.Name
-
-		enabled := fmt.Sprintf("%t", obs.ShowOutput.Enabled)
-		obj.Status.ShowOutput = &snowplanev1alpha1.APIAuthenticationIntegrationShowOutput{
-			CreatedOn:       stringPtrOrNil(obs.ShowOutput.CreatedOn),
-			Name:            stringPtrOrNil(obs.ShowOutput.Name),
-			Category:        stringPtrOrNil(obs.ShowOutput.Category),
-			IntegrationType: stringPtrOrNil(obs.ShowOutput.Type),
-			Enabled:         &enabled,
-			Comment:         stringPtrOrNil(obs.ShowOutput.Comment),
-		}
+		obj.Status.ShowOutput = obs.ShowOutput
 	}
 
 	if obs.DescribeOutput != nil {

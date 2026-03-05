@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,20 +17,7 @@ type ViewObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW VIEWS row.
-	ShowOutput *ViewShowOutput
-}
-
-// ViewShowOutput contains the fields from SHOW VIEWS.
-type ViewShowOutput struct {
-	CreatedOn      string
-	Name           string
-	DatabaseName   string
-	SchemaName     string
-	Comment        string
-	Owner          string
-	IsSecure       bool
-	Text           string // View definition
-	ChangeTracking bool
+	ShowOutput *v1alpha1.ViewShowOutput
 }
 
 // CreateViewOptions holds the parameters for creating a view.
@@ -302,7 +290,7 @@ func buildShowViewByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW VIEWS for a specific view name within a schema.
-func (v *ViewClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*ViewShowOutput, error) {
+func (v *ViewClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.ViewShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("view name is required"))
 	}
@@ -334,9 +322,9 @@ func (v *ViewClient) Observe(ctx context.Context, name SchemaObjectIdentifier) (
 }
 
 // scanViewShowOutput scans SHOW VIEWS results for a matching row.
-func scanViewShowOutput(rows *sql.Rows, name string) (*ViewShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*ViewShowOutput, error) {
-		return &ViewShowOutput{
+func scanViewShowOutput(rows *sql.Rows, name string) (*v1alpha1.ViewShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.ViewShowOutput, error) {
+		return &v1alpha1.ViewShowOutput{
 			CreatedOn:      m["created_on"],
 			Name:           m["name"],
 			DatabaseName:   m["database_name"],

@@ -26,8 +26,8 @@ func newTestAlert(name, sfName, dbRefName, schemaRefName string) *snowplanev1alp
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        sfName,
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
 			Condition:   "SELECT 1",
 			Action:      "SELECT 1",
 		},
@@ -45,8 +45,8 @@ func newTestTask(name, sfName, dbRefName, schemaRefName string) *snowplanev1alph
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:         sfName,
-			DatabaseRef:  &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:    &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			DatabaseRef:  &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:    &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
 			SQLStatement: "SELECT 1",
 		},
 	}
@@ -63,8 +63,8 @@ func newTestDynamicTable(name, sfName, dbRefName, schemaRefName string) *snowpla
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:          sfName,
-			DatabaseRef:   &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:     &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			DatabaseRef:   &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:     &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
 			Query:         "SELECT 1 AS id",
 			TargetLag:     "1 minute",
 			WarehouseName: ptr("MY_WH"),
@@ -83,8 +83,8 @@ func newTestMaskingPolicy(name, sfName, dbRefName, schemaRefName string) *snowpl
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        sfName,
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
 			Signature:   []snowplanev1alpha1.MaskingPolicyArgument{{Name: "val", Type: "VARCHAR"}},
 			Body:        "CASE WHEN current_role() IN ('ANALYST') THEN val ELSE '***' END",
 		},
@@ -102,8 +102,8 @@ func newTestPasswordPolicy(name, sfName, dbRefName, schemaRefName string) *snowp
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        sfName,
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
 		},
 	}
 }
@@ -119,8 +119,8 @@ func newTestPipe(name, sfName, dbRefName, schemaRefName string) *snowplanev1alph
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:          sfName,
-			DatabaseRef:   &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:     &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			DatabaseRef:   &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:     &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
 			CopyStatement: "COPY INTO my_table FROM @my_stage",
 		},
 	}
@@ -137,8 +137,8 @@ func newTestFileFormat(name, sfName, dbRefName, schemaRefName string) *snowplane
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        sfName,
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
 			Type:        snowplanev1alpha1.FileFormatTypeCSV,
 		},
 	}
@@ -155,8 +155,8 @@ func newTestTag(name, sfName, dbRefName, schemaRefName string) *snowplanev1alpha
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        sfName,
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
 		},
 	}
 }
@@ -172,8 +172,8 @@ func newTestRowAccessPolicy(name, sfName, dbRefName, schemaRefName string) *snow
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        sfName,
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
 			Signature:   []snowplanev1alpha1.RowAccessPolicyArgument{{Name: "val", Type: "VARCHAR"}},
 			Body:        "CASE WHEN current_role() IN ('ANALYST') THEN true ELSE false END",
 		},
@@ -332,7 +332,7 @@ func newTestDatabaseRoleAssignment(name, databaseRoleName, toRole string) *snowp
 func alertObservation(name, dbName, schemaName, owner string) *snowflake.AlertObservation {
 	return &snowflake.AlertObservation{
 		Exists: true,
-		ShowOutput: &snowflake.AlertShowOutput{
+		ShowOutput: &snowplanev1alpha1.AlertShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         name,
 			DatabaseName: dbName,
@@ -348,7 +348,7 @@ func alertObservation(name, dbName, schemaName, owner string) *snowflake.AlertOb
 func taskObservation(name, dbName, schemaName, owner string) *snowflake.TaskObservation {
 	return &snowflake.TaskObservation{
 		Exists: true,
-		ShowOutput: &snowflake.TaskShowOutput{
+		ShowOutput: &snowplanev1alpha1.TaskShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         name,
 			DatabaseName: dbName,
@@ -363,7 +363,7 @@ func taskObservation(name, dbName, schemaName, owner string) *snowflake.TaskObse
 func dynamicTableObservation(name, dbName, schemaName, owner string) *snowflake.DynamicTableObservation {
 	return &snowflake.DynamicTableObservation{
 		Exists: true,
-		ShowOutput: &snowflake.DynamicTableShowOutput{
+		ShowOutput: &snowplanev1alpha1.DynamicTableShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         name,
 			DatabaseName: dbName,
@@ -379,7 +379,7 @@ func dynamicTableObservation(name, dbName, schemaName, owner string) *snowflake.
 func networkPolicyObservation(name string) *snowflake.NetworkPolicyObservation {
 	return &snowflake.NetworkPolicyObservation{
 		Exists: true,
-		ShowOutput: &snowflake.NetworkPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.NetworkPolicyShowOutput{
 			CreatedOn:              "2024-01-01",
 			Name:                   name,
 			EntriesInAllowedIPList: "1",
@@ -390,7 +390,7 @@ func networkPolicyObservation(name string) *snowflake.NetworkPolicyObservation {
 func maskingPolicyObservation(name, dbName, schemaName, owner string) *snowflake.MaskingPolicyObservation {
 	return &snowflake.MaskingPolicyObservation{
 		Exists: true,
-		ShowOutput: &snowflake.MaskingPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.MaskingPolicyShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         name,
 			DatabaseName: dbName,
@@ -404,7 +404,7 @@ func maskingPolicyObservation(name, dbName, schemaName, owner string) *snowflake
 func passwordPolicyObservation(name, dbName, schemaName, owner string) *snowflake.PasswordPolicyObservation {
 	return &snowflake.PasswordPolicyObservation{
 		Exists: true,
-		ShowOutput: &snowflake.PasswordPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.PasswordPolicyShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         name,
 			DatabaseName: dbName,
@@ -417,7 +417,7 @@ func passwordPolicyObservation(name, dbName, schemaName, owner string) *snowflak
 func securityIntegrationObservation(name string) *snowflake.SecurityIntegrationObservation {
 	return &snowflake.SecurityIntegrationObservation{
 		Exists: true,
-		ShowOutput: &snowflake.SecurityIntegrationShowOutput{
+		ShowOutput: &snowplanev1alpha1.SecurityIntegrationShowOutput{
 			CreatedOn: "2024-01-01",
 			Name:      name,
 			Type:      "SCIM",
@@ -430,7 +430,7 @@ func securityIntegrationObservation(name string) *snowflake.SecurityIntegrationO
 func notificationIntegrationObservation(name string) *snowflake.NotificationIntegrationObservation {
 	return &snowflake.NotificationIntegrationObservation{
 		Exists: true,
-		ShowOutput: &snowflake.NotificationIntegrationShowOutput{
+		ShowOutput: &snowplanev1alpha1.NotificationIntegrationShowOutput{
 			CreatedOn: "2024-01-01",
 			Name:      name,
 			Type:      "EMAIL",
@@ -446,7 +446,7 @@ func notificationIntegrationObservation(name string) *snowflake.NotificationInte
 func storageIntegrationObservation(name string) *snowflake.StorageIntegrationObservation {
 	return &snowflake.StorageIntegrationObservation{
 		Exists: true,
-		ShowOutput: &snowflake.StorageIntegrationShowOutput{
+		ShowOutput: &snowplanev1alpha1.StorageIntegrationShowOutput{
 			CreatedOn: "2024-01-01",
 			Name:      name,
 			Type:      "EXTERNAL_STAGE",
@@ -459,7 +459,7 @@ func storageIntegrationObservation(name string) *snowflake.StorageIntegrationObs
 func resourceMonitorObservation(name string) *snowflake.ResourceMonitorObservation {
 	return &snowflake.ResourceMonitorObservation{
 		Exists: true,
-		ShowOutput: &snowflake.ResourceMonitorShowOutput{
+		ShowOutput: &snowplanev1alpha1.ResourceMonitorShowOutput{
 			CreatedOn: "2024-01-01",
 			Name:      name,
 		},
@@ -469,7 +469,7 @@ func resourceMonitorObservation(name string) *snowflake.ResourceMonitorObservati
 func pipeObservation(name, dbName, schemaName, owner string) *snowflake.PipeObservation {
 	return &snowflake.PipeObservation{
 		Exists: true,
-		ShowOutput: &snowflake.PipeShowOutput{
+		ShowOutput: &snowplanev1alpha1.PipeShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         name,
 			DatabaseName: dbName,
@@ -483,7 +483,7 @@ func pipeObservation(name, dbName, schemaName, owner string) *snowflake.PipeObse
 func fileFormatObservation(name, dbName, schemaName, owner string) *snowflake.FileFormatObservation {
 	return &snowflake.FileFormatObservation{
 		Exists: true,
-		ShowOutput: &snowflake.FileFormatShowOutput{
+		ShowOutput: &snowplanev1alpha1.FileFormatShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         name,
 			DatabaseName: dbName,
@@ -497,7 +497,7 @@ func fileFormatObservation(name, dbName, schemaName, owner string) *snowflake.Fi
 func tagObservation(name, dbName, schemaName, owner string) *snowflake.TagObservation {
 	return &snowflake.TagObservation{
 		Exists: true,
-		ShowOutput: &snowflake.TagShowOutput{
+		ShowOutput: &snowplanev1alpha1.TagShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         name,
 			DatabaseName: dbName,
@@ -510,7 +510,7 @@ func tagObservation(name, dbName, schemaName, owner string) *snowflake.TagObserv
 func rowAccessPolicyObservation(name, dbName, schemaName, owner string) *snowflake.RowAccessPolicyObservation {
 	return &snowflake.RowAccessPolicyObservation{
 		Exists: true,
-		ShowOutput: &snowflake.RowAccessPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.RowAccessPolicyShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         name,
 			DatabaseName: dbName,
@@ -524,7 +524,7 @@ func rowAccessPolicyObservation(name, dbName, schemaName, owner string) *snowfla
 func grantOwnershipObservation(objectType, objectName, grantedTo, granteeName string) *snowflake.GrantOwnershipObservation {
 	return &snowflake.GrantOwnershipObservation{
 		Exists: true,
-		ShowOutput: &snowflake.GrantOwnershipShowOutput{
+		ShowOutput: &snowplanev1alpha1.GrantOwnershipShowOutput{
 			CreatedOn:   "2024-01-01",
 			Privilege:   "OWNERSHIP",
 			GrantedOn:   objectType,
@@ -538,7 +538,7 @@ func grantOwnershipObservation(objectType, objectName, grantedTo, granteeName st
 func roleAssignmentObservation(role, grantedTo, granteeName string) *snowflake.RoleAssignmentObservation {
 	return &snowflake.RoleAssignmentObservation{
 		Exists: true,
-		ShowOutput: &snowflake.RoleAssignmentShowOutput{
+		ShowOutput: &snowplanev1alpha1.RoleAssignmentShowOutput{
 			CreatedOn:   "2024-01-01",
 			Role:        role,
 			GrantedTo:   grantedTo,
@@ -558,8 +558,8 @@ func newTestAuthenticationPolicy(name, sfName, dbRefName, schemaRefName string) 
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:                  sfName,
-			DatabaseRef:           &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:             &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			DatabaseRef:           &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:             &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
 			AuthenticationMethods: []string{"PASSWORD", "SAML"},
 			ClientTypes:           []string{"SNOWFLAKE_UI", "DRIVERS"},
 		},
@@ -569,7 +569,7 @@ func newTestAuthenticationPolicy(name, sfName, dbRefName, schemaRefName string) 
 func authenticationPolicyObservation(name, dbName, schemaName, owner string) *snowflake.AuthenticationPolicyObservation {
 	return &snowflake.AuthenticationPolicyObservation{
 		Exists: true,
-		ShowOutput: &snowflake.AuthenticationPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.AuthenticationPolicyShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         name,
 			DatabaseName: dbName,
@@ -580,5 +580,108 @@ func authenticationPolicyObservation(name, dbName, schemaName, owner string) *sn
 			"AUTHENTICATION_METHODS": "[PASSWORD, SAML]",
 			"CLIENT_TYPES":           "[SNOWFLAKE_UI, DRIVERS]",
 		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test helper constructors — APIIntegration, SecondaryDatabase, SharedDatabase
+// ---------------------------------------------------------------------------
+
+func newTestAPIIntegration(name, sfName string) *snowplanev1alpha1.APIIntegration {
+	return &snowplanev1alpha1.APIIntegration{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.APIIntegrationSpec{
+			CommonSpec: snowplanev1alpha1.CommonSpec{
+				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
+			},
+			Name:               sfName,
+			APIProvider:        "aws_api_gateway",
+			APIAllowedPrefixes: []string{"https://example.com/"},
+		},
+	}
+}
+
+func newTestSecondaryDatabase(name, sfName string) *snowplanev1alpha1.SecondaryDatabase {
+	return &snowplanev1alpha1.SecondaryDatabase{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.SecondaryDatabaseSpec{
+			CommonSpec: snowplanev1alpha1.CommonSpec{
+				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
+			},
+			Name:        sfName,
+			AsReplicaOf: "myorg.myaccount.mydb",
+		},
+	}
+}
+
+func newTestSharedDatabase(name, sfName string) *snowplanev1alpha1.SharedDatabase {
+	return &snowplanev1alpha1.SharedDatabase{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.SharedDatabaseSpec{
+			CommonSpec: snowplanev1alpha1.CommonSpec{
+				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
+			},
+			Name:      sfName,
+			FromShare: "provider_account.my_share",
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Observation factories — APIIntegration, SecondaryDatabase, SharedDatabase
+// ---------------------------------------------------------------------------
+
+func apiIntegrationObservation(name string) *snowflake.APIIntegrationObservation {
+	return &snowflake.APIIntegrationObservation{
+		Exists: true,
+		ShowOutput: &snowplanev1alpha1.APIIntegrationShowOutput{
+			CreatedOn: "2024-01-01",
+			Name:      name,
+			Type:      "EXTERNAL_API",
+			Category:  "API",
+			Enabled:   true,
+		},
+		DescribeOutput: map[string]string{
+			"API_ALLOWED_PREFIXES": "https://example.com/",
+		},
+	}
+}
+
+func secondaryDatabaseObservation(name string) *snowflake.SecondaryDatabaseObservation {
+	return &snowflake.SecondaryDatabaseObservation{
+		Exists: true,
+		ShowOutput: &snowplanev1alpha1.SecondaryDatabaseShowOutput{
+			CreatedOn:     "2024-01-01",
+			Name:          name,
+			Kind:          "SECONDARY",
+			Owner:         "SYSADMIN",
+			RetentionTime: 1,
+			Origin:        "myorg.myaccount.mydb",
+		},
+		Parameters: &snowflake.DatabaseParameters{},
+	}
+}
+
+func sharedDatabaseObservation(name string) *snowflake.SharedDatabaseObservation {
+	return &snowflake.SharedDatabaseObservation{
+		Exists: true,
+		ShowOutput: &snowplanev1alpha1.SharedDatabaseShowOutput{
+			CreatedOn:     "2024-01-01",
+			Name:          name,
+			Kind:          "IMPORTED DATABASE",
+			Owner:         "SYSADMIN",
+			RetentionTime: 1,
+			Origin:        "provider_account.my_share",
+		},
+		Parameters: &snowflake.DatabaseParameters{},
 	}
 }

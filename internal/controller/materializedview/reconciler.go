@@ -3,15 +3,20 @@ package materializedview
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	sigs "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/tracked"
@@ -36,44 +41,160 @@ type Service interface {
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
 // NewReconciler returns a new MaterializedView reconciler backed by the generic framework.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.MaterializedView, Service, *snowflake.MaterializedViewObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.MaterializedView, Service, *snowflake.MaterializedViewObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+func NewReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.MaterializedView, Service, *snowflake.MaterializedViewObservation] {
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewMaterializedViewClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
 // supply a custom ServiceFactory for testing.
 func NewReconcilerWithServiceFactory(
-	c client.Client,
+	c sigs.Client,
 	factory *clientfactory.ClientFactory,
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.MaterializedView, Service, *snowflake.MaterializedViewObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.MaterializedView, Service, *snowflake.MaterializedViewObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, recorder, sf))
+}
+
+// newAdapter creates the BaseAdapter for MaterializedView resources.
+func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.MaterializedView, Service, *snowflake.MaterializedViewObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.MaterializedView, Service, *snowflake.MaterializedViewObservation]{
+		ResourceNameVal:  "materializedview",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.MaterializedView { return &snowplanev1alpha1.MaterializedView{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(mv *snowplanev1alpha1.MaterializedView) (reconciler.Identifier, error) {
+			dbName := snowflake.ParseDatabaseNameFromFQN(mv.Status.DatabaseName)
+			schemaName := snowflake.ParseSchemaNameFromFQN(mv.Status.SchemaName)
+			return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, mv.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) (*snowflake.MaterializedViewObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.MaterializedViewObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.MaterializedView, id snowflake.SchemaObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterMaterializedViewOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.MaterializedView, id snowflake.SchemaObjectIdentifier, obs *reconciler.Observation[*snowflake.MaterializedViewObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.MaterializedView, obs *reconciler.Observation[*snowflake.MaterializedViewObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.MaterializedView, obs *reconciler.Observation[*snowflake.MaterializedViewObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		PreReconcileFn: func(ctx context.Context, mv *snowplanev1alpha1.MaterializedView) error {
+			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, mv,
+				mv.Namespace, mv.Spec.DatabaseRef, mv.Spec.DatabaseName, mv.Status.DatabaseName)
+			if err != nil {
+				return err
+			}
+
+			mv.Status.DatabaseName = dbFQN
+
+			schemaFQN, err := refresolver.PreReconcileSchemaRef(ctx, c, recorder, mv,
+				mv.Namespace, mv.Spec.SchemaRef, mv.Spec.SchemaName, mv.Status.SchemaName)
+			if err != nil {
+				return err
+			}
+
+			mv.Status.SchemaName = schemaFQN
+
+			refresolver.SetDatabaseAndSchemaResolvedCondition(mv, mv.Spec.DatabaseRef, mv.Spec.DatabaseName, mv.Spec.SchemaRef, mv.Spec.SchemaName)
+
+			return nil
+		},
+		SetupWatchesFn: func(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.MaterializedView{},
+				".spec.databaseRef.name",
+				func(o sigs.Object) []string {
+					mv, ok := o.(*snowplanev1alpha1.MaterializedView)
+					if !ok || mv.Spec.DatabaseRef == nil {
+						return nil
+					}
+
+					return []string{mv.Spec.DatabaseRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.databaseRef.name: %w", err)
+			}
+
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.MaterializedView{},
+				".spec.schemaRef.name",
+				func(o sigs.Object) []string {
+					mv, ok := o.(*snowplanev1alpha1.MaterializedView)
+					if !ok || mv.Spec.SchemaRef == nil {
+						return nil
+					}
+
+					return []string{mv.Spec.SchemaRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.schemaRef.name: %w", err)
+			}
+
+			bldr.Watches(
+				&snowplanev1alpha1.Database{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.MaterializedViewList{} }, ".spec.databaseRef.name", "listing materialized views for database watch")),
+			)
+
+			bldr.Watches(
+				&snowplanev1alpha1.Schema{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.MaterializedViewList{} }, ".spec.schemaRef.name", "listing materialized views for schema watch")),
+			)
+
+			return nil
+		},
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+func validateImmutableFields(_ context.Context, mv *snowplanev1alpha1.MaterializedView) error {
+	if reconciler.ShouldSkipImmutableValidation(mv) {
+		return nil
 	}
 
-	return snowflake.NewMaterializedViewClient(sfC), cleanup, nil
+	if mv.Status.ShowOutput != nil {
+		if mv.Status.ShowOutput.Name != "" && !strings.EqualFold(mv.Spec.Name, mv.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", mv.Status.ShowOutput.Name, mv.Spec.Name)
+		}
+
+		if mv.Status.ShowOutput.DatabaseName != "" && mv.Status.DatabaseName != "" {
+			resolvedDB := snowflake.ParseDatabaseNameFromFQN(mv.Status.DatabaseName)
+			if !strings.EqualFold(resolvedDB, mv.Status.ShowOutput.DatabaseName) {
+				return fmt.Errorf("spec.databaseRef is immutable after creation (current database: %q, resolved: %q)", mv.Status.ShowOutput.DatabaseName, resolvedDB)
+			}
+		}
+
+		if mv.Status.ShowOutput.SchemaName != "" && mv.Status.SchemaName != "" {
+			resolvedSchema := snowflake.ParseSchemaNameFromFQN(mv.Status.SchemaName)
+			if !strings.EqualFold(resolvedSchema, mv.Status.ShowOutput.SchemaName) {
+				return fmt.Errorf("spec.schemaRef is immutable after creation (current schema: %q, resolved: %q)", mv.Status.ShowOutput.SchemaName, resolvedSchema)
+			}
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(mv *snowplanev1alpha1.MaterializedView, obs *snowflake.MaterializedViewObservation) {
@@ -86,29 +207,7 @@ func applyObservation(mv *snowplanev1alpha1.MaterializedView, obs *snowflake.Mat
 		mv.Status.DatabaseName = obs.ShowOutput.DatabaseName
 		mv.Status.SchemaName = obs.ShowOutput.SchemaName
 
-		mv.Status.ShowOutput = &snowplanev1alpha1.MaterializedViewShowOutput{
-			CreatedOn:           obs.ShowOutput.CreatedOn,
-			Name:                obs.ShowOutput.Name,
-			DatabaseName:        obs.ShowOutput.DatabaseName,
-			SchemaName:          obs.ShowOutput.SchemaName,
-			ClusterBy:           obs.ShowOutput.ClusterBy,
-			Rows:                obs.ShowOutput.Rows,
-			Bytes:               obs.ShowOutput.Bytes,
-			SourceDatabaseName:  obs.ShowOutput.SourceDatabaseName,
-			SourceSchemaName:    obs.ShowOutput.SourceSchemaName,
-			SourceTableName:     obs.ShowOutput.SourceTableName,
-			RefreshedOn:         obs.ShowOutput.RefreshedOn,
-			CompactedOn:         obs.ShowOutput.CompactedOn,
-			Owner:               obs.ShowOutput.Owner,
-			Invalid:             obs.ShowOutput.Invalid,
-			InvalidReason:       obs.ShowOutput.InvalidReason,
-			BehindBy:            obs.ShowOutput.BehindBy,
-			Comment:             obs.ShowOutput.Comment,
-			Text:                obs.ShowOutput.Text,
-			IsSecure:            obs.ShowOutput.IsSecure,
-			AutomaticClustering: obs.ShowOutput.AutomaticClustering,
-			OwnerRoleType:       obs.ShowOutput.OwnerRoleType,
-		}
+		mv.Status.ShowOutput = obs.ShowOutput
 	}
 }
 

@@ -96,6 +96,36 @@ func (s *ResourceMonitorSpec) Validate() error {
 		errs = append(errs, fmt.Errorf("spec.frequency and spec.startTimestamp must both be set or both be omitted"))
 	}
 
+	// Validate trigger constraints.
+	if len(s.Triggers) > 0 {
+		notifyCount := 0
+		suspendCount := 0
+		suspendImmediateCount := 0
+
+		for _, t := range s.Triggers {
+			switch t.Action {
+			case ResourceMonitorTriggerActionNotify:
+				notifyCount++
+			case ResourceMonitorTriggerActionSuspend:
+				suspendCount++
+			case ResourceMonitorTriggerActionSuspendImmediate:
+				suspendImmediateCount++
+			}
+		}
+
+		if notifyCount > 5 {
+			errs = append(errs, fmt.Errorf("spec.triggers: at most 5 NOTIFY triggers are allowed (got %d)", notifyCount))
+		}
+
+		if suspendCount > 1 {
+			errs = append(errs, fmt.Errorf("spec.triggers: at most 1 SUSPEND trigger is allowed (got %d)", suspendCount))
+		}
+
+		if suspendImmediateCount > 1 {
+			errs = append(errs, fmt.Errorf("spec.triggers: at most 1 SUSPEND_IMMEDIATE trigger is allowed (got %d)", suspendImmediateCount))
+		}
+	}
+
 	if err := s.CommonSpec.Validate(); err != nil {
 		errs = append(errs, err)
 	}

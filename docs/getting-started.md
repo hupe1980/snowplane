@@ -484,9 +484,9 @@ spec:
 Three grant CRDs are available:
 
 ```yaml
-# AccountRoleGrant
+# GrantPrivilegesToAccountRole — grant a privilege on an account-level object
 apiVersion: snowplane.hupe1980.github.io/v1alpha1
-kind: AccountRoleGrant
+kind: GrantPrivilegesToAccountRole
 metadata:
   name: usage-on-analytics-db
 spec:
@@ -499,6 +499,56 @@ spec:
   providerRef:
     name: default
 ```
+
+```yaml
+# GrantPrivilegesToAccountRole — grant ALL PRIVILEGES
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: GrantPrivilegesToAccountRole
+metadata:
+  name: all-on-analytics-db
+spec:
+  allPrivileges: true
+  on:
+    accountObject:
+      objectType: DATABASE
+      objectName: ANALYTICS_DB
+  accountRole: DATA_ADMIN
+  providerRef:
+    name: default
+```
+
+```yaml
+# GrantPrivilegesToDatabaseRole — grant a privilege scoped to a database role
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: GrantPrivilegesToDatabaseRole
+metadata:
+  name: usage-on-my-db
+spec:
+  privilege: USAGE
+  on:
+    database: MY_DB
+  databaseRole: MY_DB.READER
+  providerRef:
+    name: default
+```
+
+```yaml
+# GrantPrivilegesToShare — grant a privilege to a share
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: GrantPrivilegesToShare
+metadata:
+  name: usage-on-shared-db
+spec:
+  privilege: USAGE
+  on:
+    database: SHARED_DB
+  share: MY_SHARE
+  providerRef:
+    name: default
+```
+
+{: .note }
+> Use `allPrivileges: true` instead of `privilege: "ALL PRIVILEGES"` on GrantPrivilegesToAccountRole and GrantPrivilegesToDatabaseRole. `allPrivileges` and `privilege` are mutually exclusive. GrantPrivilegesToShare does not support `allPrivileges`.
 
 {: .warning }
 > `withGrantOption: true` enables re-granting. Revoking the original Grant CR does NOT cascade-revoke re-grants.

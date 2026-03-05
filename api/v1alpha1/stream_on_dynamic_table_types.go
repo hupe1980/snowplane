@@ -32,7 +32,7 @@ type StreamOnDynamicTableSpec struct {
 	// DatabaseRef references a Database CR in the same namespace.
 	// Mutually exclusive with DatabaseName. Immutable after creation.
 	// +optional
-	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
+	DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
 	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
@@ -44,7 +44,7 @@ type StreamOnDynamicTableSpec struct {
 	// SchemaRef references a Schema CR in the same namespace.
 	// Mutually exclusive with SchemaName. Immutable after creation.
 	// +optional
-	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
+	SchemaRef *ObjectReference `json:"schemaRef,omitempty"`
 
 	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// Mutually exclusive with SchemaRef. Immutable after creation.
@@ -56,7 +56,7 @@ type StreamOnDynamicTableSpec struct {
 	// DynamicTableRef references a DynamicTable CR in the same namespace.
 	// Mutually exclusive with DynamicTableName. Immutable after creation.
 	// +optional
-	DynamicTableRef *LocalObjectReference `json:"dynamicTableRef,omitempty"`
+	DynamicTableRef *ObjectReference `json:"dynamicTableRef,omitempty"`
 
 	// DynamicTableName is the Snowflake dynamic table identifier (e.g. "MY_DYN_TABLE").
 	// Mutually exclusive with DynamicTableRef. Immutable after creation.

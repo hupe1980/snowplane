@@ -74,12 +74,31 @@ spec:
                     type: array
                   oauthClientID:
                     description: OAuthClientID is the OAuth 2.0 client ID.
+                    maxLength: 255
                     minLength: 1
                     type: string
-                  oauthClientSecret:
-                    description: OAuthClientSecret is the OAuth 2.0 client secret.
-                    minLength: 1
-                    type: string
+                  oauthClientSecretRef:
+                    description: OAuthClientSecretRef references a Kubernetes Secret
+                      containing the OAuth 2.0 client secret.
+                    properties:
+                      key:
+                        description: Key within the Secret data to select.
+                        maxLength: 255
+                        minLength: 1
+                        type: string
+                      name:
+                        description: Name of the Kubernetes Secret.
+                        maxLength: 255
+                        minLength: 1
+                        type: string
+                      namespace:
+                        description: Namespace of the Secret. Defaults to the namespace
+                          of the referring resource.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
                   oauthGrantType:
                     description: OAuthGrantType is the method for getting the access
                       token.
@@ -90,11 +109,12 @@ spec:
                     type: string
                   oauthTokenEndpoint:
                     description: OAuthTokenEndpoint is the OAuth token endpoint.
+                    maxLength: 255
                     minLength: 1
                     type: string
                 required:
                 - oauthClientID
-                - oauthClientSecret
+                - oauthClientSecretRef
                 - oauthTokenEndpoint
                 type: object
               comment:
@@ -144,6 +164,7 @@ spec:
                     type: array
                   issuer:
                     description: Issuer is the OAuth 2.0 token issuer URL.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   jwsKeysURL:
@@ -170,11 +191,13 @@ spec:
                   tokenUserMappingClaim:
                     description: TokenUserMappingClaim is the claim in the access
                       token that identifies the user.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   type:
                     description: Type is the external OAuth type (e.g. CUSTOM, AZURE,
                       OKTA, PING_FEDERATE).
+                    maxLength: 255
                     minLength: 1
                     type: string
                 required:
@@ -218,6 +241,7 @@ spec:
               name:
                 description: Name is the Snowflake security integration name. Immutable
                   after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               paused:
@@ -234,6 +258,7 @@ spec:
                   name:
                     default: default
                     description: Name of the ProviderConfig to use.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   namespace:
@@ -268,6 +293,7 @@ spec:
                     type: boolean
                   issuer:
                     description: Issuer is the SAML2 IdP entity ID / issuer.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   postLogoutRedirectURL:
@@ -277,6 +303,7 @@ spec:
                   provider:
                     description: Provider is the SAML IdP provider name (e.g. CUSTOM,
                       OKTA, ADFS).
+                    maxLength: 255
                     minLength: 1
                     type: string
                   requestedNameIDFormat:
@@ -294,11 +321,13 @@ spec:
                     type: string
                   ssoURL:
                     description: SSOURL is the IdP SSO URL.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   x509Cert:
                     description: X509Cert is the Base64-encoded X.509 certificate
                       from the IdP for signature validation.
+                    maxLength: 255
                     minLength: 1
                     type: string
                 required:
@@ -317,6 +346,7 @@ spec:
                   runAsRole:
                     description: RunAsRole is the Snowflake role used to create users/groups
                       via SCIM.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   scimClient:
@@ -352,6 +382,7 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                maxLength: 255
                 minLength: 1
                 type: string
             required:
@@ -454,6 +485,13 @@ spec:
                   comparing ObservedGeneration vs Generation because metadata-only
                   changes (labels, annotations) increment Generation without changing
                   the spec.
+                type: string
+              lastReconcileTime:
+                description: |-
+                  LastReconcileTime is the timestamp of the most recent successful
+                  reconciliation. Useful for SLO monitoring and diagnosing whether
+                  reconciliation is running for a specific resource.
+                format: date-time
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent metadata.generation

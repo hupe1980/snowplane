@@ -52,10 +52,12 @@ Every Snowplane resource reports its state through standard Kubernetes condition
 | `ResourceAlreadyExists` | **Terminal** | Snowflake resource exists and adoption is not enabled |
 | `NamespaceNotAllowed` | **Terminal** | Resource is in a namespace not in watchNamespaces |
 | `RoleNotAllowed` | **Terminal** | Requested useRole is not in allowedRoles |
+| `DatabaseNotAllowed` | **Terminal** | Target database is not in ProviderConfig `allowedDatabases` |
+| `SchemaNotAllowed` | **Terminal** | Target schema is not in ProviderConfig `allowedSchemas` |
 | `Adopted` | Info | Resource was adopted from existing Snowflake object |
 | `LateInitialized` | Info | Spec fields were late-initialized from observed Snowflake state during adoption |
 | `OrphanedResource` | Info | Resource was deleted with orphan policy |
-| `ConflictDetected` | Warning | Another CR already manages this Snowflake object |
+| `ConflictDetected` | **Terminal** | Another CR already manages this Snowflake object — reconciliation will not retry |
 | `DeleteBlocked` | Blocking | DROP failed — resource stuck in deleting state |
 | `InUse` | Blocking | Resource has dependents preventing deletion |
 | `ReconcilePaused` | Info | `spec.paused: true` is set |
@@ -274,6 +276,39 @@ kubectl get database <ref-name> -o jsonpath='{.status.conditions[?(@.type=="Read
 
 ---
 
+### 11. Database or Schema Not Allowed
+
+**Symptoms:** `Ready=False`, `reason=DatabaseNotAllowed` or `reason=SchemaNotAllowed`.
+
+**Diagnosis:** The ProviderConfig restricts which databases or schemas may be targeted via `spec.allowedDatabases` or `spec.allowedSchemas`.
+
+```bash
+kubectl get providerconfig <name> -o jsonpath='{.spec.allowedDatabases}'
+kubectl get providerconfig <name> -o jsonpath='{.spec.allowedSchemas}'
+```
+
+**Resolution:**
+- Add the target database/schema to the ProviderConfig's allowed lists.
+- Or use a different ProviderConfig that permits the target scope.
+
+---
+
+### 12. Pre-Flight Check — Database or Schema Not Found
+
+**Symptoms:** `Ready=False`, `reason=DependencyNotReady`, message contains "database not found in Snowflake" or "schema not found in Snowflake".
+
+**Diagnosis:** The resource uses a raw `databaseName`/`schemaName` string (not a CR reference), and the specified database or schema does not exist in the target Snowflake account.
+
+```bash
+kubectl get <resource> <name> -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}'
+```
+
+**Resolution:**
+- Create the Snowflake database/schema first (either manually or via a Snowplane Database/Schema CR).
+- Or use `databaseRef`/`schemaRef` to reference a Snowplane-managed Database/Schema CR — the controller automatically gates on CR readiness.
+
+---
+
 ## Force Reconcile
 
 There is no dedicated "force reconcile" annotation. Instead, any annotation change triggers immediate reconciliation because the controller uses an `AnnotationChangedPredicate` event filter.
@@ -331,6 +366,91 @@ groups:
 > Use `status.lastReconcileTime` to build staleness alerts. If a resource's `lastReconcileTime` is older than 2× the requeue interval (default 5m), the controller may be stuck or paused.
 
 See [Observability]({% link observability.md %}) for the full metrics reference.
+
+---
+
+## 11. Webhook Issues
+
+When the validating admission webhook is enabled (`webhook.enabled: true`), several failure modes can occur:
+
+### Webhook Rejecting All Requests
+
+**Symptom:** All `kubectl apply` operations for Snowplane resources fail with `admission webhook denied the request`.
+
+**Cause:** The webhook may be misconfigured or the controller pod is not receiving webhook traffic.
+
+**Fix:**
+
+```bash
+# Check webhook configuration
+kubectl get validatingwebhookconfiguration -l app.kubernetes.io/name=snowplane
+
+# Check if the webhook service is reachable
+kubectl get endpoints -n snowplane-system -l app.kubernetes.io/name=snowplane
+
+# Check controller logs for webhook errors
+kubectl logs deployment/snowplane -n snowplane-system | grep -i webhook
+```
+
+### Webhook Unreachable (Timeout)
+
+**Symptom:** `kubectl apply` times out or returns `context deadline exceeded` for Snowplane resources.
+
+**Cause:** NetworkPolicy may be blocking traffic to the webhook port (9443). If you have `networkPolicy.enabled: true`, ensure the chart version includes the webhook ingress rule.
+
+**Fix:** Verify the NetworkPolicy allows the API server to reach port 9443:
+
+```bash
+kubectl get networkpolicy -n snowplane-system -o yaml | grep -A5 9443
+```
+
+If missing, upgrade the Helm chart or add `webhook.port` to the NetworkPolicy ingress rules.
+
+### cert-manager Certificate Not Ready
+
+**Symptom:** Webhook TLS handshake fails. Events show `certificate not found` or `secret not found`.
+
+**Cause:** cert-manager is not installed, the Issuer failed to create, or the Certificate resource failed.
+
+**Fix:**
+
+```bash
+# Check cert-manager is running
+kubectl get pods -n cert-manager
+
+# Check certificate status
+kubectl get certificate -n snowplane-system
+kubectl describe certificate -n snowplane-system
+
+# Check issuer status
+kubectl get issuer -n snowplane-system
+```
+
+### Stale CA Bundle
+
+**Symptom:** Webhook returns `x509: certificate signed by unknown authority` after cert renewal.
+
+**Cause:** When using cert-manager, the `cert-manager.io/inject-ca-from` annotation should automatically update the CA bundle. If cert-manager's CA injector is not working, the VWC's `caBundle` becomes stale.
+
+**Fix:**
+
+```bash
+# Restart the cert-manager cainjector
+kubectl rollout restart deployment cert-manager-cainjector -n cert-manager
+```
+
+### Disabling the Webhook in Emergency
+
+If the webhook is causing cluster-wide issues, disable it without a Helm upgrade:
+
+```bash
+# Option 1: Delete the VWC directly
+kubectl delete validatingwebhookconfiguration <release>-snowplane-ownership
+
+# Option 2: Set failurePolicy to Ignore (if currently Fail)
+kubectl patch validatingwebhookconfiguration <release>-snowplane-ownership \
+  --type='json' -p='[{"op": "replace", "path": "/webhooks/0/failurePolicy", "value": "Ignore"}]'
+```
 
 ---
 

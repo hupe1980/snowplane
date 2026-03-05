@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -26,14 +27,12 @@ func newUser() *snowplanev1alpha1.User {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newUser()
 		obs := &reconciler.Observation[*snowflake.UserObservation]{
 			Exists: true,
 			Detail: &snowflake.UserObservation{
-				ShowOutput: &snowflake.UserShowOutput{
+				ShowOutput: &snowplanev1alpha1.UserShowOutput{
 					LoginName:             "TEST_USER",
 					DisplayName:           "Test User",
 					Email:                 "test@example.com",
@@ -56,7 +55,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 
 		assert.Equal(t, "TEST_USER", *obj.Spec.LoginName)
@@ -87,7 +86,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.UserObservation]{
 			Exists: true,
 			Detail: &snowflake.UserObservation{
-				ShowOutput: &snowflake.UserShowOutput{
+				ShowOutput: &snowplanev1alpha1.UserShowOutput{
 					LoginName:   "DIFFERENT_LOGIN",
 					Comment:     "snowflake comment",
 					Type:        "PERSON",
@@ -97,7 +96,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified) // Email and DefaultRole were set
 
 		assert.Equal(t, "EXISTING_LOGIN", *obj.Spec.LoginName)
@@ -114,7 +113,7 @@ func TestLateInitialize(t *testing.T) {
 			Detail: nil,
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -128,7 +127,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -137,7 +136,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.UserObservation]{
 			Exists: true,
 			Detail: &snowflake.UserObservation{
-				ShowOutput: &snowflake.UserShowOutput{
+				ShowOutput: &snowplanev1alpha1.UserShowOutput{
 					LoginName: "",
 					Email:     "",
 					Comment:   "only-comment",
@@ -145,7 +144,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 
 		assert.Nil(t, obj.Spec.LoginName) // empty string skipped

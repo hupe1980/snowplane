@@ -99,7 +99,7 @@ func newTestUser(name, namespace string) *snowplanev1alpha1.User {
 func successfulObservation() *snowflake.UserObservation {
 	return &snowflake.UserObservation{
 		Exists: true,
-		ShowOutput: &snowflake.UserShowOutput{
+		ShowOutput: &snowplanev1alpha1.UserShowOutput{
 			CreatedOn:   "2024-01-01",
 			Name:        "ALICE",
 			LoginName:   "ALICE",
@@ -121,21 +121,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.User, Service, *snowflake.UserObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client: c,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("User"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("User")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -607,7 +603,7 @@ func TestValidateImmutableFields_FirstReconcile(t *testing.T) {
 	user.Status.ObservedGeneration = 0
 	user.Spec.Name = "CHANGED"
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), user)
+	err := validateImmutableFields(context.Background(), user)
 	assert.NoError(t, err, "first reconcile should skip immutable checks")
 }
 
@@ -618,7 +614,7 @@ func TestValidateImmutableFields_NoShowOutput(t *testing.T) {
 	user.Status.ObservedGeneration = 1
 	user.Status.ShowOutput = nil
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), user)
+	err := validateImmutableFields(context.Background(), user)
 	assert.NoError(t, err, "missing ShowOutput should not cause error")
 }
 
@@ -875,8 +871,7 @@ func TestPostUpdate_RSAKeyHashTracked(t *testing.T) {
 	rsaKey := "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQ"
 	alterOpts := &snowflake.AlterUserOptions{RSAPublicKey: &rsaKey}
 
-	a := &adapter{}
-	a.PostUpdate(user, true, alterOpts)
+	postUpdate(user, true, alterOpts)
 	assert.Equal(t, hashSecret(rsaKey, string(user.UID)), user.Status.LastAppliedRSAPublicKeyHash)
 }
 
@@ -887,8 +882,7 @@ func TestPostUpdate_RSAKeyHashClearedOnRemoval(t *testing.T) {
 	user.Status.LastAppliedRSAPublicKeyHash = "oldhash"
 	// RSAPublicKey is nil in spec (removed)
 
-	a := &adapter{}
-	a.PostUpdate(user, false, &snowflake.AlterUserOptions{})
+	postUpdate(user, false, &snowflake.AlterUserOptions{})
 	assert.Empty(t, user.Status.LastAppliedRSAPublicKeyHash)
 }
 
@@ -1308,19 +1302,13 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 
 	rec := record.NewFakeRecorder(100)
 
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.User, Service, *snowflake.UserObservation]{
-		Client:   kClient,
-		Factory:  clientfactory.NewClientFactory(),
-		Recorder: rec,
-		Adapter: &adapter{
-			client: kClient,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-				capturedRole = useRole
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(kClient, testutil.NewTestClientFactory(), rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, useRole string) (Service, func(context.Context), error) {
+			capturedRole = useRole
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("User"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("User")
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("test-user", "default"))
 	require.NoError(t, err)
@@ -1364,7 +1352,7 @@ func TestValidateImmutableFields_ForceNewBypass(t *testing.T) {
 		Type: "PERSON",
 	}
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), user)
+	err := validateImmutableFields(context.Background(), user)
 	assert.NoError(t, err, "force-new should bypass immutable checks")
 }
 
@@ -1381,7 +1369,7 @@ func TestValidateImmutableFields_ForceNewFalse_StillRejects(t *testing.T) {
 		Name: "ALICE",
 	}
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), user)
+	err := validateImmutableFields(context.Background(), user)
 	assert.Error(t, err, "force-new=false should still reject immutable changes")
 	assert.Contains(t, err.Error(), "spec.name is immutable")
 }

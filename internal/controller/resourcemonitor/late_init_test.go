@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -26,14 +27,12 @@ func newResourceMonitor() *snowplanev1alpha1.ResourceMonitor {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newResourceMonitor()
 		obs := &reconciler.Observation[*snowflake.ResourceMonitorObservation]{
 			Exists: true,
 			Detail: &snowflake.ResourceMonitorObservation{
-				ShowOutput: &snowflake.ResourceMonitorShowOutput{
+				ShowOutput: &snowplanev1alpha1.ResourceMonitorShowOutput{
 					CreditQuota: "100",
 					Frequency:   "MONTHLY",
 					StartTime:   "2025-01-01 00:00",
@@ -42,7 +41,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 		assert.Equal(t, int32(100), *obj.Spec.CreditQuota)
 		assert.Equal(t, snowplanev1alpha1.ResourceMonitorFrequencyMonthly, *obj.Spec.Frequency)
@@ -60,7 +59,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.ResourceMonitorObservation]{
 			Exists: true,
 			Detail: &snowflake.ResourceMonitorObservation{
-				ShowOutput: &snowflake.ResourceMonitorShowOutput{
+				ShowOutput: &snowplanev1alpha1.ResourceMonitorShowOutput{
 					CreditQuota: "200",
 					Frequency:   "MONTHLY",
 					StartTime:   "2025-01-01 00:00",
@@ -69,7 +68,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified) // EndTime was set
 		assert.Equal(t, int32(50), *obj.Spec.CreditQuota)
 		assert.Equal(t, snowplanev1alpha1.ResourceMonitorFrequencyWeekly, *obj.Spec.Frequency)
@@ -80,7 +79,7 @@ func TestLateInitialize(t *testing.T) {
 	t.Run("returns false when detail is nil", func(t *testing.T) {
 		obj := newResourceMonitor()
 
-		modified := a.LateInitialize(obj, &reconciler.Observation[*snowflake.ResourceMonitorObservation]{
+		modified := lateInitialize(obj, &reconciler.Observation[*snowflake.ResourceMonitorObservation]{
 			Exists: true,
 			Detail: nil,
 		})
@@ -93,13 +92,13 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.ResourceMonitorObservation]{
 			Exists: true,
 			Detail: &snowflake.ResourceMonitorObservation{
-				ShowOutput: &snowflake.ResourceMonitorShowOutput{
+				ShowOutput: &snowplanev1alpha1.ResourceMonitorShowOutput{
 					CreditQuota: "100.00",
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 		assert.Equal(t, int32(100), *obj.Spec.CreditQuota)
 	})
@@ -110,7 +109,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.ResourceMonitorObservation]{
 			Exists: true,
 			Detail: &snowflake.ResourceMonitorObservation{
-				ShowOutput: &snowflake.ResourceMonitorShowOutput{
+				ShowOutput: &snowplanev1alpha1.ResourceMonitorShowOutput{
 					CreditQuota: "",
 					Frequency:   "",
 					StartTime:   "",
@@ -119,7 +118,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -129,13 +128,13 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.ResourceMonitorObservation]{
 			Exists: true,
 			Detail: &snowflake.ResourceMonitorObservation{
-				ShowOutput: &snowflake.ResourceMonitorShowOutput{
+				ShowOutput: &snowplanev1alpha1.ResourceMonitorShowOutput{
 					CreditQuota: "not-a-number",
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 		assert.Nil(t, obj.Spec.CreditQuota)
 	})

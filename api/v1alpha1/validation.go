@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/mail"
 	"regexp"
 	"sort"
@@ -287,6 +288,14 @@ func (s *WarehouseSpec) Validate() error {
 		errs = append(errs, err)
 	}
 
+	if s.Generation != nil && *s.Generation != "1" && *s.Generation != "2" {
+		errs = append(errs, fmt.Errorf("spec.generation must be %q or %q (got: %q)", "1", "2", *s.Generation))
+	}
+
+	if s.Generation != nil && s.ResourceConstraint != nil {
+		errs = append(errs, errors.New("spec.generation and spec.resourceConstraint are mutually exclusive"))
+	}
+
 	if err := s.CommonSpec.Validate(); err != nil {
 		errs = append(errs, err)
 	}
@@ -330,7 +339,7 @@ func (s *DatabaseRoleSpec) Validate() error {
 }
 
 // validateGrantOn validates the GrantOn hierarchy. It is shared by
-// AccountRoleGrantSpec and DatabaseRoleGrantSpec (ShareGrant does not use
+// GrantPrivilegesToAccountRoleSpec and GrantPrivilegesToDatabaseRoleSpec (GrantPrivilegesToShare does not use
 // the On hierarchy).
 func validateGrantOn(on *GrantOn) []error {
 	var errs []error
@@ -383,19 +392,6 @@ func validateGrantOn(on *GrantOn) []error {
 		if schemaCount != 1 {
 			errs = append(errs, errors.New("spec.on.schema: exactly one of schemaName, schemaRef, allInDatabase, allInDatabaseRef, futureInDatabase, or futureInDatabaseRef must be set"))
 		}
-
-		// Mutual exclusivity: ref vs raw string.
-		if on.Schema.SchemaName != nil && on.Schema.SchemaRef != nil {
-			errs = append(errs, errors.New("spec.on.schema: schemaName and schemaRef are mutually exclusive"))
-		}
-
-		if on.Schema.AllInDatabase != nil && on.Schema.AllInDatabaseRef != nil {
-			errs = append(errs, errors.New("spec.on.schema: allInDatabase and allInDatabaseRef are mutually exclusive"))
-		}
-
-		if on.Schema.FutureInDatabase != nil && on.Schema.FutureInDatabaseRef != nil {
-			errs = append(errs, errors.New("spec.on.schema: futureInDatabase and futureInDatabaseRef are mutually exclusive"))
-		}
 	}
 
 	if on.SchemaObject != nil {
@@ -438,12 +434,22 @@ func validateGrantOn(on *GrantOn) []error {
 	return errs
 }
 
-// Validate checks the AccountRoleGrantSpec for configuration errors.
-func (s *AccountRoleGrantSpec) Validate() error {
+// Validate checks the GrantPrivilegesToAccountRoleSpec for configuration errors.
+func (s *GrantPrivilegesToAccountRoleSpec) Validate() error {
 	var errs []error
 
-	if s.Privilege == "" {
-		errs = append(errs, errors.New("spec.privilege is required"))
+	// Exactly one of privilege or allPrivileges must be set.
+	privCount := 0
+	if s.Privilege != "" {
+		privCount++
+	}
+
+	if s.AllPrivileges {
+		privCount++
+	}
+
+	if privCount != 1 {
+		errs = append(errs, errors.New("spec: exactly one of privilege or allPrivileges must be set"))
 	}
 
 	// Validate On hierarchy.
@@ -463,13 +469,11 @@ func (s *AccountRoleGrantSpec) Validate() error {
 		errs = append(errs, errors.New("spec: exactly one of accountRole or accountRoleRef must be set"))
 	}
 
-	if s.AccountRole != nil && s.AccountRoleRef != nil {
-		errs = append(errs, errors.New("spec: accountRole and accountRoleRef are mutually exclusive"))
-	}
-
-	// Best-effort privilege-to-object-type validation.
-	if privErr := validatePrivilegeObjectCompat(&s.On, s.Privilege); privErr != nil {
-		errs = append(errs, privErr)
+	// Best-effort privilege-to-object-type validation (skip for ALL PRIVILEGES).
+	if !s.AllPrivileges {
+		if privErr := validatePrivilegeObjectCompat(&s.On, s.Privilege); privErr != nil {
+			errs = append(errs, privErr)
+		}
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -479,16 +483,107 @@ func (s *AccountRoleGrantSpec) Validate() error {
 	return errors.Join(errs...)
 }
 
-// Validate checks the DatabaseRoleGrantSpec for configuration errors.
-func (s *DatabaseRoleGrantSpec) Validate() error {
+// validateGrantPrivilegesToDatabaseRoleOn validates the GrantPrivilegesToDatabaseRoleOn hierarchy.
+func validateGrantPrivilegesToDatabaseRoleOn(on *GrantPrivilegesToDatabaseRoleOn) []error {
 	var errs []error
 
-	if s.Privilege == "" {
-		errs = append(errs, errors.New("spec.privilege is required"))
+	onCount := 0
+
+	if on.Database != nil {
+		onCount++
 	}
 
-	// Validate On hierarchy.
-	errs = append(errs, validateGrantOn(&s.On)...)
+	if on.Schema != nil {
+		onCount++
+
+		schemaCount := 0
+		if on.Schema.SchemaName != nil {
+			schemaCount++
+		}
+
+		if on.Schema.SchemaRef != nil {
+			schemaCount++
+		}
+
+		if on.Schema.AllInDatabase != nil {
+			schemaCount++
+		}
+
+		if on.Schema.AllInDatabaseRef != nil {
+			schemaCount++
+		}
+
+		if on.Schema.FutureInDatabase != nil {
+			schemaCount++
+		}
+
+		if on.Schema.FutureInDatabaseRef != nil {
+			schemaCount++
+		}
+
+		if schemaCount != 1 {
+			errs = append(errs, errors.New("spec.on.schema: exactly one of schemaName, schemaRef, allInDatabase, allInDatabaseRef, futureInDatabase, or futureInDatabaseRef must be set"))
+		}
+	}
+
+	if on.SchemaObject != nil {
+		onCount++
+
+		soCount := 0
+		if on.SchemaObject.ObjectType != "" || on.SchemaObject.ObjectName != "" {
+			soCount++
+
+			if on.SchemaObject.ObjectType == "" {
+				errs = append(errs, errors.New("spec.on.schemaObject.objectType is required when objectName is set"))
+			}
+
+			if on.SchemaObject.ObjectName == "" {
+				errs = append(errs, errors.New("spec.on.schemaObject.objectName is required when objectType is set"))
+			}
+		}
+
+		if on.SchemaObject.All != nil {
+			soCount++
+			errs = append(errs, validateGrantOnBulk("spec.on.schemaObject.all", on.SchemaObject.All)...)
+		}
+
+		if on.SchemaObject.Future != nil {
+			soCount++
+			errs = append(errs, validateGrantOnBulk("spec.on.schemaObject.future", on.SchemaObject.Future)...)
+		}
+
+		if soCount != 1 {
+			errs = append(errs, errors.New("spec.on.schemaObject: exactly one of (objectType+objectName), all, or future must be set"))
+		}
+	}
+
+	if onCount != 1 {
+		errs = append(errs, errors.New("spec.on: exactly one of database, schema, or schemaObject must be set"))
+	}
+
+	return errs
+}
+
+// Validate checks the GrantPrivilegesToDatabaseRoleSpec for configuration errors.
+func (s *GrantPrivilegesToDatabaseRoleSpec) Validate() error {
+	var errs []error
+
+	// Exactly one of privilege or allPrivileges must be set.
+	privCount := 0
+	if s.Privilege != "" {
+		privCount++
+	}
+
+	if s.AllPrivileges {
+		privCount++
+	}
+
+	if privCount != 1 {
+		errs = append(errs, errors.New("spec: exactly one of privilege or allPrivileges must be set"))
+	}
+
+	// Validate On hierarchy (database role specific).
+	errs = append(errs, validateGrantPrivilegesToDatabaseRoleOn(&s.On)...)
 
 	// Exactly one of databaseRole or databaseRoleRef must be set.
 	roleCount := 0
@@ -504,15 +599,6 @@ func (s *DatabaseRoleGrantSpec) Validate() error {
 		errs = append(errs, errors.New("spec: exactly one of databaseRole or databaseRoleRef must be set"))
 	}
 
-	if s.DatabaseRole != nil && s.DatabaseRoleRef != nil {
-		errs = append(errs, errors.New("spec: databaseRole and databaseRoleRef are mutually exclusive"))
-	}
-
-	// Best-effort privilege-to-object-type validation.
-	if privErr := validatePrivilegeObjectCompat(&s.On, s.Privilege); privErr != nil {
-		errs = append(errs, privErr)
-	}
-
 	if err := s.CommonSpec.Validate(); err != nil {
 		errs = append(errs, err)
 	}
@@ -520,21 +606,55 @@ func (s *DatabaseRoleGrantSpec) Validate() error {
 	return errors.Join(errs...)
 }
 
-// Validate checks the ShareGrantSpec for configuration errors.
-func (s *ShareGrantSpec) Validate() error {
+// validateGrantPrivilegesToShareOn validates the GrantPrivilegesToShareOn hierarchy.
+func validateGrantPrivilegesToShareOn(on *GrantPrivilegesToShareOn) []error {
+	var errs []error
+
+	onCount := 0
+	if on.Database != nil {
+		onCount++
+	}
+
+	if on.Schema != nil {
+		onCount++
+	}
+
+	if on.Table != nil {
+		onCount++
+	}
+
+	if on.AllTablesInSchema != nil {
+		onCount++
+	}
+
+	if on.Function != nil {
+		onCount++
+	}
+
+	if on.Tag != nil {
+		onCount++
+	}
+
+	if on.View != nil {
+		onCount++
+	}
+
+	if onCount != 1 {
+		errs = append(errs, errors.New("spec.on: exactly one of database, schema, table, allTablesInSchema, function, tag, or view must be set"))
+	}
+
+	return errs
+}
+
+// Validate checks the GrantPrivilegesToShareSpec for configuration errors.
+func (s *GrantPrivilegesToShareSpec) Validate() error {
 	var errs []error
 
 	if s.Privilege == "" {
 		errs = append(errs, errors.New("spec.privilege is required"))
 	}
 
-	if s.ObjectType == "" {
-		errs = append(errs, errors.New("spec.objectType is required"))
-	}
-
-	if s.ObjectName == "" {
-		errs = append(errs, errors.New("spec.objectName is required"))
-	}
+	errs = append(errs, validateGrantPrivilegesToShareOn(&s.On)...)
 
 	if s.Share == "" {
 		errs = append(errs, errors.New("spec.share is required"))
@@ -575,15 +695,6 @@ func validateGrantOnBulk(prefix string, b *GrantOnBulk) []error {
 
 	if scopeCount != 1 {
 		errs = append(errs, fmt.Errorf("%s: exactly one of inDatabase, inDatabaseRef, inSchema, or inSchemaRef must be set", prefix))
-	}
-
-	// Mutual exclusivity: ref vs raw string.
-	if b.InDatabase != nil && b.InDatabaseRef != nil {
-		errs = append(errs, fmt.Errorf("%s: inDatabase and inDatabaseRef are mutually exclusive", prefix))
-	}
-
-	if b.InSchema != nil && b.InSchemaRef != nil {
-		errs = append(errs, fmt.Errorf("%s: inSchema and inSchemaRef are mutually exclusive", prefix))
 	}
 
 	return errs
@@ -1052,6 +1163,13 @@ func (s *AlertSpec) Validate() error {
 		errs = append(errs, err)
 	}
 
+	// Validate schedule format: "N MINUTE" or "USING CRON <expr> <tz>".
+	if s.Schedule != nil && *s.Schedule != "" {
+		if err := validateSchedule(*s.Schedule); err != nil {
+			errs = append(errs, fmt.Errorf("spec.schedule: %w", err))
+		}
+	}
+
 	if err := s.CommonSpec.Validate(); err != nil {
 		errs = append(errs, err)
 	}
@@ -1120,6 +1238,12 @@ func (s *TaskSpec) Validate() error {
 		v := *s.TaskAutoRetryAttempts
 		if v < 0 || v > 30 {
 			errs = append(errs, fmt.Errorf("spec.taskAutoRetryAttempts must be between 0 and 30 (got: %d)", v))
+		}
+	}
+
+	if s.Schedule != nil && *s.Schedule != "" {
+		if err := validateSchedule(*s.Schedule); err != nil {
+			errs = append(errs, fmt.Errorf("spec.schedule: %w", err))
 		}
 	}
 
@@ -1298,11 +1422,73 @@ func (s *NetworkPolicySpec) Validate() error {
 		errs = append(errs, errors.New("spec.name is required"))
 	}
 
+	// At least one allowed source is required.
+	if len(s.AllowedIPList) == 0 && len(s.AllowedNetworkRuleList) == 0 {
+		errs = append(errs, errors.New("spec: at least one of allowedIPList or allowedNetworkRuleList must be non-empty"))
+	}
+
+	// Validate IP address / CIDR format.
+	for i, ip := range s.AllowedIPList {
+		if err := validateIPOrCIDR(ip); err != nil {
+			errs = append(errs, fmt.Errorf("spec.allowedIPList[%d]: %w", i, err))
+		}
+	}
+
+	for i, ip := range s.BlockedIPList {
+		if err := validateIPOrCIDR(ip); err != nil {
+			errs = append(errs, fmt.Errorf("spec.blockedIPList[%d]: %w", i, err))
+		}
+	}
+
 	if err := s.CommonSpec.Validate(); err != nil {
 		errs = append(errs, err)
 	}
 
 	return errors.Join(errs...)
+}
+
+// validateIPOrCIDR checks that s is a valid IPv4/IPv6 address or CIDR notation.
+func validateIPOrCIDR(s string) error {
+	if net.ParseIP(s) != nil {
+		return nil
+	}
+
+	if _, _, err := net.ParseCIDR(s); err == nil {
+		return nil
+	}
+
+	return fmt.Errorf("%q is not a valid IP address or CIDR", s)
+}
+
+// scheduleMinutePattern matches Snowflake "N MINUTE" schedules.
+var scheduleMinutePattern = regexp.MustCompile(`(?i)^\d+\s+MINUTE$`)
+
+// scheduleCronPattern matches Snowflake "USING CRON <expr> <timezone>" schedules.
+var scheduleCronPattern = regexp.MustCompile(`(?i)^USING\s+CRON\s+.+\s+\S+$`)
+
+// validateSchedule checks that s matches one of the two Snowflake schedule formats:
+//   - "N MINUTE"  (e.g. "5 MINUTE", "60 MINUTE")
+//   - "USING CRON <cron_expr> <timezone>"  (e.g. "USING CRON 0 9 * * MON-FRI America/New_York")
+func validateSchedule(s string) error {
+	if scheduleMinutePattern.MatchString(s) || scheduleCronPattern.MatchString(s) {
+		return nil
+	}
+
+	return fmt.Errorf("must be %q or %q format (got: %q)", "N MINUTE", "USING CRON <expr> <tz>", s)
+}
+
+// targetLagPattern matches Snowflake target lag duration formats (e.g. "10 seconds", "5 minutes", "1 hour", "2 days").
+var targetLagPattern = regexp.MustCompile(`(?i)^\d+\s+(seconds?|minutes?|hours?|days?)$`)
+
+// validateTargetLag checks that s matches a valid Snowflake dynamic table target lag:
+//   - Duration: "N seconds/minutes/hours/days"  (singular or plural)
+//   - Downstream: "DOWNSTREAM"
+func validateTargetLag(s string) error {
+	if strings.EqualFold(s, "DOWNSTREAM") || targetLagPattern.MatchString(s) {
+		return nil
+	}
+
+	return fmt.Errorf("must be a duration (e.g. %q) or %q (got: %q)", "10 minutes", "DOWNSTREAM", s)
 }
 
 // Validate checks the ViewSpec for configuration errors.
@@ -1437,6 +1623,24 @@ func (s *FileFormatSpec) Validate() error {
 
 	if s.Type == "" {
 		errs = append(errs, errors.New("spec.type is required"))
+	} else {
+		validTypes := []FileFormatType{
+			FileFormatTypeCSV, FileFormatTypeJSON, FileFormatTypeAVRO,
+			FileFormatTypeORC, FileFormatTypePARQUET, FileFormatTypeXML,
+		}
+
+		valid := false
+		for _, v := range validTypes {
+			if s.Type == v {
+				valid = true
+
+				break
+			}
+		}
+
+		if !valid {
+			errs = append(errs, fmt.Errorf("spec.type must be one of %v (got: %q)", validTypes, s.Type))
+		}
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -1507,6 +1711,8 @@ func (s *DynamicTableSpec) Validate() error {
 
 	if s.TargetLag == "" {
 		errs = append(errs, errors.New("spec.targetLag is required"))
+	} else if err := validateTargetLag(s.TargetLag); err != nil {
+		errs = append(errs, fmt.Errorf("spec.targetLag: %w", err))
 	}
 
 	if err := validateSourceRef("warehouse", s.WarehouseRef, s.WarehouseName); err != nil {
@@ -1641,6 +1847,11 @@ func (s *PasswordPolicySpec) Validate() error {
 	// Cross-field constraint: min <= max.
 	if s.PasswordMinLength != nil && s.PasswordMaxLength != nil && *s.PasswordMinLength > *s.PasswordMaxLength {
 		errs = append(errs, errors.New("spec.passwordMinLength must not exceed spec.passwordMaxLength"))
+	}
+
+	// Cross-field constraint: minAgeDays <= maxAgeDays.
+	if s.PasswordMinAgeDays != nil && s.PasswordMaxAgeDays != nil && *s.PasswordMinAgeDays > *s.PasswordMaxAgeDays {
+		errs = append(errs, errors.New("spec.passwordMinAgeDays must not exceed spec.passwordMaxAgeDays"))
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -1976,9 +2187,9 @@ var ValidFieldExportSourceKinds = map[string]struct{}{
 	"User":                             {},
 	"AccountRole":                      {},
 	"DatabaseRole":                     {},
-	"AccountRoleGrant":                 {},
-	"DatabaseRoleGrant":                {},
-	"ShareGrant":                       {},
+	"GrantPrivilegesToAccountRole":     {},
+	"GrantPrivilegesToDatabaseRole":    {},
+	"GrantPrivilegesToShare":           {},
 	"Table":                            {},
 	"View":                             {},
 	"Stage":                            {},
@@ -2029,6 +2240,13 @@ var ValidFieldExportSourceKinds = map[string]struct{}{
 	"APIAuthenticationIntegrationWithClientCredentials":      {},
 	"APIAuthenticationIntegrationWithAuthorizationCodeGrant": {},
 	"APIAuthenticationIntegrationWithJWTBearer":              {},
+	"SQLStatement":             {},
+	"SAML2Integration":         {},
+	"ExternalOAuthIntegration": {},
+	"APIIntegration":           {},
+	"SecondaryDatabase":        {},
+	"SharedDatabase":           {},
+	"FailoverGroup":            {},
 }
 
 // Validate checks that the FieldExport spec fields are semantically valid.
@@ -2050,8 +2268,8 @@ func (s *FieldExportSpec) Validate() error {
 	if s.From.Path == "" {
 		errs = append(errs, errors.New("spec.from.path is required"))
 	} else {
-		if !strings.HasPrefix(s.From.Path, ".") {
-			errs = append(errs, errors.New("spec.from.path must start with \".\" (e.g. \".status.showOutput.name\")"))
+		if !strings.HasPrefix(s.From.Path, ".status.") {
+			errs = append(errs, errors.New(`spec.from.path must start with ".status." (e.g. ".status.showOutput.name")`))
 		}
 
 		if strings.Contains(s.From.Path, "[") {
@@ -2119,12 +2337,12 @@ var DangerousPrivileges = map[string]bool{
 	"OWNERSHIP":     true,
 }
 
-// ValidateDangerousAccountRoleGrant checks whether an AccountRoleGrantSpec
+// ValidateDangerousGrantPrivilegesToAccountRole checks whether an GrantPrivilegesToAccountRoleSpec
 // targets a dangerous system role or uses a dangerous privilege. It returns
 // a non-nil error when the grant is considered dangerous and should be
 // blocked unless the caller explicitly opts in via the allow-dangerous-grant
 // annotation. Only account role grants can target system roles.
-func ValidateDangerousAccountRoleGrant(spec *AccountRoleGrantSpec) error {
+func ValidateDangerousGrantPrivilegesToAccountRole(spec *GrantPrivilegesToAccountRoleSpec) error {
 	var errs []error
 
 	priv := strings.ToUpper(strings.TrimSpace(spec.Privilege))
@@ -2158,7 +2376,7 @@ func ValidateDangerousAccountRoleGrant(spec *AccountRoleGrantSpec) error {
 
 // validateDatabaseSource enforces exactly-one-of semantics for
 // databaseRef / databaseName across Schema, Table, View, Stage, DatabaseRole.
-func validateDatabaseSource(ref *LocalObjectReference, name *string) error {
+func validateDatabaseSource(ref *ObjectReference, name *string) error {
 	hasRef := ref != nil && ref.Name != ""
 	hasName := name != nil && *name != ""
 
@@ -2179,7 +2397,7 @@ func validateDatabaseSource(ref *LocalObjectReference, name *string) error {
 
 // validateSchemaSource enforces exactly-one-of semantics for
 // schemaRef / schemaName across Table, View, Stage.
-func validateSchemaSource(ref *LocalObjectReference, name *string) error {
+func validateSchemaSource(ref *ObjectReference, name *string) error {
 	hasRef := ref != nil && ref.Name != ""
 	hasName := name != nil && *name != ""
 
@@ -2200,13 +2418,13 @@ func validateSchemaSource(ref *LocalObjectReference, name *string) error {
 
 // validateExternalTableSource enforces exactly-one-of semantics for
 // externalTableRef / externalTableName.
-func validateExternalTableSource(ref *LocalObjectReference, name *string) error {
+func validateExternalTableSource(ref *ObjectReference, name *string) error {
 	return validateSourceRef("externalTable", ref, name)
 }
 
 // validateSourceRef enforces exactly-one-of semantics for a
 // <kindLabel>Ref / <kindLabel>Name pair.
-func validateSourceRef(kindLabel string, ref *LocalObjectReference, name *string) error {
+func validateSourceRef(kindLabel string, ref *ObjectReference, name *string) error {
 	hasRef := ref != nil && ref.Name != ""
 	hasName := name != nil && *name != ""
 
@@ -2227,7 +2445,7 @@ func validateSourceRef(kindLabel string, ref *LocalObjectReference, name *string
 
 // validateOptionalSourceRef validates an optional ref/name pair.
 // Both may be nil (field omitted), but if one is set, the other must be nil.
-func validateOptionalSourceRef(kindLabel string, ref *LocalObjectReference, name *string) error {
+func validateOptionalSourceRef(kindLabel string, ref *ObjectReference, name *string) error {
 	hasRef := ref != nil && ref.Name != ""
 	hasName := name != nil && *name != ""
 
@@ -2409,6 +2627,26 @@ func (s *TagAssociationSpec) Validate() error {
 
 	if s.ObjectType == "" {
 		errs = append(errs, errors.New("spec.objectType is required"))
+	} else {
+		validObjectTypes := []string{
+			"ACCOUNT", "DATABASE", "SCHEMA", "TABLE", "VIEW", "COLUMN",
+			"WAREHOUSE", "ROLE", "USER", "STAGE", "STREAM", "TASK",
+			"ALERT", "PIPE", "FUNCTION", "PROCEDURE", "INTEGRATION",
+			"NETWORK POLICY", "DATABASE ROLE",
+		}
+
+		valid := false
+		for _, v := range validObjectTypes {
+			if s.ObjectType == v {
+				valid = true
+
+				break
+			}
+		}
+
+		if !valid {
+			errs = append(errs, fmt.Errorf("spec.objectType must be one of %v (got: %q)", validObjectTypes, s.ObjectType))
+		}
 	}
 
 	if s.ObjectName == "" {
@@ -2442,6 +2680,8 @@ func (s *NetworkPolicyAttachmentSpec) Validate() error {
 
 	if s.TargetType == "" {
 		errs = append(errs, errors.New("spec.targetType is required"))
+	} else if s.TargetType != "ACCOUNT" && s.TargetType != "USER" {
+		errs = append(errs, fmt.Errorf("spec.targetType must be one of [ACCOUNT USER] (got: %q)", s.TargetType))
 	}
 
 	if s.TargetType == "USER" && s.TargetName == "" {
@@ -2475,6 +2715,8 @@ func (s *PasswordPolicyAttachmentSpec) Validate() error {
 
 	if s.TargetType == "" {
 		errs = append(errs, errors.New("spec.targetType is required"))
+	} else if s.TargetType != "ACCOUNT" && s.TargetType != "USER" {
+		errs = append(errs, fmt.Errorf("spec.targetType must be one of [ACCOUNT USER] (got: %q)", s.TargetType))
 	}
 
 	if s.TargetType == "USER" && s.TargetName == "" {
@@ -2556,6 +2798,91 @@ func (s *TableConstraintSpec) Validate() error {
 		}
 	} else if s.ForeignKeyProperties != nil {
 		errs = append(errs, errors.New("spec.foreignKeyProperties must not be set when type is not FOREIGN KEY"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// destructiveKeywordsRe matches SQL keywords that indicate potentially
+// destructive operations requiring explicit opt-in via dangerousAllowDestructive.
+// Uses word boundaries (\b) to avoid false positives (e.g. "BACKDROP") and
+// handles all whitespace variants (DROP\n, DROP\t, etc.).
+//
+//nolint:gochecknoglobals // package-level compiled regex
+var destructiveKeywordsRe = regexp.MustCompile(`(?i)\b(DROP|TRUNCATE|DELETE|REMOVE)\b`)
+
+// containsDestructiveSQL checks whether a SQL string contains destructive keywords.
+func containsDestructiveSQL(sql string) bool {
+	return destructiveKeywordsRe.MatchString(sql)
+}
+
+// Validate checks the SQLStatementSpec for configuration errors.
+func (s *SQLStatementSpec) Validate() error {
+	var errs []error
+
+	if strings.TrimSpace(s.Execute) == "" {
+		errs = append(errs, errors.New("spec.execute is required and must not be blank"))
+	}
+
+	// ObserveExpect without observe makes no sense.
+	if s.Observe == nil && len(s.ObserveExpect) > 0 {
+		errs = append(errs, errors.New("spec.observeExpect requires spec.observe to be set"))
+	}
+
+	// Validate observe is not blank when set.
+	if s.Observe != nil && strings.TrimSpace(*s.Observe) == "" {
+		errs = append(errs, errors.New("spec.observe must not be blank when set"))
+	}
+
+	// Validate revert is not blank when set.
+	if s.Revert != nil && strings.TrimSpace(*s.Revert) == "" {
+		errs = append(errs, errors.New("spec.revert must not be blank when set"))
+	}
+
+	// Destructive SQL guard: require explicit opt-in for execute SQL.
+	// Note: spec.revert is exempt from this check because revert SQL is
+	// inherently destructive by design (DROP, REVOKE, etc.). Requiring
+	// dangerousAllowDestructive for every revert would cause unnecessary
+	// friction without adding safety.
+	if !s.DangerousAllowDestructive {
+		if containsDestructiveSQL(s.Execute) {
+			errs = append(errs, errors.New("spec.execute contains destructive SQL (DROP/TRUNCATE/DELETE/REMOVE); set spec.dangerousAllowDestructive=true to proceed"))
+		}
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the SAML2IntegrationSpec for configuration errors.
+func (s *SAML2IntegrationSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if s.Issuer == "" {
+		errs = append(errs, errors.New("spec.issuer is required"))
+	}
+
+	if s.SSOURL == "" {
+		errs = append(errs, errors.New("spec.ssoURL is required"))
+	}
+
+	if s.Provider == "" {
+		errs = append(errs, errors.New("spec.provider is required"))
+	}
+
+	if s.X509Cert == "" {
+		errs = append(errs, errors.New("spec.x509Cert is required"))
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {

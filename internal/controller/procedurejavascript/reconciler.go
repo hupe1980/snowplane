@@ -3,14 +3,20 @@ package procedurejavascript
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	sigs "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/tracked"
@@ -35,44 +41,169 @@ type Service interface {
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
 // NewReconciler returns a new ProcedureJavascript reconciler backed by the generic framework.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.ProcedureJavascript, Service, *snowflake.ProcedureObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.ProcedureJavascript, Service, *snowflake.ProcedureObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+func NewReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.ProcedureJavascript, Service, *snowflake.ProcedureObservation] {
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewProcedureClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
 // supply a custom ServiceFactory for testing.
 func NewReconcilerWithServiceFactory(
-	c client.Client,
+	c sigs.Client,
 	factory *clientfactory.ClientFactory,
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.ProcedureJavascript, Service, *snowflake.ProcedureObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.ProcedureJavascript, Service, *snowflake.ProcedureObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, recorder, sf))
+}
+
+// newAdapter creates the BaseAdapter for ProcedureJavascript resources.
+func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.ProcedureJavascript, Service, *snowflake.ProcedureObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.ProcedureJavascript, Service, *snowflake.ProcedureObservation]{
+		ResourceNameVal:  "procedurejavascript",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.ProcedureJavascript { return &snowplanev1alpha1.ProcedureJavascript{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(obj *snowplanev1alpha1.ProcedureJavascript) (reconciler.Identifier, error) {
+			dbName := snowflake.ParseDatabaseNameFromFQN(obj.Status.DatabaseName)
+			schemaName := snowflake.ParseSchemaNameFromFQN(obj.Status.SchemaName)
+
+			argTypes := make([]string, len(obj.Spec.Arguments))
+			for i, arg := range obj.Spec.Arguments {
+				argTypes[i] = arg.Type
+			}
+
+			return snowflake.NewCallableIdentifier(dbName, schemaName, obj.Spec.Name, argTypes), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.CallableIdentifier) (*snowflake.ProcedureObservation, error) {
+				return svc.Observe(ctx, id.SchemaObjectIdentifier, id.ArgTypes())
+			},
+			func(obs *snowflake.ProcedureObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.ProcedureJavascript, id snowflake.CallableIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterProcedureOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.CallableIdentifier) error {
+			return svc.Drop(ctx, id.SchemaObjectIdentifier, id.ArgTypes())
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.ProcedureJavascript, id snowflake.CallableIdentifier, obs *reconciler.Observation[*snowflake.ProcedureObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.ProcedureJavascript, obs *reconciler.Observation[*snowflake.ProcedureObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.ProcedureJavascript, obs *reconciler.Observation[*snowflake.ProcedureObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		SupportsCoA: true,
+		PreReconcileFn: func(ctx context.Context, obj *snowplanev1alpha1.ProcedureJavascript) error {
+			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, obj,
+				obj.Namespace, obj.Spec.DatabaseRef, obj.Spec.DatabaseName, obj.Status.DatabaseName)
+			if err != nil {
+				return err
+			}
+
+			obj.Status.DatabaseName = dbFQN
+
+			schemaFQN, err := refresolver.PreReconcileSchemaRef(ctx, c, recorder, obj,
+				obj.Namespace, obj.Spec.SchemaRef, obj.Spec.SchemaName, obj.Status.SchemaName)
+			if err != nil {
+				return err
+			}
+
+			obj.Status.SchemaName = schemaFQN
+
+			refresolver.SetDatabaseAndSchemaResolvedCondition(obj, obj.Spec.DatabaseRef, obj.Spec.DatabaseName, obj.Spec.SchemaRef, obj.Spec.SchemaName)
+
+			return nil
+		},
+		SetupWatchesFn: func(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.ProcedureJavascript{},
+				".spec.databaseRef.name",
+				func(o sigs.Object) []string {
+					obj, ok := o.(*snowplanev1alpha1.ProcedureJavascript)
+					if !ok || obj.Spec.DatabaseRef == nil {
+						return nil
+					}
+
+					return []string{obj.Spec.DatabaseRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.databaseRef.name: %w", err)
+			}
+
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.ProcedureJavascript{},
+				".spec.schemaRef.name",
+				func(o sigs.Object) []string {
+					obj, ok := o.(*snowplanev1alpha1.ProcedureJavascript)
+					if !ok || obj.Spec.SchemaRef == nil {
+						return nil
+					}
+
+					return []string{obj.Spec.SchemaRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.schemaRef.name: %w", err)
+			}
+
+			bldr.Watches(
+				&snowplanev1alpha1.Database{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.ProcedureJavascriptList{} }, ".spec.databaseRef.name", "listing procedurejavascripts for database watch")),
+			)
+
+			bldr.Watches(
+				&snowplanev1alpha1.Schema{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.ProcedureJavascriptList{} }, ".spec.schemaRef.name", "listing procedurejavascripts for schema watch")),
+			)
+
+			return nil
+		},
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+// validateImmutableFields checks that immutable fields have not changed.
+func validateImmutableFields(_ context.Context, obj *snowplanev1alpha1.ProcedureJavascript) error {
+	if reconciler.ShouldSkipImmutableValidation(obj) {
+		return nil
 	}
 
-	return snowflake.NewProcedureClient(sfC), cleanup, nil
+	if obj.Status.ShowOutput != nil {
+		if obj.Status.ShowOutput.Name != "" && !strings.EqualFold(obj.Spec.Name, obj.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", obj.Status.ShowOutput.Name, obj.Spec.Name)
+		}
+
+		if obj.Status.ShowOutput.DatabaseName != "" && obj.Status.DatabaseName != "" {
+			resolvedDB := snowflake.ParseDatabaseNameFromFQN(obj.Status.DatabaseName)
+			if !strings.EqualFold(resolvedDB, obj.Status.ShowOutput.DatabaseName) {
+				return fmt.Errorf("spec.databaseRef is immutable after creation (current database: %q, resolved: %q)", obj.Status.ShowOutput.DatabaseName, resolvedDB)
+			}
+		}
+
+		if obj.Status.ShowOutput.SchemaName != "" && obj.Status.SchemaName != "" {
+			resolvedSchema := snowflake.ParseSchemaNameFromFQN(obj.Status.SchemaName)
+			if !strings.EqualFold(resolvedSchema, obj.Status.ShowOutput.SchemaName) {
+				return fmt.Errorf("spec.schemaRef is immutable after creation (current schema: %q, resolved: %q)", obj.Status.ShowOutput.SchemaName, resolvedSchema)
+			}
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(obj *snowplanev1alpha1.ProcedureJavascript, obs *snowflake.ProcedureObservation) {
@@ -85,16 +216,7 @@ func applyObservation(obj *snowplanev1alpha1.ProcedureJavascript, obs *snowflake
 		obj.Status.DatabaseName = obs.ShowOutput.DatabaseName
 		obj.Status.SchemaName = obs.ShowOutput.SchemaName
 
-		obj.Status.ShowOutput = &snowplanev1alpha1.ProcedureShowOutput{
-			CreatedOn:    obs.ShowOutput.CreatedOn,
-			Name:         obs.ShowOutput.Name,
-			DatabaseName: obs.ShowOutput.DatabaseName,
-			SchemaName:   obs.ShowOutput.SchemaName,
-			Arguments:    obs.ShowOutput.Arguments,
-			Description:  obs.ShowOutput.Description,
-			IsSecure:     obs.ShowOutput.IsSecure,
-			Owner:        obs.ShowOutput.Owner,
-		}
+		obj.Status.ShowOutput = obs.ShowOutput
 	}
 }
 

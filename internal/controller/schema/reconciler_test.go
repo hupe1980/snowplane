@@ -89,7 +89,7 @@ func newTestSchema(name, namespace string) *snowplanev1alpha1.Schema {
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        "PUBLIC",
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "analytics-db"},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "analytics-db"},
 		},
 	}
 }
@@ -121,7 +121,7 @@ func newTestDB(name, namespace string) *snowplanev1alpha1.Database {
 func successfulObservation() *snowflake.SchemaObservation {
 	return &snowflake.SchemaObservation{
 		Exists: true,
-		ShowOutput: &snowflake.SchemaShowOutput{
+		ShowOutput: &snowplanev1alpha1.SchemaShowOutput{
 			CreatedOn:     "2024-01-01",
 			Name:          "PUBLIC",
 			DatabaseName:  "ANALYTICS",
@@ -155,22 +155,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 		cb = cb.WithRuntimeObjects(obj)
 	}
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("Schema"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("Schema")
+
+	return r
 }
 
 // newTestReconcilerWithIndex creates a reconciler with the field indexer on
@@ -194,22 +189,17 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 		cb = cb.WithRuntimeObjects(obj)
 	}
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("Schema"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("Schema")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -1249,7 +1239,7 @@ func TestReconcile_ImmutableDatabaseRef(t *testing.T) {
 	// to a different Database CR that resolves to DIFFERENT_DB.
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
-	schema.Spec.DatabaseRef = &snowplanev1alpha1.LocalObjectReference{Name: "other-db"}
+	schema.Spec.DatabaseRef = &snowplanev1alpha1.ObjectReference{Name: "other-db"}
 	schema.Status.ObservedGeneration = 1
 	schema.Status.ShowOutput = &snowplanev1alpha1.SchemaShowOutput{
 		Name:         "PUBLIC",
@@ -1448,7 +1438,7 @@ func TestBuildAlterOptions_UnsetComputedWhenParamsNil(t *testing.T) {
 	id := snowflake.NewDatabaseObjectIdentifier("DB", "S")
 	obs := &snowflake.SchemaObservation{
 		Exists:     true,
-		ShowOutput: &snowflake.SchemaShowOutput{Name: "S", DatabaseName: "DB"},
+		ShowOutput: &snowplanev1alpha1.SchemaShowOutput{Name: "S", DatabaseName: "DB"},
 		Parameters: nil,
 	}
 
@@ -1639,7 +1629,7 @@ func TestDetectSchemaDrift_NoDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.SchemaObservation{
-		ShowOutput: &snowflake.SchemaShowOutput{Comment: "test"},
+		ShowOutput: &snowplanev1alpha1.SchemaShowOutput{Comment: "test"},
 		Parameters: &snowflake.SchemaParameters{
 			DataRetentionTimeInDays: testutil.Ptr(int32(1)),
 		},
@@ -1661,7 +1651,7 @@ func TestDetectSchemaDrift_WithDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.SchemaObservation{
-		ShowOutput: &snowflake.SchemaShowOutput{Comment: "drifted"},
+		ShowOutput: &snowplanev1alpha1.SchemaShowOutput{Comment: "drifted"},
 		Parameters: &snowflake.SchemaParameters{
 			DataRetentionTimeInDays: testutil.Ptr(int32(1)),
 		},
@@ -1714,20 +1704,13 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 
 	rec := record.NewFakeRecorder(100)
 
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Schema, Service, *snowflake.SchemaObservation]{
-		Client:   c,
-		Factory:  clientfactory.NewClientFactory(),
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-				capturedUseRole = useRole
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, testutil.NewTestClientFactory(), rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, useRole string) (Service, func(context.Context), error) {
+			capturedUseRole = useRole
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("Schema"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("Schema")
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
 	require.NoError(t, err)

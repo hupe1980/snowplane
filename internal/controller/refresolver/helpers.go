@@ -53,7 +53,7 @@ func ResolveDatabaseRefWithConditions(
 	recorder record.EventRecorder,
 	obj ConditionedClientObject,
 	namespace string,
-	ref *snowplanev1alpha1.LocalObjectReference,
+	ref *snowplanev1alpha1.ObjectReference,
 	rawName *string,
 ) (string, error) {
 	dbFQN, err := ResolveDatabaseSource(ctx, c, namespace, ref, rawName)
@@ -74,7 +74,7 @@ func ResolveSchemaRefWithConditions(
 	recorder record.EventRecorder,
 	obj ConditionedClientObject,
 	namespace string,
-	ref *snowplanev1alpha1.LocalObjectReference,
+	ref *snowplanev1alpha1.ObjectReference,
 	rawName *string,
 ) (string, error) {
 	schemaFQN, err := ResolveSchemaSource(ctx, c, namespace, ref, rawName)
@@ -89,7 +89,7 @@ func ResolveSchemaRefWithConditions(
 // SetDatabaseResolvedCondition sets a ReferencesResolved condition with a
 // message indicating that a single database reference was resolved.
 // Used by Schema and DatabaseRole adapters.
-func SetDatabaseResolvedCondition(obj conditions.ConditionedObject, ref *snowplanev1alpha1.LocalObjectReference, rawName *string, dbFQN string) {
+func SetDatabaseResolvedCondition(obj conditions.ConditionedObject, ref *snowplanev1alpha1.ObjectReference, rawName *string, dbFQN string) {
 	refName := SourceName(ref, rawName)
 	conditions.SetReferencesResolved(obj, fmt.Sprintf("Database %s resolved to %s", refName, dbFQN))
 }
@@ -99,8 +99,8 @@ func SetDatabaseResolvedCondition(obj conditions.ConditionedObject, ref *snowpla
 // Used by Table, View, and Stage adapters.
 func SetDatabaseAndSchemaResolvedCondition(
 	obj conditions.ConditionedObject,
-	dbRef *snowplanev1alpha1.LocalObjectReference, dbRawName *string,
-	schemaRef *snowplanev1alpha1.LocalObjectReference, schemaRawName *string,
+	dbRef *snowplanev1alpha1.ObjectReference, dbRawName *string,
+	schemaRef *snowplanev1alpha1.ObjectReference, schemaRawName *string,
 ) {
 	dbName := SourceName(dbRef, dbRawName)
 	schName := SourceName(schemaRef, schemaRawName)
@@ -119,7 +119,7 @@ func PreReconcileDatabaseRef(
 	recorder record.EventRecorder,
 	obj ConditionedClientObject,
 	namespace string,
-	dbRef *snowplanev1alpha1.LocalObjectReference,
+	dbRef *snowplanev1alpha1.ObjectReference,
 	dbName *string,
 	cachedDBName string,
 ) (string, error) {
@@ -154,7 +154,7 @@ func PreReconcileSchemaRef(
 	recorder record.EventRecorder,
 	obj ConditionedClientObject,
 	namespace string,
-	schemaRef *snowplanev1alpha1.LocalObjectReference,
+	schemaRef *snowplanev1alpha1.ObjectReference,
 	schemaName *string,
 	cachedSchemaName string,
 ) (string, error) {
@@ -194,7 +194,7 @@ func PreReconcileSourceRef[T interface {
 	recorder record.EventRecorder,
 	obj ConditionedClientObject,
 	namespace string,
-	ref *snowplanev1alpha1.LocalObjectReference,
+	ref *snowplanev1alpha1.ObjectReference,
 	rawName *string,
 	cachedName string,
 	kindLabel string,
@@ -231,7 +231,7 @@ func PreReconcileSourceRef[T interface {
 // RefDescriptor describes a single resolved reference for condition messages.
 type RefDescriptor struct {
 	KindLabel string
-	Ref       *snowplanev1alpha1.LocalObjectReference
+	Ref       *snowplanev1alpha1.ObjectReference
 	RawName   *string
 }
 

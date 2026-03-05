@@ -6,31 +6,15 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
 // WarehouseObservation holds the result of observing a Snowflake warehouse.
 type WarehouseObservation struct {
 	Exists     bool
-	ShowOutput *WarehouseShowOutput
+	ShowOutput *v1alpha1.WarehouseShowOutput
 	Parameters *WarehouseParameters
-}
-
-// WarehouseShowOutput holds the result of a SHOW WAREHOUSES query.
-type WarehouseShowOutput struct {
-	CreatedOn       string
-	Name            string
-	State           string
-	Type            string
-	Size            string
-	Comment         string
-	Owner           string
-	AutoSuspend     int32
-	AutoResume      bool
-	MinClusterCount int32
-	MaxClusterCount int32
-	ScalingPolicy   string
-	ResourceMonitor string
 }
 
 // WarehouseParameters holds the result of SHOW PARAMETERS IN WAREHOUSE.
@@ -280,7 +264,7 @@ func buildShowWarehouseByIDSQL(name AccountObjectIdentifier) string {
 }
 
 // ShowByID retrieves a warehouse by name using SHOW WAREHOUSES.
-func (w *WarehouseClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*WarehouseShowOutput, error) {
+func (w *WarehouseClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*v1alpha1.WarehouseShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("%w: warehouse name is required", ErrInvalidIdentifier))
 	}
@@ -332,13 +316,13 @@ func (w *WarehouseClient) Observe(ctx context.Context, name AccountObjectIdentif
 	}, nil
 }
 
-func scanWarehouseShowOutput(rows *sql.Rows, name string) (*WarehouseShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*WarehouseShowOutput, error) {
+func scanWarehouseShowOutput(rows *sql.Rows, name string) (*v1alpha1.WarehouseShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.WarehouseShowOutput, error) {
 		autoSuspend, _ := parseInt32(m["auto_suspend"])
 		minCluster, _ := parseInt32(m["min_cluster_count"])
 		maxCluster, _ := parseInt32(m["max_cluster_count"])
 
-		return &WarehouseShowOutput{
+		return &v1alpha1.WarehouseShowOutput{
 			CreatedOn:       m["created_on"],
 			Name:            m["name"],
 			State:           m["state"],

@@ -82,3 +82,4 @@ just e2e-teardown-kind # hack/teardown-e2e-kind.sh
 | `policy_test.go`         | NetworkPolicy, PasswordPolicy, MaskingPolicy  |
 | `task_test.go`           | Task lifecycle (database + schema deps)       |
 | `stream_test.go`         | Stream lifecycle (database + schema + table)  |
+| `apiintegration_test.go` | APIIntegration lifecycle, orphan delete        |

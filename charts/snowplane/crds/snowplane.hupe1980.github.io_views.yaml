@@ -75,6 +75,7 @@ spec:
                   DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
                   Use this when the database is NOT managed by Snowplane.
                   Mutually exclusive with DatabaseRef. Immutable after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               databaseRef:
@@ -84,7 +85,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -132,6 +140,7 @@ spec:
                 type: object
               name:
                 description: Name is the Snowflake view name. Immutable after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               paused:
@@ -148,6 +157,7 @@ spec:
                   name:
                     default: default
                     description: Name of the ProviderConfig to use.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   namespace:
@@ -163,6 +173,7 @@ spec:
                   Use this when the schema is NOT managed by Snowplane.
                   The controller constructs the FQN from databaseName + schemaName + name.
                   Mutually exclusive with SchemaRef. Immutable after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               schemaRef:
@@ -172,7 +183,14 @@ spec:
                 properties:
                   name:
                     description: Name of the referent.
+                    maxLength: 255
                     minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent. Defaults to the namespace of the
+                      referencing resource when omitted, enabling cross-namespace
+                      references in platform/project-team enterprise topologies.
                     type: string
                 required:
                 - name
@@ -190,6 +208,7 @@ spec:
                   privileges of the operator's Snowflake service account. Users with
                   permission to create or update View CRs can execute arbitrary SQL.
                   Ensure RBAC restricts View CR access to trusted principals only.
+                maxLength: 255
                 minLength: 1
                 type: string
               useRole:
@@ -199,6 +218,7 @@ spec:
                   at CREATE time becomes the object owner, so this field indirectly
                   controls initial ownership.
                   This field is immutable after the resource has been created in Snowflake.
+                maxLength: 255
                 minLength: 1
                 type: string
             required:
@@ -323,6 +343,13 @@ spec:
                   comparing ObservedGeneration vs Generation because metadata-only
                   changes (labels, annotations) increment Generation without changing
                   the spec.
+                type: string
+              lastReconcileTime:
+                description: |-
+                  LastReconcileTime is the timestamp of the most recent successful
+                  reconciliation. Useful for SLO monitoring and diagnosing whether
+                  reconciliation is running for a specific resource.
+                format: date-time
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent metadata.generation

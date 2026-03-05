@@ -65,7 +65,7 @@ func TestBuildCreateStageSQL(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := buildCreateStageSQL(tc.opts)
-				require.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected, got)
 		})
 	}

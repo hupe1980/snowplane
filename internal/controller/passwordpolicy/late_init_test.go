@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -26,14 +27,12 @@ func newPasswordPolicy() *snowplanev1alpha1.PasswordPolicy {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newPasswordPolicy()
 		obs := &reconciler.Observation[*snowflake.PasswordPolicyObservation]{
 			Exists: true,
 			Detail: &snowflake.PasswordPolicyObservation{
-				ShowOutput: &snowflake.PasswordPolicyShowOutput{
+				ShowOutput: &snowplanev1alpha1.PasswordPolicyShowOutput{
 					Comment: "policy comment",
 				},
 				DescribeOutput: map[string]string{
@@ -52,7 +51,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 
 		assert.Equal(t, "policy comment", *obj.Spec.Comment)
@@ -77,7 +76,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.PasswordPolicyObservation]{
 			Exists: true,
 			Detail: &snowflake.PasswordPolicyObservation{
-				ShowOutput: &snowflake.PasswordPolicyShowOutput{
+				ShowOutput: &snowplanev1alpha1.PasswordPolicyShowOutput{
 					Comment: "snowflake comment",
 				},
 				DescribeOutput: map[string]string{
@@ -88,7 +87,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified) // MaxLength and MaxAgeDays set
 
 		assert.Equal(t, "user comment", *obj.Spec.Comment)
@@ -108,7 +107,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 		assert.Nil(t, obj.Spec.PasswordMinLength)
 	})
@@ -120,7 +119,7 @@ func TestLateInitialize(t *testing.T) {
 			Detail: nil,
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -134,7 +133,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 }

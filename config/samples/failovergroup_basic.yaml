@@ -1,0 +1,20 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: FailoverGroup
+metadata:
+  name: my-failover-group
+spec:
+  providerRef:
+    name: default
+  name: MY_FAILOVER_GROUP
+  objectTypes:
+    - DATABASES
+    - ROLES
+    - USERS
+    - WAREHOUSES
+  allowedAccounts:
+    - MYORG.TARGET_ACCOUNT
+  allowedDatabases:
+    - ANALYTICS_DB
+    - REPORTING_DB
+  replicationSchedule: "10 MINUTE"
+  comment: "DR failover group managed by Snowplane"

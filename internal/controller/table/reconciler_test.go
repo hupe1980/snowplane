@@ -83,8 +83,8 @@ func newTestTable(name, namespace string) *snowplanev1alpha1.Table {
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        "EVENTS",
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "analytics-db"},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: "public-schema"},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "analytics-db"},
+			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: "public-schema"},
 			Columns: []snowplanev1alpha1.ColumnDefinition{
 				{Name: "ID", Type: "NUMBER(38,0)"},
 				{Name: "PAYLOAD", Type: "VARIANT"},
@@ -130,7 +130,7 @@ func newTestSchema(name, namespace string) *snowplanev1alpha1.Schema {
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        "PUBLIC",
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "analytics-db"},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "analytics-db"},
 		},
 		Status: snowplanev1alpha1.SchemaStatus{
 			CommonStatus: snowplanev1alpha1.CommonStatus{
@@ -148,7 +148,7 @@ func newTestSchema(name, namespace string) *snowplanev1alpha1.Schema {
 func successfulObservation() *snowflake.TableObservation {
 	return &snowflake.TableObservation{
 		Exists: true,
-		ShowOutput: &snowflake.TableShowOutput{
+		ShowOutput: &snowplanev1alpha1.TableShowOutput{
 			CreatedOn:             "2024-01-01",
 			Name:                  "EVENTS",
 			DatabaseName:          "ANALYTICS",
@@ -179,22 +179,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Table, Service, *snowflake.TableObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("Table"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("Table")
+
+	return r
 }
 
 func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.Table, Service, *snowflake.TableObservation] {
@@ -228,22 +223,17 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Table, Service, *snowflake.TableObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("Table"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("Table")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -493,7 +483,6 @@ func TestReconcile_DeleteOrphanPolicy(t *testing.T) {
 func TestValidateImmutableFields_NameChanged(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{}
 	table := newTestTable("mytable", "default")
 	table.Status.ObservedGeneration = 1
 	table.Status.ShowOutput = &snowplanev1alpha1.TableShowOutput{
@@ -503,7 +492,7 @@ func TestValidateImmutableFields_NameChanged(t *testing.T) {
 		Kind:         "TABLE",
 	}
 	table.Spec.Name = "EVENTS_V2"
-	err := a.ValidateImmutableFields(context.Background(), table)
+	err := validateImmutableFields(context.Background(), table)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.name is immutable")
 }
@@ -511,7 +500,6 @@ func TestValidateImmutableFields_NameChanged(t *testing.T) {
 func TestValidateImmutableFields_TransientChanged(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{}
 	table := newTestTable("mytable", "default")
 	table.Status.ObservedGeneration = 1
 	table.Status.ShowOutput = &snowplanev1alpha1.TableShowOutput{
@@ -521,7 +509,7 @@ func TestValidateImmutableFields_TransientChanged(t *testing.T) {
 		Kind:         "TABLE",
 	}
 	table.Spec.Transient = true
-	err := a.ValidateImmutableFields(context.Background(), table)
+	err := validateImmutableFields(context.Background(), table)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.transient is immutable")
 }
@@ -529,7 +517,6 @@ func TestValidateImmutableFields_TransientChanged(t *testing.T) {
 func TestValidateImmutableFields_ForceNew(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{}
 	table := newTestTable("mytable", "default")
 	table.Status.ObservedGeneration = 1
 	table.Status.ShowOutput = &snowplanev1alpha1.TableShowOutput{
@@ -538,7 +525,7 @@ func TestValidateImmutableFields_ForceNew(t *testing.T) {
 	}
 	table.Annotations = map[string]string{snowplanev1alpha1.AnnotationForceNew: "true"}
 	table.Spec.Name = "DIFFERENT"
-	err := a.ValidateImmutableFields(context.Background(), table)
+	err := validateImmutableFields(context.Background(), table)
 	require.NoError(t, err) // forceNew bypasses
 }
 
@@ -645,7 +632,7 @@ func TestDetectDrift_CommentDrift(t *testing.T) {
 
 	obs := &snowflake.TableObservation{
 		Exists: true,
-		ShowOutput: &snowflake.TableShowOutput{
+		ShowOutput: &snowplanev1alpha1.TableShowOutput{
 			Comment: "actual",
 		},
 	}
@@ -670,7 +657,7 @@ func TestDetectColumnDrift_NoDrift(t *testing.T) {
 
 	obs := &snowflake.TableObservation{
 		Exists:     true,
-		ShowOutput: &snowflake.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
+		ShowOutput: &snowplanev1alpha1.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
 		Columns: []snowflake.ColumnInfo{
 			{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
 			{Name: "PAYLOAD", Type: "VARIANT", Kind: "COLUMN", Null: "Y"},
@@ -692,7 +679,7 @@ func TestDetectColumnDrift_MissingColumn(t *testing.T) {
 
 	obs := &snowflake.TableObservation{
 		Exists:     true,
-		ShowOutput: &snowflake.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
+		ShowOutput: &snowplanev1alpha1.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
 		Columns: []snowflake.ColumnInfo{
 			{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
 		},
@@ -712,7 +699,7 @@ func TestDetectColumnDrift_ExtraColumn(t *testing.T) {
 
 	obs := &snowflake.TableObservation{
 		Exists:     true,
-		ShowOutput: &snowflake.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
+		ShowOutput: &snowplanev1alpha1.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
 		Columns: []snowflake.ColumnInfo{
 			{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
 			{Name: "STALE_COL", Type: "VARCHAR", Kind: "COLUMN", Null: "Y"},
@@ -734,7 +721,7 @@ func TestDetectColumnDrift_TypeChange(t *testing.T) {
 
 	obs := &snowflake.TableObservation{
 		Exists:     true,
-		ShowOutput: &snowflake.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
+		ShowOutput: &snowplanev1alpha1.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
 		Columns: []snowflake.ColumnInfo{
 			{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
 			{Name: "AMOUNT", Type: "NUMBER(10,0)", Kind: "COLUMN", Null: "Y"},
@@ -756,7 +743,7 @@ func TestDetectColumnDrift_NullableChange(t *testing.T) {
 
 	obs := &snowflake.TableObservation{
 		Exists:     true,
-		ShowOutput: &snowflake.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
+		ShowOutput: &snowplanev1alpha1.TableShowOutput{Name: "MYTABLE", Kind: "TABLE"},
 		Columns: []snowflake.ColumnInfo{
 			{Name: "ID", Type: "NUMBER(38,0)", Kind: "COLUMN", Null: "Y"},
 		},

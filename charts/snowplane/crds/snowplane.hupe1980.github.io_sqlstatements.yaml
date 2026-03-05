@@ -1,0 +1,344 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: sqlstatements.snowplane.hupe1980.github.io
+spec:
+  group: snowplane.hupe1980.github.io
+  names:
+    categories:
+    - snowplane
+    kind: SQLStatement
+    listKind: SQLStatementList
+    plural: sqlstatements
+    shortNames:
+    - sqlstmt
+    singular: sqlstatement
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: SYNCED
+      type: string
+    - jsonPath: .spec.idempotent
+      name: IDEMPOTENT
+      type: boolean
+    - jsonPath: .spec.providerRef.name
+      name: PROVIDER
+      priority: 1
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          SQLStatement is an escape-hatch CRD for executing arbitrary SQL against
+          Snowflake. It is gated behind the --enable-sql-statement flag due to its
+          inherent risks (arbitrary SQL execution, no type safety, potential for
+          non-idempotent operations). Prefer typed CRDs whenever possible.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              SQLStatementSpec defines the desired state of a SQLStatement resource.
+              SQLStatement is an escape-hatch CRD that allows executing arbitrary SQL
+              against Snowflake. It is intended for resources not yet covered by typed
+              CRDs, one-off DDL, custom grants, and advanced use cases.
+
+              IMPORTANT: This resource bypasses Snowplane's SQL builder validation and
+              escaping. Users are responsible for SQL correctness and safety. Prefer
+              typed CRDs (Database, Schema, etc.) whenever possible.
+            properties:
+              dangerousAllowDestructive:
+                default: false
+                description: |-
+                  DangerousAllowDestructive must be set to true for execute or revert SQL
+                  that contains destructive keywords (DROP, TRUNCATE, DELETE, REMOVE).
+                  This provides an explicit opt-in for operations that could cause data loss.
+                type: boolean
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy specifies what happens to the Snowflake resource when the CR is deleted.
+                  Defaults to "Delete".
+                enum:
+                - Delete
+                - Orphan
+                type: string
+              execute:
+                description: |-
+                  Execute is the SQL statement to run when creating the resource.
+                  For idempotent statements, use IF NOT EXISTS or CREATE OR REPLACE patterns.
+                  Multi-statement SQL (separated by semicolons) is supported.
+                minLength: 1
+                type: string
+              idempotent:
+                default: false
+                description: |-
+                  Idempotent indicates whether the execute SQL is safe to run multiple
+                  times (e.g. uses IF NOT EXISTS or CREATE OR REPLACE). This field is
+                  informational metadata for human operators and GitOps tooling — the
+                  reconciler prevents re-execution via the creation-initiated guard and
+                  status.executeHash tracking regardless of this field's value.
+                type: boolean
+              managementPolicies:
+                description: ManagementPolicies specifies lifecycle policies for this
+                  resource.
+                properties:
+                  adoptionPolicy:
+                    default: fail-if-exists
+                    description: |-
+                      AdoptionPolicy controls how the reconciler handles a pre-existing
+                      Snowflake resource on first reconciliation.
+                      Defaults to "fail-if-exists".
+                    enum:
+                    - adopt
+                    - fail-if-exists
+                    type: string
+                  createOrAlter:
+                    default: true
+                    description: |-
+                      CreateOrAlter controls whether CREATE OR ALTER is used instead of
+                      the legacy CREATE + ALTER two-step flow for supported resource types.
+                      Defaults to true.
+                    type: boolean
+                  driftPolicy:
+                    default: correct
+                    description: |-
+                      DriftPolicy controls whether detected drift is corrected or only
+                      reported via conditions and events.
+                      Defaults to "correct".
+                    enum:
+                    - correct
+                    - detect-only
+                    type: string
+                type: object
+              observe:
+                description: |-
+                  Observe is a SQL query whose result set is used for existence checks
+                  and drift detection. The resource is considered "existing" when the
+                  query returns at least one row matching all ObserveExpect expectations.
+                  When omitted, the resource is always considered "not observable" —
+                  Execute runs once and the resource stays in Ready state without drift
+                  detection.
+                type: string
+              observeExpect:
+                description: |-
+                  ObserveExpect defines column/value expectations that the observe query
+                  result must satisfy. All expectations must match at least one row for
+                  the resource to be considered "existing". When empty (but observe is
+                  set), any non-empty result set indicates existence.
+                items:
+                  description: |-
+                    SQLStatementExpectation defines a column/value expectation for the
+                    observe query result. The resource is considered "existing" when all
+                    expectations match at least one row.
+                  properties:
+                    column:
+                      description: Column is the result set column name to inspect.
+                      maxLength: 255
+                      minLength: 1
+                      type: string
+                    value:
+                      description: Value is the expected column value (case-insensitive
+                        string comparison).
+                      minLength: 1
+                      type: string
+                  required:
+                  - column
+                  - value
+                  type: object
+                type: array
+                x-kubernetes-list-type: atomic
+              paused:
+                description: |-
+                  Paused suspends reconciliation of this resource. When true, the
+                  controller skips all Snowflake operations and sets Synced=False
+                  with reason ReconcilePaused. The Snowflake resource is not modified
+                  or deleted while paused.
+                type: boolean
+              providerRef:
+                description: ProviderRef references the ProviderConfig to use for
+                  Snowflake connectivity.
+                properties:
+                  name:
+                    default: default
+                    description: Name of the ProviderConfig to use.
+                    maxLength: 255
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the ProviderConfig. Defaults to the namespace of the
+                      referring resource. Set this to reference a ProviderConfig in a
+                      different namespace (e.g. a shared system namespace).
+                    type: string
+                type: object
+              revert:
+                description: |-
+                  Revert is the SQL statement to run when deleting the resource.
+                  This should undo what Execute created (e.g. DROP, REVOKE).
+                  When omitted, no SQL is executed on deletion (orphan behavior for the
+                  Snowflake-side resource, though the Kubernetes CR is still deleted).
+                type: string
+              useRole:
+                description: |-
+                  UseRole specifies the Snowflake role to activate via USE ROLE before
+                  CREATE/ALTER/DROP operations. In Snowflake's DAC model the role active
+                  at CREATE time becomes the object owner, so this field indirectly
+                  controls initial ownership.
+                  This field is immutable after the resource has been created in Snowflake.
+                maxLength: 255
+                minLength: 1
+                type: string
+            required:
+            - execute
+            - providerRef
+            type: object
+            x-kubernetes-validations:
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
+          status:
+            description: SQLStatementStatus defines the observed state of a SQLStatement
+              resource.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the resource's state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              executeHash:
+                description: |-
+                  ExecuteHash is the SHA-256 hash of the execute SQL at the time of
+                  last successful execution. Used to detect spec.execute changes that
+                  require re-execution (force-new semantics).
+                type: string
+              fullyQualifiedName:
+                description: FullyQualifiedName is the Snowflake fully qualified identifier
+                  for this resource.
+                type: string
+              lastAppliedSpecHash:
+                description: |-
+                  LastAppliedSpecHash is the SHA-256 hash of the spec as of the last
+                  successful reconciliation. The reconciler uses this to distinguish
+                  spec changes (user edited the CR) from external drift (Snowflake
+                  state diverged without a spec change). This is more reliable than
+                  comparing ObservedGeneration vs Generation because metadata-only
+                  changes (labels, annotations) increment Generation without changing
+                  the spec.
+                type: string
+              lastReconcileTime:
+                description: |-
+                  LastReconcileTime is the timestamp of the most recent successful
+                  reconciliation. Useful for SLO monitoring and diagnosing whether
+                  reconciliation is running for a specific resource.
+                format: date-time
+                type: string
+              observeResult:
+                description: ObserveResult captures the latest observe query result.
+                properties:
+                  matched:
+                    description: Matched indicates whether all ObserveExpect expectations
+                      were satisfied.
+                    type: boolean
+                  rowCount:
+                    description: RowCount is the number of rows returned by the observe
+                      query.
+                    format: int32
+                    type: integer
+                required:
+                - matched
+                - rowCount
+                type: object
+              observedGeneration:
+                description: ObservedGeneration is the most recent metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

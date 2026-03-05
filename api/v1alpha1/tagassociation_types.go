@@ -37,7 +37,7 @@ type TagAssociationSpec struct {
 	// When set, the tag name is resolved from the CR's fullyQualifiedName.
 	// Mutually exclusive with TagName.
 	// +optional
-	TagRef *LocalObjectReference `json:"tagRef,omitempty"`
+	TagRef *ObjectReference `json:"tagRef,omitempty"`
 
 	// TagValue is the string value to assign to the tag on the object.
 	// This is the only mutable field — changing it triggers an ALTER SET TAG

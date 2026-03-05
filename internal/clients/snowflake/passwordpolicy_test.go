@@ -80,7 +80,7 @@ func TestBuildCreatePasswordPolicySQL_CreateOrAlter(t *testing.T) {
 		UseCreateOrAlter:  true,
 	}
 	got, err := buildCreatePasswordPolicySQL(opts)
-		require.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, got, `CREATE OR ALTER PASSWORD POLICY "DB"."SCH"."MY_POLICY"`)
 	assert.NotContains(t, got, "IF NOT EXISTS")
 	assert.Contains(t, got, "PASSWORD_MIN_LENGTH = 10")

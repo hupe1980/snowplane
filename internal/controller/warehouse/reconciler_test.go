@@ -92,7 +92,7 @@ func newTestWH(name, namespace string) *snowplanev1alpha1.Warehouse {
 func successfulObservation() *snowflake.WarehouseObservation {
 	return &snowflake.WarehouseObservation{
 		Exists: true,
-		ShowOutput: &snowflake.WarehouseShowOutput{
+		ShowOutput: &snowplanev1alpha1.WarehouseShowOutput{
 			CreatedOn:       "2024-01-01",
 			Name:            "ETL_WH",
 			State:           "STARTED",
@@ -127,20 +127,17 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: rec,
-		Adapter: &adapter{
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, factory, rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("Warehouse"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("Warehouse")
+
+	return r
 }
 
 // --------------------------------------------------------------------------
@@ -867,7 +864,7 @@ func TestValidateImmutableFields_FirstReconcile(t *testing.T) {
 	wh := newTestWH("mywh", "default")
 	wh.Status.ObservedGeneration = 0
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), wh)
+	err := validateImmutableFields(context.Background(), wh)
 	assert.NoError(t, err)
 }
 
@@ -880,7 +877,7 @@ func TestValidateImmutableFields_TypeChanged_IsAllowed(t *testing.T) {
 	wh.Spec.WarehouseType = &whType
 	wh.Status.ShowOutput = &snowplanev1alpha1.WarehouseShowOutput{Type: "STANDARD"}
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), wh)
+	err := validateImmutableFields(context.Background(), wh)
 	assert.NoError(t, err, "warehouseType is now mutable; changing it should not be an error")
 }
 
@@ -893,7 +890,7 @@ func TestValidateImmutableFields_TypeUnchanged(t *testing.T) {
 	wh.Spec.WarehouseType = &whType
 	wh.Status.ShowOutput = &snowplanev1alpha1.WarehouseShowOutput{Type: "STANDARD"}
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), wh)
+	err := validateImmutableFields(context.Background(), wh)
 	assert.NoError(t, err)
 }
 
@@ -904,7 +901,7 @@ func TestValidateImmutableFields_NoShowOutput(t *testing.T) {
 	wh.Status.ObservedGeneration = 1
 	wh.Status.ShowOutput = nil
 
-	err := (&adapter{}).ValidateImmutableFields(context.Background(), wh)
+	err := validateImmutableFields(context.Background(), wh)
 	assert.NoError(t, err)
 }
 
@@ -1104,18 +1101,13 @@ func TestReconcile_UseRole_PassedToServiceFactory(t *testing.T) {
 
 	rec := record.NewFakeRecorder(100)
 
-	r := &reconciler.GenericReconciler[*snowplanev1alpha1.Warehouse, Service, *snowflake.WarehouseObservation]{
-		Client:   c,
-		Factory:  clientfactory.NewClientFactory(),
-		Recorder: rec,
-		Adapter: &adapter{
-			newService: func(_ context.Context, _ clientfactory.SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-				capturedUseRole = useRole
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, testutil.NewTestClientFactory(), rec, nil,
+		func(_ context.Context, _ clientfactory.SnowflakeClient, useRole string) (Service, func(context.Context), error) {
+			capturedUseRole = useRole
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("Warehouse"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("Warehouse")
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mywh", "default"))
 	require.NoError(t, err)

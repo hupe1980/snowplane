@@ -61,7 +61,7 @@ type APIAuthenticationIntegrationWithJWTBearerStatus struct {
 
 	// Output from SHOW SECURITY INTEGRATIONS.
 	// +optional
-	ShowOutput *APIAuthenticationIntegrationShowOutput `json:"showOutput,omitempty"`
+	ShowOutput *SecurityIntegrationShowOutput `json:"showOutput,omitempty"`
 
 	// Output from DESCRIBE INTEGRATION.
 	// +optional

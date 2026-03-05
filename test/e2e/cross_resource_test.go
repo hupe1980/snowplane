@@ -102,15 +102,15 @@ func TestCrossResource_FullStack(t *testing.T) {
 	waitForReady(t, gvrAccountRole, roleName)
 
 	grantName := roleName + "-usage"
-	grantCR := newAccountRoleGrantCR(grantName, "USAGE", roleSFName, map[string]interface{}{
+	grantCR := newGrantPrivilegesToAccountRoleCR(grantName, "USAGE", roleSFName, map[string]interface{}{
 		"accountObject": map[string]interface{}{
 			"objectType": "DATABASE",
 			"objectName": dbSFName,
 		},
 	})
-	grantCleanup := createCR(t, gvrAccountRoleGrant, grantCR)
+	grantCleanup := createCR(t, gvrGrantPrivilegesToAccountRole, grantCR)
 	defer grantCleanup()
-	waitForReady(t, gvrAccountRoleGrant, grantName)
+	waitForReady(t, gvrGrantPrivilegesToAccountRole, grantName)
 
 	// Verify all exist
 	require.True(t, sfExists(t, "DATABASES", dbSFName))
@@ -121,8 +121,8 @@ func TestCrossResource_FullStack(t *testing.T) {
 	require.True(t, sfGrantExists(t, roleSFName, "USAGE", "DATABASE", dbSFName))
 
 	// Delete in reverse dependency order
-	deleteCR(t, gvrAccountRoleGrant, grantName)
-	waitForCRDeleted(t, gvrAccountRoleGrant, grantName)
+	deleteCR(t, gvrGrantPrivilegesToAccountRole, grantName)
+	waitForCRDeleted(t, gvrGrantPrivilegesToAccountRole, grantName)
 	deleteCR(t, gvrAccountRole, roleName)
 	waitForCRDeleted(t, gvrAccountRole, roleName)
 	deleteCR(t, gvrTask, taskName)

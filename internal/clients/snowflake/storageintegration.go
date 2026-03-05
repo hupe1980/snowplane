@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,20 +17,10 @@ type StorageIntegrationObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW INTEGRATIONS row.
-	ShowOutput *StorageIntegrationShowOutput
+	ShowOutput *v1alpha1.StorageIntegrationShowOutput
 
 	// DescribeOutput contains the DESCRIBE INTEGRATION output (key-value pairs).
 	DescribeOutput map[string]string
-}
-
-// StorageIntegrationShowOutput contains the fields from SHOW STORAGE INTEGRATIONS.
-type StorageIntegrationShowOutput struct {
-	CreatedOn string
-	Name      string
-	Type      string
-	Category  string
-	Enabled   bool
-	Comment   string
 }
 
 // CreateStorageIntegrationOptions holds the parameters for creating a storage integration.
@@ -260,7 +251,7 @@ func buildShowStorageIntegrationByIDSQL(name AccountObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW STORAGE INTEGRATIONS for a specific integration.
-func (si *StorageIntegrationClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*StorageIntegrationShowOutput, error) {
+func (si *StorageIntegrationClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*v1alpha1.StorageIntegrationShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("storage integration name is required"))
 	}
@@ -320,9 +311,9 @@ func (si *StorageIntegrationClient) Observe(ctx context.Context, name AccountObj
 }
 
 // scanStorageIntegrationShowOutput scans SHOW STORAGE INTEGRATIONS results.
-func scanStorageIntegrationShowOutput(rows *sql.Rows, name string) (*StorageIntegrationShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*StorageIntegrationShowOutput, error) {
-		return &StorageIntegrationShowOutput{
+func scanStorageIntegrationShowOutput(rows *sql.Rows, name string) (*v1alpha1.StorageIntegrationShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.StorageIntegrationShowOutput, error) {
+		return &v1alpha1.StorageIntegrationShowOutput{
 			CreatedOn: m["created_on"],
 			Name:      m["name"],
 			Type:      m["type"],

@@ -1,0 +1,16 @@
+# SQLStatement with minimal configuration.
+# Executes a single SQL statement (not observable, not revertible).
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: SQLStatement
+metadata:
+  name: create-audit-table
+  namespace: snowplane-system
+spec:
+  providerRef:
+    name: default
+  execute: |
+    CREATE TABLE IF NOT EXISTS MY_DB.PUBLIC.AUDIT_LOG (
+      id INT AUTOINCREMENT,
+      event_type STRING,
+      event_time TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP()
+    )

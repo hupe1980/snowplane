@@ -54,7 +54,7 @@ func newTestSchema(name, sfName, dbRefName string) *snowplanev1alpha1.Schema {
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        sfName,
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: dbRefName},
 		},
 	}
 }
@@ -71,8 +71,8 @@ func newTestTable(name, sfName, dbRefName, schemaRefName string) *snowplanev1alp
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        sfName,
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
 			Columns: []snowplanev1alpha1.ColumnDefinition{
 				{Name: "ID", Type: "NUMBER(38,0)"},
 				{Name: "NAME", Type: "VARCHAR(256)"},
@@ -93,8 +93,8 @@ func newTestView(name, sfName, dbRefName, schemaRefName string) *snowplanev1alph
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        sfName,
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
 			Statement:   "SELECT 1",
 		},
 	}
@@ -112,8 +112,8 @@ func newTestStage(name, sfName, dbRefName, schemaRefName string) *snowplanev1alp
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        sfName,
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
-			SchemaRef:   &snowplanev1alpha1.LocalObjectReference{Name: schemaRefName},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
 		},
 	}
 }
@@ -178,19 +178,19 @@ func newTestDatabaseRole(name, sfName, dbRefName string) *snowplanev1alpha1.Data
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:        sfName,
-			DatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: dbRefName},
+			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: dbRefName},
 		},
 	}
 }
 
-// newTestGrant creates an AccountRoleGrant CR for a database-level privilege.
-func newTestGrant(name, privilege, objectType, objectName, toRole string) *snowplanev1alpha1.AccountRoleGrant {
-	return &snowplanev1alpha1.AccountRoleGrant{
+// newTestGrant creates an GrantPrivilegesToAccountRole CR for a database-level privilege.
+func newTestGrant(name, privilege, objectType, objectName, toRole string) *snowplanev1alpha1.GrantPrivilegesToAccountRole {
+	return &snowplanev1alpha1.GrantPrivilegesToAccountRole{
 		ObjectMeta: ctrl.ObjectMeta{
 			Name:      name,
 			Namespace: testNamespace,
 		},
-		Spec: snowplanev1alpha1.AccountRoleGrantSpec{
+		Spec: snowplanev1alpha1.GrantPrivilegesToAccountRoleSpec{
 			CommonSpec: snowplanev1alpha1.CommonSpec{
 				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
@@ -214,7 +214,7 @@ func newTestGrant(name, privilege, objectType, objectName, toRole string) *snowp
 func databaseObservation(name, comment, owner string) *snowflake.DatabaseObservation {
 	return &snowflake.DatabaseObservation{
 		Exists: true,
-		ShowOutput: &snowflake.DatabaseShowOutput{
+		ShowOutput: &snowplanev1alpha1.DatabaseShowOutput{
 			CreatedOn:     "2024-01-01",
 			Name:          name,
 			Kind:          "STANDARD",
@@ -239,7 +239,7 @@ func databaseObservation(name, comment, owner string) *snowflake.DatabaseObserva
 func schemaObservation(name, dbName, comment, owner string) *snowflake.SchemaObservation {
 	return &snowflake.SchemaObservation{
 		Exists: true,
-		ShowOutput: &snowflake.SchemaShowOutput{
+		ShowOutput: &snowplanev1alpha1.SchemaShowOutput{
 			CreatedOn:     "2024-01-01",
 			Name:          name,
 			DatabaseName:  dbName,
@@ -265,7 +265,7 @@ func schemaObservation(name, dbName, comment, owner string) *snowflake.SchemaObs
 func tableObservation(name, dbName, schemaName, comment, owner string) *snowflake.TableObservation {
 	return &snowflake.TableObservation{
 		Exists: true,
-		ShowOutput: &snowflake.TableShowOutput{
+		ShowOutput: &snowplanev1alpha1.TableShowOutput{
 			CreatedOn:             "2024-01-01",
 			Name:                  name,
 			DatabaseName:          dbName,
@@ -284,7 +284,7 @@ func tableObservation(name, dbName, schemaName, comment, owner string) *snowflak
 func viewObservation(name, dbName, schemaName, comment, owner, statement string, secure bool) *snowflake.ViewObservation {
 	return &snowflake.ViewObservation{
 		Exists: true,
-		ShowOutput: &snowflake.ViewShowOutput{
+		ShowOutput: &snowplanev1alpha1.ViewShowOutput{
 			CreatedOn:      "2024-01-01",
 			Name:           name,
 			DatabaseName:   dbName,
@@ -302,7 +302,7 @@ func viewObservation(name, dbName, schemaName, comment, owner, statement string,
 func stageObservation(name, dbName, schemaName, comment, owner, stageType string) *snowflake.StageObservation {
 	return &snowflake.StageObservation{
 		Exists: true,
-		ShowOutput: &snowflake.StageShowOutput{
+		ShowOutput: &snowplanev1alpha1.StageShowOutput{
 			CreatedOn:        "2024-01-01",
 			Name:             name,
 			DatabaseName:     dbName,
@@ -320,7 +320,7 @@ func stageObservation(name, dbName, schemaName, comment, owner, stageType string
 func warehouseObservation(name, comment, owner string) *snowflake.WarehouseObservation {
 	return &snowflake.WarehouseObservation{
 		Exists: true,
-		ShowOutput: &snowflake.WarehouseShowOutput{
+		ShowOutput: &snowplanev1alpha1.WarehouseShowOutput{
 			CreatedOn:       "2024-01-01",
 			Name:            name,
 			State:           "STARTED",
@@ -348,7 +348,7 @@ func warehouseObservation(name, comment, owner string) *snowflake.WarehouseObser
 func userObservation(name, comment, owner string) *snowflake.UserObservation {
 	return &snowflake.UserObservation{
 		Exists: true,
-		ShowOutput: &snowflake.UserShowOutput{
+		ShowOutput: &snowplanev1alpha1.UserShowOutput{
 			CreatedOn:   "2024-01-01",
 			Name:        name,
 			LoginName:   name,
@@ -366,7 +366,7 @@ func userObservation(name, comment, owner string) *snowflake.UserObservation {
 func accountRoleObservation(name, comment, owner string) *snowflake.AccountRoleObservation {
 	return &snowflake.AccountRoleObservation{
 		Exists: true,
-		ShowOutput: &snowflake.AccountRoleShowOutput{
+		ShowOutput: &snowplanev1alpha1.AccountRoleShowOutput{
 			CreatedOn: "2024-01-01",
 			Name:      name,
 			Comment:   comment,
@@ -379,7 +379,7 @@ func accountRoleObservation(name, comment, owner string) *snowflake.AccountRoleO
 func databaseRoleObservation(name, dbName, comment, owner string) *snowflake.DatabaseRoleObservation {
 	return &snowflake.DatabaseRoleObservation{
 		Exists: true,
-		ShowOutput: &snowflake.DatabaseRoleShowOutput{
+		ShowOutput: &snowplanev1alpha1.DatabaseRoleShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         name,
 			DatabaseName: dbName,
@@ -393,7 +393,7 @@ func databaseRoleObservation(name, dbName, comment, owner string) *snowflake.Dat
 func grantObservation(privilege, grantedOn, objectName, grantedTo, granteeName string, grantOption bool) *snowflake.GrantObservation {
 	return &snowflake.GrantObservation{
 		Exists: true,
-		ShowOutput: &snowflake.GrantShowOutput{
+		ShowOutput: &snowplanev1alpha1.GrantShowOutput{
 			CreatedOn:   "2024-01-01",
 			Privilege:   privilege,
 			GrantedOn:   grantedOn,

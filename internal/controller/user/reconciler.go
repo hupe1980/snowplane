@@ -42,14 +42,11 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 
 // NewReconciler returns a new User reconciler backed by the generic framework.
 func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.User, Service, *snowflake.UserObservation] {
-	a := &adapter{client: c, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.User, Service, *snowflake.UserObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewUserClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
@@ -62,24 +59,133 @@ func NewReconcilerWithServiceFactory(
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.User, Service, *snowflake.UserObservation] {
-	a := &adapter{client: c, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.User, Service, *snowflake.UserObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, sf))
+}
+
+// newAdapter creates the BaseAdapter for User resources.
+func newAdapter(c client.Client, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.User, Service, *snowflake.UserObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.User, Service, *snowflake.UserObservation]{
+		ResourceNameVal:  "user",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.User { return &snowplanev1alpha1.User{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(obj *snowplanev1alpha1.User) (reconciler.Identifier, error) {
+			return snowflake.NewAccountObjectIdentifier(obj.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) (*snowflake.UserObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.UserObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.User, id snowflake.AccountObjectIdentifier) error {
+			opts, err := buildCreateOptions(ctx, c, obj, id)
+			if err != nil {
+				return err
+			}
+
+			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
+
+			if err := svc.Create(ctx, opts); err != nil {
+				return err
+			}
+
+			// Track secret hashes on status for change-detection on future reconciles.
+			uid := string(obj.UID)
+			if opts.Password != nil {
+				obj.Status.LastAppliedPasswordHash = hashSecret(*opts.Password, uid)
+			}
+
+			if opts.RSAPublicKey != nil {
+				obj.Status.LastAppliedRSAPublicKeyHash = hashSecret(*opts.RSAPublicKey, uid)
+			}
+
+			if opts.RSAPublicKey2 != nil {
+				obj.Status.LastAppliedRSAPublicKey2Hash = hashSecret(*opts.RSAPublicKey2, uid)
+			}
+
+			return nil
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterUserOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.AccountObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(ctx context.Context, obj *snowplanev1alpha1.User, id snowflake.AccountObjectIdentifier, obs *reconciler.Observation[*snowflake.UserObservation]) (reconciler.AlterOptions, error) {
+			opts, err := buildAlterOptions(ctx, c, obj, id, obs.Detail)
+			if err != nil {
+				return nil, err
+			}
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.User, obs *reconciler.Observation[*snowflake.UserObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.User, obs *reconciler.Observation[*snowflake.UserObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		SupportsCoA:      true,
+		LateInitializeFn: lateInitialize,
+		PostUpdateFn:     postUpdate,
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory used by NewReconciler.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+// validateImmutableFields checks that immutable fields have not changed.
+func validateImmutableFields(_ context.Context, user *snowplanev1alpha1.User) error {
+	if reconciler.ShouldSkipImmutableValidation(user) {
+		return nil
 	}
 
-	return snowflake.NewUserClient(sfC), cleanup, nil
+	if user.Status.ShowOutput != nil {
+		if user.Status.ShowOutput.Name != "" && !strings.EqualFold(user.Spec.Name, user.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", user.Status.ShowOutput.Name, user.Spec.Name)
+		}
+
+		if user.Status.ShowOutput.Type != "" && user.Spec.Type != nil {
+			if !strings.EqualFold(string(*user.Spec.Type), user.Status.ShowOutput.Type) {
+				return fmt.Errorf("spec.type is immutable after creation (current: %q, desired: %q)", user.Status.ShowOutput.Type, string(*user.Spec.Type))
+			}
+		}
+
+	}
+
+	return nil
+}
+
+// postUpdate runs after a successful update to track secret hashes.
+func postUpdate(user *snowplanev1alpha1.User, altered bool, alterOpts reconciler.AlterOptions) {
+	uid := string(user.UID)
+
+	if altered {
+		if opts, ok := alterOpts.(*snowflake.AlterUserOptions); ok {
+			if opts.Password != nil {
+				user.Status.LastAppliedPasswordHash = hashSecret(*opts.Password, uid)
+			}
+
+			if opts.RSAPublicKey != nil {
+				user.Status.LastAppliedRSAPublicKeyHash = hashSecret(*opts.RSAPublicKey, uid)
+			}
+
+			if opts.RSAPublicKey2 != nil {
+				user.Status.LastAppliedRSAPublicKey2Hash = hashSecret(*opts.RSAPublicKey2, uid)
+			}
+		}
+	}
+
+	// Clear hashes when secret refs are removed from spec.
+	if user.Spec.Password == nil {
+		user.Status.LastAppliedPasswordHash = ""
+	}
+
+	if user.Spec.RSAPublicKey == nil {
+		user.Status.LastAppliedRSAPublicKeyHash = ""
+	}
+
+	if user.Spec.RSAPublicKey2 == nil {
+		user.Status.LastAppliedRSAPublicKey2Hash = ""
+	}
 }
 
 // resolveSecretValue reads a secret key reference and returns the plaintext value.
@@ -288,30 +394,7 @@ func applyObservation(user *snowplanev1alpha1.User, obs *snowflake.UserObservati
 	if obs.ShowOutput != nil {
 		user.Status.FullyQualifiedName = snowflake.NewAccountObjectIdentifier(obs.ShowOutput.Name).FullyQualifiedName()
 
-		user.Status.ShowOutput = &snowplanev1alpha1.UserShowOutput{
-			CreatedOn:             obs.ShowOutput.CreatedOn,
-			Name:                  obs.ShowOutput.Name,
-			LoginName:             obs.ShowOutput.LoginName,
-			DisplayName:           obs.ShowOutput.DisplayName,
-			Email:                 obs.ShowOutput.Email,
-			FirstName:             obs.ShowOutput.FirstName,
-			LastName:              obs.ShowOutput.LastName,
-			MiddleName:            obs.ShowOutput.MiddleName,
-			Comment:               obs.ShowOutput.Comment,
-			DefaultRole:           obs.ShowOutput.DefaultRole,
-			DefaultSecondaryRoles: obs.ShowOutput.DefaultSecondaryRoles,
-			DefaultWarehouse:      obs.ShowOutput.DefaultWarehouse,
-			DefaultNamespace:      obs.ShowOutput.DefaultNamespace,
-			Owner:                 obs.ShowOutput.Owner,
-			Disabled:              obs.ShowOutput.Disabled,
-			MustChangePassword:    obs.ShowOutput.MustChangePassword,
-			HasRSAPublicKey:       obs.ShowOutput.HasRSAPublicKey,
-			Type:                  obs.ShowOutput.Type,
-			DaysToExpiry:          obs.ShowOutput.DaysToExpiry,
-			MinsToUnlock:          obs.ShowOutput.MinsToUnlock,
-			MinsToBypassMFA:       obs.ShowOutput.MinsToBypassMFA,
-			DisableMFA:            obs.ShowOutput.DisableMFA,
-		}
+		user.Status.ShowOutput = obs.ShowOutput
 	}
 
 	if obs.DescribeOutput != nil {

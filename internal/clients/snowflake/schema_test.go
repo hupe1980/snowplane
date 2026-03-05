@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 )
 
 const testInvalidEnum = "INVALID"
@@ -319,22 +321,22 @@ func TestAlterSchemaOptions_Validate_MaxDataExtension(t *testing.T) {
 func TestIsManagedAccess_True(t *testing.T) {
 	t.Parallel()
 
-	o := SchemaShowOutput{Options: "MANAGED ACCESS"}
-	assert.True(t, o.IsManagedAccess())
+	o := v1alpha1.SchemaShowOutput{Options: "MANAGED ACCESS"}
+	assert.True(t, IsManagedAccess(&o))
 }
 
 func TestIsManagedAccess_False(t *testing.T) {
 	t.Parallel()
 
-	o := SchemaShowOutput{Options: ""}
-	assert.False(t, o.IsManagedAccess())
+	o := v1alpha1.SchemaShowOutput{Options: ""}
+	assert.False(t, IsManagedAccess(&o))
 }
 
 func TestIsManagedAccess_Substring(t *testing.T) {
 	t.Parallel()
 
-	o := SchemaShowOutput{Options: "TRANSIENT, MANAGED ACCESS"}
-	assert.True(t, o.IsManagedAccess())
+	o := v1alpha1.SchemaShowOutput{Options: "TRANSIENT, MANAGED ACCESS"}
+	assert.True(t, IsManagedAccess(&o))
 }
 
 // --------------------------------------------------------------------------

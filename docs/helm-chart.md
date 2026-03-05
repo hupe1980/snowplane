@@ -111,6 +111,10 @@ helm upgrade snowplane charts/snowplane/ \
 
 ### Deployment
 
+The Deployment uses an automatic rollout strategy:
+- **Single replica** (`replicaCount: 1`): `Recreate` strategy — avoids two pods competing for the leader lease during upgrades.
+- **Multiple replicas** (`replicaCount: 2+`): `RollingUpdate` with `maxSurge: 0` — prevents exceeding the intended replica count.
+
 | Parameter | Default | Description |
 |:----------|:--------|:------------|
 | `revisionHistoryLimit` | `3` | Number of old ReplicaSets to retain |
@@ -124,6 +128,23 @@ helm upgrade snowplane charts/snowplane/ \
 | `affinity` | `{}` | Pod affinity rules |
 | `topologySpreadConstraints` | `[]` | Topology spread constraints |
 | `priorityClassName` | `""` | PriorityClass name |
+
+### Webhook
+
+| Parameter | Default | Description |
+|:----------|:--------|:------------|
+| `webhook.enabled` | `false` | Enable the validating admission webhook for ownership conflict detection |
+| `webhook.failurePolicy` | `Ignore` | Webhook failure policy (`Ignore` or `Fail`) |
+| `webhook.timeoutSeconds` | `10` | Webhook request timeout |
+| `webhook.port` | `9443` | Webhook server listen port |
+| `webhook.certDir` | `/tmp/k8s-webhook-server/serving-certs` | TLS certificate directory |
+| `webhook.namespaceSelector` | `{}` | Limit webhook to matching namespaces |
+| `webhook.certManager.enabled` | `true` | Use cert-manager for automatic TLS certificates |
+| `webhook.certManager.issuerRef` | `{}` | Custom cert-manager issuer reference (empty = self-signed) |
+| `webhook.caBundle` | `""` | Manual CA bundle (only when `certManager.enabled: false`) |
+
+{: .note }
+> The webhook requires TLS certificates. When `certManager.enabled: true` (default), a self-signed Issuer and Certificate are created automatically. If you use a different certificate solution, disable cert-manager and provide `caBundle` manually.
 
 ### Extensibility
 
@@ -176,6 +197,9 @@ helm upgrade snowplane charts/snowplane/ \
 | `pdb.yaml` | PodDisruptionBudget (optional) |
 | `networkpolicy.yaml` | NetworkPolicy restricting traffic (optional) |
 | `grafana-dashboard.yaml` | Grafana dashboard ConfigMap for sidecar provisioning (optional) |
+| `webhook-validating.yaml` | ValidatingWebhookConfiguration for ownership conflict detection (optional) |
+| `webhook-service.yaml` | Service routing to the webhook endpoint (optional) |
+| `webhook-certificate.yaml` | cert-manager Issuer and Certificate for webhook TLS (optional) |
 
 ---
 

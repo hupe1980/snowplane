@@ -28,7 +28,7 @@ type SecretWithGenericStringSpec struct {
 	// Reference to a Database CR in the same namespace.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.databaseRef is immutable"
-	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
+	DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
 	// Snowflake database identifier (e.g. 'ANALYTICS').
 	// +optional
@@ -40,7 +40,7 @@ type SecretWithGenericStringSpec struct {
 	// Reference to a Schema CR in the same namespace.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.schemaRef is immutable"
-	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
+	SchemaRef *ObjectReference `json:"schemaRef,omitempty"`
 
 	// Snowflake schema identifier (e.g. 'PUBLIC').
 	// +optional

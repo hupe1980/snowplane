@@ -20,8 +20,13 @@ A deep dive into Snowplane's controller architecture — the generic reconciler,
 ┌─────────────────────────────────────────────────────────────┐
 │                  Controller Manager                         │
 │                                                             │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │  Validating Admission Webhook (optional)           │     │
+│  │  OwnershipValidator — deny duplicate FQN mappings  │     │
+│  └────────────────────────────────────────────────────┘     │
+│                                                             │
 │  ┌───────────┐ ┌───────────┐ ┌───────────┐                │
-│  │ Database   │ │ Warehouse │ │ Schema    │  ... (31 CRDs) │
+│  │ Database   │ │ Warehouse │ │ Schema    │  ... (65 CRDs) │
 │  │ Controller │ │ Controller│ │ Controller│                │
 │  └─────┬─────┘ └─────┬─────┘ └─────┬─────┘                │
 │        │              │              │                      │
@@ -88,6 +93,11 @@ The reconciler follows an **Observe → Classify → Act** loop:
                    └──────────┬──────────┘
                               │
                    ┌──────────▼──────────┐
+                   │  Pre-flight Checks  │
+                   │  (DB/Schema exist?) │
+                   └──────────┬──────────┘
+                              │
+                   ┌──────────▼──────────┐
                    │     OBSERVE         │
                    │  (SHOW + DESCRIBE)  │
                    └──────────┬──────────┘
@@ -124,6 +134,20 @@ After observing, the reconciler classifies the situation:
 | Exists, `ObservedGeneration == 0`, **creation-initiated annotation** present | `reconcilePostCrashCreate()` |
 | Exists, `ObservedGeneration == 0`, no creation-initiated annotation | `reconcileAdoptOrReject()` |
 | Exists, `ObservedGeneration > 0` | `reconcileUpdate()` |
+
+---
+
+## Pre-flight Checks
+
+After provider resolution and before OBSERVE, the reconciler runs automatic pre-flight validation for all 38 database/schema-scoped resource types. This prevents opaque Snowflake SQL errors when prerequisite resources don't exist.
+
+**Two-phase architecture:**
+
+1. **Automatic phase** — The reconciler detects whether the resource implements `ScopedResource` (all 38 scoped types do via generated accessors). When `databaseName`/`schemaName` raw strings are used (not CR references), it issues `SHOW DATABASES LIKE`/`SHOW SCHEMAS LIKE` queries to verify existence. When `databaseRef`/`schemaRef` are used, existence was already validated during reference resolution in PreReconcile.
+
+2. **Adapter-specific phase** — If the adapter implements `PreFlightChecker`, its custom check runs after the automatic checks (reserved for non-standard requirements).
+
+**Error discrimination:** The pre-flight distinguishes between definitive "not found" responses (`ErrObjectNotFound` from empty `SHOW` results) and non-definitive errors (connection timeouts, auth failures). Only definitive "not found" produces a hard failure with `DependencyNotReady`. Non-definitive errors are logged and skipped — the subsequent service creation surfaces connectivity issues with proper error handling.
 
 ---
 
@@ -216,36 +240,40 @@ Without the annotation, the controller would apply the adoption policy and poten
 
 ## Adapter Pattern
 
-Each resource implements the `ResourceAdapter[T, S, D]` interface with 14 required methods:
+Each resource defines a `newAdapter()` function that returns a `*reconciler.BaseAdapter[T, S, D]` — a closure-based implementation of the `ResourceAdapter[T, S, D]` interface. Instead of defining a per-resource struct with 14+ methods, resource-specific behavior is injected via function fields on `BaseAdapter`:
 
-| Method | Purpose |
-|:-------|:--------|
-| `ResourceName()` | Human-readable name for logs and events |
-| `FinalizerName()` | Finalizer string for deletion protection |
-| `NewObject()` | Factory for empty CRD instances |
-| `ServiceFromClient()` | Create the Snowflake CRUD service |
-| `BuildIdentifier()` | Construct the fully qualified Snowflake identifier |
-| `Observe()` | Execute SHOW query, return observation |
-| `Create()` | Execute CREATE statement |
-| `Alter()` | Execute ALTER statement |
-| `Drop()` | Execute DROP statement |
-| `ValidateImmutableFields()` | Check for forbidden field changes |
-| `BuildAlterOptions()` | Compute diff between spec and observed |
-| `ApplyObservation()` | Write observed state to CRD status |
-| `ComputeTrackedParameters()` | Return list of actively managed parameters |
-| `DetectDrift()` | Field-level drift comparison |
+| BaseAdapter Field | Purpose |
+|:------------------|:--------|
+| `ResourceNameVal` | Human-readable name for logs and events |
+| `FinalizerNameVal` | Finalizer string for deletion protection |
+| `NewObjectFn` | Factory for empty CRD instances |
+| `ServiceFactoryFn` | Create the Snowflake CRUD service |
+| `BuildIdentifierFn` | Construct the fully qualified Snowflake identifier |
+| `ObserveFn` | Execute SHOW query, return observation |
+| `CreateFn` | Execute CREATE statement |
+| `AlterFn` | Execute ALTER statement |
+| `DropFn` | Execute DROP statement |
+| `ValidateImmutableFn` | Check for forbidden field changes |
+| `BuildAlterOptsFn` | Compute diff between spec and observed |
+| `ApplyObservationFn` | Write observed state to CRD status |
+| `TrackedParamsFn` | Custom tracked params (default: reflection) |
+| `DetectDriftFn` | Field-level drift comparison |
 
-### Optional Interfaces
+Generic helper factories (`MakeObserve`, `MakeCreate`, `MakeAlter`, `MakeDrop`, `MakeBuildAlterOpts`) handle the repetitive `AssertIdentifier`/`AssertAlterOptions` boilerplate. `MakeServiceFactory` provides the standard `WithUseRole + newClient` pattern.
 
-Adapters can implement additional interfaces for extended behavior:
+### Optional Capabilities
 
-| Interface | Purpose |
-|:----------|:--------|
-| `PreReconciler[T]` | Pre-reconcile setup (e.g., Schema resolves databaseRef) |
-| `WatchConfigurer` | Extra watches (e.g., Schema watches Database) |
-| `PostCreateHook[T]` | Post-create logic (e.g., hash initial password) |
-| `PostUpdateHook[T]` | Post-update logic with access to alter options |
-| `CreateOrAlterSupporter` | Flag whether CREATE OR ALTER SQL is supported |
+`BaseAdapter` satisfies all optional interfaces with nil-safe defaults. Set the corresponding function field to opt in:
+
+| Field | Interface | Purpose |
+|:------|:----------|:--------|
+| `PreReconcileFn` | `PreReconciler[T]` | Pre-reconcile setup (e.g., Schema resolves databaseRef) |
+| `SetupWatchesFn` | `WatchConfigurer` | Extra watches (e.g., Schema watches Database) |
+| `PostCreateFn` | `PostCreateHook[T]` | Post-create logic (e.g., hash initial password) |
+| `PostUpdateFn` | `PostUpdateHook[T]` | Post-update logic with access to alter options |
+| `SupportsCoA` | `CreateOrAlterSupporter` | Flag whether CREATE OR ALTER SQL is supported |
+| `DropCascadeFn` | `CascadeDropper[T,S]` | Enable `DROP ... CASCADE` support |
+| `LateInitializeFn` | `LateInitializer[T,D]` | Fill unset spec fields from observed state |
 
 ---
 
@@ -261,10 +289,8 @@ type DatabaseSpec struct {
     Comment                 *string `json:"comment,omitempty"                 snowflake:"COMMENT"`
 }
 
-// Usage in adapter:
-func (a *Adapter) ComputeTrackedParameters(obj *v1alpha1.Database) []string {
-    return tracked.ComputeTracked(obj.Spec)
-}
+// BaseAdapter handles ComputeTrackedParameters automatically via reflection.
+// Override TrackedParamsFn only for custom behavior.
 ```
 
 **Tag modifiers:**
@@ -342,3 +368,89 @@ All status patches use **Server-Side Apply (SSA)** with field owner `snowplane-c
 | `lastAppliedSpecHash` | SHA-256 of the spec at last successful reconciliation |
 | `trackedParameters` | List of Snowflake parameters actively managed by the spec |
 | `showOutput` | Last observed Snowflake state (resource-specific) |
+
+---
+
+## Admission Webhook
+
+Snowplane includes an optional **validating admission webhook** that intercepts `CREATE` and `UPDATE` requests for all snowplane CRDs at admission time, preventing ownership conflicts before they reach the reconciler.
+
+### Why a Webhook?
+
+Without the webhook, ownership conflicts are only detected **after** the reconciler runs — the duplicate CR is created in the cluster and a `ConflictDetected` condition is set asynchronously. The webhook shifts detection **left**, rejecting the request synchronously at the API server level.
+
+### How It Works
+
+```
+  kubectl apply ─────► API Server ─────► Webhook
+                                          │
+                                    ┌─────▼──────┐
+                                    │ Compute FQN │
+                                    │ from spec   │
+                                    └─────┬──────┘
+                                          │
+                                    ┌─────▼──────────────┐
+                                    │ Hash FQN           │
+                                    │ (same algorithm as │
+                                    │  reconciler)       │
+                                    └─────┬──────────────┘
+                                          │
+                                    ┌─────▼──────────────┐
+                                    │ List CRs with      │
+                                    │ matching hash label │
+                                    └─────┬──────────────┘
+                                          │
+                               ┌──────────┼──────────┐
+                               │                     │
+                          No conflict           Conflict!
+                               │                     │
+                          ┌────▼────┐           ┌────▼────┐
+                          │ ALLOW   │           │  DENY   │
+                          └─────────┘           └─────────┘
+```
+
+**FQN computation from spec fields:**
+
+| Resource Level | Spec Fields | FQN Format |
+|:---------------|:------------|:-----------|
+| Account (Database, Warehouse, etc.) | `spec.name` | `"NAME"` |
+| Database (Schema, DatabaseRole) | `spec.databaseName` or `spec.databaseRef` + `spec.name` | `"DB"."NAME"` |
+| Schema (Table, View, etc.) | `spec.databaseName`/`databaseRef` + `spec.schemaName`/`schemaRef` + `spec.name` | `"DB"."SCHEMA"."NAME"` |
+
+When CR references (`databaseRef`, `schemaRef`) are used instead of inline names, the webhook resolves them by reading the referenced CR's `spec.name` from the API server.
+
+### Graceful Degradation
+
+The webhook is designed to **never block valid operations**:
+
+| Condition | Behavior |
+|:----------|:---------|
+| Referenced CR doesn't exist yet | Allow — reconciler validates later |
+| Label list API call fails | Allow — reconciler catches conflict |
+| FQN cannot be computed | Allow — insufficient data for a verdict |
+| Webhook pod is down | Allow — `failurePolicy: Ignore` (default) |
+
+This makes the webhook a **best-effort early check** — the reconciler remains the authoritative conflict detector.
+
+### Enabling
+
+The webhook is opt-in and requires [cert-manager](https://cert-manager.io/) for TLS certificate management:
+
+```yaml
+webhook:
+  enabled: true
+  failurePolicy: Ignore  # or Fail for strict enforcement
+  certManager:
+    enabled: true
+```
+
+See [Helm Chart]({% link helm-chart.md %}) for the full set of webhook configuration options.
+
+---
+
+## Further Reading
+
+- [Resource Dependencies & Ordering](/snowplane/resource-dependencies/) — Built-in readiness gating, FieldExport, kro, and GitOps ordering
+- [Drift Detection](/snowplane/drift-detection/) — Field-level drift detection and correction policies
+- [CRD Lifecycle](/snowplane/crd-lifecycle/) — Create, adopt, update, and delete lifecycle details
+- [Observability](/snowplane/observability/) — Metrics, events, and Grafana dashboard

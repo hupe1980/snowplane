@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // validCommonSpec returns a CommonSpec with the required providerRef.name
@@ -66,12 +67,12 @@ func TestDatabaseSpec_Validate_MultipleErrors(t *testing.T) {
 
 func TestSchemaSpec_Validate_Valid(t *testing.T) {
 	t.Parallel()
-	assert.NoError(t, (&SchemaSpec{CommonSpec: validCommonSpec(), Name: "S", DatabaseRef: &LocalObjectReference{Name: "db"}}).Validate())
+	assert.NoError(t, (&SchemaSpec{CommonSpec: validCommonSpec(), Name: "S", DatabaseRef: &ObjectReference{Name: "db"}}).Validate())
 }
 
 func TestSchemaSpec_Validate_EmptyName(t *testing.T) {
 	t.Parallel()
-	err := (&SchemaSpec{DatabaseRef: &LocalObjectReference{Name: "db"}}).Validate()
+	err := (&SchemaSpec{DatabaseRef: &ObjectReference{Name: "db"}}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.name is required")
 }
@@ -532,7 +533,7 @@ func TestDatabaseSpec_Validate_InvalidTraceLevel(t *testing.T) {
 
 func TestSchemaSpec_Validate_MaxDataExtensionOutOfRange(t *testing.T) {
 	t.Parallel()
-	err := (&SchemaSpec{Name: "S", DatabaseRef: &LocalObjectReference{Name: "db"}, MaxDataExtensionTimeInDays: ptr(int32(100))}).Validate()
+	err := (&SchemaSpec{Name: "S", DatabaseRef: &ObjectReference{Name: "db"}, MaxDataExtensionTimeInDays: ptr(int32(100))}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.maxDataExtensionTimeInDays must be between 0 and 90")
 }
@@ -540,7 +541,7 @@ func TestSchemaSpec_Validate_MaxDataExtensionOutOfRange(t *testing.T) {
 func TestSchemaSpec_Validate_InvalidStorageSerializationPolicy(t *testing.T) {
 	t.Parallel()
 	bad := StorageSerializationPolicy("CUSTOM")
-	err := (&SchemaSpec{Name: "S", DatabaseRef: &LocalObjectReference{Name: "db"}, StorageSerializationPolicy: &bad}).Validate()
+	err := (&SchemaSpec{Name: "S", DatabaseRef: &ObjectReference{Name: "db"}, StorageSerializationPolicy: &bad}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.storageSerializationPolicy must be one of")
 }
@@ -548,7 +549,7 @@ func TestSchemaSpec_Validate_InvalidStorageSerializationPolicy(t *testing.T) {
 func TestSchemaSpec_Validate_InvalidLogLevel(t *testing.T) {
 	t.Parallel()
 	bad := LogLevel("VERBOSE")
-	err := (&SchemaSpec{Name: "S", DatabaseRef: &LocalObjectReference{Name: "db"}, LogLevel: &bad}).Validate()
+	err := (&SchemaSpec{Name: "S", DatabaseRef: &ObjectReference{Name: "db"}, LogLevel: &bad}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.logLevel must be one of")
 }
@@ -556,7 +557,7 @@ func TestSchemaSpec_Validate_InvalidLogLevel(t *testing.T) {
 func TestSchemaSpec_Validate_InvalidMetricLevel(t *testing.T) {
 	t.Parallel()
 	bad := MetricLevel("PARTIAL")
-	err := (&SchemaSpec{Name: "S", DatabaseRef: &LocalObjectReference{Name: "db"}, MetricLevel: &bad}).Validate()
+	err := (&SchemaSpec{Name: "S", DatabaseRef: &ObjectReference{Name: "db"}, MetricLevel: &bad}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.metricLevel must be one of")
 }
@@ -564,7 +565,7 @@ func TestSchemaSpec_Validate_InvalidMetricLevel(t *testing.T) {
 func TestSchemaSpec_Validate_InvalidTraceLevel(t *testing.T) {
 	t.Parallel()
 	bad := TraceLevel("RARELY")
-	err := (&SchemaSpec{Name: "S", DatabaseRef: &LocalObjectReference{Name: "db"}, TraceLevel: &bad}).Validate()
+	err := (&SchemaSpec{Name: "S", DatabaseRef: &ObjectReference{Name: "db"}, TraceLevel: &bad}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.traceLevel must be one of")
 }
@@ -883,6 +884,19 @@ func TestIsNamespaceAllowed_EmptyList(t *testing.T) {
 	assert.True(t, spec.IsNamespaceAllowed("default"))
 }
 
+func TestIsNamespaceAllowed_EmptyListWithSelector(t *testing.T) {
+	t.Parallel()
+
+	// When a selector is set but static list is empty, IsNamespaceAllowed returns
+	// false — the resolver's isNamespacePermitted will evaluate the selector.
+	spec := &ProviderConfigSpec{
+		AllowedNamespaceSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{"team": "analytics"},
+		},
+	}
+	assert.False(t, spec.IsNamespaceAllowed("any-namespace"))
+}
+
 func TestIsNamespaceAllowed_Wildcard(t *testing.T) {
 	t.Parallel()
 
@@ -917,22 +931,104 @@ func TestIsNamespaceAllowed_SingleNamespace(t *testing.T) {
 	assert.False(t, spec.IsNamespaceAllowed("staging"))
 }
 
-// --- Dangerous Grant Validation ---
+// --- IsDatabaseAllowed ---
 
-func TestValidateDangerousAccountRoleGrant_SafeGrant(t *testing.T) {
+func TestIsDatabaseAllowed_EmptyList(t *testing.T) {
 	t.Parallel()
 
-	spec := &AccountRoleGrantSpec{
+	spec := &ProviderConfigSpec{}
+	assert.True(t, spec.IsDatabaseAllowed("ANY_DB"))
+}
+
+func TestIsDatabaseAllowed_Wildcard(t *testing.T) {
+	t.Parallel()
+
+	spec := &ProviderConfigSpec{AllowedDatabases: []string{"*"}}
+	assert.True(t, spec.IsDatabaseAllowed("ANY_DB"))
+}
+
+func TestIsDatabaseAllowed_SpecificDatabases(t *testing.T) {
+	t.Parallel()
+
+	spec := &ProviderConfigSpec{AllowedDatabases: []string{"ANALYTICS", "RAW"}}
+	assert.True(t, spec.IsDatabaseAllowed("ANALYTICS"))
+	assert.True(t, spec.IsDatabaseAllowed("analytics"))
+	assert.True(t, spec.IsDatabaseAllowed("RAW"))
+	assert.False(t, spec.IsDatabaseAllowed("PRODUCTION"))
+}
+
+func TestIsDatabaseAllowed_CaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	spec := &ProviderConfigSpec{AllowedDatabases: []string{"Analytics"}}
+	assert.True(t, spec.IsDatabaseAllowed("ANALYTICS"))
+	assert.True(t, spec.IsDatabaseAllowed("analytics"))
+	assert.True(t, spec.IsDatabaseAllowed("Analytics"))
+	assert.False(t, spec.IsDatabaseAllowed("Other"))
+}
+
+// --- IsSchemaAllowed ---
+
+func TestIsSchemaAllowed_EmptyList(t *testing.T) {
+	t.Parallel()
+
+	spec := &ProviderConfigSpec{}
+	assert.True(t, spec.IsSchemaAllowed("DB", "ANY_SCHEMA"))
+}
+
+func TestIsSchemaAllowed_Wildcard(t *testing.T) {
+	t.Parallel()
+
+	spec := &ProviderConfigSpec{AllowedSchemas: []string{"*"}}
+	assert.True(t, spec.IsSchemaAllowed("DB", "ANY_SCHEMA"))
+}
+
+func TestIsSchemaAllowed_FullyQualified(t *testing.T) {
+	t.Parallel()
+
+	spec := &ProviderConfigSpec{AllowedSchemas: []string{"ANALYTICS.PUBLIC", "RAW.STAGING"}}
+	assert.True(t, spec.IsSchemaAllowed("ANALYTICS", "PUBLIC"))
+	assert.True(t, spec.IsSchemaAllowed("analytics", "public"))
+	assert.True(t, spec.IsSchemaAllowed("RAW", "STAGING"))
+	assert.False(t, spec.IsSchemaAllowed("ANALYTICS", "STAGING"))
+	assert.False(t, spec.IsSchemaAllowed("OTHER", "PUBLIC"))
+}
+
+func TestIsSchemaAllowed_SchemaNameOnly(t *testing.T) {
+	t.Parallel()
+
+	spec := &ProviderConfigSpec{AllowedSchemas: []string{"PUBLIC"}}
+	assert.True(t, spec.IsSchemaAllowed("ANALYTICS", "PUBLIC"))
+	assert.True(t, spec.IsSchemaAllowed("RAW", "PUBLIC"))
+	assert.True(t, spec.IsSchemaAllowed("DB", "public"))
+	assert.False(t, spec.IsSchemaAllowed("DB", "STAGING"))
+}
+
+func TestIsSchemaAllowed_MixedEntries(t *testing.T) {
+	t.Parallel()
+
+	spec := &ProviderConfigSpec{AllowedSchemas: []string{"ANALYTICS.PUBLIC", "STAGING"}}
+	assert.True(t, spec.IsSchemaAllowed("ANALYTICS", "PUBLIC"))
+	assert.True(t, spec.IsSchemaAllowed("ANY_DB", "STAGING"))
+	assert.False(t, spec.IsSchemaAllowed("RAW", "PUBLIC"))
+}
+
+// --- Dangerous Grant Validation ---
+
+func TestValidateDangerousGrantPrivilegesToAccountRole_SafeGrant(t *testing.T) {
+	t.Parallel()
+
+	spec := &GrantPrivilegesToAccountRoleSpec{
 		Privilege:   "USAGE",
 		On:          GrantOn{Account: true},
 		AccountRole: ptr("DATA_READER"),
 	}
 
-	err := ValidateDangerousAccountRoleGrant(spec)
+	err := ValidateDangerousGrantPrivilegesToAccountRole(spec)
 	assert.NoError(t, err)
 }
 
-func TestValidateDangerousAccountRoleGrant_DangerousSystemRoles(t *testing.T) {
+func TestValidateDangerousGrantPrivilegesToAccountRole_DangerousSystemRoles(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -950,13 +1046,13 @@ func TestValidateDangerousAccountRoleGrant_DangerousSystemRoles(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec := &AccountRoleGrantSpec{
+			spec := &GrantPrivilegesToAccountRoleSpec{
 				Privilege:   "USAGE",
 				On:          GrantOn{Account: true},
 				AccountRole: ptr(tt.role),
 			}
 
-			err := ValidateDangerousAccountRoleGrant(spec)
+			err := ValidateDangerousGrantPrivilegesToAccountRole(spec)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "dangerous and blocked by default")
 			assert.Contains(t, err.Error(), AnnotationAllowDangerousGrant)
@@ -964,7 +1060,7 @@ func TestValidateDangerousAccountRoleGrant_DangerousSystemRoles(t *testing.T) {
 	}
 }
 
-func TestValidateDangerousAccountRoleGrant_DangerousPrivilegesOnAccount(t *testing.T) {
+func TestValidateDangerousGrantPrivilegesToAccountRole_DangerousPrivilegesOnAccount(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -980,24 +1076,24 @@ func TestValidateDangerousAccountRoleGrant_DangerousPrivilegesOnAccount(t *testi
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec := &AccountRoleGrantSpec{
+			spec := &GrantPrivilegesToAccountRoleSpec{
 				Privilege:   tt.privilege,
 				On:          GrantOn{Account: true},
 				AccountRole: ptr("CUSTOM_ROLE"),
 			}
 
-			err := ValidateDangerousAccountRoleGrant(spec)
+			err := ValidateDangerousGrantPrivilegesToAccountRole(spec)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "dangerous and blocked by default")
 		})
 	}
 }
 
-func TestValidateDangerousAccountRoleGrant_DangerousPrivilegeNotOnAccount(t *testing.T) {
+func TestValidateDangerousGrantPrivilegesToAccountRole_DangerousPrivilegeNotOnAccount(t *testing.T) {
 	t.Parallel()
 
 	// OWNERSHIP on a specific object is normal — only blocked on ACCOUNT.
-	spec := &AccountRoleGrantSpec{
+	spec := &GrantPrivilegesToAccountRoleSpec{
 		Privilege: "OWNERSHIP",
 		On: GrantOn{AccountObject: &GrantOnAccountObject{
 			ObjectType: "DATABASE",
@@ -1006,37 +1102,37 @@ func TestValidateDangerousAccountRoleGrant_DangerousPrivilegeNotOnAccount(t *tes
 		AccountRole: ptr("DBA_ROLE"),
 	}
 
-	err := ValidateDangerousAccountRoleGrant(spec)
+	err := ValidateDangerousGrantPrivilegesToAccountRole(spec)
 	assert.NoError(t, err)
 }
 
-func TestValidateDangerousAccountRoleGrant_BothDangerousPrivAndTarget(t *testing.T) {
+func TestValidateDangerousGrantPrivilegesToAccountRole_BothDangerousPrivAndTarget(t *testing.T) {
 	t.Parallel()
 
-	spec := &AccountRoleGrantSpec{
+	spec := &GrantPrivilegesToAccountRoleSpec{
 		Privilege:   "MANAGE GRANTS",
 		On:          GrantOn{Account: true},
 		AccountRole: ptr("ACCOUNTADMIN"),
 	}
 
-	err := ValidateDangerousAccountRoleGrant(spec)
+	err := ValidateDangerousGrantPrivilegesToAccountRole(spec)
 	require.Error(t, err)
 	// Should contain errors for both privilege and target.
 	assert.Contains(t, err.Error(), "MANAGE GRANTS on ACCOUNT")
 	assert.Contains(t, err.Error(), "system role ACCOUNTADMIN")
 }
 
-func TestValidateDangerousAccountRoleGrant_NonSystemRoleAllowed(t *testing.T) {
+func TestValidateDangerousGrantPrivilegesToAccountRole_NonSystemRoleAllowed(t *testing.T) {
 	t.Parallel()
 
 	// Non-system account roles are never blocked by the target check.
-	spec := &AccountRoleGrantSpec{
+	spec := &GrantPrivilegesToAccountRoleSpec{
 		Privilege:   "USAGE",
 		On:          GrantOn{Account: true},
 		AccountRole: ptr("MY_CUSTOM_ROLE"),
 	}
 
-	err := ValidateDangerousAccountRoleGrant(spec)
+	err := ValidateDangerousGrantPrivilegesToAccountRole(spec)
 	assert.NoError(t, err)
 }
 
@@ -1160,8 +1256,8 @@ func TestTableSpec_Validate_ValidColumnType(t *testing.T) {
 	spec := TableSpec{
 		CommonSpec:  validCommonSpec(),
 		Name:        "T",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 		Columns: []ColumnDefinition{
 			{Name: "id", Type: "NUMBER(38,0)"},
 			{Name: "name", Type: "VARCHAR(100)"},
@@ -1177,8 +1273,8 @@ func TestTableSpec_Validate_InvalidColumnType(t *testing.T) {
 	spec := TableSpec{
 		CommonSpec:  validCommonSpec(),
 		Name:        "T",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 		Columns: []ColumnDefinition{
 			{Name: "id", Type: "NUMBER"},
 			{Name: "bad", Type: "INVALID_TYPE"},
@@ -1196,8 +1292,8 @@ func TestTableSpec_Validate_SQLInjectionColumnType(t *testing.T) {
 	spec := TableSpec{
 		CommonSpec:  validCommonSpec(),
 		Name:        "T",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 		Columns: []ColumnDefinition{
 			{Name: "col", Type: "'; DROP TABLE --"},
 		},
@@ -1215,8 +1311,8 @@ func TestTableSpec_Validate_SQLInjectionColumnType(t *testing.T) {
 func TestTableSpec_Validate_EmptyName(t *testing.T) {
 	t.Parallel()
 	err := (&TableSpec{
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 		Columns:     []ColumnDefinition{{Name: "id", Type: "INT"}},
 	}).Validate()
 	require.Error(t, err)
@@ -1227,7 +1323,7 @@ func TestTableSpec_Validate_EmptyDatabaseRef(t *testing.T) {
 	t.Parallel()
 	err := (&TableSpec{
 		Name:      "T",
-		SchemaRef: &LocalObjectReference{Name: "sch"},
+		SchemaRef: &ObjectReference{Name: "sch"},
 		Columns:   []ColumnDefinition{{Name: "id", Type: "INT"}},
 	}).Validate()
 	require.Error(t, err)
@@ -1238,7 +1334,7 @@ func TestTableSpec_Validate_EmptySchemaRef(t *testing.T) {
 	t.Parallel()
 	err := (&TableSpec{
 		Name:        "T",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
+		DatabaseRef: &ObjectReference{Name: "db"},
 		Columns:     []ColumnDefinition{{Name: "id", Type: "INT"}},
 	}).Validate()
 	require.Error(t, err)
@@ -1249,8 +1345,8 @@ func TestTableSpec_Validate_EmptyColumns(t *testing.T) {
 	t.Parallel()
 	err := (&TableSpec{
 		Name:        "T",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 		Columns:     []ColumnDefinition{},
 	}).Validate()
 	require.Error(t, err)
@@ -1261,8 +1357,8 @@ func TestTableSpec_Validate_ColumnMissingName(t *testing.T) {
 	t.Parallel()
 	err := (&TableSpec{
 		Name:        "T",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 		Columns:     []ColumnDefinition{{Type: "INT"}},
 	}).Validate()
 	require.Error(t, err)
@@ -1273,8 +1369,8 @@ func TestTableSpec_Validate_ColumnMissingType(t *testing.T) {
 	t.Parallel()
 	err := (&TableSpec{
 		Name:        "T",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 		Columns:     []ColumnDefinition{{Name: "id"}},
 	}).Validate()
 	require.Error(t, err)
@@ -1286,8 +1382,8 @@ func TestTableSpec_Validate_DataRetentionOutOfRange(t *testing.T) {
 	err := (&TableSpec{
 		CommonSpec:              validCommonSpec(),
 		Name:                    "T",
-		DatabaseRef:             &LocalObjectReference{Name: "db"},
-		SchemaRef:               &LocalObjectReference{Name: "sch"},
+		DatabaseRef:             &ObjectReference{Name: "db"},
+		SchemaRef:               &ObjectReference{Name: "sch"},
 		Columns:                 []ColumnDefinition{{Name: "id", Type: "INT"}},
 		DataRetentionTimeInDays: ptr(int32(100)),
 	}).Validate()
@@ -1300,8 +1396,8 @@ func TestTableSpec_Validate_MaxExtensionOutOfRange(t *testing.T) {
 	err := (&TableSpec{
 		CommonSpec:                 validCommonSpec(),
 		Name:                       "T",
-		DatabaseRef:                &LocalObjectReference{Name: "db"},
-		SchemaRef:                  &LocalObjectReference{Name: "sch"},
+		DatabaseRef:                &ObjectReference{Name: "db"},
+		SchemaRef:                  &ObjectReference{Name: "sch"},
 		Columns:                    []ColumnDefinition{{Name: "id", Type: "INT"}},
 		MaxDataExtensionTimeInDays: ptr(int32(-1)),
 	}).Validate()
@@ -1619,8 +1715,8 @@ func TestViewSpec_Validate_Valid(t *testing.T) {
 	assert.NoError(t, (&ViewSpec{
 		CommonSpec:  validCommonSpec(),
 		Name:        "V",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 		Statement:   "SELECT 1",
 	}).Validate())
 }
@@ -1628,8 +1724,8 @@ func TestViewSpec_Validate_Valid(t *testing.T) {
 func TestViewSpec_Validate_EmptyName(t *testing.T) {
 	t.Parallel()
 	err := (&ViewSpec{
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 		Statement:   "SELECT 1",
 	}).Validate()
 	require.Error(t, err)
@@ -1640,7 +1736,7 @@ func TestViewSpec_Validate_EmptyDatabaseRef(t *testing.T) {
 	t.Parallel()
 	err := (&ViewSpec{
 		Name:      "V",
-		SchemaRef: &LocalObjectReference{Name: "sch"},
+		SchemaRef: &ObjectReference{Name: "sch"},
 		Statement: "SELECT 1",
 	}).Validate()
 	require.Error(t, err)
@@ -1651,7 +1747,7 @@ func TestViewSpec_Validate_EmptySchemaRef(t *testing.T) {
 	t.Parallel()
 	err := (&ViewSpec{
 		Name:        "V",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
+		DatabaseRef: &ObjectReference{Name: "db"},
 		Statement:   "SELECT 1",
 	}).Validate()
 	require.Error(t, err)
@@ -1662,8 +1758,8 @@ func TestViewSpec_Validate_EmptyStatement(t *testing.T) {
 	t.Parallel()
 	err := (&ViewSpec{
 		Name:        "V",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 	}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.statement is required")
@@ -1689,16 +1785,16 @@ func TestStageSpec_Validate_Valid(t *testing.T) {
 	assert.NoError(t, (&StageSpec{
 		CommonSpec:  validCommonSpec(),
 		Name:        "S",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 	}).Validate())
 }
 
 func TestStageSpec_Validate_EmptyName(t *testing.T) {
 	t.Parallel()
 	err := (&StageSpec{
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 	}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.name is required")
@@ -1708,7 +1804,7 @@ func TestStageSpec_Validate_EmptyDatabaseRef(t *testing.T) {
 	t.Parallel()
 	err := (&StageSpec{
 		Name:      "S",
-		SchemaRef: &LocalObjectReference{Name: "sch"},
+		SchemaRef: &ObjectReference{Name: "sch"},
 	}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of spec.databaseRef or spec.databaseName must be set")
@@ -1718,7 +1814,7 @@ func TestStageSpec_Validate_EmptySchemaRef(t *testing.T) {
 	t.Parallel()
 	err := (&StageSpec{
 		Name:        "S",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
+		DatabaseRef: &ObjectReference{Name: "db"},
 	}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of spec.schemaRef or spec.schemaName must be set")
@@ -1729,8 +1825,8 @@ func TestStageSpec_Validate_StorageIntegrationWithoutURL(t *testing.T) {
 	err := (&StageSpec{
 		CommonSpec:         validCommonSpec(),
 		Name:               "S",
-		DatabaseRef:        &LocalObjectReference{Name: "db"},
-		SchemaRef:          &LocalObjectReference{Name: "sch"},
+		DatabaseRef:        &ObjectReference{Name: "db"},
+		SchemaRef:          &ObjectReference{Name: "sch"},
 		StorageIntegration: ptr("MY_INT"),
 	}).Validate()
 	require.Error(t, err)
@@ -1742,8 +1838,8 @@ func TestStageSpec_Validate_StorageIntegrationWithURL(t *testing.T) {
 	assert.NoError(t, (&StageSpec{
 		CommonSpec:         validCommonSpec(),
 		Name:               "S",
-		DatabaseRef:        &LocalObjectReference{Name: "db"},
-		SchemaRef:          &LocalObjectReference{Name: "sch"},
+		DatabaseRef:        &ObjectReference{Name: "db"},
+		SchemaRef:          &ObjectReference{Name: "sch"},
 		URL:                ptr("s3://bucket/path"),
 		StorageIntegration: ptr("MY_INT"),
 	}).Validate())
@@ -1754,8 +1850,8 @@ func TestStageSpec_Validate_StorageIntegrationWithEmptyURL(t *testing.T) {
 	err := (&StageSpec{
 		CommonSpec:         validCommonSpec(),
 		Name:               "S",
-		DatabaseRef:        &LocalObjectReference{Name: "db"},
-		SchemaRef:          &LocalObjectReference{Name: "sch"},
+		DatabaseRef:        &ObjectReference{Name: "db"},
+		SchemaRef:          &ObjectReference{Name: "sch"},
 		URL:                ptr(""),
 		StorageIntegration: ptr("MY_INT"),
 	}).Validate()
@@ -1781,8 +1877,8 @@ func TestStageSpec_Validate_EncryptionInternalOnly(t *testing.T) {
 		spec := &StageSpec{
 			CommonSpec:  validCommonSpec(),
 			Name:        "S",
-			DatabaseRef: &LocalObjectReference{Name: "db"},
-			SchemaRef:   &LocalObjectReference{Name: "sch"},
+			DatabaseRef: &ObjectReference{Name: "db"},
+			SchemaRef:   &ObjectReference{Name: "sch"},
 			URL:         ptr("s3://bucket/path"),
 			Encryption:  &StageEncryption{Type: encType},
 		}
@@ -1799,8 +1895,8 @@ func TestStageSpec_Validate_EncryptionExternalOnly(t *testing.T) {
 		spec := &StageSpec{
 			CommonSpec:  validCommonSpec(),
 			Name:        "S",
-			DatabaseRef: &LocalObjectReference{Name: "db"},
-			SchemaRef:   &LocalObjectReference{Name: "sch"},
+			DatabaseRef: &ObjectReference{Name: "db"},
+			SchemaRef:   &ObjectReference{Name: "sch"},
 			Encryption:  &StageEncryption{Type: encType},
 		}
 		err := spec.Validate()
@@ -1814,8 +1910,8 @@ func TestStageSpec_Validate_EncryptionValidInternal(t *testing.T) {
 	spec := &StageSpec{
 		CommonSpec:  validCommonSpec(),
 		Name:        "S",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 		Encryption:  &StageEncryption{Type: "SNOWFLAKE_FULL"},
 	}
 	assert.NoError(t, spec.Validate())
@@ -1826,8 +1922,8 @@ func TestStageSpec_Validate_EncryptionValidExternal(t *testing.T) {
 	spec := &StageSpec{
 		CommonSpec:  validCommonSpec(),
 		Name:        "S",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
-		SchemaRef:   &LocalObjectReference{Name: "sch"},
+		DatabaseRef: &ObjectReference{Name: "db"},
+		SchemaRef:   &ObjectReference{Name: "sch"},
 		URL:         ptr("s3://bucket/path"),
 		Encryption:  &StageEncryption{Type: "AWS_SSE_S3"},
 	}
@@ -1843,14 +1939,14 @@ func TestDatabaseRoleSpec_Validate_Valid(t *testing.T) {
 	assert.NoError(t, (&DatabaseRoleSpec{
 		CommonSpec:  validCommonSpec(),
 		Name:        "R",
-		DatabaseRef: &LocalObjectReference{Name: "db"},
+		DatabaseRef: &ObjectReference{Name: "db"},
 	}).Validate())
 }
 
 func TestDatabaseRoleSpec_Validate_EmptyName(t *testing.T) {
 	t.Parallel()
 	err := (&DatabaseRoleSpec{
-		DatabaseRef: &LocalObjectReference{Name: "db"},
+		DatabaseRef: &ObjectReference{Name: "db"},
 	}).Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.name is required")
@@ -1876,12 +1972,12 @@ func TestDatabaseRoleSpec_Validate_MultipleErrors(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// AccountRoleGrantSpec — validation tests
+// GrantPrivilegesToAccountRoleSpec — validation tests
 // ---------------------------------------------------------------------------
 
-// validAccountRoleGrantSpec returns a minimal valid AccountRoleGrantSpec.
-func validAccountRoleGrantSpec() *AccountRoleGrantSpec {
-	return &AccountRoleGrantSpec{
+// validGrantPrivilegesToAccountRoleSpec returns a minimal valid GrantPrivilegesToAccountRoleSpec.
+func validGrantPrivilegesToAccountRoleSpec() *GrantPrivilegesToAccountRoleSpec {
+	return &GrantPrivilegesToAccountRoleSpec{
 		CommonSpec:  validCommonSpec(),
 		Privilege:   "CREATE DATABASE",
 		On:          GrantOn{Account: true},
@@ -1889,99 +1985,100 @@ func validAccountRoleGrantSpec() *AccountRoleGrantSpec {
 	}
 }
 
-// validDatabaseRoleGrantSpec returns a minimal valid DatabaseRoleGrantSpec.
-func validDatabaseRoleGrantSpec() *DatabaseRoleGrantSpec {
-	return &DatabaseRoleGrantSpec{
+// validGrantPrivilegesToDatabaseRoleSpec returns a minimal valid GrantPrivilegesToDatabaseRoleSpec.
+func validGrantPrivilegesToDatabaseRoleSpec() *GrantPrivilegesToDatabaseRoleSpec {
+	db := "MY_DB"
+	return &GrantPrivilegesToDatabaseRoleSpec{
 		CommonSpec:   validCommonSpec(),
 		Privilege:    "USAGE",
-		On:           GrantOn{AccountObject: &GrantOnAccountObject{ObjectType: "DATABASE", ObjectName: "MY_DB"}},
+		On:           GrantPrivilegesToDatabaseRoleOn{Database: &db},
 		DatabaseRole: ptr("MY_DB.MY_ROLE"),
 	}
 }
 
-// validShareGrantSpec returns a minimal valid ShareGrantSpec.
-func validShareGrantSpec() *ShareGrantSpec {
-	return &ShareGrantSpec{
+// validGrantPrivilegesToShareSpec returns a minimal valid GrantPrivilegesToShareSpec.
+func validGrantPrivilegesToShareSpec() *GrantPrivilegesToShareSpec {
+	db := "MY_DB"
+	return &GrantPrivilegesToShareSpec{
 		CommonSpec: validCommonSpec(),
 		Privilege:  "USAGE",
-		ObjectType: "DATABASE",
-		ObjectName: "MY_DB",
+		On:         GrantPrivilegesToShareOn{Database: &db},
 		Share:      "MY_SHARE",
 	}
 }
 
-func TestAccountRoleGrantSpec_Validate_Valid_AccountGrant(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Valid_AccountGrant(t *testing.T) {
 	t.Parallel()
-	assert.NoError(t, validAccountRoleGrantSpec().Validate())
+	assert.NoError(t, validGrantPrivilegesToAccountRoleSpec().Validate())
 }
 
-func TestAccountRoleGrantSpec_Validate_Valid_AccountObjectGrant(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Valid_AccountObjectGrant(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.Privilege = "USAGE"
 	spec.On = GrantOn{AccountObject: &GrantOnAccountObject{ObjectType: "DATABASE", ObjectName: "MY_DB"}}
 	assert.NoError(t, spec.Validate())
 }
 
-func TestAccountRoleGrantSpec_Validate_Valid_SchemaGrant_SchemaName(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Valid_SchemaGrant_SchemaName(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.Privilege = "USAGE"
 	spec.On = GrantOn{Schema: &GrantOnSchema{SchemaName: ptr(`"DB"."SCH"`)}}
 	assert.NoError(t, spec.Validate())
 }
 
-func TestAccountRoleGrantSpec_Validate_Valid_SchemaGrant_SchemaRef(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Valid_SchemaGrant_SchemaRef(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.Privilege = "USAGE"
-	spec.On = GrantOn{Schema: &GrantOnSchema{SchemaRef: &LocalObjectReference{Name: "my-schema"}}}
+	spec.On = GrantOn{Schema: &GrantOnSchema{SchemaRef: &ObjectReference{Name: "my-schema"}}}
 	assert.NoError(t, spec.Validate())
 }
 
-func TestAccountRoleGrantSpec_Validate_Valid_SchemaGrant_AllInDatabase(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Valid_SchemaGrant_AllInDatabase(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.Privilege = "USAGE"
 	spec.On = GrantOn{Schema: &GrantOnSchema{AllInDatabase: ptr("MY_DB")}}
 	assert.NoError(t, spec.Validate())
 }
 
-func TestAccountRoleGrantSpec_Validate_Valid_SchemaGrant_AllInDatabaseRef(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Valid_SchemaGrant_AllInDatabaseRef(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.Privilege = "USAGE"
-	spec.On = GrantOn{Schema: &GrantOnSchema{AllInDatabaseRef: &LocalObjectReference{Name: "my-db"}}}
+	spec.On = GrantOn{Schema: &GrantOnSchema{AllInDatabaseRef: &ObjectReference{Name: "my-db"}}}
 	assert.NoError(t, spec.Validate())
 }
 
-func TestAccountRoleGrantSpec_Validate_Valid_SchemaGrant_FutureInDatabase(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Valid_SchemaGrant_FutureInDatabase(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.Privilege = "USAGE"
 	spec.On = GrantOn{Schema: &GrantOnSchema{FutureInDatabase: ptr("MY_DB")}}
 	assert.NoError(t, spec.Validate())
 }
 
-func TestAccountRoleGrantSpec_Validate_Valid_SchemaGrant_FutureInDatabaseRef(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Valid_SchemaGrant_FutureInDatabaseRef(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.Privilege = "USAGE"
-	spec.On = GrantOn{Schema: &GrantOnSchema{FutureInDatabaseRef: &LocalObjectReference{Name: "my-db"}}}
+	spec.On = GrantOn{Schema: &GrantOnSchema{FutureInDatabaseRef: &ObjectReference{Name: "my-db"}}}
 	assert.NoError(t, spec.Validate())
 }
 
-func TestAccountRoleGrantSpec_Validate_Valid_SchemaObjectGrant(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Valid_SchemaObjectGrant(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.Privilege = "SELECT"
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{ObjectType: "TABLE", ObjectName: `"DB"."SCH"."T"`}}
 	assert.NoError(t, spec.Validate())
 }
 
-func TestAccountRoleGrantSpec_Validate_Valid_SchemaObjectAllGrant(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Valid_SchemaObjectAllGrant(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.Privilege = "SELECT"
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{
 		All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptr("MY_DB")},
@@ -1989,9 +2086,9 @@ func TestAccountRoleGrantSpec_Validate_Valid_SchemaObjectAllGrant(t *testing.T) 
 	assert.NoError(t, spec.Validate())
 }
 
-func TestAccountRoleGrantSpec_Validate_Valid_SchemaObjectFutureGrant(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Valid_SchemaObjectFutureGrant(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.Privilege = "SELECT"
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{
 		Future: &GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: ptr(`"DB"."SCH"`)},
@@ -1999,39 +2096,39 @@ func TestAccountRoleGrantSpec_Validate_Valid_SchemaObjectFutureGrant(t *testing.
 	assert.NoError(t, spec.Validate())
 }
 
-func TestAccountRoleGrantSpec_Validate_Valid_AccountRoleRef(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Valid_AccountRoleRef(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.AccountRole = nil
-	spec.AccountRoleRef = &LocalObjectReference{Name: "my-role"}
+	spec.AccountRoleRef = &ObjectReference{Name: "my-role"}
 	assert.NoError(t, spec.Validate())
 }
 
-// --- AccountRoleGrantSpec: empty privilege ---
+// --- GrantPrivilegesToAccountRoleSpec: empty privilege ---
 
-func TestAccountRoleGrantSpec_Validate_EmptyPrivilege(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_EmptyPrivilege(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.Privilege = ""
 	err := spec.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.privilege is required")
+	assert.Contains(t, err.Error(), "exactly one of privilege or allPrivileges must be set")
 }
 
-// --- AccountRoleGrantSpec: On mutual exclusivity ---
+// --- GrantPrivilegesToAccountRoleSpec: On mutual exclusivity ---
 
-func TestAccountRoleGrantSpec_Validate_OnNoneSet(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_OnNoneSet(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.On = GrantOn{}
 	err := spec.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.on: exactly one of account, accountObject, schema, or schemaObject must be set")
 }
 
-func TestAccountRoleGrantSpec_Validate_OnMultipleSet(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_OnMultipleSet(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.On = GrantOn{
 		Account:       true,
 		AccountObject: &GrantOnAccountObject{ObjectType: "DATABASE", ObjectName: "DB"},
@@ -2041,40 +2138,40 @@ func TestAccountRoleGrantSpec_Validate_OnMultipleSet(t *testing.T) {
 	assert.Contains(t, err.Error(), "spec.on: exactly one of")
 }
 
-// --- AccountRoleGrantSpec: AccountObject missing fields ---
+// --- GrantPrivilegesToAccountRoleSpec: AccountObject missing fields ---
 
-func TestAccountRoleGrantSpec_Validate_AccountObject_MissingObjectType(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_AccountObject_MissingObjectType(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.On = GrantOn{AccountObject: &GrantOnAccountObject{ObjectName: "MY_DB"}}
 	err := spec.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.on.accountObject.objectType is required")
 }
 
-func TestAccountRoleGrantSpec_Validate_AccountObject_MissingObjectName(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_AccountObject_MissingObjectName(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.On = GrantOn{AccountObject: &GrantOnAccountObject{ObjectType: "DATABASE"}}
 	err := spec.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.on.accountObject.objectName is required")
 }
 
-// --- AccountRoleGrantSpec: Schema mutual exclusivity ---
+// --- GrantPrivilegesToAccountRoleSpec: Schema mutual exclusivity ---
 
-func TestAccountRoleGrantSpec_Validate_Schema_NoneSet(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Schema_NoneSet(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.On = GrantOn{Schema: &GrantOnSchema{}}
 	err := spec.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.on.schema: exactly one of")
 }
 
-func TestAccountRoleGrantSpec_Validate_Schema_MultipleSet(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Schema_MultipleSet(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.On = GrantOn{Schema: &GrantOnSchema{
 		SchemaName:    ptr("DB.SCH"),
 		AllInDatabase: ptr("DB"),
@@ -2084,57 +2181,53 @@ func TestAccountRoleGrantSpec_Validate_Schema_MultipleSet(t *testing.T) {
 	assert.Contains(t, err.Error(), "spec.on.schema: exactly one of")
 }
 
-func TestAccountRoleGrantSpec_Validate_Schema_RawAndRefMutuallyExclusive(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_Schema_RawAndRefBothSet(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		schema  GrantOnSchema
-		wantErr string
+		name   string
+		schema GrantOnSchema
 	}{
 		{
 			"schemaName+schemaRef",
-			GrantOnSchema{SchemaName: ptr("DB.SCH"), SchemaRef: &LocalObjectReference{Name: "s"}},
-			"schemaName and schemaRef are mutually exclusive",
+			GrantOnSchema{SchemaName: ptr("DB.SCH"), SchemaRef: &ObjectReference{Name: "s"}},
 		},
 		{
 			"allInDatabase+allInDatabaseRef",
-			GrantOnSchema{AllInDatabase: ptr("DB"), AllInDatabaseRef: &LocalObjectReference{Name: "d"}},
-			"allInDatabase and allInDatabaseRef are mutually exclusive",
+			GrantOnSchema{AllInDatabase: ptr("DB"), AllInDatabaseRef: &ObjectReference{Name: "d"}},
 		},
 		{
 			"futureInDatabase+futureInDatabaseRef",
-			GrantOnSchema{FutureInDatabase: ptr("DB"), FutureInDatabaseRef: &LocalObjectReference{Name: "d"}},
-			"futureInDatabase and futureInDatabaseRef are mutually exclusive",
+			GrantOnSchema{FutureInDatabase: ptr("DB"), FutureInDatabaseRef: &ObjectReference{Name: "d"}},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			spec := validAccountRoleGrantSpec()
+			spec := validGrantPrivilegesToAccountRoleSpec()
 			spec.On = GrantOn{Schema: &tt.schema}
 			err := spec.Validate()
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.wantErr)
+			assert.Contains(t, err.Error(), "spec.on.schema: exactly one of")
 		})
 	}
 }
 
-// --- AccountRoleGrantSpec: SchemaObject mutual exclusivity ---
+// --- GrantPrivilegesToAccountRoleSpec: SchemaObject mutual exclusivity ---
 
-func TestAccountRoleGrantSpec_Validate_SchemaObject_NoneSet(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_SchemaObject_NoneSet(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{}}
 	err := spec.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.on.schemaObject: exactly one of")
 }
 
-func TestAccountRoleGrantSpec_Validate_SchemaObject_MultipleSet(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_SchemaObject_MultipleSet(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{
 		ObjectType: "TABLE",
 		ObjectName: "T",
@@ -2145,29 +2238,29 @@ func TestAccountRoleGrantSpec_Validate_SchemaObject_MultipleSet(t *testing.T) {
 	assert.Contains(t, err.Error(), "spec.on.schemaObject: exactly one of")
 }
 
-func TestAccountRoleGrantSpec_Validate_SchemaObject_ObjectTypeMissingName(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_SchemaObject_ObjectTypeMissingName(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{ObjectType: "TABLE"}}
 	err := spec.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.on.schemaObject.objectName is required when objectType is set")
 }
 
-func TestAccountRoleGrantSpec_Validate_SchemaObject_ObjectNameMissingType(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_SchemaObject_ObjectNameMissingType(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{ObjectName: "T"}}
 	err := spec.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.on.schemaObject.objectType is required when objectName is set")
 }
 
-// --- AccountRoleGrantSpec: Bulk grant (All/Future) validation ---
+// --- GrantPrivilegesToAccountRoleSpec: Bulk grant (All/Future) validation ---
 
-func TestAccountRoleGrantSpec_Validate_BulkGrant_MissingObjectTypePlural(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_BulkGrant_MissingObjectTypePlural(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{
 		All: &GrantOnBulk{InDatabase: ptr("DB")},
 	}}
@@ -2176,9 +2269,9 @@ func TestAccountRoleGrantSpec_Validate_BulkGrant_MissingObjectTypePlural(t *test
 	assert.Contains(t, err.Error(), "objectTypePlural is required")
 }
 
-func TestAccountRoleGrantSpec_Validate_BulkGrant_NoScope(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_BulkGrant_NoScope(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{
 		All: &GrantOnBulk{ObjectTypePlural: "TABLES"},
 	}}
@@ -2187,9 +2280,9 @@ func TestAccountRoleGrantSpec_Validate_BulkGrant_NoScope(t *testing.T) {
 	assert.Contains(t, err.Error(), "exactly one of inDatabase, inDatabaseRef, inSchema, or inSchemaRef must be set")
 }
 
-func TestAccountRoleGrantSpec_Validate_BulkGrant_MultipleScope(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_BulkGrant_MultipleScope(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{
 		All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptr("DB"), InSchema: ptr("DB.SCH")},
 	}}
@@ -2198,39 +2291,36 @@ func TestAccountRoleGrantSpec_Validate_BulkGrant_MultipleScope(t *testing.T) {
 	assert.Contains(t, err.Error(), "exactly one of inDatabase, inDatabaseRef, inSchema, or inSchemaRef must be set")
 }
 
-func TestAccountRoleGrantSpec_Validate_BulkGrant_RawAndRefMutuallyExclusive(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_BulkGrant_RawAndRefBothSet(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		bulk    GrantOnBulk
-		wantErr string
+		name string
+		bulk GrantOnBulk
 	}{
 		{
 			"inDatabase+inDatabaseRef",
-			GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptr("DB"), InDatabaseRef: &LocalObjectReference{Name: "d"}},
-			"inDatabase and inDatabaseRef are mutually exclusive",
+			GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptr("DB"), InDatabaseRef: &ObjectReference{Name: "d"}},
 		},
 		{
 			"inSchema+inSchemaRef",
-			GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: ptr("DB.SCH"), InSchemaRef: &LocalObjectReference{Name: "s"}},
-			"inSchema and inSchemaRef are mutually exclusive",
+			GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: ptr("DB.SCH"), InSchemaRef: &ObjectReference{Name: "s"}},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			spec := validAccountRoleGrantSpec()
+			spec := validGrantPrivilegesToAccountRoleSpec()
 			spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{All: &tt.bulk}}
 			err := spec.Validate()
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.wantErr)
+			assert.Contains(t, err.Error(), "exactly one of inDatabase, inDatabaseRef, inSchema, or inSchemaRef must be set")
 		})
 	}
 }
 
-func TestAccountRoleGrantSpec_Validate_BulkGrant_ValidScopes(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_BulkGrant_ValidScopes(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -2238,15 +2328,15 @@ func TestAccountRoleGrantSpec_Validate_BulkGrant_ValidScopes(t *testing.T) {
 		bulk GrantOnBulk
 	}{
 		{"inDatabase", GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptr("DB")}},
-		{"inDatabaseRef", GrantOnBulk{ObjectTypePlural: "TABLES", InDatabaseRef: &LocalObjectReference{Name: "d"}}},
+		{"inDatabaseRef", GrantOnBulk{ObjectTypePlural: "TABLES", InDatabaseRef: &ObjectReference{Name: "d"}}},
 		{"inSchema", GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: ptr("DB.SCH")}},
-		{"inSchemaRef", GrantOnBulk{ObjectTypePlural: "TABLES", InSchemaRef: &LocalObjectReference{Name: "s"}}},
+		{"inSchemaRef", GrantOnBulk{ObjectTypePlural: "TABLES", InSchemaRef: &ObjectReference{Name: "s"}}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			spec := validAccountRoleGrantSpec()
+			spec := validGrantPrivilegesToAccountRoleSpec()
 			spec.Privilege = "SELECT"
 			spec.On = GrantOn{SchemaObject: &GrantOnSchemaObject{All: &tt.bulk}}
 			assert.NoError(t, spec.Validate())
@@ -2254,39 +2344,39 @@ func TestAccountRoleGrantSpec_Validate_BulkGrant_ValidScopes(t *testing.T) {
 	}
 }
 
-// --- AccountRoleGrantSpec: AccountRole/AccountRoleRef mutual exclusivity ---
+// --- GrantPrivilegesToAccountRoleSpec: AccountRole/AccountRoleRef mutual exclusivity ---
 
-func TestAccountRoleGrantSpec_Validate_AccountRoleAndRefMutuallyExclusive(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_AccountRoleAndRefBothSet(t *testing.T) {
 	t.Parallel()
-	spec := validAccountRoleGrantSpec()
+	spec := validGrantPrivilegesToAccountRoleSpec()
 	spec.AccountRole = ptr("R")
-	spec.AccountRoleRef = &LocalObjectReference{Name: "r"}
+	spec.AccountRoleRef = &ObjectReference{Name: "r"}
 	err := spec.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "accountRole and accountRoleRef are mutually exclusive")
+	assert.Contains(t, err.Error(), "exactly one of accountRole or accountRoleRef must be set")
 }
 
-// --- AccountRoleGrantSpec: Multiple errors aggregation ---
+// --- GrantPrivilegesToAccountRoleSpec: Multiple errors aggregation ---
 
-func TestAccountRoleGrantSpec_Validate_MultipleErrors(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_Validate_MultipleErrors(t *testing.T) {
 	t.Parallel()
-	err := (&AccountRoleGrantSpec{
+	err := (&GrantPrivilegesToAccountRoleSpec{
 		// Empty privilege, empty On, no accountRole/accountRoleRef, missing providerRef.
 		On: GrantOn{},
 	}).Validate()
 	require.Error(t, err)
 	s := err.Error()
-	assert.Contains(t, s, "spec.privilege is required")
+	assert.Contains(t, s, "exactly one of privilege or allPrivileges must be set")
 	assert.Contains(t, s, "spec.on: exactly one of")
 	assert.Contains(t, s, "spec: exactly one of accountRole or accountRoleRef must be set")
 	assert.Contains(t, s, "spec.providerRef.name is required")
 }
 
 // ---------------------------------------------------------------------------
-// AccountRoleGrantSpec.ResolveKind — tests
+// GrantPrivilegesToAccountRoleSpec.ResolveKind — tests
 // ---------------------------------------------------------------------------
 
-func TestAccountRoleGrantSpec_ResolveKind_Regular(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_ResolveKind_Regular(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -2296,20 +2386,20 @@ func TestAccountRoleGrantSpec_ResolveKind_Regular(t *testing.T) {
 		{"account", GrantOn{Account: true}},
 		{"accountObject", GrantOn{AccountObject: &GrantOnAccountObject{ObjectType: "DATABASE", ObjectName: "DB"}}},
 		{"schemaName", GrantOn{Schema: &GrantOnSchema{SchemaName: ptr("DB.SCH")}}},
-		{"schemaRef", GrantOn{Schema: &GrantOnSchema{SchemaRef: &LocalObjectReference{Name: "s"}}}},
+		{"schemaRef", GrantOn{Schema: &GrantOnSchema{SchemaRef: &ObjectReference{Name: "s"}}}},
 		{"schemaObject", GrantOn{SchemaObject: &GrantOnSchemaObject{ObjectType: "TABLE", ObjectName: "T"}}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			spec := &AccountRoleGrantSpec{On: tt.on}
+			spec := &GrantPrivilegesToAccountRoleSpec{On: tt.on}
 			assert.Equal(t, GrantKindRegular, spec.ResolveKind())
 		})
 	}
 }
 
-func TestAccountRoleGrantSpec_ResolveKind_Future(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_ResolveKind_Future(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -2317,20 +2407,20 @@ func TestAccountRoleGrantSpec_ResolveKind_Future(t *testing.T) {
 		on   GrantOn
 	}{
 		{"futureInDatabase", GrantOn{Schema: &GrantOnSchema{FutureInDatabase: ptr("DB")}}},
-		{"futureInDatabaseRef", GrantOn{Schema: &GrantOnSchema{FutureInDatabaseRef: &LocalObjectReference{Name: "d"}}}},
+		{"futureInDatabaseRef", GrantOn{Schema: &GrantOnSchema{FutureInDatabaseRef: &ObjectReference{Name: "d"}}}},
 		{"futureSchemaObject", GrantOn{SchemaObject: &GrantOnSchemaObject{Future: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptr("DB")}}}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			spec := &AccountRoleGrantSpec{On: tt.on}
+			spec := &GrantPrivilegesToAccountRoleSpec{On: tt.on}
 			assert.Equal(t, GrantKindFuture, spec.ResolveKind())
 		})
 	}
 }
 
-func TestAccountRoleGrantSpec_ResolveKind_All(t *testing.T) {
+func TestGrantPrivilegesToAccountRoleSpec_ResolveKind_All(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -2338,14 +2428,14 @@ func TestAccountRoleGrantSpec_ResolveKind_All(t *testing.T) {
 		on   GrantOn
 	}{
 		{"allInDatabase", GrantOn{Schema: &GrantOnSchema{AllInDatabase: ptr("DB")}}},
-		{"allInDatabaseRef", GrantOn{Schema: &GrantOnSchema{AllInDatabaseRef: &LocalObjectReference{Name: "d"}}}},
+		{"allInDatabaseRef", GrantOn{Schema: &GrantOnSchema{AllInDatabaseRef: &ObjectReference{Name: "d"}}}},
 		{"allSchemaObject", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptr("DB")}}}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			spec := &AccountRoleGrantSpec{On: tt.on}
+			spec := &GrantPrivilegesToAccountRoleSpec{On: tt.on}
 			assert.Equal(t, GrantKindAll, spec.ResolveKind())
 		})
 	}
@@ -2366,16 +2456,16 @@ func TestGrantOn_Description(t *testing.T) {
 		{"account", GrantOn{Account: true}, "ON ACCOUNT"},
 		{"accountObject", GrantOn{AccountObject: &GrantOnAccountObject{ObjectType: "DATABASE", ObjectName: "DB"}}, "ON DATABASE DB"},
 		{"schemaName", GrantOn{Schema: &GrantOnSchema{SchemaName: ptr("DB.SCH")}}, "ON SCHEMA DB.SCH"},
-		{"schemaRef", GrantOn{Schema: &GrantOnSchema{SchemaRef: &LocalObjectReference{Name: "s"}}}, "ON SCHEMA (ref: s)"},
+		{"schemaRef", GrantOn{Schema: &GrantOnSchema{SchemaRef: &ObjectReference{Name: "s"}}}, "ON SCHEMA (ref: s)"},
 		{"allInDatabase", GrantOn{Schema: &GrantOnSchema{AllInDatabase: ptr("DB")}}, "ON ALL SCHEMAS IN DATABASE DB"},
-		{"allInDatabaseRef", GrantOn{Schema: &GrantOnSchema{AllInDatabaseRef: &LocalObjectReference{Name: "d"}}}, "ON ALL SCHEMAS IN DATABASE (ref: d)"},
+		{"allInDatabaseRef", GrantOn{Schema: &GrantOnSchema{AllInDatabaseRef: &ObjectReference{Name: "d"}}}, "ON ALL SCHEMAS IN DATABASE (ref: d)"},
 		{"futureInDatabase", GrantOn{Schema: &GrantOnSchema{FutureInDatabase: ptr("DB")}}, "ON FUTURE SCHEMAS IN DATABASE DB"},
-		{"futureInDatabaseRef", GrantOn{Schema: &GrantOnSchema{FutureInDatabaseRef: &LocalObjectReference{Name: "d"}}}, "ON FUTURE SCHEMAS IN DATABASE (ref: d)"},
+		{"futureInDatabaseRef", GrantOn{Schema: &GrantOnSchema{FutureInDatabaseRef: &ObjectReference{Name: "d"}}}, "ON FUTURE SCHEMAS IN DATABASE (ref: d)"},
 		{"schemaObject", GrantOn{SchemaObject: &GrantOnSchemaObject{ObjectType: "TABLE", ObjectName: "T"}}, "ON TABLE T"},
 		{"allInDB", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabase: ptr("DB")}}}, "ON ALL TABLES IN DATABASE DB"},
-		{"allInDBRef", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabaseRef: &LocalObjectReference{Name: "d"}}}}, "ON ALL TABLES IN DATABASE (ref: d)"},
+		{"allInDBRef", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InDatabaseRef: &ObjectReference{Name: "d"}}}}, "ON ALL TABLES IN DATABASE (ref: d)"},
 		{"allInSchema", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InSchema: ptr("DB.SCH")}}}, "ON ALL TABLES IN SCHEMA DB.SCH"},
-		{"allInSchemaRef", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InSchemaRef: &LocalObjectReference{Name: "s"}}}}, "ON ALL TABLES IN SCHEMA (ref: s)"},
+		{"allInSchemaRef", GrantOn{SchemaObject: &GrantOnSchemaObject{All: &GrantOnBulk{ObjectTypePlural: "TABLES", InSchemaRef: &ObjectReference{Name: "s"}}}}, "ON ALL TABLES IN SCHEMA (ref: s)"},
 		{"futureInDB", GrantOn{SchemaObject: &GrantOnSchemaObject{Future: &GrantOnBulk{ObjectTypePlural: "VIEWS", InDatabase: ptr("DB")}}}, "ON FUTURE VIEWS IN DATABASE DB"},
 		{"unknown", GrantOn{}, "ON <unknown>"},
 	}
@@ -2403,8 +2493,8 @@ func TestAccountRoleAssignmentSpec_Validate_Valid_RoleRef_ToUserRef(t *testing.T
 	t.Parallel()
 	assert.NoError(t, (&AccountRoleAssignmentSpec{
 		CommonSpec: validCommonSpec(),
-		RoleRef:    &LocalObjectReference{Name: "my-role"},
-		ToUserRef:  &LocalObjectReference{Name: "my-user"},
+		RoleRef:    &ObjectReference{Name: "my-role"},
+		ToUserRef:  &ObjectReference{Name: "my-user"},
 	}).Validate())
 }
 
@@ -2420,7 +2510,7 @@ func TestAccountRoleAssignmentSpec_Validate_BothRoleAndRef(t *testing.T) {
 	err := (&AccountRoleAssignmentSpec{
 		CommonSpec: validCommonSpec(),
 		RoleName:   ptr("X"),
-		RoleRef:    &LocalObjectReference{Name: "y"},
+		RoleRef:    &ObjectReference{Name: "y"},
 		ToRole:     ptr("SYSADMIN"),
 	}).Validate()
 	require.Error(t, err)
@@ -2458,7 +2548,7 @@ func TestDatabaseRoleAssignmentSpec_Validate_Valid_ToDatabaseRole(t *testing.T) 
 	t.Parallel()
 	assert.NoError(t, (&DatabaseRoleAssignmentSpec{
 		CommonSpec:      validCommonSpec(),
-		DatabaseRoleRef: &LocalObjectReference{Name: "my-dr"},
+		DatabaseRoleRef: &ObjectReference{Name: "my-dr"},
 		ToDatabaseRole:  ptr("MY_DB.WRITER"),
 	}).Validate())
 }
@@ -2475,7 +2565,7 @@ func TestDatabaseRoleAssignmentSpec_Validate_BothRoleAndRef(t *testing.T) {
 	err := (&DatabaseRoleAssignmentSpec{
 		CommonSpec:       validCommonSpec(),
 		DatabaseRoleName: ptr("X"),
-		DatabaseRoleRef:  &LocalObjectReference{Name: "y"},
+		DatabaseRoleRef:  &ObjectReference{Name: "y"},
 		ToRole:           ptr("SYSADMIN"),
 	}).Validate()
 	require.Error(t, err)
@@ -2754,7 +2844,7 @@ func TestFieldExportSpec_Validate_PathNoLeadingDot(t *testing.T) {
 	}
 	err := spec.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `must start with "."`)
+	assert.Contains(t, err.Error(), `must start with ".status."`)
 }
 
 func TestFieldExportSpec_Validate_PathArrayIndexing(t *testing.T) {
@@ -2777,7 +2867,7 @@ func TestFieldExportSpec_Validate_PathArrayIndexing(t *testing.T) {
 
 func TestFieldExportSpec_Validate_AllSourceKinds(t *testing.T) {
 	t.Parallel()
-	for _, kind := range []string{"Database", "Schema", "Warehouse", "User", "AccountRole", "DatabaseRole", "AccountRoleGrant", "DatabaseRoleGrant", "ShareGrant", "Table", "View", "Stage", "Task", "StreamOnTable", "StreamOnView", "StreamOnExternalTable", "StreamOnDirectoryTable", "StreamOnDynamicTable", "Tag", "NetworkPolicy", "ResourceMonitor", "MaskingPolicy", "RowAccessPolicy", "GrantOwnership"} {
+	for _, kind := range []string{"Database", "Schema", "Warehouse", "User", "AccountRole", "DatabaseRole", "GrantPrivilegesToAccountRole", "GrantPrivilegesToDatabaseRole", "GrantPrivilegesToShare", "Table", "View", "Stage", "Task", "StreamOnTable", "StreamOnView", "StreamOnExternalTable", "StreamOnDirectoryTable", "StreamOnDynamicTable", "Tag", "NetworkPolicy", "ResourceMonitor", "MaskingPolicy", "RowAccessPolicy", "GrantOwnership"} {
 		spec := FieldExportSpec{
 			From: FieldExportSource{
 				Resource: FieldExportResourceRef{Kind: kind, Name: "test"},
@@ -2794,55 +2884,54 @@ func TestFieldExportSpec_Validate_AllSourceKinds(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// ShareGrantSpec — validation tests
+// GrantPrivilegesToShareSpec — validation tests
 // ---------------------------------------------------------------------------
 
-func TestShareGrantSpec_Validate_Valid(t *testing.T) {
+func TestGrantPrivilegesToShareSpec_Validate_Valid(t *testing.T) {
 	t.Parallel()
-	assert.NoError(t, validShareGrantSpec().Validate())
+	assert.NoError(t, validGrantPrivilegesToShareSpec().Validate())
 }
 
-func TestShareGrantSpec_Validate_EmptyFields(t *testing.T) {
+func TestGrantPrivilegesToShareSpec_Validate_EmptyFields(t *testing.T) {
 	t.Parallel()
-	err := (&ShareGrantSpec{}).Validate()
+	err := (&GrantPrivilegesToShareSpec{}).Validate()
 	require.Error(t, err)
 	s := err.Error()
 	assert.Contains(t, s, "spec.privilege is required")
-	assert.Contains(t, s, "spec.objectType is required")
-	assert.Contains(t, s, "spec.objectName is required")
+	assert.Contains(t, s, "spec.on: exactly one of database, schema, table, allTablesInSchema, function, tag, or view must be set")
 	assert.Contains(t, s, "spec.share is required")
 }
 
 // ---------------------------------------------------------------------------
-// DatabaseRoleGrantSpec — validation tests
+// GrantPrivilegesToDatabaseRoleSpec — validation tests
 // ---------------------------------------------------------------------------
 
-func TestDatabaseRoleGrantSpec_Validate_Valid(t *testing.T) {
+func TestGrantPrivilegesToDatabaseRoleSpec_Validate_Valid(t *testing.T) {
 	t.Parallel()
-	assert.NoError(t, validDatabaseRoleGrantSpec().Validate())
+	assert.NoError(t, validGrantPrivilegesToDatabaseRoleSpec().Validate())
 }
 
-func TestDatabaseRoleGrantSpec_Validate_RoleAndRefMutuallyExclusive(t *testing.T) {
+func TestGrantPrivilegesToDatabaseRoleSpec_Validate_RoleAndRefBothSet(t *testing.T) {
 	t.Parallel()
-	spec := validDatabaseRoleGrantSpec()
-	spec.DatabaseRoleRef = &LocalObjectReference{Name: "r"}
+	spec := validGrantPrivilegesToDatabaseRoleSpec()
+	spec.DatabaseRoleRef = &ObjectReference{Name: "r"}
 	err := spec.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "databaseRole and databaseRoleRef are mutually exclusive")
+	assert.Contains(t, err.Error(), "exactly one of databaseRole or databaseRoleRef must be set")
 }
 
-func TestDatabaseRoleGrantSpec_Validate_EmptyPrivilege(t *testing.T) {
+func TestGrantPrivilegesToDatabaseRoleSpec_Validate_EmptyPrivilege(t *testing.T) {
 	t.Parallel()
-	spec := validDatabaseRoleGrantSpec()
+	spec := validGrantPrivilegesToDatabaseRoleSpec()
 	spec.Privilege = ""
 	err := spec.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.privilege is required")
+	assert.Contains(t, err.Error(), "exactly one of privilege or allPrivileges must be set")
 }
 
-func TestDatabaseRoleGrantSpec_Validate_NoRoleOrRef(t *testing.T) {
+func TestGrantPrivilegesToDatabaseRoleSpec_Validate_NoRoleOrRef(t *testing.T) {
 	t.Parallel()
-	spec := validDatabaseRoleGrantSpec()
+	spec := validGrantPrivilegesToDatabaseRoleSpec()
 	spec.DatabaseRole = nil
 	spec.DatabaseRoleRef = nil
 	err := spec.Validate()
@@ -2850,20 +2939,20 @@ func TestDatabaseRoleGrantSpec_Validate_NoRoleOrRef(t *testing.T) {
 	assert.Contains(t, err.Error(), "exactly one of databaseRole or databaseRoleRef must be set")
 }
 
-func TestDatabaseRoleGrantSpec_Validate_OnNoneSet(t *testing.T) {
+func TestGrantPrivilegesToDatabaseRoleSpec_Validate_OnNoneSet(t *testing.T) {
 	t.Parallel()
-	spec := validDatabaseRoleGrantSpec()
-	spec.On = GrantOn{}
+	spec := validGrantPrivilegesToDatabaseRoleSpec()
+	spec.On = GrantPrivilegesToDatabaseRoleOn{}
 	err := spec.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of")
 }
 
-func TestDatabaseRoleGrantSpec_Validate_ValidWithRef(t *testing.T) {
+func TestGrantPrivilegesToDatabaseRoleSpec_Validate_ValidWithRef(t *testing.T) {
 	t.Parallel()
-	spec := validDatabaseRoleGrantSpec()
+	spec := validGrantPrivilegesToDatabaseRoleSpec()
 	spec.DatabaseRole = nil
-	spec.DatabaseRoleRef = &LocalObjectReference{Name: "my-role"}
+	spec.DatabaseRoleRef = &ObjectReference{Name: "my-role"}
 	assert.NoError(t, spec.Validate())
 }
 
@@ -3239,7 +3328,7 @@ func TestMaskingPolicySpec_Validate_NoSchemaSource(t *testing.T) {
 func TestMaskingPolicySpec_Validate_BothDatabaseSources(t *testing.T) {
 	t.Parallel()
 	s := validMaskingPolicySpec()
-	s.DatabaseRef = &LocalObjectReference{Name: "db-cr"}
+	s.DatabaseRef = &ObjectReference{Name: "db-cr"}
 	err := s.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "databaseRef")
@@ -3380,7 +3469,7 @@ func TestTagSpec_Validate_NoSchemaSource(t *testing.T) {
 func TestTagSpec_Validate_BothDatabaseSources(t *testing.T) {
 	t.Parallel()
 	s := validTagSpec()
-	s.DatabaseRef = &LocalObjectReference{Name: "db-cr"}
+	s.DatabaseRef = &ObjectReference{Name: "db-cr"}
 	err := s.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "databaseRef")
@@ -3388,14 +3477,14 @@ func TestTagSpec_Validate_BothDatabaseSources(t *testing.T) {
 
 func TestValidateDatabaseSource_EmptyRefName(t *testing.T) {
 	t.Parallel()
-	err := validateDatabaseSource(&LocalObjectReference{Name: ""}, nil)
+	err := validateDatabaseSource(&ObjectReference{Name: ""}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of spec.databaseRef or spec.databaseName must be set")
 }
 
 func TestValidateSchemaSource_EmptyRefName(t *testing.T) {
 	t.Parallel()
-	err := validateSchemaSource(&LocalObjectReference{Name: ""}, nil)
+	err := validateSchemaSource(&ObjectReference{Name: ""}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of spec.schemaRef or spec.schemaName must be set")
 }
@@ -3518,7 +3607,7 @@ func TestTaskSpec_Validate_ValidTimeoutAndRetry(t *testing.T) {
 
 func TestNetworkPolicySpec_Validate_Valid(t *testing.T) {
 	t.Parallel()
-	assert.NoError(t, (&NetworkPolicySpec{CommonSpec: validCommonSpec(), Name: "MY_NP"}).Validate())
+	assert.NoError(t, (&NetworkPolicySpec{CommonSpec: validCommonSpec(), Name: "MY_NP", AllowedIPList: []string{"10.0.0.1"}}).Validate())
 }
 
 func TestNetworkPolicySpec_Validate_EmptyName(t *testing.T) {
@@ -3636,7 +3725,7 @@ func TestGrantOwnershipSpec_Validate_AccountRoleRef(t *testing.T) {
 	t.Parallel()
 	s := validGrantOwnershipSpec()
 	s.AccountRole = nil
-	s.AccountRoleRef = &LocalObjectReference{Name: "my-role"}
+	s.AccountRoleRef = &ObjectReference{Name: "my-role"}
 	assert.NoError(t, s.Validate())
 }
 
@@ -3644,7 +3733,7 @@ func TestGrantOwnershipSpec_Validate_DatabaseRoleRef(t *testing.T) {
 	t.Parallel()
 	s := validGrantOwnershipSpec()
 	s.AccountRole = nil
-	s.DatabaseRoleRef = &LocalObjectReference{Name: "my-db-role"}
+	s.DatabaseRoleRef = &ObjectReference{Name: "my-db-role"}
 	assert.NoError(t, s.Validate())
 }
 
@@ -3771,11 +3860,11 @@ func TestCELAndGoMutualExclusivityInSync(t *testing.T) {
 	}
 
 	// Grant role/ref mutual exclusivity.
-	t.Run("accountRoleGrant_roleRef", func(t *testing.T) {
-		assertCELMutualExclusivity(t, "accountrolegrant_types.go", "accountRole", "accountRoleRef")
+	t.Run("grantPrivilegesToAccountRole_roleRef", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "grantprivilegestoaccountrole_types.go", "accountRole", "accountRoleRef")
 	})
-	t.Run("databaseRoleGrant_roleRef", func(t *testing.T) {
-		assertCELMutualExclusivity(t, "databaserolegrant_types.go", "databaseRole", "databaseRoleRef")
+	t.Run("grantPrivilegesToDatabaseRole_roleRef", func(t *testing.T) {
+		assertCELMutualExclusivity(t, "grantprivilegestodatabaserole_types.go", "databaseRole", "databaseRoleRef")
 	})
 
 	// RoleAssignment mutual exclusivity.
@@ -3889,7 +3978,7 @@ func TestMaskingPolicyApplicationSpec_Validate_Valid_PolicyRef(t *testing.T) {
 	t.Parallel()
 	spec := validMaskingPolicyApplicationSpec()
 	spec.PolicyName = nil
-	spec.PolicyRef = &LocalObjectReference{Name: "my-masking-policy"}
+	spec.PolicyRef = &ObjectReference{Name: "my-masking-policy"}
 	assert.NoError(t, spec.Validate())
 }
 
@@ -3906,7 +3995,7 @@ func TestMaskingPolicyApplicationSpec_Validate_NeitherPolicyNorRef(t *testing.T)
 func TestMaskingPolicyApplicationSpec_Validate_BothPolicyAndRef(t *testing.T) {
 	t.Parallel()
 	spec := validMaskingPolicyApplicationSpec()
-	spec.PolicyRef = &LocalObjectReference{Name: "my-masking-policy"}
+	spec.PolicyRef = &ObjectReference{Name: "my-masking-policy"}
 	err := spec.Validate()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of policyName or policyRef must be set")
@@ -3951,7 +4040,7 @@ func TestNetworkPolicyAttachmentSpec_Validate_Valid_PolicyRef(t *testing.T) {
 	t.Parallel()
 	spec := validNetworkPolicyAttachmentSpec()
 	spec.PolicyName = nil
-	spec.PolicyRef = &LocalObjectReference{Name: "my-network-policy"}
+	spec.PolicyRef = &ObjectReference{Name: "my-network-policy"}
 	assert.NoError(t, spec.Validate())
 }
 
@@ -3976,7 +4065,7 @@ func TestNetworkPolicyAttachmentSpec_Validate_NeitherPolicyNorRef(t *testing.T) 
 func TestNetworkPolicyAttachmentSpec_Validate_BothPolicyAndRef(t *testing.T) {
 	t.Parallel()
 	spec := validNetworkPolicyAttachmentSpec()
-	spec.PolicyRef = &LocalObjectReference{Name: "my-network-policy"}
+	spec.PolicyRef = &ObjectReference{Name: "my-network-policy"}
 	err := spec.Validate()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of policyName or policyRef must be set")
@@ -4022,7 +4111,7 @@ func TestPasswordPolicyAttachmentSpec_Validate_Valid_PolicyRef(t *testing.T) {
 	t.Parallel()
 	spec := validPasswordPolicyAttachmentSpec()
 	spec.PolicyName = nil
-	spec.PolicyRef = &LocalObjectReference{Name: "my-password-policy"}
+	spec.PolicyRef = &ObjectReference{Name: "my-password-policy"}
 	assert.NoError(t, spec.Validate())
 }
 
@@ -4047,7 +4136,7 @@ func TestPasswordPolicyAttachmentSpec_Validate_NeitherPolicyNorRef(t *testing.T)
 func TestPasswordPolicyAttachmentSpec_Validate_BothPolicyAndRef(t *testing.T) {
 	t.Parallel()
 	spec := validPasswordPolicyAttachmentSpec()
-	spec.PolicyRef = &LocalObjectReference{Name: "my-password-policy"}
+	spec.PolicyRef = &ObjectReference{Name: "my-password-policy"}
 	err := spec.Validate()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of policyName or policyRef must be set")
@@ -4095,7 +4184,7 @@ func TestTagAssociationSpec_Validate_Valid_TagRef(t *testing.T) {
 	t.Parallel()
 	spec := validTagAssociationSpec()
 	spec.TagName = nil
-	spec.TagRef = &LocalObjectReference{Name: "my-tag"}
+	spec.TagRef = &ObjectReference{Name: "my-tag"}
 	assert.NoError(t, spec.Validate())
 }
 
@@ -4112,7 +4201,7 @@ func TestTagAssociationSpec_Validate_NeitherTagNorRef(t *testing.T) {
 func TestTagAssociationSpec_Validate_BothTagAndRef(t *testing.T) {
 	t.Parallel()
 	spec := validTagAssociationSpec()
-	spec.TagRef = &LocalObjectReference{Name: "my-tag"}
+	spec.TagRef = &ObjectReference{Name: "my-tag"}
 	err := spec.Validate()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "exactly one of tagName or tagRef must be set")
@@ -4152,4 +4241,849 @@ func TestTagAssociationSpec_Validate_MissingObjectName(t *testing.T) {
 	err := spec.Validate()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.objectName is required")
+}
+
+// --- SQLStatementSpec ---
+
+func validSQLStatementSpec() SQLStatementSpec {
+	return SQLStatementSpec{
+		CommonSpec: CommonSpec{
+			ProviderRef: ProviderReference{Name: "default"},
+		},
+		Execute: "CREATE TABLE IF NOT EXISTS test_table (id INT)",
+	}
+}
+
+func TestSQLStatementSpec_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	assert.NoError(t, spec.Validate())
+}
+
+func TestSQLStatementSpec_Validate_EmptyExecute(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	spec.Execute = ""
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.execute is required")
+}
+
+func TestSQLStatementSpec_Validate_BlankExecute(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	spec.Execute = "   "
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.execute is required")
+}
+
+func TestSQLStatementSpec_Validate_ObserveExpectWithoutObserve(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	spec.ObserveExpect = []SQLStatementExpectation{{Column: "status", Value: "active"}}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.observeExpect requires spec.observe")
+}
+
+func TestSQLStatementSpec_Validate_BlankObserve(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	blank := "   "
+	spec.Observe = &blank
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.observe must not be blank")
+}
+
+func TestSQLStatementSpec_Validate_BlankRevert(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	blank := "   "
+	spec.Revert = &blank
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.revert must not be blank")
+}
+
+func TestSQLStatementSpec_Validate_DestructiveExecute(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	spec.Execute = "DROP TABLE test_table"
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.execute contains destructive SQL")
+}
+
+func TestSQLStatementSpec_Validate_DestructiveRevertExempt(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	revert := "DROP TABLE test_table"
+	spec.Revert = &revert
+	// Revert SQL is inherently destructive — no dangerousAllowDestructive needed.
+	assert.NoError(t, spec.Validate())
+}
+
+func TestSQLStatementSpec_Validate_DestructiveAllowed(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	spec.Execute = "DROP TABLE test_table"
+	spec.DangerousAllowDestructive = true
+	assert.NoError(t, spec.Validate())
+}
+
+func TestSQLStatementSpec_Validate_TruncateIsDestructive(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	spec.Execute = "TRUNCATE TABLE test_table"
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "destructive SQL")
+}
+
+func TestSQLStatementSpec_Validate_DeleteIsDestructive(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	spec.Execute = "DELETE FROM test_table WHERE id = 1"
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "destructive SQL")
+}
+
+func TestSQLStatementSpec_Validate_CaseInsensitiveDestructive(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	spec.Execute = "drop table test_table"
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "destructive SQL")
+}
+
+func TestSQLStatementSpec_Validate_ValidWithObserveAndExpect(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	observe := "SELECT status FROM test_table"
+	spec.Observe = &observe
+	spec.ObserveExpect = []SQLStatementExpectation{
+		{Column: "status", Value: "active"},
+	}
+	assert.NoError(t, spec.Validate())
+}
+
+func TestSQLStatementSpec_Validate_ValidWithRevert(t *testing.T) {
+	t.Parallel()
+	spec := validSQLStatementSpec()
+	revert := "CREATE TABLE IF NOT EXISTS revert_cleanup (id INT)"
+	spec.Revert = &revert
+	assert.NoError(t, spec.Validate())
+}
+
+func TestSQLStatementSpec_Validate_MultipleErrors(t *testing.T) {
+	t.Parallel()
+	spec := SQLStatementSpec{
+		CommonSpec: CommonSpec{},
+		Execute:    "",
+		ObserveExpect: []SQLStatementExpectation{
+			{Column: "status", Value: "active"},
+		},
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.execute is required")
+	assert.Contains(t, err.Error(), "spec.observeExpect requires spec.observe")
+}
+
+func TestContainsDestructiveSQL_NonDestructive(t *testing.T) {
+	t.Parallel()
+	assert.False(t, containsDestructiveSQL("CREATE TABLE t (id INT)"))
+	assert.False(t, containsDestructiveSQL("SELECT 1"))
+	assert.False(t, containsDestructiveSQL("INSERT INTO t VALUES (1)"))
+	assert.False(t, containsDestructiveSQL("ALTER TABLE t ADD COLUMN name TEXT"))
+}
+
+func TestContainsDestructiveSQL_AllKeywords(t *testing.T) {
+	t.Parallel()
+	assert.True(t, containsDestructiveSQL("DROP TABLE t"))
+	assert.True(t, containsDestructiveSQL("TRUNCATE TABLE t"))
+	assert.True(t, containsDestructiveSQL("DELETE FROM t"))
+	assert.True(t, containsDestructiveSQL("REMOVE @my_stage/path"))
+}
+
+func TestContainsDestructiveSQL_WordBoundary_NoFalsePositive(t *testing.T) {
+	t.Parallel()
+	// "BACKDROP" contains "DROP" as a substring but is not destructive.
+	assert.False(t, containsDestructiveSQL("BACKDROP TABLE t"))
+	// "UNDELETE" contains "DELETE" as a substring but is not destructive.
+	assert.False(t, containsDestructiveSQL("UNDELETE FROM t"))
+}
+
+func TestContainsDestructiveSQL_WhitespaceVariants(t *testing.T) {
+	t.Parallel()
+	// Newline after keyword.
+	assert.True(t, containsDestructiveSQL("DROP\nTABLE t"))
+	// Tab after keyword.
+	assert.True(t, containsDestructiveSQL("DROP\tTABLE t"))
+	// Keyword at end of string (no trailing space).
+	assert.True(t, containsDestructiveSQL("SELECT 1; DROP"))
+}
+
+// ---------------------------------------------------------------------------
+// NetworkPolicySpec — IP/CIDR validation & non-empty allowed list (Findings #2, #8)
+// ---------------------------------------------------------------------------
+
+func TestNetworkPolicySpec_Validate_ValidIP(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, (&NetworkPolicySpec{
+		CommonSpec:    validCommonSpec(),
+		Name:          "MY_NP",
+		AllowedIPList: []string{"10.0.0.1"},
+	}).Validate())
+}
+
+func TestNetworkPolicySpec_Validate_ValidCIDR(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, (&NetworkPolicySpec{
+		CommonSpec:    validCommonSpec(),
+		Name:          "MY_NP",
+		AllowedIPList: []string{"192.168.0.0/24"},
+	}).Validate())
+}
+
+func TestNetworkPolicySpec_Validate_ValidNetworkRuleList(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, (&NetworkPolicySpec{
+		CommonSpec:             validCommonSpec(),
+		Name:                   "MY_NP",
+		AllowedNetworkRuleList: []string{"MY_RULE"},
+	}).Validate())
+}
+
+func TestNetworkPolicySpec_Validate_InvalidIP(t *testing.T) {
+	t.Parallel()
+	err := (&NetworkPolicySpec{
+		CommonSpec:    validCommonSpec(),
+		Name:          "MY_NP",
+		AllowedIPList: []string{"banana"},
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.allowedIPList[0]")
+	assert.Contains(t, err.Error(), "not a valid IP address or CIDR")
+}
+
+func TestNetworkPolicySpec_Validate_InvalidCIDR(t *testing.T) {
+	t.Parallel()
+	err := (&NetworkPolicySpec{
+		CommonSpec:    validCommonSpec(),
+		Name:          "MY_NP",
+		AllowedIPList: []string{"999.999.999.999/99"},
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not a valid IP address or CIDR")
+}
+
+func TestNetworkPolicySpec_Validate_BlockedInvalidIP(t *testing.T) {
+	t.Parallel()
+	err := (&NetworkPolicySpec{
+		CommonSpec:    validCommonSpec(),
+		Name:          "MY_NP",
+		AllowedIPList: []string{"10.0.0.1"},
+		BlockedIPList: []string{"not-an-ip"},
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.blockedIPList[0]")
+}
+
+func TestNetworkPolicySpec_Validate_EmptyAllowedLists(t *testing.T) {
+	t.Parallel()
+	err := (&NetworkPolicySpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_NP",
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "at least one of allowedIPList or allowedNetworkRuleList must be non-empty")
+}
+
+// ---------------------------------------------------------------------------
+// FileFormatSpec — type enum validation (Finding #3)
+// ---------------------------------------------------------------------------
+
+func TestFileFormatSpec_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, (&FileFormatSpec{
+		CommonSpec:   validCommonSpec(),
+		Name:         "MY_FF",
+		DatabaseName: ptr("DB"),
+		SchemaName:   ptr("SCH"),
+		Type:         FileFormatTypeCSV,
+	}).Validate())
+}
+
+func TestFileFormatSpec_Validate_InvalidType(t *testing.T) {
+	t.Parallel()
+	err := (&FileFormatSpec{
+		CommonSpec:   validCommonSpec(),
+		Name:         "MY_FF",
+		DatabaseName: ptr("DB"),
+		SchemaName:   ptr("SCH"),
+		Type:         "INVALID",
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.type must be one of")
+}
+
+func TestFileFormatSpec_Validate_EmptyType(t *testing.T) {
+	t.Parallel()
+	err := (&FileFormatSpec{
+		CommonSpec:   validCommonSpec(),
+		Name:         "MY_FF",
+		DatabaseName: ptr("DB"),
+		SchemaName:   ptr("SCH"),
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.type is required")
+}
+
+// ---------------------------------------------------------------------------
+// AlertSpec — schedule format validation (Finding #7)
+// ---------------------------------------------------------------------------
+
+func validAlertSpec() *AlertSpec {
+	return &AlertSpec{
+		CommonSpec:   validCommonSpec(),
+		Name:         "MY_ALERT",
+		DatabaseName: ptr("DB"),
+		SchemaName:   ptr("SCH"),
+		Condition:    "SELECT 1",
+		Action:       "CALL my_proc()",
+	}
+}
+
+func TestAlertSpec_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validAlertSpec().Validate())
+}
+
+func TestAlertSpec_Validate_ValidScheduleMinute(t *testing.T) {
+	t.Parallel()
+	spec := validAlertSpec()
+	spec.Schedule = ptr("5 MINUTE")
+	assert.NoError(t, spec.Validate())
+}
+
+func TestAlertSpec_Validate_ValidScheduleCron(t *testing.T) {
+	t.Parallel()
+	spec := validAlertSpec()
+	spec.Schedule = ptr("USING CRON 0 9 * * MON-FRI America/New_York")
+	assert.NoError(t, spec.Validate())
+}
+
+func TestAlertSpec_Validate_InvalidSchedulePlural(t *testing.T) {
+	t.Parallel()
+	spec := validAlertSpec()
+	spec.Schedule = ptr("5 MINUTES")
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.schedule")
+}
+
+func TestAlertSpec_Validate_InvalidScheduleGarbage(t *testing.T) {
+	t.Parallel()
+	spec := validAlertSpec()
+	spec.Schedule = ptr("every 5 minutes")
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.schedule")
+}
+
+// ---------------------------------------------------------------------------
+// PasswordPolicySpec — cross-field age validation (Finding #5)
+// ---------------------------------------------------------------------------
+
+func validPasswordPolicySpec() *PasswordPolicySpec {
+	return &PasswordPolicySpec{
+		CommonSpec:   validCommonSpec(),
+		Name:         "MY_PP",
+		DatabaseName: ptr("DB"),
+		SchemaName:   ptr("SCH"),
+	}
+}
+
+func TestPasswordPolicySpec_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validPasswordPolicySpec().Validate())
+}
+
+func TestPasswordPolicySpec_Validate_MinLengthExceedsMax(t *testing.T) {
+	t.Parallel()
+	spec := validPasswordPolicySpec()
+	min := int32(20)
+	max := int32(8)
+	spec.PasswordMinLength = &min
+	spec.PasswordMaxLength = &max
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.passwordMinLength must not exceed spec.passwordMaxLength")
+}
+
+func TestPasswordPolicySpec_Validate_MinAgeDaysExceedsMaxAgeDays(t *testing.T) {
+	t.Parallel()
+	spec := validPasswordPolicySpec()
+	minAge := int32(90)
+	maxAge := int32(30)
+	spec.PasswordMinAgeDays = &minAge
+	spec.PasswordMaxAgeDays = &maxAge
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.passwordMinAgeDays must not exceed spec.passwordMaxAgeDays")
+}
+
+func TestPasswordPolicySpec_Validate_AgeDaysEqual(t *testing.T) {
+	t.Parallel()
+	spec := validPasswordPolicySpec()
+	val := int32(30)
+	spec.PasswordMinAgeDays = &val
+	spec.PasswordMaxAgeDays = &val
+	assert.NoError(t, spec.Validate())
+}
+
+// ---------------------------------------------------------------------------
+// ResourceMonitorSpec — trigger limit validation (Finding #4)
+// ---------------------------------------------------------------------------
+
+func TestResourceMonitorSpec_Validate_TooManyNotifyTriggers(t *testing.T) {
+	t.Parallel()
+	triggers := make([]ResourceMonitorTrigger, 6)
+	for i := range triggers {
+		triggers[i] = ResourceMonitorTrigger{Threshold: int32(10 * (i + 1)), Action: ResourceMonitorTriggerActionNotify}
+	}
+	err := (&ResourceMonitorSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_MONITOR",
+		Triggers:   triggers,
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "at most 5 NOTIFY triggers are allowed")
+}
+
+func TestResourceMonitorSpec_Validate_MultipleSuspendTriggers(t *testing.T) {
+	t.Parallel()
+	err := (&ResourceMonitorSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_MONITOR",
+		Triggers: []ResourceMonitorTrigger{
+			{Threshold: 80, Action: ResourceMonitorTriggerActionSuspend},
+			{Threshold: 90, Action: ResourceMonitorTriggerActionSuspend},
+		},
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "at most 1 SUSPEND trigger is allowed")
+}
+
+func TestResourceMonitorSpec_Validate_MultipleSuspendImmediateTriggers(t *testing.T) {
+	t.Parallel()
+	err := (&ResourceMonitorSpec{
+		CommonSpec: validCommonSpec(),
+		Name:       "MY_MONITOR",
+		Triggers: []ResourceMonitorTrigger{
+			{Threshold: 80, Action: ResourceMonitorTriggerActionSuspendImmediate},
+			{Threshold: 90, Action: ResourceMonitorTriggerActionSuspendImmediate},
+		},
+	}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "at most 1 SUSPEND_IMMEDIATE trigger is allowed")
+}
+
+func TestResourceMonitorSpec_Validate_ValidMixedTriggers(t *testing.T) {
+	t.Parallel()
+	freq := ResourceMonitorFrequencyMonthly
+	assert.NoError(t, (&ResourceMonitorSpec{
+		CommonSpec:     validCommonSpec(),
+		Name:           "MY_MONITOR",
+		Frequency:      &freq,
+		StartTimestamp: ptr("IMMEDIATELY"),
+		Triggers: []ResourceMonitorTrigger{
+			{Threshold: 50, Action: ResourceMonitorTriggerActionNotify},
+			{Threshold: 80, Action: ResourceMonitorTriggerActionNotify},
+			{Threshold: 90, Action: ResourceMonitorTriggerActionSuspend},
+			{Threshold: 100, Action: ResourceMonitorTriggerActionSuspendImmediate},
+		},
+	}).Validate())
+}
+
+// ---------------------------------------------------------------------------
+// TagAssociationSpec — ObjectType enum validation (Finding #11)
+// ---------------------------------------------------------------------------
+
+func TestTagAssociationSpec_Validate_InvalidObjectType(t *testing.T) {
+	t.Parallel()
+	spec := validTagAssociationSpec()
+	spec.ObjectType = "FOOBAR"
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.objectType must be one of")
+}
+
+func TestTagAssociationSpec_Validate_ValidObjectType_NetworkPolicy(t *testing.T) {
+	t.Parallel()
+	spec := validTagAssociationSpec()
+	spec.ObjectType = "NETWORK POLICY"
+	assert.NoError(t, spec.Validate())
+}
+
+func TestTagAssociationSpec_Validate_ValidObjectType_DatabaseRole(t *testing.T) {
+	t.Parallel()
+	spec := validTagAssociationSpec()
+	spec.ObjectType = "DATABASE ROLE"
+	assert.NoError(t, spec.Validate())
+}
+
+// ---------------------------------------------------------------------------
+// NetworkPolicyAttachmentSpec — TargetType enum validation (Finding #3)
+// ---------------------------------------------------------------------------
+
+func TestNetworkPolicyAttachmentSpec_Validate_InvalidTargetType(t *testing.T) {
+	t.Parallel()
+	spec := validNetworkPolicyAttachmentSpec()
+	spec.TargetType = "FOOBAR"
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.targetType must be one of [ACCOUNT USER]")
+}
+
+// ---------------------------------------------------------------------------
+// PasswordPolicyAttachmentSpec — TargetType enum validation (Finding #3)
+// ---------------------------------------------------------------------------
+
+func TestPasswordPolicyAttachmentSpec_Validate_InvalidTargetType(t *testing.T) {
+	t.Parallel()
+	spec := validPasswordPolicyAttachmentSpec()
+	spec.TargetType = "FOOBAR"
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.targetType must be one of [ACCOUNT USER]")
+}
+
+// ---------------------------------------------------------------------------
+// validateSchedule helper
+// ---------------------------------------------------------------------------
+
+func TestValidateSchedule_ValidMinute(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validateSchedule("1 MINUTE"))
+	assert.NoError(t, validateSchedule("60 MINUTE"))
+	assert.NoError(t, validateSchedule("1440 MINUTE"))
+}
+
+func TestValidateSchedule_ValidCron(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validateSchedule("USING CRON 0 9 * * MON-FRI America/New_York"))
+	assert.NoError(t, validateSchedule("USING CRON */5 * * * * UTC"))
+}
+
+func TestValidateSchedule_Invalid(t *testing.T) {
+	t.Parallel()
+	assert.Error(t, validateSchedule("5 MINUTES"))          // plural
+	assert.Error(t, validateSchedule("every 5 minutes"))    // freeform
+	assert.Error(t, validateSchedule("CRON 0 9 * * * UTC")) // missing USING
+}
+
+// ---------------------------------------------------------------------------
+// validateIPOrCIDR helper
+// ---------------------------------------------------------------------------
+
+func TestValidateIPOrCIDR_ValidIPv4(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validateIPOrCIDR("192.168.0.1"))
+	assert.NoError(t, validateIPOrCIDR("10.0.0.0"))
+}
+
+func TestValidateIPOrCIDR_ValidCIDR(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validateIPOrCIDR("10.0.0.0/8"))
+	assert.NoError(t, validateIPOrCIDR("192.168.0.0/24"))
+}
+
+func TestValidateIPOrCIDR_Invalid(t *testing.T) {
+	t.Parallel()
+	assert.Error(t, validateIPOrCIDR("banana"))
+	assert.Error(t, validateIPOrCIDR("999.999.999.999"))
+	assert.Error(t, validateIPOrCIDR(""))
+}
+
+// ---------------------------------------------------------------------------
+// TaskSpec.Validate — schedule format (R-17 F1)
+// ---------------------------------------------------------------------------
+
+func TestTaskSpec_Validate_ValidScheduleMinute(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.Schedule = ptr("5 MINUTE")
+	assert.NoError(t, s.Validate())
+}
+
+func TestTaskSpec_Validate_ValidScheduleCron(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.Schedule = ptr("USING CRON 0 9 * * MON-FRI America/New_York")
+	assert.NoError(t, s.Validate())
+}
+
+func TestTaskSpec_Validate_InvalidSchedule(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.Schedule = ptr("5 MINUTES")
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.schedule:")
+}
+
+func TestTaskSpec_Validate_EmptyScheduleSkipped(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.Schedule = ptr("")
+	assert.NoError(t, s.Validate())
+}
+
+func TestTaskSpec_Validate_NilScheduleSkipped(t *testing.T) {
+	t.Parallel()
+	s := validTaskSpec()
+	s.Schedule = nil
+	assert.NoError(t, s.Validate())
+}
+
+// ---------------------------------------------------------------------------
+// DynamicTableSpec.Validate — targetLag format (R-17 F2)
+// ---------------------------------------------------------------------------
+
+func TestDynamicTableSpec_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	spec := &DynamicTableSpec{
+		CommonSpec:    validCommonSpec(),
+		Name:          "DT",
+		DatabaseName:  ptr("DB"),
+		SchemaName:    ptr("SCH"),
+		Query:         "SELECT 1",
+		TargetLag:     "10 minutes",
+		WarehouseName: ptr("WH"),
+	}
+	assert.NoError(t, spec.Validate())
+}
+
+func TestDynamicTableSpec_Validate_TargetLagDownstream(t *testing.T) {
+	t.Parallel()
+	spec := &DynamicTableSpec{
+		CommonSpec:    validCommonSpec(),
+		Name:          "DT",
+		DatabaseName:  ptr("DB"),
+		SchemaName:    ptr("SCH"),
+		Query:         "SELECT 1",
+		TargetLag:     "DOWNSTREAM",
+		WarehouseName: ptr("WH"),
+	}
+	assert.NoError(t, spec.Validate())
+}
+
+func TestDynamicTableSpec_Validate_TargetLagDownstreamCaseInsensitive(t *testing.T) {
+	t.Parallel()
+	spec := &DynamicTableSpec{
+		CommonSpec:    validCommonSpec(),
+		Name:          "DT",
+		DatabaseName:  ptr("DB"),
+		SchemaName:    ptr("SCH"),
+		Query:         "SELECT 1",
+		TargetLag:     "downstream",
+		WarehouseName: ptr("WH"),
+	}
+	assert.NoError(t, spec.Validate())
+}
+
+func TestDynamicTableSpec_Validate_TargetLagSingularUnit(t *testing.T) {
+	t.Parallel()
+	for _, lag := range []string{"1 second", "1 minute", "1 hour", "1 day"} {
+		spec := &DynamicTableSpec{
+			CommonSpec:    validCommonSpec(),
+			Name:          "DT",
+			DatabaseName:  ptr("DB"),
+			SchemaName:    ptr("SCH"),
+			Query:         "SELECT 1",
+			TargetLag:     lag,
+			WarehouseName: ptr("WH"),
+		}
+		assert.NoError(t, spec.Validate(), "lag=%q", lag)
+	}
+}
+
+func TestDynamicTableSpec_Validate_TargetLagPluralUnit(t *testing.T) {
+	t.Parallel()
+	for _, lag := range []string{"30 seconds", "5 minutes", "2 hours", "7 days"} {
+		spec := &DynamicTableSpec{
+			CommonSpec:    validCommonSpec(),
+			Name:          "DT",
+			DatabaseName:  ptr("DB"),
+			SchemaName:    ptr("SCH"),
+			Query:         "SELECT 1",
+			TargetLag:     lag,
+			WarehouseName: ptr("WH"),
+		}
+		assert.NoError(t, spec.Validate(), "lag=%q", lag)
+	}
+}
+
+func TestDynamicTableSpec_Validate_TargetLagInvalid(t *testing.T) {
+	t.Parallel()
+	for _, lag := range []string{"banana", "5 WEEKS", "10", "fast"} {
+		spec := &DynamicTableSpec{
+			CommonSpec:    validCommonSpec(),
+			Name:          "DT",
+			DatabaseName:  ptr("DB"),
+			SchemaName:    ptr("SCH"),
+			Query:         "SELECT 1",
+			TargetLag:     lag,
+			WarehouseName: ptr("WH"),
+		}
+		err := spec.Validate()
+		require.Error(t, err, "lag=%q", lag)
+		assert.Contains(t, err.Error(), "spec.targetLag:", "lag=%q", lag)
+	}
+}
+
+func TestDynamicTableSpec_Validate_TargetLagEmpty(t *testing.T) {
+	t.Parallel()
+	spec := &DynamicTableSpec{
+		CommonSpec:    validCommonSpec(),
+		Name:          "DT",
+		DatabaseName:  ptr("DB"),
+		SchemaName:    ptr("SCH"),
+		Query:         "SELECT 1",
+		TargetLag:     "",
+		WarehouseName: ptr("WH"),
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.targetLag is required")
+}
+
+// ---------------------------------------------------------------------------
+// validateTargetLag helper (R-17 F2)
+// ---------------------------------------------------------------------------
+
+func TestValidateTargetLag_ValidDurations(t *testing.T) {
+	t.Parallel()
+	for _, lag := range []string{"1 second", "30 seconds", "1 minute", "5 minutes", "1 hour", "2 hours", "1 day", "7 days"} {
+		assert.NoError(t, validateTargetLag(lag), "lag=%q", lag)
+	}
+}
+
+func TestValidateTargetLag_Downstream(t *testing.T) {
+	t.Parallel()
+	assert.NoError(t, validateTargetLag("DOWNSTREAM"))
+	assert.NoError(t, validateTargetLag("downstream"))
+	assert.NoError(t, validateTargetLag("Downstream"))
+}
+
+func TestValidateTargetLag_Invalid(t *testing.T) {
+	t.Parallel()
+	for _, lag := range []string{"banana", "5 WEEKS", "10", "", "fast"} {
+		assert.Error(t, validateTargetLag(lag), "lag=%q should fail", lag)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// WarehouseSpec.Validate — Generation enum + mutual exclusion (R-17 F3)
+// ---------------------------------------------------------------------------
+
+func TestWarehouseSpec_Validate_GenerationValid(t *testing.T) {
+	t.Parallel()
+	for _, gen := range []string{"1", "2"} {
+		spec := &WarehouseSpec{CommonSpec: validCommonSpec(), Name: "WH", Generation: ptr(gen)}
+		assert.NoError(t, spec.Validate(), "generation=%q", gen)
+	}
+}
+
+func TestWarehouseSpec_Validate_GenerationInvalid(t *testing.T) {
+	t.Parallel()
+	for _, gen := range []string{"0", "3", "abc"} {
+		spec := &WarehouseSpec{CommonSpec: validCommonSpec(), Name: "WH", Generation: ptr(gen)}
+		err := spec.Validate()
+		require.Error(t, err, "generation=%q", gen)
+		assert.Contains(t, err.Error(), "spec.generation must be", "generation=%q", gen)
+	}
+}
+
+func TestWarehouseSpec_Validate_GenerationAndResourceConstraintMutuallyExclusive(t *testing.T) {
+	t.Parallel()
+	rc := ResourceConstraintMemory
+	spec := &WarehouseSpec{
+		CommonSpec:         validCommonSpec(),
+		Name:               "WH",
+		Generation:         ptr("1"),
+		ResourceConstraint: &rc,
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mutually exclusive")
+}
+
+func TestWarehouseSpec_Validate_GenerationNilSkipped(t *testing.T) {
+	t.Parallel()
+	spec := &WarehouseSpec{CommonSpec: validCommonSpec(), Name: "WH", Generation: nil}
+	assert.NoError(t, spec.Validate())
+}
+
+// ---------------------------------------------------------------------------
+// FieldExportSpec.Validate — .status. prefix (R-17 F10)
+// ---------------------------------------------------------------------------
+
+func TestFieldExportSpec_Validate_PathSpecPrefix(t *testing.T) {
+	t.Parallel()
+	// ".spec.name" starts with "." but NOT ".status." — should now fail.
+	spec := FieldExportSpec{
+		From: FieldExportSource{
+			Resource: FieldExportResourceRef{Kind: "Database", Name: "my-db"},
+			Path:     ".spec.name",
+		},
+		To: FieldExportTarget{
+			Kind: FieldExportTargetConfigMap,
+			Name: "my-cm",
+			Key:  "db-name",
+		},
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `must start with ".status."`)
+}
+
+func TestFieldExportSpec_Validate_PathMetadataPrefix(t *testing.T) {
+	t.Parallel()
+	spec := FieldExportSpec{
+		From: FieldExportSource{
+			Resource: FieldExportResourceRef{Kind: "Database", Name: "my-db"},
+			Path:     ".metadata.name",
+		},
+		To: FieldExportTarget{
+			Kind: FieldExportTargetConfigMap,
+			Name: "my-cm",
+			Key:  "name",
+		},
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `must start with ".status."`)
+}
+
+func TestFieldExportSpec_Validate_PathStatusValid(t *testing.T) {
+	t.Parallel()
+	spec := FieldExportSpec{
+		From: FieldExportSource{
+			Resource: FieldExportResourceRef{Kind: "Database", Name: "my-db"},
+			Path:     ".status.showOutput.name",
+		},
+		To: FieldExportTarget{
+			Kind: FieldExportTargetConfigMap,
+			Name: "my-cm",
+			Key:  "db-name",
+		},
+	}
+	assert.NoError(t, spec.Validate())
 }

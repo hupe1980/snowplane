@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -15,36 +16,10 @@ type UserObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW USERS row.
-	ShowOutput *UserShowOutput
+	ShowOutput *v1alpha1.UserShowOutput
 
 	// DescribeOutput contains the DESCRIBE USER output.
 	DescribeOutput *UserDescribeOutput
-}
-
-// UserShowOutput contains the fields from SHOW USERS.
-type UserShowOutput struct {
-	CreatedOn             string
-	Name                  string
-	LoginName             string
-	DisplayName           string
-	Email                 string
-	FirstName             string
-	LastName              string
-	MiddleName            string
-	Comment               string
-	DefaultRole           string
-	DefaultSecondaryRoles string
-	DefaultWarehouse      string
-	DefaultNamespace      string
-	Owner                 string
-	Disabled              bool
-	MustChangePassword    bool
-	HasRSAPublicKey       bool
-	Type                  string
-	DaysToExpiry          string
-	MinsToUnlock          string
-	MinsToBypassMFA       string
-	DisableMFA            bool
 }
 
 // UserDescribeOutput holds additional fields from DESCRIBE USER.
@@ -330,7 +305,7 @@ func buildShowUserByIDSQL(name AccountObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW USERS for a specific user name.
-func (u *UserClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*UserShowOutput, error) {
+func (u *UserClient) ShowByID(ctx context.Context, name AccountObjectIdentifier) (*v1alpha1.UserShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("user name is required"))
 	}
@@ -388,9 +363,9 @@ func (u *UserClient) Observe(ctx context.Context, name AccountObjectIdentifier) 
 }
 
 // scanUserShowOutput scans SHOW USERS results for a matching row.
-func scanUserShowOutput(rows *sql.Rows, name string) (*UserShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*UserShowOutput, error) {
-		return &UserShowOutput{
+func scanUserShowOutput(rows *sql.Rows, name string) (*v1alpha1.UserShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.UserShowOutput, error) {
+		return &v1alpha1.UserShowOutput{
 			CreatedOn:             m["created_on"],
 			Name:                  m["name"],
 			LoginName:             m["login_name"],

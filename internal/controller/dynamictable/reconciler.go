@@ -3,15 +3,20 @@ package dynamictable
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	sigs "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 	"github.com/hupe1980/snowplane/internal/tracked"
@@ -36,44 +41,211 @@ type Service interface {
 type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error)
 
 // NewReconciler returns a new DynamicTable reconciler backed by the generic framework.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.DynamicTable, Service, *snowflake.DynamicTableObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: defaultServiceFactory}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.DynamicTable, Service, *snowflake.DynamicTableObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
-	}
+func NewReconciler(c sigs.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.DynamicTable, Service, *snowflake.DynamicTableObservation] {
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
+			return snowflake.NewDynamicTableClient(exec)
+		}),
+	)
 }
 
 // NewReconcilerWithServiceFactory is like NewReconciler but lets the caller
 // supply a custom ServiceFactory for testing.
 func NewReconcilerWithServiceFactory(
-	c client.Client,
+	c sigs.Client,
 	factory *clientfactory.ClientFactory,
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.DynamicTable, Service, *snowflake.DynamicTableObservation] {
-	a := &adapter{client: c, recorder: recorder, newService: sf}
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.DynamicTable, Service, *snowflake.DynamicTableObservation]{
-		Client:      c,
-		Factory:     factory,
-		Recorder:    recorder,
-		RateLimiter: rl,
-		Adapter:     a,
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(c, recorder, sf))
+}
+
+// newAdapter creates the BaseAdapter for DynamicTable resources.
+func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.DynamicTable, Service, *snowflake.DynamicTableObservation] {
+	return &reconciler.BaseAdapter[*snowplanev1alpha1.DynamicTable, Service, *snowflake.DynamicTableObservation]{
+		ResourceNameVal:  "dynamictable",
+		FinalizerNameVal: finalizerName,
+		NewObjectFn:      func() *snowplanev1alpha1.DynamicTable { return &snowplanev1alpha1.DynamicTable{} },
+		ServiceFactoryFn: sf,
+		BuildIdentifierFn: func(dt *snowplanev1alpha1.DynamicTable) (reconciler.Identifier, error) {
+			dbName := snowflake.ParseDatabaseNameFromFQN(dt.Status.DatabaseName)
+			schemaName := snowflake.ParseSchemaNameFromFQN(dt.Status.SchemaName)
+			return snowflake.NewSchemaObjectIdentifier(dbName, schemaName, dt.Spec.Name), nil
+		},
+		ObserveFn: reconciler.MakeObserve(
+			func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) (*snowflake.DynamicTableObservation, error) {
+				return svc.Observe(ctx, id)
+			},
+			func(obs *snowflake.DynamicTableObservation) bool { return obs.Exists },
+		),
+		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.DynamicTable, id snowflake.SchemaObjectIdentifier) error {
+			opts := buildCreateOptions(obj, id)
+			return svc.Create(ctx, opts)
+		}),
+		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterDynamicTableOptions) error {
+			return svc.Alter(ctx, *opts)
+		}),
+		DropFn: reconciler.MakeDrop(func(ctx context.Context, svc Service, id snowflake.SchemaObjectIdentifier) error {
+			return svc.Drop(ctx, id)
+		}),
+		ValidateImmutableFn: validateImmutableFields,
+		BuildAlterOptsFn: reconciler.MakeBuildAlterOpts(func(_ context.Context, obj *snowplanev1alpha1.DynamicTable, id snowflake.SchemaObjectIdentifier, obs *reconciler.Observation[*snowflake.DynamicTableObservation]) (reconciler.AlterOptions, error) {
+			opts := buildAlterOptions(obj, id, obs.Detail)
+			return &opts, nil
+		}),
+		ApplyObservationFn: func(obj *snowplanev1alpha1.DynamicTable, obs *reconciler.Observation[*snowflake.DynamicTableObservation]) {
+			applyObservation(obj, obs.Detail)
+		},
+		DetectDriftFn: func(obj *snowplanev1alpha1.DynamicTable, obs *reconciler.Observation[*snowflake.DynamicTableObservation]) *drift.Result {
+			return detectDrift(obj, obs.Detail)
+		},
+		LateInitializeFn: lateInitialize,
+		PreReconcileFn: func(ctx context.Context, dt *snowplanev1alpha1.DynamicTable) error {
+			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, dt,
+				dt.Namespace, dt.Spec.DatabaseRef, dt.Spec.DatabaseName, dt.Status.DatabaseName)
+			if err != nil {
+				return err
+			}
+
+			dt.Status.DatabaseName = dbFQN
+
+			schemaFQN, err := refresolver.PreReconcileSchemaRef(ctx, c, recorder, dt,
+				dt.Namespace, dt.Spec.SchemaRef, dt.Spec.SchemaName, dt.Status.SchemaName)
+			if err != nil {
+				return err
+			}
+
+			dt.Status.SchemaName = schemaFQN
+
+			warehouseName, err := refresolver.PreReconcileSourceRef(ctx, c, recorder, dt,
+				dt.Namespace, dt.Spec.WarehouseRef, dt.Spec.WarehouseName, dt.Status.WarehouseName,
+				"Warehouse",
+				func() *snowplanev1alpha1.Warehouse { return &snowplanev1alpha1.Warehouse{} },
+				snowplanev1alpha1.GroupVersion.WithKind("Warehouse"),
+				func(w *snowplanev1alpha1.Warehouse) string { return w.Spec.Name },
+			)
+			if err != nil {
+				return err
+			}
+
+			dt.Status.WarehouseName = warehouseName
+
+			refresolver.SetAllReferencesResolvedCondition(dt,
+				refresolver.RefDescriptor{KindLabel: "Database", Ref: dt.Spec.DatabaseRef, RawName: dt.Spec.DatabaseName},
+				refresolver.RefDescriptor{KindLabel: "Schema", Ref: dt.Spec.SchemaRef, RawName: dt.Spec.SchemaName},
+				refresolver.RefDescriptor{KindLabel: "Warehouse", Ref: dt.Spec.WarehouseRef, RawName: dt.Spec.WarehouseName},
+			)
+
+			return nil
+		},
+		SetupWatchesFn: func(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.DynamicTable{},
+				".spec.databaseRef.name",
+				func(o sigs.Object) []string {
+					dt, ok := o.(*snowplanev1alpha1.DynamicTable)
+					if !ok || dt.Spec.DatabaseRef == nil {
+						return nil
+					}
+
+					return []string{dt.Spec.DatabaseRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.databaseRef.name: %w", err)
+			}
+
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.DynamicTable{},
+				".spec.schemaRef.name",
+				func(o sigs.Object) []string {
+					dt, ok := o.(*snowplanev1alpha1.DynamicTable)
+					if !ok || dt.Spec.SchemaRef == nil {
+						return nil
+					}
+
+					return []string{dt.Spec.SchemaRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.schemaRef.name: %w", err)
+			}
+
+			bldr.Watches(
+				&snowplanev1alpha1.Database{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.DynamicTableList{} }, ".spec.databaseRef.name", "listing dynamic tables for database watch")),
+			)
+
+			bldr.Watches(
+				&snowplanev1alpha1.Schema{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.DynamicTableList{} }, ".spec.schemaRef.name", "listing dynamic tables for schema watch")),
+			)
+
+			if err := mgr.GetFieldIndexer().IndexField(
+				ctx,
+				&snowplanev1alpha1.DynamicTable{},
+				".spec.warehouseRef.name",
+				func(o sigs.Object) []string {
+					dt, ok := o.(*snowplanev1alpha1.DynamicTable)
+					if !ok || dt.Spec.WarehouseRef == nil {
+						return nil
+					}
+
+					return []string{dt.Spec.WarehouseRef.Name}
+				},
+			); err != nil {
+				return fmt.Errorf("creating field indexer for .spec.warehouseRef.name: %w", err)
+			}
+
+			bldr.Watches(
+				&snowplanev1alpha1.Warehouse{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.DynamicTableList{} }, ".spec.warehouseRef.name", "listing dynamic tables for warehouse watch")),
+			)
+
+			return nil
+		},
 	}
 }
 
-// defaultServiceFactory is the production ServiceFactory.
-func defaultServiceFactory(ctx context.Context, sfClient SnowflakeClient, useRole string) (Service, func(context.Context), error) {
-	sfC, cleanup, err := reconciler.WithUseRole(ctx, sfClient, useRole)
-	if err != nil {
-		return nil, nil, err
+func validateImmutableFields(_ context.Context, dt *snowplanev1alpha1.DynamicTable) error {
+	if reconciler.ShouldSkipImmutableValidation(dt) {
+		return nil
 	}
 
-	return snowflake.NewDynamicTableClient(sfC), cleanup, nil
+	if dt.Status.ShowOutput != nil {
+		if dt.Status.ShowOutput.Name != "" && !strings.EqualFold(dt.Spec.Name, dt.Status.ShowOutput.Name) {
+			return fmt.Errorf("spec.name is immutable after creation (current: %q, desired: %q)", dt.Status.ShowOutput.Name, dt.Spec.Name)
+		}
+
+		if dt.Status.ShowOutput.DatabaseName != "" && dt.Status.DatabaseName != "" {
+			resolvedDB := snowflake.ParseDatabaseNameFromFQN(dt.Status.DatabaseName)
+			if !strings.EqualFold(resolvedDB, dt.Status.ShowOutput.DatabaseName) {
+				return fmt.Errorf("spec.databaseRef is immutable after creation (current database: %q, resolved: %q)", dt.Status.ShowOutput.DatabaseName, resolvedDB)
+			}
+		}
+
+		if dt.Status.ShowOutput.SchemaName != "" && dt.Status.SchemaName != "" {
+			resolvedSchema := snowflake.ParseSchemaNameFromFQN(dt.Status.SchemaName)
+			if !strings.EqualFold(resolvedSchema, dt.Status.ShowOutput.SchemaName) {
+				return fmt.Errorf("spec.schemaRef is immutable after creation (current schema: %q, resolved: %q)", dt.Status.ShowOutput.SchemaName, resolvedSchema)
+			}
+		}
+
+		// query is immutable — defines the dynamic table's SQL content.
+		if dt.Status.ShowOutput.Text != "" && dt.Spec.Query != dt.Status.ShowOutput.Text {
+			return fmt.Errorf("spec.query is immutable after creation (current: %q, desired: %q)", dt.Status.ShowOutput.Text, dt.Spec.Query)
+		}
+
+		// refreshMode is immutable — set at CREATE time only.
+		if dt.Status.ShowOutput.RefreshMode != "" && dt.Spec.RefreshMode != nil {
+			if !strings.EqualFold(string(*dt.Spec.RefreshMode), dt.Status.ShowOutput.RefreshMode) {
+				return fmt.Errorf("spec.refreshMode is immutable after creation (current: %q, desired: %q)", dt.Status.ShowOutput.RefreshMode, *dt.Spec.RefreshMode)
+			}
+		}
+	}
+
+	return nil
 }
 
 func applyObservation(dt *snowplanev1alpha1.DynamicTable, obs *snowflake.DynamicTableObservation) {
@@ -86,21 +258,7 @@ func applyObservation(dt *snowplanev1alpha1.DynamicTable, obs *snowflake.Dynamic
 		dt.Status.DatabaseName = obs.ShowOutput.DatabaseName
 		dt.Status.SchemaName = obs.ShowOutput.SchemaName
 
-		dt.Status.ShowOutput = &snowplanev1alpha1.DynamicTableShowOutput{
-			CreatedOn:       obs.ShowOutput.CreatedOn,
-			Name:            obs.ShowOutput.Name,
-			DatabaseName:    obs.ShowOutput.DatabaseName,
-			SchemaName:      obs.ShowOutput.SchemaName,
-			Owner:           obs.ShowOutput.Owner,
-			Comment:         obs.ShowOutput.Comment,
-			TargetLag:       obs.ShowOutput.TargetLag,
-			Warehouse:       obs.ShowOutput.Warehouse,
-			RefreshMode:     obs.ShowOutput.RefreshMode,
-			Text:            obs.ShowOutput.Text,
-			SchedulingState: obs.ShowOutput.SchedulingState,
-			ClusterBy:       obs.ShowOutput.ClusterBy,
-			DataTimestamp:   obs.ShowOutput.DataTimestamp,
-		}
+		dt.Status.ShowOutput = obs.ShowOutput
 	}
 }
 

@@ -27,7 +27,7 @@ Full lifecycle management for every resource — create, alter, drop, drift dete
 |:---------|:----------|
 | **Core Infrastructure** | Database, Schema, Warehouse |
 | **Data Objects** | Table, View, MaterializedView, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe, Sequence, ExternalTable |
-| **Identity & Access** | User, AccountRole, DatabaseRole, AccountRoleGrant, DatabaseRoleGrant, AccountRoleAssignment, DatabaseRoleAssignment, ShareGrant, GrantOwnership |
+| **Identity & Access** | User, AccountRole, DatabaseRole, GrantPrivilegesToAccountRole, GrantPrivilegesToDatabaseRole, AccountRoleAssignment, DatabaseRoleAssignment, GrantPrivilegesToShare, GrantOwnership |
 | **Orchestration** | Task, Alert |
 | **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
 | **Security & Governance** | AuthenticationPolicy, NetworkPolicy, NetworkRule, PasswordPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
@@ -46,7 +46,7 @@ Full lifecycle management for every resource — create, alter, drop, drift dete
 : Field-level drift detection with structured reporting. Use `detect-only` policy for monitoring without correction.
 
 **Cross-Resource References**
-: Schemas reference Databases; Tables, Views, MaterializedViews, and Stages reference Schemas. Dependency resolution and backoff are automatic.
+: Schemas reference Databases; Tables, Views, MaterializedViews, and Stages reference Schemas. Dependency resolution and backoff are automatic. See the [Resource Dependencies](/snowplane/resource-dependencies/) guide for full details.
 
 **Resource Adoption**
 : Adopt pre-existing Snowflake objects via `spec.managementPolicies.adoptionPolicy: adopt` — no data migration needed. Spec fields are automatically late-initialized from observed Snowflake state.

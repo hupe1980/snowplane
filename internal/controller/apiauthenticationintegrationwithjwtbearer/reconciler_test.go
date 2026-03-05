@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -79,7 +78,7 @@ func newTestIntegration(name, namespace string) *snowplanev1alpha1.APIAuthentica
 func successfulObservation() *snowflake.APIAuthenticationIntegrationObservation {
 	return &snowflake.APIAuthenticationIntegrationObservation{
 		Exists: true,
-		ShowOutput: &snowflake.SecurityIntegrationShowOutput{
+		ShowOutput: &snowplanev1alpha1.SecurityIntegrationShowOutput{
 			CreatedOn: "2024-01-01", Name: "MY_JWT_AUTH", Type: "API_AUTHENTICATION", Category: "SECURITY", Enabled: true,
 		},
 		DescribeOutput: map[string]string{
@@ -98,18 +97,14 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 
 	c := cb.Build()
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBearer, Service, *snowflake.APIAuthenticationIntegrationObservation]{
-		Client:   c,
-		Factory:  clientfactory.NewClientFactory(),
-		Recorder: record.NewFakeRecorder(100),
-		Adapter: &adapter{
-			client: c,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
+	r := NewReconcilerWithServiceFactory(c, testutil.NewTestClientFactory(), record.NewFakeRecorder(100), nil,
+		func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
 		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("APIAuthenticationIntegrationWithJWTBearer"),
-	}
+	)
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("APIAuthenticationIntegrationWithJWTBearer")
+
+	return r
 }
 
 func TestReconcile_StandardSuite(t *testing.T) {
@@ -373,8 +368,8 @@ func TestReconcile_ImmutableName(t *testing.T) {
 	obj.Finalizers = []string{finalizerName}
 	obj.Status.ObservedGeneration = 1
 	obj.Spec.Name = "RENAMED_AUTH"
-	obj.Status.ShowOutput = &snowplanev1alpha1.APIAuthenticationIntegrationShowOutput{
-		Name: testutil.Ptr("MY_JWT_AUTH"),
+	obj.Status.ShowOutput = &snowplanev1alpha1.SecurityIntegrationShowOutput{
+		Name: "MY_JWT_AUTH",
 	}
 
 	obs := successfulObservation()
@@ -445,7 +440,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 		},
 	}
 	obs := &snowflake.APIAuthenticationIntegrationObservation{
-		ShowOutput:     &snowflake.SecurityIntegrationShowOutput{Name: "MY_JWT_AUTH", Enabled: true},
+		ShowOutput:     &snowplanev1alpha1.SecurityIntegrationShowOutput{Name: "MY_JWT_AUTH", Enabled: true},
 		DescribeOutput: map[string]string{"OAUTH_ASSERTION_ISSUER": "https://issuer.example.com"},
 	}
 	result := detectDrift(obj, obs)
@@ -465,7 +460,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.APIAuthenticationIntegrationObservation{
-		ShowOutput: &snowflake.SecurityIntegrationShowOutput{
+		ShowOutput: &snowplanev1alpha1.SecurityIntegrationShowOutput{
 			Name:    "MY_JWT_AUTH",
 			Enabled: true,
 			Comment: "drifted",

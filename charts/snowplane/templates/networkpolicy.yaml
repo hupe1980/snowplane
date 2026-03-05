@@ -27,6 +27,12 @@ spec:
             matchLabels:
               kubernetes.io/metadata.name: {{ .Values.networkPolicy.metricsNamespace }}
       {{- end }}
+    {{- if .Values.webhook.enabled }}
+    # Allow API server to reach the webhook endpoint.
+    - ports:
+        - port: {{ .Values.webhook.port }}
+          protocol: TCP
+    {{- end }}
     {{- with .Values.networkPolicy.extraIngress }}
     {{- toYaml . | nindent 4 }}
     {{- end }}

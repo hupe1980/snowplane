@@ -40,7 +40,7 @@ type PasswordPolicyAttachmentSpec struct {
 	// When set, the policy name is resolved from the CR's fullyQualifiedName.
 	// Mutually exclusive with PolicyName.
 	// +optional
-	PolicyRef *LocalObjectReference `json:"policyRef,omitempty"`
+	PolicyRef *ObjectReference `json:"policyRef,omitempty"`
 
 	// TargetType is the kind of Snowflake object to attach the policy to.
 	// Immutable after creation.

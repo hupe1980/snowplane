@@ -31,7 +31,7 @@ type ProcedurePythonSpec struct {
 
 	// DatabaseRef references a Database CR in the same namespace.
 	// +optional
-	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
+	DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
 	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// +optional
@@ -41,7 +41,7 @@ type ProcedurePythonSpec struct {
 
 	// SchemaRef references a Schema CR in the same namespace.
 	// +optional
-	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
+	SchemaRef *ObjectReference `json:"schemaRef,omitempty"`
 
 	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// +optional

@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -26,20 +27,18 @@ func newAccountRole() *snowplanev1alpha1.AccountRole {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills comment from observation", func(t *testing.T) {
 		obj := newAccountRole()
 		obs := &reconciler.Observation[*snowflake.AccountRoleObservation]{
 			Exists: true,
 			Detail: &snowflake.AccountRoleObservation{
-				ShowOutput: &snowflake.AccountRoleShowOutput{
+				ShowOutput: &snowplanev1alpha1.AccountRoleShowOutput{
 					Comment: "role comment",
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 		assert.Equal(t, "role comment", *obj.Spec.Comment)
 	})
@@ -51,13 +50,13 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.AccountRoleObservation]{
 			Exists: true,
 			Detail: &snowflake.AccountRoleObservation{
-				ShowOutput: &snowflake.AccountRoleShowOutput{
+				ShowOutput: &snowplanev1alpha1.AccountRoleShowOutput{
 					Comment: "snowflake comment",
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 		assert.Equal(t, "user comment", *obj.Spec.Comment)
 	})
@@ -69,7 +68,7 @@ func TestLateInitialize(t *testing.T) {
 			Detail: nil,
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 
@@ -78,13 +77,13 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.AccountRoleObservation]{
 			Exists: true,
 			Detail: &snowflake.AccountRoleObservation{
-				ShowOutput: &snowflake.AccountRoleShowOutput{
+				ShowOutput: &snowplanev1alpha1.AccountRoleShowOutput{
 					Comment: "",
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 		assert.Nil(t, obj.Spec.Comment)
 	})

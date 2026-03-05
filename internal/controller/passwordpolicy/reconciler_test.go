@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/testutil"
@@ -98,7 +97,7 @@ func newTestPasswordPolicy(name, namespace string) *snowplanev1alpha1.PasswordPo
 func successfulObservation() *snowflake.PasswordPolicyObservation {
 	return &snowflake.PasswordPolicyObservation{
 		Exists: true,
-		ShowOutput: &snowflake.PasswordPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.PasswordPolicyShowOutput{
 			CreatedOn:    "2024-01-01",
 			Name:         "MY_POLICY",
 			DatabaseName: "MY_DB",
@@ -119,20 +118,16 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	rec := record.NewFakeRecorder(100)
 
 	return &reconciler.GenericReconciler[*snowplanev1alpha1.PasswordPolicy, Service, *snowflake.PasswordPolicyObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: rec,
-		Adapter: &adapter{
-			client:   c,
-			recorder: rec,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
-		},
+		Adapter: newAdapter(c, rec, func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+			return mock, nil, nil
+		}),
 		GVK: snowplanev1alpha1.GroupVersion.WithKind("PasswordPolicy"),
 	}
 }
@@ -377,7 +372,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.PasswordPolicyObservation{
-		ShowOutput: &snowflake.PasswordPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.PasswordPolicyShowOutput{
 			Name: "MY_POLICY",
 		},
 	}
@@ -397,7 +392,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	}
 
 	obs := &snowflake.PasswordPolicyObservation{
-		ShowOutput: &snowflake.PasswordPolicyShowOutput{
+		ShowOutput: &snowplanev1alpha1.PasswordPolicyShowOutput{
 			Name:    "MY_POLICY",
 			Comment: "drifted",
 		},

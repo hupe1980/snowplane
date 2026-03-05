@@ -36,7 +36,7 @@ type PipeSpec struct {
 	// DatabaseRef references a Database CR in the same namespace.
 	// Mutually exclusive with DatabaseName. Immutable after creation.
 	// +optional
-	DatabaseRef *LocalObjectReference `json:"databaseRef,omitempty"`
+	DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
 	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
 	// Mutually exclusive with DatabaseRef. Immutable after creation.
@@ -48,7 +48,7 @@ type PipeSpec struct {
 	// SchemaRef references a Schema CR in the same namespace.
 	// Mutually exclusive with SchemaName. Immutable after creation.
 	// +optional
-	SchemaRef *LocalObjectReference `json:"schemaRef,omitempty"`
+	SchemaRef *ObjectReference `json:"schemaRef,omitempty"`
 
 	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
 	// Mutually exclusive with SchemaRef. Immutable after creation.
@@ -73,7 +73,7 @@ type PipeSpec struct {
 	// Mutually exclusive with IntegrationName. Immutable after creation.
 	// Required when autoIngest is true.
 	// +optional
-	IntegrationRef *LocalObjectReference `json:"integrationRef,omitempty"`
+	IntegrationRef *ObjectReference `json:"integrationRef,omitempty"`
 
 	// IntegrationName is the Snowflake notification integration identifier.
 	// Mutually exclusive with IntegrationRef. Immutable after creation.
@@ -92,7 +92,7 @@ type PipeSpec struct {
 	// ErrorIntegrationRef references a NotificationIntegration CR for error notifications.
 	// Mutually exclusive with ErrorIntegrationName.
 	// +optional
-	ErrorIntegrationRef *LocalObjectReference `json:"errorIntegrationRef,omitempty"`
+	ErrorIntegrationRef *ObjectReference `json:"errorIntegrationRef,omitempty"`
 
 	// ErrorIntegrationName is the Snowflake notification integration name for error notifications.
 	// Mutually exclusive with ErrorIntegrationRef.

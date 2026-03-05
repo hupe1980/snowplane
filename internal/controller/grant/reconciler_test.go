@@ -16,9 +16,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
-	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
+	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/testutil"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
@@ -61,15 +61,14 @@ func (m *mockService) Revoke(ctx context.Context, opts snowflake.RevokeGrantOpti
 // Helpers
 // --------------------------------------------------------------------------
 
-
-func newTestAccountRoleGrant(name, namespace string) *snowplanev1alpha1.AccountRoleGrant {
-	return &snowplanev1alpha1.AccountRoleGrant{
+func newTestGrantPrivilegesToAccountRole(name, namespace string) *snowplanev1alpha1.GrantPrivilegesToAccountRole {
+	return &snowplanev1alpha1.GrantPrivilegesToAccountRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       name,
 			Namespace:  namespace,
 			Generation: 1,
 		},
-		Spec: snowplanev1alpha1.AccountRoleGrantSpec{
+		Spec: snowplanev1alpha1.GrantPrivilegesToAccountRoleSpec{
 			CommonSpec: snowplanev1alpha1.CommonSpec{
 				DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete,
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
@@ -89,7 +88,7 @@ func newTestAccountRoleGrant(name, namespace string) *snowplanev1alpha1.AccountR
 func newSuccessfulObservation() *snowflake.GrantObservation {
 	return &snowflake.GrantObservation{
 		Exists: true,
-		ShowOutput: &snowflake.GrantShowOutput{
+		ShowOutput: &snowplanev1alpha1.GrantShowOutput{
 			CreatedOn:   "2024-01-01",
 			Privilege:   "USAGE",
 			GrantedOn:   "DATABASE",
@@ -102,12 +101,12 @@ func newSuccessfulObservation() *snowflake.GrantObservation {
 	}
 }
 
-func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service, *snowflake.GrantObservation] {
+func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.GrantPrivilegesToAccountRole, Service, *snowflake.GrantObservation] {
 	scheme := testutil.TestScheme()
 
 	cb := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(
-			&snowplanev1alpha1.AccountRoleGrant{},
+			&snowplanev1alpha1.GrantPrivilegesToAccountRole{},
 			&snowplanev1alpha1.ProviderConfig{},
 			&snowplanev1alpha1.AccountRole{},
 			&snowplanev1alpha1.DatabaseRole{},
@@ -118,21 +117,19 @@ func newTestReconciler(mock *mockService, objs ...runtime.Object) *reconciler.Ge
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
+	factory := testutil.NewTestClientFactory()
 	recorder := record.NewFakeRecorder(100)
 
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service, *snowflake.GrantObservation]{
+	sf := func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+		return mock, nil, nil
+	}
+
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.GrantPrivilegesToAccountRole, Service, *snowflake.GrantObservation]{
 		Client:   c,
 		Factory:  factory,
 		Recorder: recorder,
-		Adapter: &accountRoleGrantAdapter{
-			client:   c,
-			recorder: recorder,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
-		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("AccountRoleGrant"),
+		Adapter:  newGrantPrivilegesToAccountRoleAdapter(c, recorder, sf),
+		GVK:      snowplanev1alpha1.GroupVersion.WithKind("GrantPrivilegesToAccountRole"),
 	}
 }
 
@@ -149,12 +146,12 @@ func TestReconcile_StandardSuite(t *testing.T) {
 			return testutil.ReconcilerSetup{Reconciler: r, Client: r.Client}
 		},
 		NewFixture: func(name, ns string) client.Object {
-			return newTestAccountRoleGrant(name, ns)
+			return newTestGrantPrivilegesToAccountRole(name, ns)
 		},
 		NewBlankObject: func() client.Object {
-			return &snowplanev1alpha1.AccountRoleGrant{}
+			return &snowplanev1alpha1.GrantPrivilegesToAccountRole{}
 		},
-		FinalizerName: accountRoleGrantFinalizer,
+		FinalizerName: grantPrivilegesToAccountRoleFinalizer,
 	}.Run(t)
 }
 
@@ -165,8 +162,8 @@ func TestReconcile_StandardSuite(t *testing.T) {
 func TestReconcile_GrantPrivilege(t *testing.T) {
 	t.Parallel()
 
-	grant := newTestAccountRoleGrant("my-grant", "default")
-	grant.Finalizers = []string{accountRoleGrantFinalizer}
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
+	grant.Finalizers = []string{grantPrivilegesToAccountRoleFinalizer}
 
 	var capturedOpts snowflake.CreateGrantOptions
 
@@ -199,7 +196,7 @@ func TestReconcile_GrantPrivilege(t *testing.T) {
 	assert.False(t, capturedOpts.WithGrantOption)
 
 	// Verify status was updated.
-	got := &snowplanev1alpha1.AccountRoleGrant{}
+	got := &snowplanev1alpha1.GrantPrivilegesToAccountRole{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "my-grant", Namespace: "default"}, got))
 	assert.Equal(t, int64(1), got.Status.ObservedGeneration)
 	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
@@ -210,8 +207,8 @@ func TestReconcile_GrantPrivilege(t *testing.T) {
 func TestReconcile_GrantWithGrantOption(t *testing.T) {
 	t.Parallel()
 
-	grant := newTestAccountRoleGrant("my-grant", "default")
-	grant.Finalizers = []string{accountRoleGrantFinalizer}
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
+	grant.Finalizers = []string{grantPrivilegesToAccountRoleFinalizer}
 	grant.Spec.WithGrantOption = true
 
 	var capturedOpts snowflake.CreateGrantOptions
@@ -251,8 +248,8 @@ func TestReconcile_GrantWithGrantOption(t *testing.T) {
 func TestReconcile_ExistingGrantInSync(t *testing.T) {
 	t.Parallel()
 
-	grant := newTestAccountRoleGrant("my-grant", "default")
-	grant.Finalizers = []string{accountRoleGrantFinalizer}
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
+	grant.Finalizers = []string{grantPrivilegesToAccountRoleFinalizer}
 	grant.Status.ObservedGeneration = 1
 	hash, err := grant.ComputeSpecHash()
 	require.NoError(t, err)
@@ -281,8 +278,8 @@ func TestReconcile_RevokeGrant(t *testing.T) {
 	t.Parallel()
 
 	now := metav1.Now()
-	grant := newTestAccountRoleGrant("my-grant", "default")
-	grant.Finalizers = []string{accountRoleGrantFinalizer}
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
+	grant.Finalizers = []string{grantPrivilegesToAccountRoleFinalizer}
 	grant.DeletionTimestamp = &now
 
 	revokeCalled := false
@@ -308,8 +305,8 @@ func TestReconcile_DeleteOrphanPolicy(t *testing.T) {
 	t.Parallel()
 
 	now := metav1.Now()
-	grant := newTestAccountRoleGrant("my-grant", "default")
-	grant.Finalizers = []string{accountRoleGrantFinalizer}
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
+	grant.Finalizers = []string{grantPrivilegesToAccountRoleFinalizer}
 	grant.DeletionTimestamp = &now
 	grant.Spec.DeletionPolicy = snowplanev1alpha1.DeletionPolicyOrphan
 
@@ -335,8 +332,8 @@ func TestReconcile_DeleteOrphanPolicy(t *testing.T) {
 func TestReconcile_GrantError(t *testing.T) {
 	t.Parallel()
 
-	grant := newTestAccountRoleGrant("my-grant", "default")
-	grant.Finalizers = []string{accountRoleGrantFinalizer}
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
+	grant.Finalizers = []string{grantPrivilegesToAccountRoleFinalizer}
 
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.GrantIdentifier) (*snowflake.GrantObservation, error) {
@@ -357,8 +354,8 @@ func TestReconcile_GrantError(t *testing.T) {
 func TestReconcile_ObserveError(t *testing.T) {
 	t.Parallel()
 
-	grant := newTestAccountRoleGrant("my-grant", "default")
-	grant.Finalizers = []string{accountRoleGrantFinalizer}
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
+	grant.Finalizers = []string{grantPrivilegesToAccountRoleFinalizer}
 
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.GrantIdentifier) (*snowflake.GrantObservation, error) {
@@ -444,8 +441,8 @@ func TestApplyGrantShowOutput_NilShowOutput(t *testing.T) {
 func TestValidateImmutableFields_FirstReconcile(t *testing.T) {
 	t.Parallel()
 
-	a := &accountRoleGrantAdapter{}
-	grant := newTestAccountRoleGrant("my-grant", "default")
+	a := newGrantPrivilegesToAccountRoleAdapter(nil, nil, nil)
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
 	grant.Status.ObservedGeneration = 0
 
 	err := a.ValidateImmutableFields(context.Background(), grant)
@@ -455,8 +452,8 @@ func TestValidateImmutableFields_FirstReconcile(t *testing.T) {
 func TestValidateImmutableFields_ForceNew(t *testing.T) {
 	t.Parallel()
 
-	a := &accountRoleGrantAdapter{}
-	grant := newTestAccountRoleGrant("my-grant", "default")
+	a := newGrantPrivilegesToAccountRoleAdapter(nil, nil, nil)
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
 	grant.Status.ObservedGeneration = 1
 	grant.Annotations = map[string]string{
 		snowplanev1alpha1.AnnotationForceNew: "true",
@@ -472,8 +469,8 @@ func TestValidateImmutableFields_ForceNew(t *testing.T) {
 func TestValidateImmutableFields_PrivilegeChanged(t *testing.T) {
 	t.Parallel()
 
-	a := &accountRoleGrantAdapter{}
-	grant := newTestAccountRoleGrant("my-grant", "default")
+	a := newGrantPrivilegesToAccountRoleAdapter(nil, nil, nil)
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
 	grant.Status.ObservedGeneration = 1
 	grant.Status.ShowOutput = &snowplanev1alpha1.GrantShowOutput{
 		Privilege: "SELECT",
@@ -488,8 +485,8 @@ func TestValidateImmutableFields_PrivilegeChanged(t *testing.T) {
 func TestValidateImmutableFields_WithGrantOptionChanged(t *testing.T) {
 	t.Parallel()
 
-	a := &accountRoleGrantAdapter{}
-	grant := newTestAccountRoleGrant("my-grant", "default")
+	a := newGrantPrivilegesToAccountRoleAdapter(nil, nil, nil)
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
 	grant.Status.ObservedGeneration = 1
 	grant.Status.ShowOutput = &snowplanev1alpha1.GrantShowOutput{
 		Privilege:   "USAGE",
@@ -509,8 +506,8 @@ func TestValidateImmutableFields_WithGrantOptionChanged(t *testing.T) {
 func TestValidateImmutableFields_NoChanges(t *testing.T) {
 	t.Parallel()
 
-	a := &accountRoleGrantAdapter{}
-	grant := newTestAccountRoleGrant("my-grant", "default")
+	a := newGrantPrivilegesToAccountRoleAdapter(nil, nil, nil)
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
 	grant.Status.ObservedGeneration = 1
 	grant.Status.ShowOutput = &snowplanev1alpha1.GrantShowOutput{
 		Privilege:   "USAGE",
@@ -532,8 +529,8 @@ func TestValidateImmutableFields_NoChanges(t *testing.T) {
 func TestBuildIdentifier(t *testing.T) {
 	t.Parallel()
 
-	a := &accountRoleGrantAdapter{}
-	grant := newTestAccountRoleGrant("my-grant", "default")
+	a := newGrantPrivilegesToAccountRoleAdapter(nil, nil, nil)
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
 	grant.Spec.WithGrantOption = true
 
 	id, err := a.BuildIdentifier(grant)
@@ -601,6 +598,370 @@ func TestOnToParams_SchemaObject(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
+// Tests: dbRoleOnToParams
+// --------------------------------------------------------------------------
+
+func TestDBRoleOnToParams_Database(t *testing.T) {
+	t.Parallel()
+
+	db := "MY_DB"
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{Database: &db}
+	p := dbRoleOnToParams(on)
+	assert.Equal(t, "DATABASE", p.AccountObjectType)
+	assert.Equal(t, "MY_DB", p.AccountObjectName)
+}
+
+func TestDBRoleOnToParams_SchemaName(t *testing.T) {
+	t.Parallel()
+
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		Schema: &snowplanev1alpha1.GrantOnSchema{SchemaName: testutil.Ptr("MY_DB.PUBLIC")},
+	}
+	p := dbRoleOnToParams(on)
+	assert.Equal(t, "MY_DB.PUBLIC", p.SchemaName)
+}
+
+func TestDBRoleOnToParams_SchemaAllInDB(t *testing.T) {
+	t.Parallel()
+
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		Schema: &snowplanev1alpha1.GrantOnSchema{AllInDatabase: testutil.Ptr("MY_DB")},
+	}
+	p := dbRoleOnToParams(on)
+	assert.Equal(t, "MY_DB", p.AllSchemasInDB)
+}
+
+func TestDBRoleOnToParams_SchemaFutureInDB(t *testing.T) {
+	t.Parallel()
+
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		Schema: &snowplanev1alpha1.GrantOnSchema{FutureInDatabase: testutil.Ptr("MY_DB")},
+	}
+	p := dbRoleOnToParams(on)
+	assert.Equal(t, "MY_DB", p.FutureSchemasInDB)
+}
+
+func TestDBRoleOnToParams_SchemaObject(t *testing.T) {
+	t.Parallel()
+
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		SchemaObject: &snowplanev1alpha1.GrantOnSchemaObject{
+			ObjectType: "TABLE",
+			ObjectName: "MY_DB.PUBLIC.ORDERS",
+		},
+	}
+	p := dbRoleOnToParams(on)
+	assert.Equal(t, "TABLE", p.SchemaObjectType)
+	assert.Equal(t, "MY_DB.PUBLIC.ORDERS", p.SchemaObjectName)
+}
+
+func TestDBRoleOnToParams_SchemaObjectAll(t *testing.T) {
+	t.Parallel()
+
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		SchemaObject: &snowplanev1alpha1.GrantOnSchemaObject{
+			All: &snowplanev1alpha1.GrantOnBulk{
+				ObjectTypePlural: "TABLES",
+				InDatabase:       testutil.Ptr("MY_DB"),
+			},
+		},
+	}
+	p := dbRoleOnToParams(on)
+	assert.Equal(t, "TABLES", p.AllObjectsTypePlural)
+	assert.Equal(t, "MY_DB", p.AllObjectsInDB)
+}
+
+func TestDBRoleOnToParams_SchemaObjectFuture(t *testing.T) {
+	t.Parallel()
+
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		SchemaObject: &snowplanev1alpha1.GrantOnSchemaObject{
+			Future: &snowplanev1alpha1.GrantOnBulk{
+				ObjectTypePlural: "VIEWS",
+				InSchema:         testutil.Ptr("MY_DB.PUBLIC"),
+			},
+		},
+	}
+	p := dbRoleOnToParams(on)
+	assert.Equal(t, "VIEWS", p.FutureObjectsTypePlural)
+	assert.Equal(t, "MY_DB.PUBLIC", p.FutureObjectsInSchema)
+}
+
+func TestDBRoleOnToParams_Empty(t *testing.T) {
+	t.Parallel()
+
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{}
+	p := dbRoleOnToParams(on)
+	assert.False(t, p.Account)
+	assert.Empty(t, p.AccountObjectType)
+	assert.Empty(t, p.SchemaName)
+}
+
+// --------------------------------------------------------------------------
+// Tests: buildDBRoleGrantIdentifier
+// --------------------------------------------------------------------------
+
+func TestBuildDBRoleGrantIdentifier_Database(t *testing.T) {
+	t.Parallel()
+
+	db := "MY_DB"
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{Database: &db}
+	id, err := buildDBRoleGrantIdentifier(on, "USAGE", `TO DATABASE ROLE "MY_DB"."READER"`, "MY_DB.READER", snowplanev1alpha1.GrantKindRegular)
+	require.NoError(t, err)
+	assert.Equal(t, "USAGE", id.Privilege)
+	assert.Equal(t, `ON DATABASE "MY_DB"`, id.OnClause)
+	assert.Equal(t, `TO DATABASE ROLE "MY_DB"."READER"`, id.ToClause)
+	assert.Equal(t, "MY_DB.READER", id.GranteeName)
+	assert.Equal(t, snowflake.GrantKindRegular, id.Kind)
+}
+
+func TestBuildDBRoleGrantIdentifier_FutureKind(t *testing.T) {
+	t.Parallel()
+
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		SchemaObject: &snowplanev1alpha1.GrantOnSchemaObject{
+			Future: &snowplanev1alpha1.GrantOnBulk{
+				ObjectTypePlural: "TABLES",
+				InDatabase:       testutil.Ptr("MY_DB"),
+			},
+		},
+	}
+	id, err := buildDBRoleGrantIdentifier(on, "SELECT", `TO DATABASE ROLE "MY_DB"."R"`, "MY_DB.R", snowplanev1alpha1.GrantKindRegular)
+	require.NoError(t, err)
+	assert.Equal(t, snowflake.GrantKindFuture, id.Kind)
+}
+
+func TestBuildDBRoleGrantIdentifier_AllKind(t *testing.T) {
+	t.Parallel()
+
+	db := "MY_DB"
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{Database: &db}
+	id, err := buildDBRoleGrantIdentifier(on, "ALL PRIVILEGES", `TO DATABASE ROLE "MY_DB"."R"`, "MY_DB.R", snowplanev1alpha1.GrantKindAll)
+	require.NoError(t, err)
+	assert.Equal(t, snowflake.GrantKindAll, id.Kind)
+}
+
+// --------------------------------------------------------------------------
+// Tests: buildGrantPrivilegesToShareIdentifier
+// --------------------------------------------------------------------------
+
+func TestBuildGrantPrivilegesToShareIdentifier_Database(t *testing.T) {
+	t.Parallel()
+
+	db := "SHARED_DB"
+	on := &snowplanev1alpha1.GrantPrivilegesToShareOn{Database: &db}
+	id := buildGrantPrivilegesToShareIdentifier(on, "USAGE", "MY_SHARE")
+	assert.Equal(t, "USAGE", id.Privilege)
+	assert.Equal(t, `ON DATABASE "SHARED_DB"`, id.OnClause)
+	assert.Equal(t, `TO SHARE "MY_SHARE"`, id.ToClause)
+	assert.Equal(t, "MY_SHARE", id.GranteeName)
+	assert.Equal(t, snowflake.GrantKindShare, id.Kind)
+	assert.Equal(t, `TO SHARE "MY_SHARE"`, id.ShowGrantsTarget)
+}
+
+func TestBuildGrantPrivilegesToShareIdentifier_Schema(t *testing.T) {
+	t.Parallel()
+
+	sch := "MY_DB.PUBLIC"
+	on := &snowplanev1alpha1.GrantPrivilegesToShareOn{Schema: &sch}
+	id := buildGrantPrivilegesToShareIdentifier(on, "USAGE", "MY_SHARE")
+	assert.Equal(t, `ON SCHEMA "MY_DB"."PUBLIC"`, id.OnClause)
+	assert.Equal(t, snowflake.GrantKindShare, id.Kind)
+}
+
+func TestBuildGrantPrivilegesToShareIdentifier_Table(t *testing.T) {
+	t.Parallel()
+
+	tbl := "MY_DB.PUBLIC.ORDERS"
+	on := &snowplanev1alpha1.GrantPrivilegesToShareOn{Table: &tbl}
+	id := buildGrantPrivilegesToShareIdentifier(on, "SELECT", "MY_SHARE")
+	assert.Equal(t, `ON TABLE "MY_DB"."PUBLIC"."ORDERS"`, id.OnClause)
+}
+
+func TestBuildGrantPrivilegesToShareIdentifier_AllTablesInSchema(t *testing.T) {
+	t.Parallel()
+
+	sch := "MY_DB.PUBLIC"
+	on := &snowplanev1alpha1.GrantPrivilegesToShareOn{AllTablesInSchema: &sch}
+	id := buildGrantPrivilegesToShareIdentifier(on, "SELECT", "MY_SHARE")
+	assert.Equal(t, `ON ALL TABLES IN SCHEMA "MY_DB"."PUBLIC"`, id.OnClause)
+}
+
+func TestBuildGrantPrivilegesToShareIdentifier_View(t *testing.T) {
+	t.Parallel()
+
+	v := "MY_DB.PUBLIC.MY_VIEW"
+	on := &snowplanev1alpha1.GrantPrivilegesToShareOn{View: &v}
+	id := buildGrantPrivilegesToShareIdentifier(on, "SELECT", "MY_SHARE")
+	assert.Equal(t, `ON VIEW "MY_DB"."PUBLIC"."MY_VIEW"`, id.OnClause)
+}
+
+func TestBuildGrantPrivilegesToShareIdentifier_Function(t *testing.T) {
+	t.Parallel()
+
+	fn := "MY_DB.PUBLIC.MY_FUNC"
+	on := &snowplanev1alpha1.GrantPrivilegesToShareOn{Function: &fn}
+	id := buildGrantPrivilegesToShareIdentifier(on, "USAGE", "MY_SHARE")
+	assert.Equal(t, `ON FUNCTION "MY_DB"."PUBLIC"."MY_FUNC"`, id.OnClause)
+}
+
+func TestBuildGrantPrivilegesToShareIdentifier_Tag(t *testing.T) {
+	t.Parallel()
+
+	tag := "MY_DB.PUBLIC.MY_TAG"
+	on := &snowplanev1alpha1.GrantPrivilegesToShareOn{Tag: &tag}
+	id := buildGrantPrivilegesToShareIdentifier(on, "READ", "MY_SHARE")
+	assert.Equal(t, `ON TAG "MY_DB"."PUBLIC"."MY_TAG"`, id.OnClause)
+}
+
+// --------------------------------------------------------------------------
+// Tests: hasDBRoleOnRefs / extractDBRoleOnRefs
+// --------------------------------------------------------------------------
+
+func TestHasDBRoleOnRefs_NoRefs(t *testing.T) {
+	t.Parallel()
+
+	db := "MY_DB"
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{Database: &db}
+	assert.False(t, hasDBRoleOnRefs(on))
+}
+
+func TestHasDBRoleOnRefs_SchemaRef(t *testing.T) {
+	t.Parallel()
+
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		Schema: &snowplanev1alpha1.GrantOnSchema{
+			SchemaRef: &snowplanev1alpha1.ObjectReference{Name: "my-schema"},
+		},
+	}
+	assert.True(t, hasDBRoleOnRefs(on))
+}
+
+func TestHasDBRoleOnRefs_AllInDatabaseRef(t *testing.T) {
+	t.Parallel()
+
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		Schema: &snowplanev1alpha1.GrantOnSchema{
+			AllInDatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "my-db"},
+		},
+	}
+	assert.True(t, hasDBRoleOnRefs(on))
+}
+
+func TestHasDBRoleOnRefs_FutureInDatabaseRef(t *testing.T) {
+	t.Parallel()
+
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		Schema: &snowplanev1alpha1.GrantOnSchema{
+			FutureInDatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "my-db"},
+		},
+	}
+	assert.True(t, hasDBRoleOnRefs(on))
+}
+
+func TestHasDBRoleOnRefs_SchemaObjectAllInDatabaseRef(t *testing.T) {
+	t.Parallel()
+
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		SchemaObject: &snowplanev1alpha1.GrantOnSchemaObject{
+			All: &snowplanev1alpha1.GrantOnBulk{
+				ObjectTypePlural: "TABLES",
+				InDatabaseRef:    &snowplanev1alpha1.ObjectReference{Name: "my-db"},
+			},
+		},
+	}
+	assert.True(t, hasDBRoleOnRefs(on))
+}
+
+func TestHasDBRoleOnRefs_SchemaObjectFutureInSchemaRef(t *testing.T) {
+	t.Parallel()
+
+	on := &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		SchemaObject: &snowplanev1alpha1.GrantOnSchemaObject{
+			Future: &snowplanev1alpha1.GrantOnBulk{
+				ObjectTypePlural: "VIEWS",
+				InSchemaRef:      &snowplanev1alpha1.ObjectReference{Name: "my-schema"},
+			},
+		},
+	}
+	assert.True(t, hasDBRoleOnRefs(on))
+}
+
+func TestExtractDatabaseRefsFromDBRoleOn_Deduplicates(t *testing.T) {
+	t.Parallel()
+
+	on := snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		Schema: &snowplanev1alpha1.GrantOnSchema{
+			AllInDatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "same-db"},
+		},
+		SchemaObject: &snowplanev1alpha1.GrantOnSchemaObject{
+			All: &snowplanev1alpha1.GrantOnBulk{
+				ObjectTypePlural: "TABLES",
+				InDatabaseRef:    &snowplanev1alpha1.ObjectReference{Name: "same-db"},
+			},
+		},
+	}
+
+	refs := extractDatabaseRefsFromDBRoleOn(&on)
+	assert.Equal(t, []string{"same-db"}, refs)
+}
+
+func TestExtractDatabaseRefsFromDBRoleOn_MultipleRefs(t *testing.T) {
+	t.Parallel()
+
+	on := snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		Schema: &snowplanev1alpha1.GrantOnSchema{
+			AllInDatabaseRef:    &snowplanev1alpha1.ObjectReference{Name: "db-a"},
+			FutureInDatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "db-b"},
+		},
+	}
+
+	refs := extractDatabaseRefsFromDBRoleOn(&on)
+	assert.Len(t, refs, 2)
+	assert.Contains(t, refs, "db-a")
+	assert.Contains(t, refs, "db-b")
+}
+
+func TestExtractDatabaseRefsFromDBRoleOn_NoRefs(t *testing.T) {
+	t.Parallel()
+
+	db := "MY_DB"
+	on := snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{Database: &db}
+	refs := extractDatabaseRefsFromDBRoleOn(&on)
+	assert.Nil(t, refs)
+}
+
+func TestExtractSchemaRefsFromDBRoleOn_MultipleRefs(t *testing.T) {
+	t.Parallel()
+
+	on := snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+		Schema: &snowplanev1alpha1.GrantOnSchema{
+			SchemaRef: &snowplanev1alpha1.ObjectReference{Name: "schema-1"},
+		},
+		SchemaObject: &snowplanev1alpha1.GrantOnSchemaObject{
+			All: &snowplanev1alpha1.GrantOnBulk{
+				ObjectTypePlural: "VIEWS",
+				InSchemaRef:      &snowplanev1alpha1.ObjectReference{Name: "schema-2"},
+			},
+		},
+	}
+
+	refs := extractSchemaRefsFromDBRoleOn(&on)
+	assert.Len(t, refs, 2)
+	assert.Contains(t, refs, "schema-1")
+	assert.Contains(t, refs, "schema-2")
+}
+
+func TestExtractSchemaRefsFromDBRoleOn_NoRefs(t *testing.T) {
+	t.Parallel()
+
+	db := "MY_DB"
+	on := snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{Database: &db}
+	refs := extractSchemaRefsFromDBRoleOn(&on)
+	assert.Nil(t, refs)
+}
+
+// --------------------------------------------------------------------------
 // Tests: Ref resolution in PreReconcile
 // --------------------------------------------------------------------------
 
@@ -626,11 +987,11 @@ func newReadyAccountRole(name, namespace, sfName string) *snowplanev1alpha1.Acco
 func TestPreReconcile_AccountRoleRefResolved(t *testing.T) {
 	t.Parallel()
 
-	grant := newTestAccountRoleGrant("my-grant", "default")
-	grant.Finalizers = []string{accountRoleGrantFinalizer}
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
+	grant.Finalizers = []string{grantPrivilegesToAccountRoleFinalizer}
 	// Use AccountRoleRef instead of raw AccountRole.
 	grant.Spec.AccountRole = nil
-	grant.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "reader-role"}
+	grant.Spec.AccountRoleRef = &snowplanev1alpha1.ObjectReference{Name: "reader-role"}
 
 	accountRole := newReadyAccountRole("reader-role", "default", "DATA_READER")
 
@@ -657,7 +1018,7 @@ func TestPreReconcile_AccountRoleRefResolved(t *testing.T) {
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("my-grant", "default"))
 	require.NoError(t, err)
 
-	got := &snowplanev1alpha1.AccountRoleGrant{}
+	got := &snowplanev1alpha1.GrantPrivilegesToAccountRole{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "my-grant", Namespace: "default"}, got))
 	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
 	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReferencesResolved))
@@ -666,10 +1027,10 @@ func TestPreReconcile_AccountRoleRefResolved(t *testing.T) {
 func TestPreReconcile_AccountRoleRefNotFound(t *testing.T) {
 	t.Parallel()
 
-	grant := newTestAccountRoleGrant("my-grant", "default")
-	grant.Finalizers = []string{accountRoleGrantFinalizer}
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
+	grant.Finalizers = []string{grantPrivilegesToAccountRoleFinalizer}
 	grant.Spec.AccountRole = nil
-	grant.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "missing-role"}
+	grant.Spec.AccountRoleRef = &snowplanev1alpha1.ObjectReference{Name: "missing-role"}
 
 	mock := &mockService{}
 
@@ -678,7 +1039,7 @@ func TestPreReconcile_AccountRoleRefNotFound(t *testing.T) {
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("my-grant", "default"))
 	require.Error(t, err)
 
-	got := &snowplanev1alpha1.AccountRoleGrant{}
+	got := &snowplanev1alpha1.GrantPrivilegesToAccountRole{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "my-grant", Namespace: "default"}, got))
 
 	refCond := conditions.Get(got, snowplanev1alpha1.TypeReferencesResolved)
@@ -690,10 +1051,10 @@ func TestPreReconcile_AccountRoleRefNotFound(t *testing.T) {
 func TestPreReconcile_AccountRoleRefNotReady(t *testing.T) {
 	t.Parallel()
 
-	grant := newTestAccountRoleGrant("my-grant", "default")
-	grant.Finalizers = []string{accountRoleGrantFinalizer}
+	grant := newTestGrantPrivilegesToAccountRole("my-grant", "default")
+	grant.Finalizers = []string{grantPrivilegesToAccountRoleFinalizer}
 	grant.Spec.AccountRole = nil
-	grant.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "unready-role"}
+	grant.Spec.AccountRoleRef = &snowplanev1alpha1.ObjectReference{Name: "unready-role"}
 
 	// Create an AccountRole that exists but is NOT ready.
 	role := &snowplanev1alpha1.AccountRole{
@@ -716,7 +1077,7 @@ func TestPreReconcile_AccountRoleRefNotReady(t *testing.T) {
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("my-grant", "default"))
 	require.Error(t, err)
 
-	got := &snowplanev1alpha1.AccountRoleGrant{}
+	got := &snowplanev1alpha1.GrantPrivilegesToAccountRole{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "my-grant", Namespace: "default"}, got))
 
 	refCond := conditions.Get(got, snowplanev1alpha1.TypeReferencesResolved)
@@ -725,21 +1086,21 @@ func TestPreReconcile_AccountRoleRefNotReady(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Helpers: newTestReconcilerWithIndex
+// Helpers: buildIndexedClient
 // --------------------------------------------------------------------------
 
-func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service, *snowflake.GrantObservation] {
+func buildIndexedClient(objs ...runtime.Object) client.Client {
 	scheme := testutil.TestScheme()
 
 	cb := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(
-			&snowplanev1alpha1.AccountRoleGrant{},
+			&snowplanev1alpha1.GrantPrivilegesToAccountRole{},
 			&snowplanev1alpha1.ProviderConfig{},
 			&snowplanev1alpha1.AccountRole{},
 			&snowplanev1alpha1.DatabaseRole{},
 		).
-		WithIndex(&snowplanev1alpha1.AccountRoleGrant{}, argIndexAccountRoleRef, func(o client.Object) []string {
-			g, ok := o.(*snowplanev1alpha1.AccountRoleGrant)
+		WithIndex(&snowplanev1alpha1.GrantPrivilegesToAccountRole{}, argIndexAccountRoleRef, func(o client.Object) []string {
+			g, ok := o.(*snowplanev1alpha1.GrantPrivilegesToAccountRole)
 			if !ok {
 				return nil
 			}
@@ -748,15 +1109,15 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 			}
 			return nil
 		}).
-		WithIndex(&snowplanev1alpha1.AccountRoleGrant{}, argIndexDatabaseRef, func(o client.Object) []string {
-			g, ok := o.(*snowplanev1alpha1.AccountRoleGrant)
+		WithIndex(&snowplanev1alpha1.GrantPrivilegesToAccountRole{}, argIndexDatabaseRef, func(o client.Object) []string {
+			g, ok := o.(*snowplanev1alpha1.GrantPrivilegesToAccountRole)
 			if !ok {
 				return nil
 			}
 			return extractDatabaseRefsFromOn(&g.Spec.On)
 		}).
-		WithIndex(&snowplanev1alpha1.AccountRoleGrant{}, argIndexSchemaRef, func(o client.Object) []string {
-			g, ok := o.(*snowplanev1alpha1.AccountRoleGrant)
+		WithIndex(&snowplanev1alpha1.GrantPrivilegesToAccountRole{}, argIndexSchemaRef, func(o client.Object) []string {
+			g, ok := o.(*snowplanev1alpha1.GrantPrivilegesToAccountRole)
 			if !ok {
 				return nil
 			}
@@ -767,45 +1128,31 @@ func newTestReconcilerWithIndex(mock *mockService, objs ...runtime.Object) *reco
 		cb = cb.WithRuntimeObjects(obj)
 	}
 
-	c := cb.Build()
-	factory := clientfactory.NewClientFactory()
-	recorder := record.NewFakeRecorder(100)
-
-	return &reconciler.GenericReconciler[*snowplanev1alpha1.AccountRoleGrant, Service, *snowflake.GrantObservation]{
-		Client:   c,
-		Factory:  factory,
-		Recorder: recorder,
-		Adapter: &accountRoleGrantAdapter{
-			client:   c,
-			recorder: recorder,
-			newService: func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
-				return mock, nil, nil
-			},
-		},
-		GVK: snowplanev1alpha1.GroupVersion.WithKind("AccountRoleGrant"),
-	}
+	return cb.Build()
 }
 
 // --------------------------------------------------------------------------
-// Tests: SetupWatches — listByIndex (AccountRole to AccountRoleGrants)
+// Tests: SetupWatches — listByIndex (AccountRole to GrantPrivilegesToAccountRoles)
 // --------------------------------------------------------------------------
 
 func TestListByIndex_AccountRole_FiltersCorrectly(t *testing.T) {
 	t.Parallel()
 
-	g1 := newTestAccountRoleGrant("grant-a", "default")
+	g1 := newTestGrantPrivilegesToAccountRole("grant-a", "default")
 	g1.Spec.AccountRole = nil
-	g1.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "reader-role"}
+	g1.Spec.AccountRoleRef = &snowplanev1alpha1.ObjectReference{Name: "reader-role"}
 
-	g2 := newTestAccountRoleGrant("grant-b", "default")
+	g2 := newTestGrantPrivilegesToAccountRole("grant-b", "default")
 	g2.Spec.AccountRole = nil
-	g2.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "writer-role"}
+	g2.Spec.AccountRoleRef = &snowplanev1alpha1.ObjectReference{Name: "writer-role"}
 
-	r := newTestReconcilerWithIndex(&mockService{}, g1, g2)
-	a := r.Adapter.(*accountRoleGrantAdapter)
+	c := buildIndexedClient(g1, g2)
+	mapFn := refresolver.MapByFieldIndex(c,
+		func() client.ObjectList { return &snowplanev1alpha1.GrantPrivilegesToAccountRoleList{} },
+		argIndexAccountRoleRef, "test")
 
 	role := newReadyAccountRole("reader-role", "default", "DATA_READER")
-	requests := a.listByIndex(context.Background(), role, argIndexAccountRoleRef)
+	requests := mapFn(context.Background(), role)
 
 	require.Len(t, requests, 1)
 	assert.Equal(t, "grant-a", requests[0].Name)
@@ -815,19 +1162,21 @@ func TestListByIndex_AccountRole_FiltersCorrectly(t *testing.T) {
 func TestListByIndex_AccountRole_MultipleMatches(t *testing.T) {
 	t.Parallel()
 
-	g1 := newTestAccountRoleGrant("grant-a", "default")
+	g1 := newTestGrantPrivilegesToAccountRole("grant-a", "default")
 	g1.Spec.AccountRole = nil
-	g1.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "reader-role"}
+	g1.Spec.AccountRoleRef = &snowplanev1alpha1.ObjectReference{Name: "reader-role"}
 
-	g2 := newTestAccountRoleGrant("grant-b", "default")
+	g2 := newTestGrantPrivilegesToAccountRole("grant-b", "default")
 	g2.Spec.AccountRole = nil
-	g2.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "reader-role"}
+	g2.Spec.AccountRoleRef = &snowplanev1alpha1.ObjectReference{Name: "reader-role"}
 
-	r := newTestReconcilerWithIndex(&mockService{}, g1, g2)
-	a := r.Adapter.(*accountRoleGrantAdapter)
+	c := buildIndexedClient(g1, g2)
+	mapFn := refresolver.MapByFieldIndex(c,
+		func() client.ObjectList { return &snowplanev1alpha1.GrantPrivilegesToAccountRoleList{} },
+		argIndexAccountRoleRef, "test")
 
 	role := newReadyAccountRole("reader-role", "default", "DATA_READER")
-	requests := a.listByIndex(context.Background(), role, argIndexAccountRoleRef)
+	requests := mapFn(context.Background(), role)
 
 	require.Len(t, requests, 2)
 	names := []string{requests[0].Name, requests[1].Name}
@@ -838,42 +1187,46 @@ func TestListByIndex_AccountRole_MultipleMatches(t *testing.T) {
 func TestListByIndex_AccountRole_NoMatch(t *testing.T) {
 	t.Parallel()
 
-	g1 := newTestAccountRoleGrant("grant-a", "default")
+	g1 := newTestGrantPrivilegesToAccountRole("grant-a", "default")
 	g1.Spec.AccountRole = nil
-	g1.Spec.AccountRoleRef = &snowplanev1alpha1.LocalObjectReference{Name: "reader-role"}
+	g1.Spec.AccountRoleRef = &snowplanev1alpha1.ObjectReference{Name: "reader-role"}
 
-	r := newTestReconcilerWithIndex(&mockService{}, g1)
-	a := r.Adapter.(*accountRoleGrantAdapter)
+	c := buildIndexedClient(g1)
+	mapFn := refresolver.MapByFieldIndex(c,
+		func() client.ObjectList { return &snowplanev1alpha1.GrantPrivilegesToAccountRoleList{} },
+		argIndexAccountRoleRef, "test")
 
 	role := newReadyAccountRole("unrelated-role", "default", "ADMIN")
-	requests := a.listByIndex(context.Background(), role, argIndexAccountRoleRef)
+	requests := mapFn(context.Background(), role)
 
 	assert.Empty(t, requests)
 }
 
 // --------------------------------------------------------------------------
-// Tests: SetupWatches — listByIndex (Database to AccountRoleGrants)
+// Tests: SetupWatches — listByIndex (Database to GrantPrivilegesToAccountRoles)
 // --------------------------------------------------------------------------
 
 func TestListByIndex_Database_AllInDatabaseRef(t *testing.T) {
 	t.Parallel()
 
-	g1 := newTestAccountRoleGrant("grant-a", "default")
+	g1 := newTestGrantPrivilegesToAccountRole("grant-a", "default")
 	g1.Spec.On.AccountObject = nil
 	g1.Spec.On.Schema = &snowplanev1alpha1.GrantOnSchema{
-		AllInDatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "analytics-db"},
+		AllInDatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "analytics-db"},
 	}
 
-	g2 := newTestAccountRoleGrant("grant-b", "default")
+	g2 := newTestGrantPrivilegesToAccountRole("grant-b", "default")
 	// grant-b uses AccountObject, no database ref
 
-	r := newTestReconcilerWithIndex(&mockService{}, g1, g2)
-	a := r.Adapter.(*accountRoleGrantAdapter)
+	c := buildIndexedClient(g1, g2)
+	mapFn := refresolver.MapByFieldIndex(c,
+		func() client.ObjectList { return &snowplanev1alpha1.GrantPrivilegesToAccountRoleList{} },
+		argIndexDatabaseRef, "test")
 
 	db := &snowplanev1alpha1.Database{
 		ObjectMeta: metav1.ObjectMeta{Name: "analytics-db", Namespace: "default"},
 	}
-	requests := a.listByIndex(context.Background(), db, argIndexDatabaseRef)
+	requests := mapFn(context.Background(), db)
 
 	require.Len(t, requests, 1)
 	assert.Equal(t, "grant-a", requests[0].Name)
@@ -882,47 +1235,51 @@ func TestListByIndex_Database_AllInDatabaseRef(t *testing.T) {
 func TestListByIndex_Database_SchemaObjectFutureInDatabaseRef(t *testing.T) {
 	t.Parallel()
 
-	g1 := newTestAccountRoleGrant("grant-a", "default")
+	g1 := newTestGrantPrivilegesToAccountRole("grant-a", "default")
 	g1.Spec.On.AccountObject = nil
 	g1.Spec.On.SchemaObject = &snowplanev1alpha1.GrantOnSchemaObject{
 		Future: &snowplanev1alpha1.GrantOnBulk{
 			ObjectTypePlural: "TABLES",
-			InDatabaseRef:    &snowplanev1alpha1.LocalObjectReference{Name: "analytics-db"},
+			InDatabaseRef:    &snowplanev1alpha1.ObjectReference{Name: "analytics-db"},
 		},
 	}
 
-	r := newTestReconcilerWithIndex(&mockService{}, g1)
-	a := r.Adapter.(*accountRoleGrantAdapter)
+	c := buildIndexedClient(g1)
+	mapFn := refresolver.MapByFieldIndex(c,
+		func() client.ObjectList { return &snowplanev1alpha1.GrantPrivilegesToAccountRoleList{} },
+		argIndexDatabaseRef, "test")
 
 	db := &snowplanev1alpha1.Database{
 		ObjectMeta: metav1.ObjectMeta{Name: "analytics-db", Namespace: "default"},
 	}
-	requests := a.listByIndex(context.Background(), db, argIndexDatabaseRef)
+	requests := mapFn(context.Background(), db)
 
 	require.Len(t, requests, 1)
 	assert.Equal(t, "grant-a", requests[0].Name)
 }
 
 // --------------------------------------------------------------------------
-// Tests: SetupWatches — listByIndex (Schema to AccountRoleGrants)
+// Tests: SetupWatches — listByIndex (Schema to GrantPrivilegesToAccountRoles)
 // --------------------------------------------------------------------------
 
 func TestListByIndex_Schema_SchemaRef(t *testing.T) {
 	t.Parallel()
 
-	g1 := newTestAccountRoleGrant("grant-a", "default")
+	g1 := newTestGrantPrivilegesToAccountRole("grant-a", "default")
 	g1.Spec.On.AccountObject = nil
 	g1.Spec.On.Schema = &snowplanev1alpha1.GrantOnSchema{
-		SchemaRef: &snowplanev1alpha1.LocalObjectReference{Name: "my-schema"},
+		SchemaRef: &snowplanev1alpha1.ObjectReference{Name: "my-schema"},
 	}
 
-	r := newTestReconcilerWithIndex(&mockService{}, g1)
-	a := r.Adapter.(*accountRoleGrantAdapter)
+	c := buildIndexedClient(g1)
+	mapFn := refresolver.MapByFieldIndex(c,
+		func() client.ObjectList { return &snowplanev1alpha1.GrantPrivilegesToAccountRoleList{} },
+		argIndexSchemaRef, "test")
 
 	schema := &snowplanev1alpha1.Schema{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-schema", Namespace: "default"},
 	}
-	requests := a.listByIndex(context.Background(), schema, argIndexSchemaRef)
+	requests := mapFn(context.Background(), schema)
 
 	require.Len(t, requests, 1)
 	assert.Equal(t, "grant-a", requests[0].Name)
@@ -931,16 +1288,18 @@ func TestListByIndex_Schema_SchemaRef(t *testing.T) {
 func TestListByIndex_Schema_NoMatch(t *testing.T) {
 	t.Parallel()
 
-	g1 := newTestAccountRoleGrant("grant-a", "default")
+	g1 := newTestGrantPrivilegesToAccountRole("grant-a", "default")
 	// grant-a has no schema ref
 
-	r := newTestReconcilerWithIndex(&mockService{}, g1)
-	a := r.Adapter.(*accountRoleGrantAdapter)
+	c := buildIndexedClient(g1)
+	mapFn := refresolver.MapByFieldIndex(c,
+		func() client.ObjectList { return &snowplanev1alpha1.GrantPrivilegesToAccountRoleList{} },
+		argIndexSchemaRef, "test")
 
 	schema := &snowplanev1alpha1.Schema{
 		ObjectMeta: metav1.ObjectMeta{Name: "unrelated-schema", Namespace: "default"},
 	}
-	requests := a.listByIndex(context.Background(), schema, argIndexSchemaRef)
+	requests := mapFn(context.Background(), schema)
 
 	assert.Empty(t, requests)
 }
@@ -954,12 +1313,12 @@ func TestExtractDatabaseRefsFromOn_Deduplicates(t *testing.T) {
 
 	on := snowplanev1alpha1.GrantOn{
 		Schema: &snowplanev1alpha1.GrantOnSchema{
-			AllInDatabaseRef: &snowplanev1alpha1.LocalObjectReference{Name: "same-db"},
+			AllInDatabaseRef: &snowplanev1alpha1.ObjectReference{Name: "same-db"},
 		},
 		SchemaObject: &snowplanev1alpha1.GrantOnSchemaObject{
 			All: &snowplanev1alpha1.GrantOnBulk{
 				ObjectTypePlural: "TABLES",
-				InDatabaseRef:    &snowplanev1alpha1.LocalObjectReference{Name: "same-db"},
+				InDatabaseRef:    &snowplanev1alpha1.ObjectReference{Name: "same-db"},
 			},
 		},
 	}
@@ -973,12 +1332,12 @@ func TestExtractSchemaRefsFromOn_MultipleRefs(t *testing.T) {
 
 	on := snowplanev1alpha1.GrantOn{
 		Schema: &snowplanev1alpha1.GrantOnSchema{
-			SchemaRef: &snowplanev1alpha1.LocalObjectReference{Name: "schema-1"},
+			SchemaRef: &snowplanev1alpha1.ObjectReference{Name: "schema-1"},
 		},
 		SchemaObject: &snowplanev1alpha1.GrantOnSchemaObject{
 			All: &snowplanev1alpha1.GrantOnBulk{
 				ObjectTypePlural: "VIEWS",
-				InSchemaRef:      &snowplanev1alpha1.LocalObjectReference{Name: "schema-2"},
+				InSchemaRef:      &snowplanev1alpha1.ObjectReference{Name: "schema-2"},
 			},
 		},
 	}
@@ -1034,10 +1393,412 @@ func TestToToFrom(t *testing.T) {
 	assert.Equal(t, "short", toToFrom("short"))
 }
 
-func TestCaseInsensitiveEqual(t *testing.T) {
+// ==========================================================================
+// GrantPrivilegesToDatabaseRole reconciler tests
+// ==========================================================================
+
+func newTestGrantPrivilegesToDatabaseRole(name, namespace string) *snowplanev1alpha1.GrantPrivilegesToDatabaseRole {
+	return &snowplanev1alpha1.GrantPrivilegesToDatabaseRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       name,
+			Namespace:  namespace,
+			Generation: 1,
+		},
+		Spec: snowplanev1alpha1.GrantPrivilegesToDatabaseRoleSpec{
+			CommonSpec: snowplanev1alpha1.CommonSpec{
+				DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete,
+				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
+			},
+			Privilege:    "SELECT",
+			DatabaseRole: testutil.Ptr("MY_DB.DATA_READER"),
+			On: snowplanev1alpha1.GrantPrivilegesToDatabaseRoleOn{
+				Schema: &snowplanev1alpha1.GrantOnSchema{
+					SchemaName: testutil.Ptr("MY_DB.PUBLIC"),
+				},
+			},
+		},
+	}
+}
+
+func newTestGrantPrivilegesToDatabaseRoleReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.GrantPrivilegesToDatabaseRole, Service, *snowflake.GrantObservation] {
+	scheme := testutil.TestScheme()
+
+	cb := fake.NewClientBuilder().WithScheme(scheme).
+		WithStatusSubresource(
+			&snowplanev1alpha1.GrantPrivilegesToDatabaseRole{},
+			&snowplanev1alpha1.ProviderConfig{},
+			&snowplanev1alpha1.DatabaseRole{},
+		)
+
+	for _, obj := range objs {
+		cb = cb.WithRuntimeObjects(obj)
+	}
+
+	c := cb.Build()
+	factory := testutil.NewTestClientFactory()
+	recorder := record.NewFakeRecorder(100)
+
+	sf := func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+		return mock, nil, nil
+	}
+
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.GrantPrivilegesToDatabaseRole, Service, *snowflake.GrantObservation]{
+		Client:   c,
+		Factory:  factory,
+		Recorder: recorder,
+		Adapter:  newGrantPrivilegesToDatabaseRoleAdapter(c, recorder, sf),
+		GVK:      snowplanev1alpha1.GroupVersion.WithKind("GrantPrivilegesToDatabaseRole"),
+	}
+}
+
+func newDBRoleGrantSuccessfulObservation() *snowflake.GrantObservation {
+	return &snowflake.GrantObservation{
+		Exists: true,
+		ShowOutput: &snowplanev1alpha1.GrantShowOutput{
+			CreatedOn:   "2024-01-01",
+			Privilege:   "SELECT",
+			GrantedOn:   "SCHEMA",
+			Name:        "MY_DB.PUBLIC",
+			GrantedTo:   "DATABASE_ROLE",
+			GranteeName: "MY_DB.DATA_READER",
+			GrantOption: false,
+			GrantedBy:   "SYSADMIN",
+		},
+	}
+}
+
+func TestGrantPrivilegesToDatabaseRole_Reconcile_Grant(t *testing.T) {
 	t.Parallel()
 
-	assert.True(t, caseInsensitiveEqual("USAGE", "usage"))
-	assert.True(t, caseInsensitiveEqual("SELECT", "SELECT"))
-	assert.False(t, caseInsensitiveEqual("SELECT", "INSERT"))
+	grant := newTestGrantPrivilegesToDatabaseRole("my-drg", "default")
+	grant.Finalizers = []string{grantPrivilegesToDatabaseRoleFinalizer}
+
+	var capturedOpts snowflake.CreateGrantOptions
+
+	firstCall := true
+
+	mock := &mockService{
+		grantFn: func(_ context.Context, opts snowflake.CreateGrantOptions) error {
+			capturedOpts = opts
+			return nil
+		},
+		observeFn: func(_ context.Context, _ snowflake.GrantIdentifier) (*snowflake.GrantObservation, error) {
+			if firstCall {
+				firstCall = false
+				return &snowflake.GrantObservation{Exists: false}, nil
+			}
+
+			return newDBRoleGrantSuccessfulObservation(), nil
+		},
+	}
+
+	r := newTestGrantPrivilegesToDatabaseRoleReconciler(mock, grant, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("my-drg", "default"))
+	require.NoError(t, err)
+
+	assert.Equal(t, "SELECT", capturedOpts.Privilege)
+	assert.Contains(t, capturedOpts.OnClause, "SCHEMA")
+	assert.Contains(t, capturedOpts.ToClause, "DATABASE ROLE")
+	assert.False(t, capturedOpts.WithGrantOption)
+
+	got := &snowplanev1alpha1.GrantPrivilegesToDatabaseRole{}
+	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "my-drg", Namespace: "default"}, got))
+	assert.Equal(t, int64(1), got.Status.ObservedGeneration)
+	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
+	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeSynced))
+	assert.NotEmpty(t, got.Status.FullyQualifiedName)
+}
+
+func TestGrantPrivilegesToDatabaseRole_Reconcile_Revoke(t *testing.T) {
+	t.Parallel()
+
+	now := metav1.Now()
+	grant := newTestGrantPrivilegesToDatabaseRole("my-drg", "default")
+	grant.Finalizers = []string{grantPrivilegesToDatabaseRoleFinalizer}
+	grant.DeletionTimestamp = &now
+
+	revokeCalled := false
+
+	mock := &mockService{
+		revokeFn: func(_ context.Context, opts snowflake.RevokeGrantOptions) error {
+			revokeCalled = true
+			assert.Equal(t, "SELECT", opts.Privilege)
+			assert.Contains(t, opts.OnClause, "SCHEMA")
+			assert.Contains(t, opts.FromClause, "DATABASE ROLE")
+			return nil
+		},
+	}
+
+	r := newTestGrantPrivilegesToDatabaseRoleReconciler(mock, grant, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("my-drg", "default"))
+	require.NoError(t, err)
+	assert.True(t, revokeCalled)
+}
+
+func TestGrantPrivilegesToDatabaseRole_Reconcile_ExistingInSync(t *testing.T) {
+	t.Parallel()
+
+	grant := newTestGrantPrivilegesToDatabaseRole("my-drg", "default")
+	grant.Finalizers = []string{grantPrivilegesToDatabaseRoleFinalizer}
+	grant.Status.ObservedGeneration = 1
+	hash, err := grant.ComputeSpecHash()
+	require.NoError(t, err)
+	grant.Status.LastAppliedSpecHash = hash
+
+	mock := &mockService{
+		observeFn: func(_ context.Context, _ snowflake.GrantIdentifier) (*snowflake.GrantObservation, error) {
+			return newDBRoleGrantSuccessfulObservation(), nil
+		},
+	}
+
+	r := newTestGrantPrivilegesToDatabaseRoleReconciler(mock, grant, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	result, reconcileErr := r.Reconcile(context.Background(), testutil.ReconcileReq("my-drg", "default"))
+	require.NoError(t, reconcileErr)
+	assert.NotEqual(t, time.Second, result.RequeueAfter)
+}
+
+func TestGrantPrivilegesToDatabaseRole_Reconcile_AllPrivileges(t *testing.T) {
+	t.Parallel()
+
+	grant := newTestGrantPrivilegesToDatabaseRole("my-drg", "default")
+	grant.Finalizers = []string{grantPrivilegesToDatabaseRoleFinalizer}
+	grant.Spec.Privilege = ""
+	grant.Spec.AllPrivileges = true
+
+	var capturedOpts snowflake.CreateGrantOptions
+
+	firstCall := true
+
+	mock := &mockService{
+		grantFn: func(_ context.Context, opts snowflake.CreateGrantOptions) error {
+			capturedOpts = opts
+			return nil
+		},
+		observeFn: func(_ context.Context, _ snowflake.GrantIdentifier) (*snowflake.GrantObservation, error) {
+			if firstCall {
+				firstCall = false
+				return &snowflake.GrantObservation{Exists: false}, nil
+			}
+
+			obs := newDBRoleGrantSuccessfulObservation()
+			obs.ShowOutput.Privilege = "ALL"
+
+			return obs, nil
+		},
+	}
+
+	r := newTestGrantPrivilegesToDatabaseRoleReconciler(mock, grant, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("my-drg", "default"))
+	require.NoError(t, err)
+	assert.Equal(t, "ALL PRIVILEGES", capturedOpts.Privilege)
+}
+
+// ==========================================================================
+// GrantPrivilegesToShare reconciler tests
+// ==========================================================================
+
+func newTestGrantPrivilegesToShare(name, namespace string) *snowplanev1alpha1.GrantPrivilegesToShare {
+	return &snowplanev1alpha1.GrantPrivilegesToShare{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       name,
+			Namespace:  namespace,
+			Generation: 1,
+		},
+		Spec: snowplanev1alpha1.GrantPrivilegesToShareSpec{
+			CommonSpec: snowplanev1alpha1.CommonSpec{
+				DeletionPolicy: snowplanev1alpha1.DeletionPolicyDelete,
+				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
+			},
+			Privilege: "USAGE",
+			On: snowplanev1alpha1.GrantPrivilegesToShareOn{
+				Database: testutil.Ptr("MY_DB"),
+			},
+			Share: "MY_SHARE",
+		},
+	}
+}
+
+func newTestGrantPrivilegesToShareReconciler(mock *mockService, objs ...runtime.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.GrantPrivilegesToShare, Service, *snowflake.GrantObservation] {
+	scheme := testutil.TestScheme()
+
+	cb := fake.NewClientBuilder().WithScheme(scheme).
+		WithStatusSubresource(
+			&snowplanev1alpha1.GrantPrivilegesToShare{},
+			&snowplanev1alpha1.ProviderConfig{},
+		)
+
+	for _, obj := range objs {
+		cb = cb.WithRuntimeObjects(obj)
+	}
+
+	c := cb.Build()
+	factory := testutil.NewTestClientFactory()
+	recorder := record.NewFakeRecorder(100)
+
+	sf := func(_ context.Context, _ SnowflakeClient, _ string) (Service, func(context.Context), error) {
+		return mock, nil, nil
+	}
+
+	return &reconciler.GenericReconciler[*snowplanev1alpha1.GrantPrivilegesToShare, Service, *snowflake.GrantObservation]{
+		Client:   c,
+		Factory:  factory,
+		Recorder: recorder,
+		Adapter:  newGrantPrivilegesToShareAdapter(c, recorder, sf),
+		GVK:      snowplanev1alpha1.GroupVersion.WithKind("GrantPrivilegesToShare"),
+	}
+}
+
+func newGrantPrivilegesToShareSuccessfulObservation() *snowflake.GrantObservation {
+	return &snowflake.GrantObservation{
+		Exists: true,
+		ShowOutput: &snowplanev1alpha1.GrantShowOutput{
+			CreatedOn:   "2024-01-01",
+			Privilege:   "USAGE",
+			GrantedOn:   "DATABASE",
+			Name:        "MY_DB",
+			GrantedTo:   "SHARE",
+			GranteeName: "MY_SHARE",
+			GrantOption: false,
+			GrantedBy:   "SYSADMIN",
+		},
+	}
+}
+
+func TestGrantPrivilegesToShare_Reconcile_Grant(t *testing.T) {
+	t.Parallel()
+
+	grant := newTestGrantPrivilegesToShare("my-sg", "default")
+	grant.Finalizers = []string{grantPrivilegesToShareFinalizer}
+
+	var capturedOpts snowflake.CreateGrantOptions
+
+	firstCall := true
+
+	mock := &mockService{
+		grantFn: func(_ context.Context, opts snowflake.CreateGrantOptions) error {
+			capturedOpts = opts
+			return nil
+		},
+		observeFn: func(_ context.Context, _ snowflake.GrantIdentifier) (*snowflake.GrantObservation, error) {
+			if firstCall {
+				firstCall = false
+				return &snowflake.GrantObservation{Exists: false}, nil
+			}
+
+			return newGrantPrivilegesToShareSuccessfulObservation(), nil
+		},
+	}
+
+	r := newTestGrantPrivilegesToShareReconciler(mock, grant, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("my-sg", "default"))
+	require.NoError(t, err)
+
+	assert.Equal(t, "USAGE", capturedOpts.Privilege)
+	assert.Contains(t, capturedOpts.OnClause, "DATABASE")
+	assert.Contains(t, capturedOpts.ToClause, "SHARE")
+	assert.False(t, capturedOpts.WithGrantOption)
+
+	got := &snowplanev1alpha1.GrantPrivilegesToShare{}
+	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "my-sg", Namespace: "default"}, got))
+	assert.Equal(t, int64(1), got.Status.ObservedGeneration)
+	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
+	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeSynced))
+	assert.NotEmpty(t, got.Status.FullyQualifiedName)
+}
+
+func TestGrantPrivilegesToShare_Reconcile_Revoke(t *testing.T) {
+	t.Parallel()
+
+	now := metav1.Now()
+	grant := newTestGrantPrivilegesToShare("my-sg", "default")
+	grant.Finalizers = []string{grantPrivilegesToShareFinalizer}
+	grant.DeletionTimestamp = &now
+
+	revokeCalled := false
+
+	mock := &mockService{
+		revokeFn: func(_ context.Context, opts snowflake.RevokeGrantOptions) error {
+			revokeCalled = true
+			assert.Equal(t, "USAGE", opts.Privilege)
+			assert.Contains(t, opts.OnClause, "DATABASE")
+			assert.Contains(t, opts.FromClause, "SHARE")
+			return nil
+		},
+	}
+
+	r := newTestGrantPrivilegesToShareReconciler(mock, grant, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("my-sg", "default"))
+	require.NoError(t, err)
+	assert.True(t, revokeCalled)
+}
+
+func TestGrantPrivilegesToShare_Reconcile_ExistingInSync(t *testing.T) {
+	t.Parallel()
+
+	grant := newTestGrantPrivilegesToShare("my-sg", "default")
+	grant.Finalizers = []string{grantPrivilegesToShareFinalizer}
+	grant.Status.ObservedGeneration = 1
+	hash, err := grant.ComputeSpecHash()
+	require.NoError(t, err)
+	grant.Status.LastAppliedSpecHash = hash
+
+	mock := &mockService{
+		observeFn: func(_ context.Context, _ snowflake.GrantIdentifier) (*snowflake.GrantObservation, error) {
+			return newGrantPrivilegesToShareSuccessfulObservation(), nil
+		},
+	}
+
+	r := newTestGrantPrivilegesToShareReconciler(mock, grant, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	result, reconcileErr := r.Reconcile(context.Background(), testutil.ReconcileReq("my-sg", "default"))
+	require.NoError(t, reconcileErr)
+	assert.NotEqual(t, time.Second, result.RequeueAfter)
+}
+
+func TestGrantPrivilegesToShare_Reconcile_OnTable(t *testing.T) {
+	t.Parallel()
+
+	grant := newTestGrantPrivilegesToShare("my-sg", "default")
+	grant.Finalizers = []string{grantPrivilegesToShareFinalizer}
+	grant.Spec.Privilege = "SELECT"
+	grant.Spec.On = snowplanev1alpha1.GrantPrivilegesToShareOn{
+		Table: testutil.Ptr("MY_DB.PUBLIC.ORDERS"),
+	}
+
+	var capturedOpts snowflake.CreateGrantOptions
+
+	firstCall := true
+
+	mock := &mockService{
+		grantFn: func(_ context.Context, opts snowflake.CreateGrantOptions) error {
+			capturedOpts = opts
+			return nil
+		},
+		observeFn: func(_ context.Context, _ snowflake.GrantIdentifier) (*snowflake.GrantObservation, error) {
+			if firstCall {
+				firstCall = false
+				return &snowflake.GrantObservation{Exists: false}, nil
+			}
+
+			obs := newGrantPrivilegesToShareSuccessfulObservation()
+			obs.ShowOutput.Privilege = "SELECT"
+			obs.ShowOutput.GrantedOn = "TABLE"
+			obs.ShowOutput.Name = "MY_DB.PUBLIC.ORDERS"
+
+			return obs, nil
+		},
+	}
+
+	r := newTestGrantPrivilegesToShareReconciler(mock, grant, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("my-sg", "default"))
+	require.NoError(t, err)
+	assert.Equal(t, "SELECT", capturedOpts.Privilege)
+	assert.Contains(t, capturedOpts.OnClause, "TABLE")
 }

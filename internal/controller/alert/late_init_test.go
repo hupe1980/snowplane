@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -26,14 +27,12 @@ func newAlert() *snowplanev1alpha1.Alert {
 }
 
 func TestLateInitialize(t *testing.T) {
-	a := &adapter{}
-
 	t.Run("fills all nil fields from observation", func(t *testing.T) {
 		obj := newAlert()
 		obs := &reconciler.Observation[*snowflake.AlertObservation]{
 			Exists: true,
 			Detail: &snowflake.AlertObservation{
-				ShowOutput: &snowflake.AlertShowOutput{
+				ShowOutput: &snowplanev1alpha1.AlertShowOutput{
 					Warehouse: "COMPUTE_WH",
 					Schedule:  "USING CRON 0 9 * * * UTC",
 					Comment:   "alert comment",
@@ -42,7 +41,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 
 		assert.Equal(t, "COMPUTE_WH", *obj.Spec.WarehouseName)
@@ -56,13 +55,13 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.AlertObservation]{
 			Exists: true,
 			Detail: &snowflake.AlertObservation{
-				ShowOutput: &snowflake.AlertShowOutput{
+				ShowOutput: &snowplanev1alpha1.AlertShowOutput{
 					State: "started",
 				},
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified)
 		assert.Equal(t, false, *obj.Spec.Suspend)
 	})
@@ -75,7 +74,7 @@ func TestLateInitialize(t *testing.T) {
 		obs := &reconciler.Observation[*snowflake.AlertObservation]{
 			Exists: true,
 			Detail: &snowflake.AlertObservation{
-				ShowOutput: &snowflake.AlertShowOutput{
+				ShowOutput: &snowplanev1alpha1.AlertShowOutput{
 					Comment:   "snowflake comment",
 					State:     "suspended",
 					Warehouse: "WH",
@@ -83,7 +82,7 @@ func TestLateInitialize(t *testing.T) {
 			},
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.True(t, modified) // Warehouse was set
 
 		assert.Equal(t, "user comment", *obj.Spec.Comment)
@@ -98,7 +97,7 @@ func TestLateInitialize(t *testing.T) {
 			Detail: nil,
 		}
 
-		modified := a.LateInitialize(obj, obs)
+		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
 	})
 }

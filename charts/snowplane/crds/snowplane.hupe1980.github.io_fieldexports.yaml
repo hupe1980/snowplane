@@ -19,23 +19,26 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: SYNCED
+      type: string
     - jsonPath: .spec.from.resource.kind
-      name: Source Kind
+      name: SOURCE-KIND
       type: string
     - jsonPath: .spec.from.resource.name
-      name: Source Name
+      name: SOURCE-NAME
       type: string
     - jsonPath: .spec.to.kind
-      name: Target Kind
+      name: TARGET-KIND
       type: string
     - jsonPath: .spec.to.name
-      name: Target Name
-      type: string
-    - jsonPath: .status.conditions[?(@.type=="Ready")].status
-      name: Ready
+      name: TARGET-NAME
       type: string
     - jsonPath: .metadata.creationTimestamp
-      name: Age
+      name: AGE
       type: date
     name: v1alpha1
     schema:
@@ -74,6 +77,7 @@ spec:
 
                       Only dot-separated field names are supported. Array indexing
                       (e.g. ".status.conditions[0].message") is not supported.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   resource:
@@ -83,10 +87,12 @@ spec:
                       kind:
                         description: Kind is the resource kind (e.g., "Database",
                           "Warehouse", "Schema").
+                        maxLength: 255
                         minLength: 1
                         type: string
                       name:
                         description: Name is the resource name.
+                        maxLength: 255
                         minLength: 1
                         type: string
                     required:
@@ -103,6 +109,7 @@ spec:
                   key:
                     description: Key is the key within the ConfigMap data or Secret
                       data to write to.
+                    maxLength: 255
                     minLength: 1
                     type: string
                   kind:
@@ -114,6 +121,7 @@ spec:
                     type: string
                   name:
                     description: Name is the target ConfigMap or Secret name.
+                    maxLength: 255
                     minLength: 1
                     type: string
                 required:
@@ -132,7 +140,7 @@ spec:
               rule: '!self.from.path.contains(''['')'
             - message: spec.from.resource.kind must be a supported Snowplane resource
                 kind
-              rule: self.from.resource.kind in ['Alert','AuthenticationPolicy','Database','Schema','Warehouse','User','AccountRole','DatabaseRole','AccountRoleGrant','DatabaseRoleGrant','ShareGrant','AccountRoleAssignment','DatabaseRoleAssignment','TagAssociation','NetworkPolicyAttachment','PasswordPolicyAttachment','MaskingPolicyApplication','TableConstraint','Table','View','Stage','Task','StreamOnTable','StreamOnView','StreamOnExternalTable','StreamOnDirectoryTable','StreamOnDynamicTable','Tag','NetworkPolicy','ResourceMonitor','MaskingPolicy','RowAccessPolicy','GrantOwnership','StorageIntegration','SecurityIntegration','NotificationIntegration','FileFormat','Pipe','DynamicTable','PasswordPolicy','NetworkRule','Sequence','ExternalTable','MaterializedView','ProcedureSQL','ProcedureJavascript','ProcedurePython','ProcedureJava','ProcedureScala','FunctionSQL','FunctionJavascript','FunctionPython','FunctionJava','FunctionScala','SecretWithClientCredentials','SecretWithAuthorizationCodeGrant','SecretWithBasicAuthentication','SecretWithGenericString','APIAuthenticationIntegrationWithClientCredentials','APIAuthenticationIntegrationWithAuthorizationCodeGrant','APIAuthenticationIntegrationWithJWTBearer']
+              rule: self.from.resource.kind in ['Alert','AuthenticationPolicy','Database','Schema','Warehouse','User','AccountRole','DatabaseRole','GrantPrivilegesToAccountRole','GrantPrivilegesToDatabaseRole','GrantPrivilegesToShare','AccountRoleAssignment','DatabaseRoleAssignment','TagAssociation','NetworkPolicyAttachment','PasswordPolicyAttachment','MaskingPolicyApplication','TableConstraint','Table','View','Stage','Task','StreamOnTable','StreamOnView','StreamOnExternalTable','StreamOnDirectoryTable','StreamOnDynamicTable','Tag','NetworkPolicy','ResourceMonitor','MaskingPolicy','RowAccessPolicy','GrantOwnership','StorageIntegration','SecurityIntegration','NotificationIntegration','FileFormat','Pipe','DynamicTable','PasswordPolicy','NetworkRule','Sequence','ExternalTable','MaterializedView','ProcedureSQL','ProcedureJavascript','ProcedurePython','ProcedureJava','ProcedureScala','FunctionSQL','FunctionJavascript','FunctionPython','FunctionJava','FunctionScala','SecretWithClientCredentials','SecretWithAuthorizationCodeGrant','SecretWithBasicAuthentication','SecretWithGenericString','APIAuthenticationIntegrationWithClientCredentials','APIAuthenticationIntegrationWithAuthorizationCodeGrant','APIAuthenticationIntegrationWithJWTBearer','SAML2Integration','ExternalOAuthIntegration','APIIntegration','SecondaryDatabase','SharedDatabase','FailoverGroup','SQLStatement']
             - message: spec.from.resource.kind is immutable
               rule: self.from.resource.kind == oldSelf.from.resource.kind
             - message: spec.from.resource.name is immutable

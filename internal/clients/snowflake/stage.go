@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,21 +17,7 @@ type StageObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW STAGES row.
-	ShowOutput *StageShowOutput
-}
-
-// StageShowOutput contains the fields from SHOW STAGES.
-type StageShowOutput struct {
-	CreatedOn          string
-	Name               string
-	DatabaseName       string
-	SchemaName         string
-	URL                string
-	Owner              string
-	Comment            string
-	Type               string // INTERNAL or EXTERNAL
-	StorageIntegration string
-	DirectoryEnabled   bool
+	ShowOutput *v1alpha1.StageShowOutput
 }
 
 // CreateStageOptions holds the parameters for creating a stage.
@@ -306,7 +293,7 @@ func buildShowStageByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW STAGES for a specific stage name within a schema.
-func (s *StageClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*StageShowOutput, error) {
+func (s *StageClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.StageShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("stage name is required"))
 	}
@@ -338,9 +325,9 @@ func (s *StageClient) Observe(ctx context.Context, name SchemaObjectIdentifier) 
 }
 
 // scanStageShowOutput scans SHOW STAGES results for a matching row.
-func scanStageShowOutput(rows *sql.Rows, name string) (*StageShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*StageShowOutput, error) {
-		return &StageShowOutput{
+func scanStageShowOutput(rows *sql.Rows, name string) (*v1alpha1.StageShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.StageShowOutput, error) {
+		return &v1alpha1.StageShowOutput{
 			CreatedOn:          m["created_on"],
 			Name:               m["name"],
 			DatabaseName:       m["database_name"],

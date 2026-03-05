@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake/sqlbuilder"
 )
 
@@ -16,25 +17,10 @@ type TableObservation struct {
 	Exists bool
 
 	// ShowOutput contains the SHOW TABLES row.
-	ShowOutput *TableShowOutput
+	ShowOutput *v1alpha1.TableShowOutput
 
 	// Columns contains the columns returned by DESCRIBE TABLE.
 	Columns []ColumnInfo
-}
-
-// TableShowOutput contains the fields from SHOW TABLES.
-type TableShowOutput struct {
-	CreatedOn             string
-	Name                  string
-	DatabaseName          string
-	SchemaName            string
-	Kind                  string // TABLE, TRANSIENT, TEMPORARY
-	Comment               string
-	Owner                 string
-	RetentionTime         int32
-	ClusterBy             string
-	ChangeTracking        bool
-	EnableSchemaEvolution bool
 }
 
 // ColumnInfo represents a column from DESCRIBE TABLE output.
@@ -529,7 +515,7 @@ func buildShowTableByIDSQL(name SchemaObjectIdentifier) string {
 }
 
 // ShowByID queries SHOW TABLES for a specific table name within a schema.
-func (t *TableClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*TableShowOutput, error) {
+func (t *TableClient) ShowByID(ctx context.Context, name SchemaObjectIdentifier) (*v1alpha1.TableShowOutput, error) {
 	if !ValidObjectIdentifier(name) {
 		return nil, NewTerminalError(fmt.Errorf("table name is required"))
 	}
@@ -638,11 +624,11 @@ func (t *TableClient) Observe(ctx context.Context, name SchemaObjectIdentifier) 
 }
 
 // scanTableShowOutput scans SHOW TABLES results for a matching row.
-func scanTableShowOutput(rows *sql.Rows, name string) (*TableShowOutput, error) {
-	return ScanShowOutput(rows, name, func(m map[string]string) (*TableShowOutput, error) {
+func scanTableShowOutput(rows *sql.Rows, name string) (*v1alpha1.TableShowOutput, error) {
+	return ScanShowOutput(rows, name, func(m map[string]string) (*v1alpha1.TableShowOutput, error) {
 		rt, _ := parseInt32(m["retention_time"])
 
-		return &TableShowOutput{
+		return &v1alpha1.TableShowOutput{
 			CreatedOn:             m["created_on"],
 			Name:                  m["name"],
 			DatabaseName:          m["database_name"],

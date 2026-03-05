@@ -58,10 +58,10 @@ kubectl get rgd -owide   # All should show State: Active
 
 | RGD | Custom Kind | Resources Created | Key Feature |
 |:----|:------------|:------------------|:------------|
-| [`snowflake-project.yaml`](../kro/snowflake-project.yaml) | `SnowflakeProject` | Database, Schema, Warehouse, AccountRole, AccountRoleGrant | Project bootstrap |
+| [`snowflake-project.yaml`](../kro/snowflake-project.yaml) | `SnowflakeProject` | Database, Schema, Warehouse, AccountRole, GrantPrivilegesToAccountRole | Project bootstrap |
 | [`tagged-table.yaml`](../kro/tagged-table.yaml) | `TaggedTable` | Table, N × TagAssociation | `forEach` collections |
 | [`data-pipeline.yaml`](../kro/data-pipeline.yaml) | `SnowflakePipeline` | Table, StreamOnTable, Task | Conditional resources |
-| [`rbac-stack.yaml`](../kro/rbac-stack.yaml) | `SnowflakeRBAC` | AccountRole, N × AccountRoleGrant, AccountRoleAssignment | `forEach` grants |
+| [`rbac-stack.yaml`](../kro/rbac-stack.yaml) | `SnowflakeRBAC` | AccountRole, N × GrantPrivilegesToAccountRole, AccountRoleAssignment | `forEach` grants |
 
 ---
 
@@ -88,7 +88,7 @@ spec:
 kubectl apply -f analytics-project.yaml
 
 # Watch all five resources come up together
-kubectl get databases,schemas,warehouses,accountroles,accountrolegrants -n data-team
+kubectl get databases,schemas,warehouses,accountroles,grantprivilegestoaccountroles -n data-team
 ```
 
 ### Clean Up
@@ -220,11 +220,11 @@ spec:
 ```bash
 kubectl apply -f analytics-reader.yaml
 
-# kro creates: 1 AccountRole + 3 AccountRoleGrants + 1 AccountRoleAssignment
-kubectl get accountroles,accountrolegrants,accountroleassignments -n data-team
+# kro creates: 1 AccountRole + 3 GrantPrivilegesToAccountRoles + 1 AccountRoleAssignment
+kubectl get accountroles,grantprivilegestoaccountroles,accountroleassignments -n data-team
 ```
 
-> **How `forEach` works here:** kro iterates over `spec.grants` and creates one `AccountRoleGrant` per entry, each linked to the role via `accountRoleRef`. The `assignToRole` field uses `includeWhen` to conditionally create an `AccountRoleAssignment` — leave it empty to skip the assignment.
+> **How `forEach` works here:** kro iterates over `spec.grants` and creates one `GrantPrivilegesToAccountRole` per entry, each linked to the role via `accountRoleRef`. The `assignToRole` field uses `includeWhen` to conditionally create an `AccountRoleAssignment` — leave it empty to skip the assignment.
 
 ---
 
@@ -238,7 +238,7 @@ flowchart TD
     DAG --> WH["Warehouse"]
     DAG --> R["AccountRole"]
     DB --> S["Schema<br/>(depends on Database)"]
-    R --> G["AccountRoleGrant<br/>(depends on Role)"]
+    R --> G["GrantPrivilegesToAccountRole<br/>(depends on Role)"]
     S --> SP["Snowplane reconcilers"]
     G --> SP
     WH --> SP

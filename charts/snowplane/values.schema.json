@@ -106,6 +106,7 @@
     "podSecurityContext": {
       "type": "object",
       "description": "Pod security context.",
+      "additionalProperties": false,
       "properties": {
         "runAsNonRoot": { "type": "boolean" },
         "runAsUser": { "type": "integer" },
@@ -126,6 +127,7 @@
     "securityContext": {
       "type": "object",
       "description": "Container security context.",
+      "additionalProperties": false,
       "properties": {
         "allowPrivilegeEscalation": { "type": "boolean" },
         "readOnlyRootFilesystem": { "type": "boolean" },
@@ -213,6 +215,10 @@
         "enableAlphaResources": {
           "type": "boolean",
           "description": "Enable alpha-maturity resource controllers."
+        },
+        "enableSQLStatement": {
+          "type": "boolean",
+          "description": "Enable the SQLStatement escape-hatch controller. WARNING: allows executing arbitrary SQL against Snowflake."
         },
         "disableControllers": {
           "type": "string",
@@ -543,6 +549,59 @@
               "description": "Annotations for the dashboard ConfigMap."
             }
           }
+        }
+      }
+    },
+    "webhook": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Ownership-conflict validating admission webhook.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable the ownership-conflict validating webhook."
+        },
+        "failurePolicy": {
+          "type": "string",
+          "enum": ["Ignore", "Fail"],
+          "description": "Webhook failure policy."
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Webhook timeout in seconds."
+        },
+        "port": {
+          "type": "integer",
+          "description": "Webhook server port."
+        },
+        "certDir": {
+          "type": "string",
+          "description": "Directory containing TLS cert and key."
+        },
+        "namespaceSelector": {
+          "type": "object",
+          "description": "Optional namespace selector to limit webhook scope."
+        },
+        "certManager": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "cert-manager integration.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Use cert-manager to provision the webhook TLS certificate."
+            },
+            "issuerRef": {
+              "type": "object",
+              "description": "Override the issuer reference."
+            }
+          }
+        },
+        "caBundle": {
+          "type": "string",
+          "description": "Base64-encoded CA bundle (only needed when certManager.enabled is false)."
         }
       }
     }

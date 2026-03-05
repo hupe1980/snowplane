@@ -1,7 +1,7 @@
 # SnowflakeProject — Project Bootstrap Stack
 #
 # Creates a complete Snowflake project environment from a single resource:
-#   Database → Schema → Warehouse → AccountRole → AccountRoleGrant
+#   Database → Schema → Warehouse → AccountRole → GrantPrivilegesToAccountRole
 #
 # Usage:
 #   kubectl apply -f snowflake-project.yaml
@@ -103,7 +103,7 @@ spec:
     - id: grant
       template:
         apiVersion: snowplane.hupe1980.github.io/v1alpha1
-        kind: AccountRoleGrant
+        kind: GrantPrivilegesToAccountRole
         metadata:
           name: ${schema.spec.name}-${schema.spec.environment}-db-usage
         spec:
