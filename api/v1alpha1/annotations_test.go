@@ -42,3 +42,35 @@ func TestIsAbandonOnDelete(t *testing.T) {
 	assert.False(t, IsAbandonOnDelete(map[string]string{}))
 	assert.False(t, IsAbandonOnDelete(nil))
 }
+
+func TestAmbiguousBoolAnnotations(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		wantCount   int
+	}{
+		{"nil annotations", nil, 0},
+		{"empty annotations", map[string]string{}, 0},
+		{"canonical true", map[string]string{AnnotationForceNew: "true"}, 0},
+		{"uppercase True triggers warning", map[string]string{AnnotationForceNew: "True"}, 1},
+		{"all-caps TRUE triggers warning", map[string]string{AnnotationForceNew: "TRUE"}, 1},
+		{"yes triggers warning", map[string]string{AnnotationForceNew: "yes"}, 1},
+		{"1 triggers warning", map[string]string{AnnotationForceNew: "1"}, 1},
+		{"false triggers warning", map[string]string{AnnotationForceNew: "false"}, 1},
+		{"random value does not warn", map[string]string{AnnotationForceNew: "maybe"}, 0},
+		{"multiple annotations with issues", map[string]string{
+			AnnotationForceNew:        "True",
+			AnnotationAbandonOnDelete: "YES",
+		}, 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			warnings := AmbiguousBoolAnnotations(tt.annotations)
+			assert.Len(t, warnings, tt.wantCount)
+		})
+	}
+}

@@ -1582,7 +1582,7 @@ func TestShouldSkipImmutableValidation_ForceNewFalse(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: isCreateOrAlterUnsupported table-driven (M-2)
+// Tests: isCreateOrAlterUnsupported table-driven
 // ---------------------------------------------------------------------------
 
 func TestIsCreateOrAlterUnsupported(t *testing.T) {
@@ -1598,11 +1598,11 @@ func TestIsCreateOrAlterUnsupported(t *testing.T) {
 		{"permission denied", errors.New("insufficient privileges"), false},
 		{"unsupported keyword", errors.New("SQL compilation error: UNSUPPORTED feature"), true},
 		{"unexpected OR", errors.New("SQL compilation error: unexpected 'OR'"), true},
-		{"syntax error", errors.New("SQL compilation error: syntax error"), true},
+		{"syntax error no longer matches", errors.New("SQL compilation error: syntax error"), false},
 		{"structured error code 2032", &gosnowflake.SnowflakeError{Number: snowflake.ErrCodeCreateOrAlterUnsupported}, true},
 		{"error code 002032 no longer matches", errors.New("002032 (42601): SQL compilation error"), false},
 		{"case insensitive unsupported", errors.New("unsupported statement type"), true},
-		{"case insensitive syntax", errors.New("Syntax Error near 'CREATE'"), true},
+		{"case insensitive syntax", errors.New("Syntax Error near 'CREATE'"), false},
 	}
 
 	for _, tt := range tests {
@@ -1614,7 +1614,7 @@ func TestIsCreateOrAlterUnsupported(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: CREATE OR ALTER fallback to ALTER on syntax error (M-1)
+// Tests: CREATE OR ALTER fallback to ALTER on syntax error
 // ---------------------------------------------------------------------------
 
 func TestReconcile_CreateOrAlter_SyntaxError_FallsBackToAlter(t *testing.T) {
@@ -1636,7 +1636,7 @@ func TestReconcile_CreateOrAlter_SyntaxError_FallsBackToAlter(t *testing.T) {
 		},
 		createFn: func(_ context.Context, _ any, _ *snowplanev1alpha1.Database, _ reconciler.Identifier) error {
 			createCalled = true
-			return errors.New("SQL compilation error: syntax error line 1 at position 7 unexpected 'OR'")
+			return errors.New("SQL compilation error: unexpected 'OR' near position 7")
 		},
 		alterFn: func(_ context.Context, _ any, _ reconciler.AlterOptions) error {
 			alterCalled = true
@@ -1663,7 +1663,7 @@ func TestReconcile_CreateOrAlter_SyntaxError_FallsBackToAlter(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: Post-crash create recovery (M-3)
+// Tests: Post-crash create recovery
 // ---------------------------------------------------------------------------
 
 func TestReconcile_PostCrashCreate_Recovery(t *testing.T) {
@@ -1742,7 +1742,7 @@ func TestReconcile_PostCrashCreate_WithLateInit(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: Orphan deletion — condition and event assertions (M-4)
+// Tests: Orphan deletion — condition and event assertions
 // ---------------------------------------------------------------------------
 
 func TestReconcile_Delete_OrphanPolicy_ConditionsAndEvents(t *testing.T) {
@@ -1784,7 +1784,7 @@ func TestReconcile_Delete_OrphanPolicy_ConditionsAndEvents(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: ForceNew warning event (M-5)
+// Tests: ForceNew warning event
 // ---------------------------------------------------------------------------
 
 func TestReconcile_ForceNew_EmitsWarningEvent(t *testing.T) {
@@ -1818,7 +1818,7 @@ func TestReconcile_ForceNew_EmitsWarningEvent(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: Delete path terminal error handling (H-18)
+// Tests: Delete path terminal error handling
 // ---------------------------------------------------------------------------
 
 func TestReconcile_Delete_TerminalDropError_SetsConditions(t *testing.T) {
@@ -1872,7 +1872,7 @@ func TestReconcile_Delete_DropError_SetsSyncedCondition(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: Hash error returns nil (no requeue) (H-19)
+// Tests: Hash error returns nil (no requeue)
 // ---------------------------------------------------------------------------
 
 func TestReconcile_Update_HashError_ReturnsNil(t *testing.T) {
@@ -1906,7 +1906,7 @@ func TestReconcile_Update_HashError_ReturnsNil(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: Nil observation guard (H-20)
+// Tests: Nil observation guard
 // ---------------------------------------------------------------------------
 
 func TestReconcile_NilObservation_ReturnsError(t *testing.T) {
@@ -2067,4 +2067,133 @@ func TestReconcile_PreFlight_Failure_EmitsEvent(t *testing.T) {
 	}
 
 	assert.True(t, found, "should emit DependencyNotReady event for pre-flight failure")
+}
+
+// ---------------------------------------------------------------------------
+// Tests: ObserveOnly management policy
+// ---------------------------------------------------------------------------
+
+func TestReconcile_ObserveOnly_ResourceExists_PopulatesStatusWithoutAlter(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.Status.ObservedGeneration = 1
+	observeOnly := true
+	db.Spec.ManagementPolicies.ObserveOnly = &observeOnly
+
+	// Simulate spec-unchanged by pre-setting the hash.
+	hash, err := db.ComputeSpecHash()
+	require.NoError(t, err)
+	db.Status.LastAppliedSpecHash = hash
+
+	createCalled := false
+	alterCalled := false
+
+	adapter := &mockAdapter{
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
+		},
+		createFn: func(_ context.Context, _ any, _ *snowplanev1alpha1.Database, _ reconciler.Identifier) error {
+			createCalled = true
+			return nil
+		},
+		alterFn: func(_ context.Context, _ any, _ reconciler.AlterOptions) error {
+			alterCalled = true
+			return nil
+		},
+	}
+
+	recorder := record.NewFakeRecorder(100)
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r.Recorder = recorder
+	result, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.False(t, createCalled, "Create should NOT be called in observe-only mode")
+	assert.False(t, alterCalled, "Alter should NOT be called in observe-only mode")
+	assert.Equal(t, reconciler.DefaultRequeueInterval, result.RequeueAfter)
+	assert.Equal(t, 1, adapter.applyObservationCalled, "ApplyObservation should be called to populate status")
+}
+
+func TestReconcile_ObserveOnly_ResourceNotExists_SkipsCreate(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	observeOnly := true
+	db.Spec.ManagementPolicies.ObserveOnly = &observeOnly
+
+	createCalled := false
+
+	adapter := &mockAdapter{
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: false}, nil
+		},
+		createFn: func(_ context.Context, _ any, _ *snowplanev1alpha1.Database, _ reconciler.Identifier) error {
+			createCalled = true
+			return nil
+		},
+	}
+
+	recorder := record.NewFakeRecorder(100)
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r.Recorder = recorder
+	result, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.False(t, createCalled, "Create should NOT be called in observe-only mode")
+	assert.Equal(t, reconciler.DefaultRequeueInterval, result.RequeueAfter)
+
+	// Verify ObserveOnly event was emitted.
+	found := false
+	close(recorder.Events)
+
+	for event := range recorder.Events {
+		if strings.Contains(event, snowplanev1alpha1.ReasonObserveOnly) {
+			found = true
+			break
+		}
+	}
+
+	assert.True(t, found, "should emit ObserveOnly event when resource not found")
+}
+
+func TestReconcile_ObserveOnly_Delete_RemovesFinalizerWithoutDrop(t *testing.T) {
+	t.Parallel()
+
+	now := metav1.Now()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.DeletionTimestamp = &now
+	observeOnly := true
+	db.Spec.ManagementPolicies.ObserveOnly = &observeOnly
+
+	dropCalled := false
+
+	adapter := &mockAdapter{
+		dropFn: func(_ context.Context, _ any, _ reconciler.Identifier) error {
+			dropCalled = true
+			return nil
+		},
+	}
+
+	recorder := record.NewFakeRecorder(100)
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r.Recorder = recorder
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.False(t, dropCalled, "Drop should NOT be called in observe-only mode")
+
+	// Verify the ObserveOnly event was emitted.
+	found := false
+	close(recorder.Events)
+
+	for event := range recorder.Events {
+		if strings.Contains(event, snowplanev1alpha1.ReasonObserveOnly) &&
+			strings.Contains(event, "finalizer removed without DROP") {
+			found = true
+			break
+		}
+	}
+
+	assert.True(t, found, "should emit ObserveOnly event on delete")
 }

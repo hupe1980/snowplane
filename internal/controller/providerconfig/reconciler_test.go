@@ -544,7 +544,7 @@ func TestMapSecretToProviderConfigs_EmptyNamespaceFallsBackToPCNamespace(t *test
 }
 
 // --------------------------------------------------------------------------
-// Tests: Finalizer and deletion guard (L-14)
+// Tests: Finalizer and deletion guard
 // --------------------------------------------------------------------------
 
 func TestReconcile_AddsFinalizer(t *testing.T) {
@@ -915,14 +915,15 @@ func TestListLen_AllTypes(t *testing.T) {
 	assert.Equal(t, 1, listLen(&snowplanev1alpha1.DatabaseRoleList{Items: []snowplanev1alpha1.DatabaseRole{{}}}))
 	assert.Equal(t, 1, listLen(&snowplanev1alpha1.TableList{Items: []snowplanev1alpha1.Table{{}}}))
 	assert.Equal(t, 1, listLen(&snowplanev1alpha1.ViewList{Items: []snowplanev1alpha1.View{{}}}))
-	assert.Equal(t, 1, listLen(&snowplanev1alpha1.StageList{Items: []snowplanev1alpha1.Stage{{}}}))
+	assert.Equal(t, 1, listLen(&snowplanev1alpha1.InternalStageList{Items: []snowplanev1alpha1.InternalStage{{}}}))
+	assert.Equal(t, 1, listLen(&snowplanev1alpha1.ExternalStageList{Items: []snowplanev1alpha1.ExternalStage{{}}}))
 	assert.Equal(t, 1, listLen(&snowplanev1alpha1.GrantPrivilegesToAccountRoleList{Items: []snowplanev1alpha1.GrantPrivilegesToAccountRole{{}}}))
 	assert.Equal(t, 1, listLen(&snowplanev1alpha1.GrantPrivilegesToDatabaseRoleList{Items: []snowplanev1alpha1.GrantPrivilegesToDatabaseRole{{}}}))
 	assert.Equal(t, 1, listLen(&snowplanev1alpha1.GrantPrivilegesToShareList{Items: []snowplanev1alpha1.GrantPrivilegesToShare{{}}}))
 }
 
 // --------------------------------------------------------------------------
-// Tests: IsRoleAllowed (M-4)
+// Tests: IsRoleAllowed
 // --------------------------------------------------------------------------
 
 func TestIsRoleAllowed_NilAllowlist_AllRolesPermitted(t *testing.T) {
@@ -970,7 +971,7 @@ func TestIsRoleAllowed_CaseInsensitive(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Tests: Reconcile with role allowlist (M-4)
+// Tests: Reconcile with role allowlist
 // --------------------------------------------------------------------------
 
 func TestReconcile_RoleNotAllowed_SetsCondition(t *testing.T) {

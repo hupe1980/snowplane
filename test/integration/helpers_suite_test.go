@@ -100,24 +100,6 @@ func newTestView(name, sfName, dbRefName, schemaRefName string) *snowplanev1alph
 	}
 }
 
-// newTestStage creates a Stage CR referencing a Database and Schema for integration tests.
-func newTestStage(name, sfName, dbRefName, schemaRefName string) *snowplanev1alpha1.Stage {
-	return &snowplanev1alpha1.Stage{
-		ObjectMeta: ctrl.ObjectMeta{
-			Name:      name,
-			Namespace: testNamespace,
-		},
-		Spec: snowplanev1alpha1.StageSpec{
-			CommonSpec: snowplanev1alpha1.CommonSpec{
-				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
-			},
-			Name:        sfName,
-			DatabaseRef: &snowplanev1alpha1.ObjectReference{Name: dbRefName},
-			SchemaRef:   &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
-		},
-	}
-}
-
 // newTestWarehouse creates a Warehouse CR with sensible defaults for integration tests.
 func newTestWarehouse(name, sfName string) *snowplanev1alpha1.Warehouse {
 	return &snowplanev1alpha1.Warehouse{
@@ -294,24 +276,6 @@ func viewObservation(name, dbName, schemaName, comment, owner, statement string,
 			IsSecure:       secure,
 			Text:           statement,
 			ChangeTracking: false,
-		},
-	}
-}
-
-// stageObservation returns a standard existing-stage observation.
-func stageObservation(name, dbName, schemaName, comment, owner, stageType string) *snowflake.StageObservation {
-	return &snowflake.StageObservation{
-		Exists: true,
-		ShowOutput: &snowplanev1alpha1.StageShowOutput{
-			CreatedOn:        "2024-01-01",
-			Name:             name,
-			DatabaseName:     dbName,
-			SchemaName:       schemaName,
-			URL:              "",
-			Owner:            owner,
-			Comment:          comment,
-			Type:             stageType,
-			DirectoryEnabled: false,
 		},
 	}
 }
@@ -557,4 +521,167 @@ func setupReadyDatabaseAndSchema(t *testing.T, dbK8sName, sfDBName, schemaK8sNam
 	}
 
 	return dbKey, schemaKey, cleanup
+}
+
+// --------------------------------------------------------------------------
+// CR factory helpers — ExternalVolume, CortexSearchService, GitRepository,
+// Streamlit
+// --------------------------------------------------------------------------
+
+// newTestExternalVolume creates an ExternalVolume CR with sensible defaults for integration tests.
+func newTestExternalVolume(name, sfName string) *snowplanev1alpha1.ExternalVolume {
+	return &snowplanev1alpha1.ExternalVolume{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.ExternalVolumeSpec{
+			CommonSpec: snowplanev1alpha1.CommonSpec{
+				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
+			},
+			Name: sfName,
+			StorageLocations: []snowplanev1alpha1.ExternalVolumeStorageLocation{
+				{
+					Name:            "loc1",
+					StorageProvider: "S3",
+					StorageBaseURL:  "s3://my-bucket/path/",
+				},
+			},
+		},
+	}
+}
+
+// newTestCortexSearchService creates a CortexSearchService CR with sensible defaults for integration tests.
+func newTestCortexSearchService(name, sfName, dbRefName, schemaRefName string) *snowplanev1alpha1.CortexSearchService {
+	return &snowplanev1alpha1.CortexSearchService{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.CortexSearchServiceSpec{
+			CommonSpec: snowplanev1alpha1.CommonSpec{
+				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
+			},
+			Name:          sfName,
+			DatabaseRef:   &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:     &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
+			WarehouseName: ptr("TEST_WH"),
+			On:            "TEXT_COL",
+			TargetLag:     "1 hour",
+			Query:         "SELECT TEXT_COL FROM my_table",
+		},
+	}
+}
+
+// newTestGitRepository creates a GitRepository CR with sensible defaults for integration tests.
+func newTestGitRepository(name, sfName, dbRefName, schemaRefName string) *snowplanev1alpha1.GitRepository {
+	return &snowplanev1alpha1.GitRepository{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.GitRepositorySpec{
+			CommonSpec: snowplanev1alpha1.CommonSpec{
+				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
+			},
+			Name:           sfName,
+			DatabaseRef:    &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:      &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
+			Origin:         "https://github.com/example/repo.git",
+			APIIntegration: "my_api_integration",
+		},
+	}
+}
+
+// newTestStreamlit creates a Streamlit CR with sensible defaults for integration tests.
+func newTestStreamlit(name, sfName, dbRefName, schemaRefName string) *snowplanev1alpha1.Streamlit {
+	return &snowplanev1alpha1.Streamlit{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+		},
+		Spec: snowplanev1alpha1.StreamlitSpec{
+			CommonSpec: snowplanev1alpha1.CommonSpec{
+				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
+			},
+			Name:          sfName,
+			DatabaseRef:   &snowplanev1alpha1.ObjectReference{Name: dbRefName},
+			SchemaRef:     &snowplanev1alpha1.ObjectReference{Name: schemaRefName},
+			WarehouseName: ptr("TEST_WH"),
+			MainFile:      ptr("main.py"),
+		},
+	}
+}
+
+// --------------------------------------------------------------------------
+// Observation factory helpers — ExternalVolume, CortexSearchService,
+// GitRepository, Streamlit
+// --------------------------------------------------------------------------
+
+// externalVolumeObservation returns a standard existing-external-volume observation.
+func externalVolumeObservation(name, comment string, allowWrites bool) *snowflake.ExternalVolumeObservation {
+	return &snowflake.ExternalVolumeObservation{
+		Exists: true,
+		ShowOutput: &snowplanev1alpha1.ExternalVolumeShowOutput{
+			Name:        name,
+			AllowWrites: allowWrites,
+			Comment:     comment,
+		},
+		StorageLocationNames: []string{"loc1"},
+	}
+}
+
+// cortexSearchServiceObservation returns a standard existing-cortex-search-service observation.
+func cortexSearchServiceObservation(name, dbName, schemaName, on, targetLag, query, comment string) *snowflake.CortexSearchServiceObservation {
+	return &snowflake.CortexSearchServiceObservation{
+		Exists: true,
+		ShowOutput: &snowplanev1alpha1.CortexSearchServiceShowOutput{
+			CreatedOn:    "2024-01-01",
+			Name:         name,
+			DatabaseName: dbName,
+			SchemaName:   schemaName,
+			TargetLag:    targetLag,
+			Comment:      comment,
+			SearchColumn: on,
+			Definition:   query,
+		},
+		DescribeOutput: &snowplanev1alpha1.CortexSearchServiceDescribeOutput{
+			IndexingState: "ACTIVE",
+			ServingState:  "READY",
+		},
+	}
+}
+
+// gitRepositoryObservation returns a standard existing-git-repository observation.
+func gitRepositoryObservation(name, dbName, schemaName, origin, apiIntegration, owner string) *snowflake.GitRepositoryObservation {
+	return &snowflake.GitRepositoryObservation{
+		Exists: true,
+		ShowOutput: &snowplanev1alpha1.GitRepositoryShowOutput{
+			CreatedOn:      "2024-01-01",
+			Name:           name,
+			DatabaseName:   dbName,
+			SchemaName:     schemaName,
+			Origin:         origin,
+			APIIntegration: apiIntegration,
+			Owner:          owner,
+		},
+	}
+}
+
+// streamlitObservation returns a standard existing-streamlit observation.
+func streamlitObservation(name, dbName, schemaName, owner, mainFile string) *snowflake.StreamlitObservation {
+	return &snowflake.StreamlitObservation{
+		Exists: true,
+		ShowOutput: &snowplanev1alpha1.StreamlitShowOutput{
+			CreatedOn:    "2024-01-01",
+			Name:         name,
+			DatabaseName: dbName,
+			SchemaName:   schemaName,
+			Owner:        owner,
+		},
+		DescribeOutput: &snowplanev1alpha1.StreamlitDescribeOutput{
+			MainFile: mainFile,
+			Name:     name,
+		},
+	}
 }

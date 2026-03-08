@@ -81,7 +81,6 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 		),
 		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.MaskingPolicy, id snowflake.SchemaObjectIdentifier) error {
 			opts := buildCreateOptions(obj, id)
-			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
 			return svc.Create(ctx, opts)
 		}),
 		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterMaskingPolicyOptions) error {
@@ -101,7 +100,7 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 		DetectDriftFn: func(obj *snowplanev1alpha1.MaskingPolicy, obs *reconciler.Observation[*snowflake.MaskingPolicyObservation]) *drift.Result {
 			return detectDrift(obj, obs.Detail)
 		},
-		SupportsCoA: true,
+		SupportsCoA: false,
 		PreReconcileFn: func(ctx context.Context, mp *snowplanev1alpha1.MaskingPolicy) error {
 			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, mp,
 				mp.Namespace, mp.Spec.DatabaseRef, mp.Spec.DatabaseName, mp.Status.DatabaseName)

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/hupe1980/snowplane/internal/circuitbreaker"
 )
@@ -37,6 +38,11 @@ type SetupConfig struct {
 	// MaxConcurrentReconciles is the maximum number of concurrent reconciles
 	// per controller.
 	MaxConcurrentReconciles int
+
+	// ShardPredicate is an optional predicate that restricts this controller
+	// to a deterministic subset of objects for horizontal sharding.
+	// When nil, all objects are reconciled (single-instance mode).
+	ShardPredicate predicate.Predicate
 }
 
 // Registerable is the interface satisfied by every GenericReconciler[T, S, D] instance.
@@ -50,6 +56,10 @@ type Registerable interface {
 // It is the single entry-point for controller wiring, replacing the repeated
 // With*().With*().SetupWithManager() chains.
 func (r *GenericReconciler[T, S, D]) Setup(cfg SetupConfig) error {
+	if cfg.ShardPredicate != nil {
+		r.shardPredicate = cfg.ShardPredicate
+	}
+
 	return r.
 		WithCircuitBreaker(cfg.CircuitBreaker).
 		WithRequeueInterval(cfg.RequeueInterval).

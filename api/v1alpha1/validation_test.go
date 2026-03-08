@@ -17,6 +17,9 @@ func validCommonSpec() CommonSpec {
 	return CommonSpec{ProviderRef: ProviderReference{Name: "default"}, DeletionPolicy: DeletionPolicyDelete}
 }
 
+// ptrStr returns a pointer to the given string. Test helper.
+func ptrStr(s string) *string { return &s }
+
 func TestDatabaseSpec_Validate_Valid(t *testing.T) {
 	t.Parallel()
 	assert.NoError(t, (&DatabaseSpec{CommonSpec: validCommonSpec(), Name: "MYDB"}).Validate())
@@ -239,7 +242,7 @@ func TestValidateSecretKeyRef_Nil(t *testing.T) {
 	assert.NoError(t, validateSecretKeyRef("f", nil))
 }
 
-// --- ProviderRef.Name validation (H-3) ---
+// --- ProviderRef.Name validation ---
 
 func TestCommonSpec_Validate_EmptyProviderRef(t *testing.T) {
 	t.Parallel()
@@ -401,7 +404,7 @@ func TestWarehouseSpec_Validate_ValidResourceConstraints(t *testing.T) {
 	assert.NoError(t, (&WarehouseSpec{CommonSpec: validCommonSpec(), Name: "WH", ResourceConstraint: &rc}).Validate())
 }
 
-// --- Warehouse range validation (L-6) ---
+// --- Warehouse range validation ---
 
 func TestWarehouseSpec_Validate_ClusterCountRange(t *testing.T) {
 	t.Parallel()
@@ -672,7 +675,7 @@ func TestProviderConfigSpec_Validate_AllAuthTypes(t *testing.T) {
 	}
 }
 
-// --- Auth-type credential validation (H-2) ---
+// --- Auth-type credential validation ---
 
 func TestProviderConfigSpec_Validate_KeyPairMissingSecret(t *testing.T) {
 	t.Parallel()
@@ -1013,6 +1016,52 @@ func TestIsSchemaAllowed_MixedEntries(t *testing.T) {
 	assert.False(t, spec.IsSchemaAllowed("RAW", "PUBLIC"))
 }
 
+// --- IsRefNamespaceAllowed ---
+
+func TestIsRefNamespaceAllowed_EmptyList(t *testing.T) {
+	t.Parallel()
+
+	spec := &ProviderConfigSpec{}
+	assert.True(t, spec.IsRefNamespaceAllowed("team-a", "infra"))
+	assert.True(t, spec.IsRefNamespaceAllowed("team-a", "team-a"))
+}
+
+func TestIsRefNamespaceAllowed_Wildcard(t *testing.T) {
+	t.Parallel()
+
+	spec := &ProviderConfigSpec{AllowedRefNamespaces: []string{"*"}}
+	assert.True(t, spec.IsRefNamespaceAllowed("team-a", "infra"))
+	assert.True(t, spec.IsRefNamespaceAllowed("team-a", "team-b"))
+}
+
+func TestIsRefNamespaceAllowed_SameNamespace(t *testing.T) {
+	t.Parallel()
+
+	spec := &ProviderConfigSpec{AllowedRefNamespaces: []string{"SAME"}}
+	assert.True(t, spec.IsRefNamespaceAllowed("team-a", "team-a"))
+	assert.True(t, spec.IsRefNamespaceAllowed("team-a", ""))
+	assert.False(t, spec.IsRefNamespaceAllowed("team-a", "infra"))
+}
+
+func TestIsRefNamespaceAllowed_ExplicitNamespaces(t *testing.T) {
+	t.Parallel()
+
+	spec := &ProviderConfigSpec{AllowedRefNamespaces: []string{"infra", "shared"}}
+	assert.True(t, spec.IsRefNamespaceAllowed("team-a", "infra"))
+	assert.True(t, spec.IsRefNamespaceAllowed("team-a", "shared"))
+	assert.True(t, spec.IsRefNamespaceAllowed("team-a", "team-a"))
+	assert.False(t, spec.IsRefNamespaceAllowed("team-a", "forbidden"))
+}
+
+func TestIsRefNamespaceAllowed_MixedSAMEAndExplicit(t *testing.T) {
+	t.Parallel()
+
+	spec := &ProviderConfigSpec{AllowedRefNamespaces: []string{"SAME", "infra"}}
+	assert.True(t, spec.IsRefNamespaceAllowed("team-a", "team-a"))
+	assert.True(t, spec.IsRefNamespaceAllowed("team-a", "infra"))
+	assert.False(t, spec.IsRefNamespaceAllowed("team-a", "other"))
+}
+
 // --- Dangerous Grant Validation ---
 
 func TestValidateDangerousGrantPrivilegesToAccountRole_SafeGrant(t *testing.T) {
@@ -1137,7 +1186,7 @@ func TestValidateDangerousGrantPrivilegesToAccountRole_NonSystemRoleAllowed(t *t
 }
 
 // --------------------------------------------------------------------------
-// Tests: UserSpec email validation (L-8)
+// Tests: UserSpec email validation
 // --------------------------------------------------------------------------
 
 func TestUserSpec_Validate_ValidEmail(t *testing.T) {
@@ -1494,7 +1543,7 @@ func TestTableSpec_Validate_ConstraintForeignKey(t *testing.T) {
 				Type:    TableConstraintForeignKey,
 				Columns: []string{"PARENT_ID"},
 				ForeignKey: &ForeignKeyReference{
-					Table:   "PARENT",
+					Table:   ptrStr("PARENT"),
 					Columns: []string{"ID"},
 				},
 			},
@@ -1578,12 +1627,12 @@ func TestTableSpec_Validate_ConstraintFKEmptyTable(t *testing.T) {
 				Name:       "fk",
 				Type:       TableConstraintForeignKey,
 				Columns:    []string{"ID"},
-				ForeignKey: &ForeignKeyReference{Table: "", Columns: []string{"ID"}},
+				ForeignKey: &ForeignKeyReference{Columns: []string{"ID"}},
 			},
 		},
 	}).Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "foreignKey.table is required")
+	assert.Contains(t, err.Error(), "exactly one of table or tableRef must be set")
 }
 
 func TestTableSpec_Validate_ConstraintFKEmptyColumns(t *testing.T) {
@@ -1601,7 +1650,7 @@ func TestTableSpec_Validate_ConstraintFKEmptyColumns(t *testing.T) {
 				Name:       "fk",
 				Type:       TableConstraintForeignKey,
 				Columns:    []string{"ID"},
-				ForeignKey: &ForeignKeyReference{Table: "PARENT", Columns: nil},
+				ForeignKey: &ForeignKeyReference{Table: ptrStr("PARENT"), Columns: nil},
 			},
 		},
 	}).Validate()
@@ -1628,7 +1677,7 @@ func TestTableSpec_Validate_ConstraintFKColumnMismatch(t *testing.T) {
 				Type:    TableConstraintForeignKey,
 				Columns: []string{"A", "B"},
 				ForeignKey: &ForeignKeyReference{
-					Table:   "OTHER",
+					Table:   ptrStr("OTHER"),
 					Columns: []string{"X"},
 				},
 			},
@@ -1676,7 +1725,7 @@ func TestTableSpec_Validate_ConstraintPKWithForeignKey(t *testing.T) {
 				Type:    TableConstraintPrimaryKey,
 				Columns: []string{"ID"},
 				ForeignKey: &ForeignKeyReference{
-					Table:   "OTHER",
+					Table:   ptrStr("OTHER"),
 					Columns: []string{"X"},
 				},
 			},
@@ -1774,160 +1823,6 @@ func TestViewSpec_Validate_MultipleErrors(t *testing.T) {
 	assert.Contains(t, s, "exactly one of spec.databaseRef or spec.databaseName must be set")
 	assert.Contains(t, s, "exactly one of spec.schemaRef or spec.schemaName must be set")
 	assert.Contains(t, s, "spec.statement is required")
-}
-
-// ---------------------------------------------------------------------------
-// StageSpec — validation tests
-// ---------------------------------------------------------------------------
-
-func TestStageSpec_Validate_Valid(t *testing.T) {
-	t.Parallel()
-	assert.NoError(t, (&StageSpec{
-		CommonSpec:  validCommonSpec(),
-		Name:        "S",
-		DatabaseRef: &ObjectReference{Name: "db"},
-		SchemaRef:   &ObjectReference{Name: "sch"},
-	}).Validate())
-}
-
-func TestStageSpec_Validate_EmptyName(t *testing.T) {
-	t.Parallel()
-	err := (&StageSpec{
-		DatabaseRef: &ObjectReference{Name: "db"},
-		SchemaRef:   &ObjectReference{Name: "sch"},
-	}).Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.name is required")
-}
-
-func TestStageSpec_Validate_EmptyDatabaseRef(t *testing.T) {
-	t.Parallel()
-	err := (&StageSpec{
-		Name:      "S",
-		SchemaRef: &ObjectReference{Name: "sch"},
-	}).Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "exactly one of spec.databaseRef or spec.databaseName must be set")
-}
-
-func TestStageSpec_Validate_EmptySchemaRef(t *testing.T) {
-	t.Parallel()
-	err := (&StageSpec{
-		Name:        "S",
-		DatabaseRef: &ObjectReference{Name: "db"},
-	}).Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "exactly one of spec.schemaRef or spec.schemaName must be set")
-}
-
-func TestStageSpec_Validate_StorageIntegrationWithoutURL(t *testing.T) {
-	t.Parallel()
-	err := (&StageSpec{
-		CommonSpec:         validCommonSpec(),
-		Name:               "S",
-		DatabaseRef:        &ObjectReference{Name: "db"},
-		SchemaRef:          &ObjectReference{Name: "sch"},
-		StorageIntegration: ptr("MY_INT"),
-	}).Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.storageIntegration requires spec.url")
-}
-
-func TestStageSpec_Validate_StorageIntegrationWithURL(t *testing.T) {
-	t.Parallel()
-	assert.NoError(t, (&StageSpec{
-		CommonSpec:         validCommonSpec(),
-		Name:               "S",
-		DatabaseRef:        &ObjectReference{Name: "db"},
-		SchemaRef:          &ObjectReference{Name: "sch"},
-		URL:                ptr("s3://bucket/path"),
-		StorageIntegration: ptr("MY_INT"),
-	}).Validate())
-}
-
-func TestStageSpec_Validate_StorageIntegrationWithEmptyURL(t *testing.T) {
-	t.Parallel()
-	err := (&StageSpec{
-		CommonSpec:         validCommonSpec(),
-		Name:               "S",
-		DatabaseRef:        &ObjectReference{Name: "db"},
-		SchemaRef:          &ObjectReference{Name: "sch"},
-		URL:                ptr(""),
-		StorageIntegration: ptr("MY_INT"),
-	}).Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.storageIntegration requires spec.url")
-}
-
-func TestStageSpec_Validate_MultipleErrors(t *testing.T) {
-	t.Parallel()
-	err := (&StageSpec{StorageIntegration: ptr("I")}).Validate()
-	require.Error(t, err)
-	s := err.Error()
-	assert.Contains(t, s, "spec.name is required")
-	assert.Contains(t, s, "exactly one of spec.databaseRef or spec.databaseName must be set")
-	assert.Contains(t, s, "exactly one of spec.schemaRef or spec.schemaName must be set")
-	assert.Contains(t, s, "spec.storageIntegration requires spec.url")
-}
-
-func TestStageSpec_Validate_EncryptionInternalOnly(t *testing.T) {
-	t.Parallel()
-
-	for _, encType := range []string{"SNOWFLAKE_FULL", "SNOWFLAKE_SSE"} {
-		spec := &StageSpec{
-			CommonSpec:  validCommonSpec(),
-			Name:        "S",
-			DatabaseRef: &ObjectReference{Name: "db"},
-			SchemaRef:   &ObjectReference{Name: "sch"},
-			URL:         ptr("s3://bucket/path"),
-			Encryption:  &StageEncryption{Type: encType},
-		}
-		err := spec.Validate()
-		require.Error(t, err, "encryption type %s should fail on external stage", encType)
-		assert.Contains(t, err.Error(), "only valid for internal stages")
-	}
-}
-
-func TestStageSpec_Validate_EncryptionExternalOnly(t *testing.T) {
-	t.Parallel()
-
-	for _, encType := range []string{"AWS_CSE", "AWS_SSE_S3", "AWS_SSE_KMS", "GCS_SSE_KMS", "AZURE_CSE", "NONE"} {
-		spec := &StageSpec{
-			CommonSpec:  validCommonSpec(),
-			Name:        "S",
-			DatabaseRef: &ObjectReference{Name: "db"},
-			SchemaRef:   &ObjectReference{Name: "sch"},
-			Encryption:  &StageEncryption{Type: encType},
-		}
-		err := spec.Validate()
-		require.Error(t, err, "encryption type %s should fail on internal stage", encType)
-		assert.Contains(t, err.Error(), "only valid for external stages")
-	}
-}
-
-func TestStageSpec_Validate_EncryptionValidInternal(t *testing.T) {
-	t.Parallel()
-	spec := &StageSpec{
-		CommonSpec:  validCommonSpec(),
-		Name:        "S",
-		DatabaseRef: &ObjectReference{Name: "db"},
-		SchemaRef:   &ObjectReference{Name: "sch"},
-		Encryption:  &StageEncryption{Type: "SNOWFLAKE_FULL"},
-	}
-	assert.NoError(t, spec.Validate())
-}
-
-func TestStageSpec_Validate_EncryptionValidExternal(t *testing.T) {
-	t.Parallel()
-	spec := &StageSpec{
-		CommonSpec:  validCommonSpec(),
-		Name:        "S",
-		DatabaseRef: &ObjectReference{Name: "db"},
-		SchemaRef:   &ObjectReference{Name: "sch"},
-		URL:         ptr("s3://bucket/path"),
-		Encryption:  &StageEncryption{Type: "AWS_SSE_S3"},
-	}
-	assert.NoError(t, spec.Validate())
 }
 
 // ---------------------------------------------------------------------------
@@ -2589,161 +2484,6 @@ func TestDatabaseRoleAssignmentSpec_Validate_TwoTargets(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// NotificationIntegrationSpec.Validate — tests
-// ---------------------------------------------------------------------------
-
-func TestNotificationIntegrationSpec_Validate_ValidEmail(t *testing.T) {
-	t.Parallel()
-
-	spec := NotificationIntegrationSpec{
-		CommonSpec: validCommonSpec(),
-		Name:       "MY_NI",
-		Type:       NotificationIntegrationTypeEmail,
-		Email:      &EmailNotificationConfig{AllowedRecipients: []string{"a@b.com"}},
-	}
-	require.NoError(t, spec.Validate())
-}
-
-func TestNotificationIntegrationSpec_Validate_ValidQueue(t *testing.T) {
-	t.Parallel()
-
-	spec := NotificationIntegrationSpec{
-		CommonSpec: validCommonSpec(),
-		Name:       "MY_NI",
-		Type:       NotificationIntegrationTypeQueue,
-		Queue:      &QueueNotificationConfig{NotificationProvider: "AWS_SNS", Direction: "OUTBOUND"},
-	}
-	require.NoError(t, spec.Validate())
-}
-
-func TestNotificationIntegrationSpec_Validate_ValidWebhook(t *testing.T) {
-	t.Parallel()
-
-	spec := NotificationIntegrationSpec{
-		CommonSpec: validCommonSpec(),
-		Name:       "MY_NI",
-		Type:       NotificationIntegrationTypeWebhook,
-		Webhook:    &WebhookNotificationConfig{WebhookURL: "https://example.com/hook"},
-	}
-	require.NoError(t, spec.Validate())
-}
-
-func TestNotificationIntegrationSpec_Validate_EmptyName(t *testing.T) {
-	t.Parallel()
-
-	spec := NotificationIntegrationSpec{
-		CommonSpec: validCommonSpec(),
-		Type:       NotificationIntegrationTypeEmail,
-		Email:      &EmailNotificationConfig{AllowedRecipients: []string{"a@b.com"}},
-	}
-	err := spec.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.name is required")
-}
-
-func TestNotificationIntegrationSpec_Validate_EmptyType(t *testing.T) {
-	t.Parallel()
-
-	spec := NotificationIntegrationSpec{
-		CommonSpec: validCommonSpec(),
-		Name:       "MY_NI",
-	}
-	err := spec.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.type is required")
-}
-
-func TestNotificationIntegrationSpec_Validate_EmailMissingConfig(t *testing.T) {
-	t.Parallel()
-
-	spec := NotificationIntegrationSpec{
-		CommonSpec: validCommonSpec(),
-		Name:       "MY_NI",
-		Type:       NotificationIntegrationTypeEmail,
-	}
-	err := spec.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.email is required when type is EMAIL")
-}
-
-func TestNotificationIntegrationSpec_Validate_EmailMissingRecipients(t *testing.T) {
-	t.Parallel()
-
-	spec := NotificationIntegrationSpec{
-		CommonSpec: validCommonSpec(),
-		Name:       "MY_NI",
-		Type:       NotificationIntegrationTypeEmail,
-		Email:      &EmailNotificationConfig{},
-	}
-	err := spec.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.email.allowedRecipients is required")
-}
-
-func TestNotificationIntegrationSpec_Validate_QueueMissingConfig(t *testing.T) {
-	t.Parallel()
-
-	spec := NotificationIntegrationSpec{
-		CommonSpec: validCommonSpec(),
-		Name:       "MY_NI",
-		Type:       NotificationIntegrationTypeQueue,
-	}
-	err := spec.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.queue is required when type is QUEUE")
-}
-
-func TestNotificationIntegrationSpec_Validate_QueueMissingProvider(t *testing.T) {
-	t.Parallel()
-
-	spec := NotificationIntegrationSpec{
-		CommonSpec: validCommonSpec(),
-		Name:       "MY_NI",
-		Type:       NotificationIntegrationTypeQueue,
-		Queue:      &QueueNotificationConfig{Direction: "OUTBOUND"},
-	}
-	err := spec.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.queue.notificationProvider is required")
-}
-
-func TestNotificationIntegrationSpec_Validate_WebhookMissingConfig(t *testing.T) {
-	t.Parallel()
-
-	spec := NotificationIntegrationSpec{
-		CommonSpec: validCommonSpec(),
-		Name:       "MY_NI",
-		Type:       NotificationIntegrationTypeWebhook,
-	}
-	err := spec.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.webhook is required when type is WEBHOOK")
-}
-
-func TestNotificationIntegrationSpec_Validate_WebhookMissingURL(t *testing.T) {
-	t.Parallel()
-
-	spec := NotificationIntegrationSpec{
-		CommonSpec: validCommonSpec(),
-		Name:       "MY_NI",
-		Type:       NotificationIntegrationTypeWebhook,
-		Webhook:    &WebhookNotificationConfig{},
-	}
-	err := spec.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.webhook.webhookURL is required")
-}
-
-func TestNotificationIntegrationSpec_Validate_MultipleErrors(t *testing.T) {
-	t.Parallel()
-
-	err := (&NotificationIntegrationSpec{}).Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec.name is required")
-	assert.Contains(t, err.Error(), "spec.type is required")
-}
-
-// ---------------------------------------------------------------------------
 // FieldExportSpec.Validate — tests
 // ---------------------------------------------------------------------------
 
@@ -2867,7 +2607,7 @@ func TestFieldExportSpec_Validate_PathArrayIndexing(t *testing.T) {
 
 func TestFieldExportSpec_Validate_AllSourceKinds(t *testing.T) {
 	t.Parallel()
-	for _, kind := range []string{"Database", "Schema", "Warehouse", "User", "AccountRole", "DatabaseRole", "GrantPrivilegesToAccountRole", "GrantPrivilegesToDatabaseRole", "GrantPrivilegesToShare", "Table", "View", "Stage", "Task", "StreamOnTable", "StreamOnView", "StreamOnExternalTable", "StreamOnDirectoryTable", "StreamOnDynamicTable", "Tag", "NetworkPolicy", "ResourceMonitor", "MaskingPolicy", "RowAccessPolicy", "GrantOwnership"} {
+	for _, kind := range []string{"Database", "Schema", "Warehouse", "User", "AccountRole", "DatabaseRole", "GrantPrivilegesToAccountRole", "GrantPrivilegesToDatabaseRole", "GrantPrivilegesToShare", "Table", "View", "ExternalStage", "InternalStage", "Task", "StreamOnTable", "StreamOnView", "StreamOnExternalTable", "StreamOnDirectoryTable", "StreamOnDynamicTable", "Tag", "NetworkPolicy", "ResourceMonitor", "MaskingPolicy", "RowAccessPolicy", "GrantOwnership"} {
 		spec := FieldExportSpec{
 			From: FieldExportSource{
 				Resource: FieldExportResourceRef{Kind: kind, Name: "test"},
@@ -2957,7 +2697,7 @@ func TestGrantPrivilegesToDatabaseRoleSpec_Validate_ValidWithRef(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Tests: validatePrivilegeObjectCompat (L-15)
+// Tests: validatePrivilegeObjectCompat
 // --------------------------------------------------------------------------
 
 func TestPrivilegeObjectCompat_Account_Valid(t *testing.T) {
@@ -3815,7 +3555,8 @@ func TestCELAndGoMutualExclusivityInSync(t *testing.T) {
 		"stream_on_directory_table_types.go",
 		"stream_on_dynamic_table_types.go",
 		"tag_types.go",
-		"stage_types.go",
+		"internalstage_types.go",
+		"externalstage_types.go",
 		"fileformat_types.go",
 		"pipe_types.go",
 		"dynamictable_types.go",
@@ -3843,7 +3584,8 @@ func TestCELAndGoMutualExclusivityInSync(t *testing.T) {
 		"stream_on_directory_table_types.go",
 		"stream_on_dynamic_table_types.go",
 		"tag_types.go",
-		"stage_types.go",
+		"internalstage_types.go",
+		"externalstage_types.go",
 		"fileformat_types.go",
 		"pipe_types.go",
 		"dynamictable_types.go",
@@ -4429,7 +4171,7 @@ func TestContainsDestructiveSQL_WhitespaceVariants(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// NetworkPolicySpec — IP/CIDR validation & non-empty allowed list (Findings #2, #8)
+// NetworkPolicySpec — IP/CIDR validation & non-empty allowed list
 // ---------------------------------------------------------------------------
 
 func TestNetworkPolicySpec_Validate_ValidIP(t *testing.T) {
@@ -4505,7 +4247,7 @@ func TestNetworkPolicySpec_Validate_EmptyAllowedLists(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// FileFormatSpec — type enum validation (Finding #3)
+// FileFormatSpec — type enum validation
 // ---------------------------------------------------------------------------
 
 func TestFileFormatSpec_Validate_Valid(t *testing.T) {
@@ -4545,7 +4287,7 @@ func TestFileFormatSpec_Validate_EmptyType(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// AlertSpec — schedule format validation (Finding #7)
+// AlertSpec — schedule format validation
 // ---------------------------------------------------------------------------
 
 func validAlertSpec() *AlertSpec {
@@ -4597,7 +4339,7 @@ func TestAlertSpec_Validate_InvalidScheduleGarbage(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// PasswordPolicySpec — cross-field age validation (Finding #5)
+// PasswordPolicySpec — cross-field age validation
 // ---------------------------------------------------------------------------
 
 func validPasswordPolicySpec() *PasswordPolicySpec {
@@ -4648,7 +4390,7 @@ func TestPasswordPolicySpec_Validate_AgeDaysEqual(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// ResourceMonitorSpec — trigger limit validation (Finding #4)
+// ResourceMonitorSpec — trigger limit validation
 // ---------------------------------------------------------------------------
 
 func TestResourceMonitorSpec_Validate_TooManyNotifyTriggers(t *testing.T) {
@@ -4712,7 +4454,7 @@ func TestResourceMonitorSpec_Validate_ValidMixedTriggers(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TagAssociationSpec — ObjectType enum validation (Finding #11)
+// TagAssociationSpec — ObjectType enum validation
 // ---------------------------------------------------------------------------
 
 func TestTagAssociationSpec_Validate_InvalidObjectType(t *testing.T) {
@@ -4739,7 +4481,7 @@ func TestTagAssociationSpec_Validate_ValidObjectType_DatabaseRole(t *testing.T) 
 }
 
 // ---------------------------------------------------------------------------
-// NetworkPolicyAttachmentSpec — TargetType enum validation (Finding #3)
+// NetworkPolicyAttachmentSpec — TargetType enum validation
 // ---------------------------------------------------------------------------
 
 func TestNetworkPolicyAttachmentSpec_Validate_InvalidTargetType(t *testing.T) {
@@ -4752,7 +4494,7 @@ func TestNetworkPolicyAttachmentSpec_Validate_InvalidTargetType(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// PasswordPolicyAttachmentSpec — TargetType enum validation (Finding #3)
+// PasswordPolicyAttachmentSpec — TargetType enum validation
 // ---------------------------------------------------------------------------
 
 func TestPasswordPolicyAttachmentSpec_Validate_InvalidTargetType(t *testing.T) {
@@ -5086,4 +4828,96 @@ func TestFieldExportSpec_Validate_PathStatusValid(t *testing.T) {
 		},
 	}
 	assert.NoError(t, spec.Validate())
+}
+
+// ---------------------------------------------------------------------------
+// Sensitive field guard — FieldExportSpec.Validate
+// ---------------------------------------------------------------------------
+
+func TestFieldExportSpec_Validate_SensitivePath_ConfigMap_Rejected(t *testing.T) {
+	t.Parallel()
+	spec := FieldExportSpec{
+		From: FieldExportSource{
+			Resource: FieldExportResourceRef{Kind: "ExternalOAuthIntegration", Name: "my-int"},
+			Path:     ".status.describeOutput.oauthClientId",
+		},
+		To: FieldExportTarget{
+			Kind: FieldExportTargetConfigMap,
+			Name: "my-cm",
+			Key:  "oauth-id",
+		},
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "sensitive")
+	assert.Contains(t, err.Error(), "Secret")
+}
+
+func TestFieldExportSpec_Validate_SensitivePath_Secret_Allowed(t *testing.T) {
+	t.Parallel()
+	spec := FieldExportSpec{
+		From: FieldExportSource{
+			Resource: FieldExportResourceRef{Kind: "ExternalOAuthIntegration", Name: "my-int"},
+			Path:     ".status.describeOutput.oauthClientId",
+		},
+		To: FieldExportTarget{
+			Kind: FieldExportTargetSecret,
+			Name: "my-secret",
+			Key:  "oauth-id",
+		},
+	}
+	assert.NoError(t, spec.Validate())
+}
+
+func TestFieldExportSpec_Validate_NonSensitivePath_ConfigMap_Allowed(t *testing.T) {
+	t.Parallel()
+	// Database has no sensitive status paths — all paths are safe for ConfigMap.
+	spec := FieldExportSpec{
+		From: FieldExportSource{
+			Resource: FieldExportResourceRef{Kind: "Database", Name: "my-db"},
+			Path:     ".status.showOutput.name",
+		},
+		To: FieldExportTarget{
+			Kind: FieldExportTargetConfigMap,
+			Name: "my-cm",
+			Key:  "name",
+		},
+	}
+	assert.NoError(t, spec.Validate())
+}
+
+func TestFieldExportSpec_Validate_UserPII_ConfigMap_Rejected(t *testing.T) {
+	t.Parallel()
+	spec := FieldExportSpec{
+		From: FieldExportSource{
+			Resource: FieldExportResourceRef{Kind: "User", Name: "my-user"},
+			Path:     ".status.showOutput.email",
+		},
+		To: FieldExportTarget{
+			Kind: FieldExportTargetConfigMap,
+			Name: "my-cm",
+			Key:  "email",
+		},
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "sensitive")
+}
+
+func TestFieldExportSpec_Validate_StorageIntegrationAWSARN_ConfigMap_Rejected(t *testing.T) {
+	t.Parallel()
+	spec := FieldExportSpec{
+		From: FieldExportSource{
+			Resource: FieldExportResourceRef{Kind: "StorageIntegrationAWS", Name: "my-si"},
+			Path:     ".status.storageAWSIAMUserARN",
+		},
+		To: FieldExportTarget{
+			Kind: FieldExportTargetConfigMap,
+			Name: "my-cm",
+			Key:  "arn",
+		},
+	}
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "sensitive")
 }

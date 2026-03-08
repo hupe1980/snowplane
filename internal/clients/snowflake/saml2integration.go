@@ -200,11 +200,11 @@ func buildAlterSAML2IntegrationStatements(opts AlterSAML2IntegrationOptions) ([]
 	}
 
 	if opts.AllowedEmailPatterns != nil {
-		sc.UnsafeRaw(buildStringListClause("ALLOWED_EMAIL_PATTERNS", *opts.AllowedEmailPatterns))
+		sc.UnsafeRaw(buildStringListClause("ALLOWED_EMAIL_PATTERNS", *opts.AllowedEmailPatterns)) //nolint:forbidigo // values escaped via EscapeString
 	}
 
 	if opts.AllowedUserDomains != nil {
-		sc.UnsafeRaw(buildStringListClause("ALLOWED_USER_DOMAINS", *opts.AllowedUserDomains))
+		sc.UnsafeRaw(buildStringListClause("ALLOWED_USER_DOMAINS", *opts.AllowedUserDomains)) //nolint:forbidigo // values escaped via EscapeString
 	}
 
 	if opts.SPInitiatedLoginLabel != nil {

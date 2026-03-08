@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/hupe1980/snowplane/internal/metrics"
 )
 
 // EscapeString escapes backslashes and single quotes for Snowflake
@@ -371,6 +373,7 @@ func ValidatePolicyBody(body string) error {
 	}
 
 	if policyBodyDenyRe.MatchString(body) {
+		metrics.RecordPolicyBodyRejection("policy_body")
 		return fmt.Errorf("invalid policy body: contains forbidden pattern (semicolons, comment markers, or dollar-quoting)")
 	}
 

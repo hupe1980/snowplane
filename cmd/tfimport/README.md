@@ -17,7 +17,6 @@
 | `snowflake_grant_privileges_to_share` | GrantPrivilegesToShare |
 | `snowflake_table` | Table |
 | `snowflake_view` | View |
-| `snowflake_stage` | Stage |
 
 Unsupported resource types are silently skipped.
 

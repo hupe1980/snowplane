@@ -625,6 +625,57 @@ func TestResolveClient_NamespaceIsolation(t *testing.T) {
 	assert.NotEqual(t, resolvedA.CacheKey, resolvedB.CacheKey)
 }
 
+func TestIsRefNamespaceAllowed(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		resolved *ResolvedProvider
+		sourceNS string
+		targetNS string
+		want     bool
+	}{
+		{"empty_allows_all", &ResolvedProvider{}, "team-a", "infra", true},
+		{"same_ns_always_allowed", &ResolvedProvider{AllowedRefNamespaces: []string{"SAME"}}, "team-a", "team-a", true},
+		{"empty_target_always_allowed", &ResolvedProvider{AllowedRefNamespaces: []string{"SAME"}}, "team-a", "", true},
+		{"wildcard", &ResolvedProvider{AllowedRefNamespaces: []string{"*"}}, "team-a", "infra", true},
+		{"SAME_denies_cross_ns", &ResolvedProvider{AllowedRefNamespaces: []string{"SAME"}}, "team-a", "infra", false},
+		{"explicit_match", &ResolvedProvider{AllowedRefNamespaces: []string{"infra", "shared"}}, "team-a", "infra", true},
+		{"explicit_denied", &ResolvedProvider{AllowedRefNamespaces: []string{"infra", "shared"}}, "team-a", "forbidden", false},
+		{"mixed_SAME_explicit", &ResolvedProvider{AllowedRefNamespaces: []string{"SAME", "infra"}}, "team-a", "infra", true},
+		{"mixed_SAME_denied", &ResolvedProvider{AllowedRefNamespaces: []string{"SAME", "infra"}}, "team-a", "other", false},
+	}
+
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, IsRefNamespaceAllowed(tt.resolved, tt.sourceNS, tt.targetNS), tt.name)
+	}
+}
+
+func TestResolveClient_AllowedRefNamespaces_Propagated(t *testing.T) {
+	t.Parallel()
+
+	pc := newReadyPC("default")
+	pc.Spec.AllowedRefNamespaces = []string{"infra", "shared"}
+	secret := newTestSecret("default")
+
+	c := fake.NewClientBuilder().
+		WithScheme(testScheme()).
+		WithRuntimeObjects(pc, secret).
+		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
+		Build()
+
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+		return &fakeSnowflakeClient{}, nil
+	})
+
+	obj := &testConditionedObject{}
+	ref := snowplanev1alpha1.ProviderReference{Name: "default-pc"}
+
+	resolved, err := ResolveClient(context.Background(), c, factory, obj, ref, "default", nil, nil, "test")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"infra", "shared"}, resolved.AllowedRefNamespaces)
+}
+
 // fakeSnowflakeClient implements clientfactory.SnowflakeClient for tests.
 type fakeSnowflakeClient struct{}
 

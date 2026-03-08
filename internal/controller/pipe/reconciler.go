@@ -118,16 +118,16 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 
 			pipe.Status.SchemaName = schemaFQN
 
-			// Resolve optional Integration ref (immutable, references NotificationIntegration).
+			// Resolve optional Integration ref (immutable, references QueueNotificationIntegration).
 			if pipe.Spec.IntegrationRef != nil || pipe.Spec.IntegrationName != nil {
 				integrationName, intErr := refresolver.PreReconcileSourceRef(ctx, c, recorder, pipe,
 					pipe.Namespace, pipe.Spec.IntegrationRef, pipe.Spec.IntegrationName, pipe.Status.IntegrationName,
 					"Integration",
-					func() *snowplanev1alpha1.NotificationIntegration {
-						return &snowplanev1alpha1.NotificationIntegration{}
+					func() *snowplanev1alpha1.QueueNotificationIntegration {
+						return &snowplanev1alpha1.QueueNotificationIntegration{}
 					},
-					snowplanev1alpha1.GroupVersion.WithKind("NotificationIntegration"),
-					func(ni *snowplanev1alpha1.NotificationIntegration) string { return ni.Spec.Name },
+					snowplanev1alpha1.GroupVersion.WithKind("QueueNotificationIntegration"),
+					func(ni *snowplanev1alpha1.QueueNotificationIntegration) string { return ni.Spec.Name },
 				)
 				if intErr != nil {
 					return intErr
@@ -136,16 +136,16 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 				pipe.Status.IntegrationName = integrationName
 			}
 
-			// Resolve optional ErrorIntegration ref (mutable, references NotificationIntegration).
+			// Resolve optional ErrorIntegration ref (mutable, references QueueNotificationIntegration).
 			if pipe.Spec.ErrorIntegrationRef != nil || pipe.Spec.ErrorIntegrationName != nil {
 				errorIntName, eiErr := refresolver.PreReconcileSourceRef(ctx, c, recorder, pipe,
 					pipe.Namespace, pipe.Spec.ErrorIntegrationRef, pipe.Spec.ErrorIntegrationName, pipe.Status.ErrorIntegrationName,
 					"ErrorIntegration",
-					func() *snowplanev1alpha1.NotificationIntegration {
-						return &snowplanev1alpha1.NotificationIntegration{}
+					func() *snowplanev1alpha1.QueueNotificationIntegration {
+						return &snowplanev1alpha1.QueueNotificationIntegration{}
 					},
-					snowplanev1alpha1.GroupVersion.WithKind("NotificationIntegration"),
-					func(ni *snowplanev1alpha1.NotificationIntegration) string { return ni.Spec.Name },
+					snowplanev1alpha1.GroupVersion.WithKind("QueueNotificationIntegration"),
+					func(ni *snowplanev1alpha1.QueueNotificationIntegration) string { return ni.Spec.Name },
 				)
 				if eiErr != nil {
 					return eiErr
@@ -248,8 +248,8 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 			}
 
 			bldr.Watches(
-				&snowplanev1alpha1.NotificationIntegration{},
-				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.PipeList{} }, ".spec.integrationRef.name", "listing pipes for notification integration watch")),
+				&snowplanev1alpha1.QueueNotificationIntegration{},
+				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.PipeList{} }, ".spec.integrationRef.name", "listing pipes for queue notification integration watch")),
 			)
 
 			return nil

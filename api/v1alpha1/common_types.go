@@ -137,6 +137,14 @@ type ManagementPolicies struct {
 	// +kubebuilder:default=true
 	// +optional
 	CreateOrAlter *bool `json:"createOrAlter,omitempty"`
+
+	// ObserveOnly puts the resource into read-only mode. When true the
+	// controller will Observe the Snowflake resource and populate status
+	// but will never issue CREATE, ALTER, or DROP statements. Deletion
+	// of the CR removes the finalizer without dropping the Snowflake
+	// resource. Defaults to false.
+	// +optional
+	ObserveOnly *bool `json:"observeOnly,omitempty"`
 }
 
 // IsCreateOrAlter returns true when CREATE OR ALTER should be used.
@@ -149,9 +157,30 @@ func (m ManagementPolicies) IsCreateOrAlter() bool {
 	return *m.CreateOrAlter
 }
 
+// IsObserveOnly returns true when the resource is in observe-only mode.
+// In this mode the controller never issues CREATE, ALTER, or DROP.
+func (m ManagementPolicies) IsObserveOnly() bool {
+	if m.ObserveOnly == nil {
+		return false
+	}
+
+	return *m.ObserveOnly
+}
+
 // IsDetectOnly returns true when the drift policy is set to detect-only.
 func (m ManagementPolicies) IsDetectOnly() bool {
 	return m.DriftPolicy == DriftPolicyDetectOnly
+}
+
+// DerefBool returns the value of a bool pointer, or false if nil.
+// Use this when bridging *bool CRD spec fields to plain bool parameters
+// (e.g. Snowflake CREATE options that take bool).
+func DerefBool(b *bool) bool {
+	if b == nil {
+		return false
+	}
+
+	return *b
 }
 
 // CommonSpec contains fields shared by all managed resource specs.
@@ -227,4 +256,27 @@ func ComputeSpecHash(spec interface{}) (string, error) {
 	h := sha256.Sum256(data)
 
 	return hex.EncodeToString(h[:]), nil
+}
+
+// SecurityIntegrationShowOutput mirrors the SHOW SECURITY INTEGRATIONS output stored in status.
+// This type is shared across SecurityIntegration-derived CRDs (APIAuthenticationIntegration variants,
+// ExternalOAuthIntegration, SAML2Integration, SCIMIntegration).
+type SecurityIntegrationShowOutput struct {
+	// CreatedOn is the timestamp when the integration was created.
+	CreatedOn string `json:"createdOn,omitempty"`
+
+	// Name is the integration name as returned by Snowflake.
+	Name string `json:"name,omitempty"`
+
+	// Type is the integration type.
+	Type string `json:"type,omitempty"`
+
+	// Category is the integration category (SECURITY).
+	Category string `json:"category,omitempty"`
+
+	// Enabled indicates whether the integration is active.
+	Enabled bool `json:"enabled,omitempty" snowflake:"ENABLED,nounset"`
+
+	// Comment is the integration description.
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 }

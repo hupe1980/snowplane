@@ -61,6 +61,7 @@ type SecretWithBasicAuthenticationSpec struct {
 
 	// Comment for the secret.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 

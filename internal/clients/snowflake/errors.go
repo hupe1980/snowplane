@@ -142,8 +142,10 @@ func IsConnectionFailed(err error) bool {
 
 // IsCreateOrAlterUnsupported checks whether err indicates that the
 // CREATE OR ALTER syntax is not supported by the Snowflake account.
-// It first checks for a structured gosnowflake.SnowflakeError with code 2032,
-// then falls back to string matching for non-structured errors.
+// It checks for a structured gosnowflake.SnowflakeError with code 2032,
+// then falls back to targeted string matching for "UNSUPPORTED" and
+// "UNEXPECTED 'OR'" — but NOT generic "SYNTAX ERROR", which would
+// misclassify legitimate SQL typos as CoA-unsupported (see FINDINGS H4).
 func IsCreateOrAlterUnsupported(err error) bool {
 	if err == nil {
 		return false
@@ -155,13 +157,16 @@ func IsCreateOrAlterUnsupported(err error) bool {
 		return true
 	}
 
-	// Fallback: string matching for non-structured errors (e.g. wrapped or
-	// non-driver errors that don't produce gosnowflake.SnowflakeError).
+	// Targeted fallback: only match patterns that unambiguously indicate
+	// CREATE OR ALTER is not supported. "SYNTAX ERROR" is intentionally
+	// excluded — it is too broad and would swallow genuine user SQL errors
+	// (missing commas, invalid types, etc.), causing silent fallback to
+	// CREATE IF NOT EXISTS and leaving the user wondering why their
+	// spec changes are ignored.
 	msg := strings.ToUpper(err.Error())
 
 	return strings.Contains(msg, "UNSUPPORTED") ||
-		strings.Contains(msg, "UNEXPECTED 'OR'") ||
-		strings.Contains(msg, "SYNTAX ERROR")
+		strings.Contains(msg, "UNEXPECTED 'OR'")
 }
 
 // MapSnowflakeError wraps err with the matching sentinel error from errorCodeMap.
@@ -184,4 +189,21 @@ func MapSnowflakeError(err error) error {
 	}
 
 	return fmt.Errorf("%w: %w", sentinel, err)
+}
+
+// ExtractErrorCode attempts to extract a Snowflake error code from the error
+// chain. Returns the code and true if found, 0 and false otherwise.
+// This is used by the reconciler to record error codes in metrics without
+// needing to import the gosnowflake package directly.
+func ExtractErrorCode(err error) (int, bool) {
+	if err == nil {
+		return 0, false
+	}
+
+	var sfErr *gosnowflake.SnowflakeError
+	if errors.As(err, &sfErr) {
+		return sfErr.Number, true
+	}
+
+	return 0, false
 }

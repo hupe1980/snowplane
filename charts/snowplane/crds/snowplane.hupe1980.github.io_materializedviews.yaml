@@ -76,6 +76,7 @@ spec:
                 type: array
               comment:
                 description: Comment is the materialized view description.
+                maxLength: 10000
                 type: string
               databaseName:
                 description: DatabaseName is the Snowflake database identifier (e.g.
@@ -141,6 +142,14 @@ spec:
                     - correct
                     - detect-only
                     type: string
+                  observeOnly:
+                    description: |-
+                      ObserveOnly puts the resource into read-only mode. When true the
+                      controller will Observe the Snowflake resource and populate status
+                      but will never issue CREATE, ALTER, or DROP statements. Deletion
+                      of the CR removes the finalizer without dropping the Snowflake
+                      resource. Defaults to false.
+                    type: boolean
                 type: object
               name:
                 description: Name is the Snowflake materialized view name. Immutable
@@ -197,13 +206,15 @@ spec:
                 - name
                 type: object
               secure:
-                description: Secure specifies whether the materialized view is a secure
-                  view.
+                description: |-
+                  Secure specifies whether the materialized view is a secure view.
+                  When nil the attribute is left unmanaged; when false SECURE is
+                  explicitly unset.
                 type: boolean
               statement:
                 description: Statement is the SELECT query that defines the materialized
                   view. Immutable after creation.
-                maxLength: 255
+                maxLength: 65536
                 minLength: 1
                 type: string
               useRole:

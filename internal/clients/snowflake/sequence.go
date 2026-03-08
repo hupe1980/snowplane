@@ -182,12 +182,12 @@ func buildAlterSequenceStatements(opts AlterSequenceOptions) ([]string, error) {
 	fqn := opts.Name.FullyQualifiedName()
 
 	if opts.Increment != nil {
-		sc.UnsafeRaw(fmt.Sprintf("INCREMENT BY = %d", *opts.Increment))
+		sc.UnsafeRaw(fmt.Sprintf("INCREMENT BY = %d", *opts.Increment)) //nolint:forbidigo // integer formatting is injection-safe
 	}
 
 	if opts.Ordering != nil {
 		// ORDER/NOORDER are keywords, not SET parameters.
-		sc.UnsafeRaw(*opts.Ordering)
+		sc.UnsafeRaw(*opts.Ordering) //nolint:forbidigo // Snowflake keyword validated by CRD enum
 	}
 
 	sc.String("COMMENT", opts.Comment)

@@ -238,10 +238,10 @@ func buildAlterOptions(schema *snowplanev1alpha1.Schema, id snowflake.DatabaseOb
 	}
 
 	// Diff ManagedAccess: compare desired vs observed.
-	if obs.ShowOutput != nil {
+	if obs.ShowOutput != nil && schema.Spec.ManagedAccess != nil {
 		observed := snowflake.IsManagedAccess(obs.ShowOutput)
-		if schema.Spec.ManagedAccess != observed {
-			opts.SetManagedAccess = &schema.Spec.ManagedAccess
+		if *schema.Spec.ManagedAccess != observed {
+			opts.SetManagedAccess = schema.Spec.ManagedAccess
 		}
 	}
 
@@ -319,7 +319,7 @@ func detectDrift(schema *snowplanev1alpha1.Schema, obs *snowflake.SchemaObservat
 
 		// Mutable fields.
 		d.CompareString("COMMENT", schema.Spec.Comment, obs.ShowOutput.Comment, false)
-		d.CompareBoolValue("MANAGED_ACCESS", schema.Spec.ManagedAccess, snowflake.IsManagedAccess(obs.ShowOutput), false)
+		d.CompareBool("MANAGED_ACCESS", schema.Spec.ManagedAccess, boolPtr(snowflake.IsManagedAccess(obs.ShowOutput)), false)
 	}
 
 	if obs.Parameters != nil {
@@ -336,3 +336,5 @@ func detectDrift(schema *snowplanev1alpha1.Schema, obs *snowflake.SchemaObservat
 
 	return d.Result()
 }
+
+func boolPtr(v bool) *bool { return &v }

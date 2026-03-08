@@ -74,7 +74,6 @@ type MaskingPolicySpec struct {
 
 	// Body is the SQL expression that transforms the data.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:MaxLength=65536
 	Body string `json:"body" snowflake:"BODY,always"`
 
@@ -85,6 +84,7 @@ type MaskingPolicySpec struct {
 
 	// Comment is an optional description for the masking policy.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
@@ -165,7 +165,7 @@ type MaskingPolicyStatus struct {
 // MaskingPolicy is the Schema for the maskingpolicies API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=mp
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

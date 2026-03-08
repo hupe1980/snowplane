@@ -46,7 +46,7 @@ type CreateSchemaOptions struct {
 	DataRetentionTimeInDays    *int32
 	MaxDataExtensionTimeInDays *int32
 	Transient                  bool
-	ManagedAccess              bool
+	ManagedAccess              *bool
 	DefaultDDLCollation        *string
 	ReplaceInvalidCharacters   *bool
 	StorageSerializationPolicy *string
@@ -150,7 +150,7 @@ func buildCreateSchemaSQL(opts CreateSchemaOptions) (string, error) {
 
 	sqlbuilder.BuildCreatePreamble(&b, "SCHEMA", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, opts.Transient)
 
-	if opts.ManagedAccess {
+	if opts.ManagedAccess != nil && *opts.ManagedAccess {
 		b.WriteString(" WITH MANAGED ACCESS")
 	}
 

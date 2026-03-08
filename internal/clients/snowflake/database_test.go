@@ -488,7 +488,7 @@ func TestBoolToSQL(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// UNSET support tests (C-2)
+// UNSET support tests
 // ---------------------------------------------------------------------------
 
 func TestAlterDatabaseOptions_HasChanges_UnsetFields(t *testing.T) {

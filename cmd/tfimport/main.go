@@ -13,7 +13,6 @@
 //   - snowflake_grant_privileges_to_share → GrantPrivilegesToShare
 //   - snowflake_table            → Table
 //   - snowflake_view             → View
-//   - snowflake_stage            → Stage
 //
 // Usage:
 //
@@ -850,61 +849,6 @@ func convertView(attrs map[string]any, provider, namespace string) string {
 	return b.String()
 }
 
-func convertStage(attrs map[string]any, provider, namespace string) string {
-	name, ok := attrs["name"].(string)
-	if !ok || name == "" {
-		return ""
-	}
-
-	database := ""
-	schema := ""
-
-	if v := stringAttr(attrs, "database"); v != nil {
-		database = *v
-	}
-
-	if v := stringAttr(attrs, "schema"); v != nil {
-		schema = *v
-	}
-
-	crName := sanitizeName(database + "-" + schema + "-" + name)
-
-	var b strings.Builder
-
-	fmt.Fprintf(&b, "apiVersion: %s\nkind: Stage\nmetadata:\n  name: %s\n  namespace: %s\nspec:\n", apiVersion, crName, namespace)
-	fmt.Fprintf(&b, "  providerRef:\n    name: %s\n", provider)
-	fmt.Fprintf(&b, "  deletionPolicy: Orphan\n")
-	fmt.Fprintf(&b, "  name: %s\n", yamlString(name))
-
-	if database != "" {
-		fmt.Fprintf(&b, "  databaseRef:\n    name: %s\n", sanitizeName(database))
-	}
-
-	if schema != "" {
-		fmt.Fprintf(&b, "  schemaRef:\n    name: %s\n", sanitizeName(database+"-"+schema))
-	}
-
-	indent := "  "
-
-	emitField(&b, indent, "url", stringAttr(attrs, "url"))
-	emitField(&b, indent, "storageIntegration", stringAttr(attrs, "storage_integration"))
-	emitField(&b, indent, "fileFormat", stringAttr(attrs, "file_format"))
-
-	// encryption block
-	if v := stringAttr(attrs, "encryption"); v != nil && *v != "" {
-		fmt.Fprintf(&b, "  encryption:\n    type: %s\n", yamlString(*v))
-	}
-
-	// directory
-	if isTruthy(attrs, "directory") {
-		fmt.Fprintf(&b, "  directory:\n    enable: true\n")
-	}
-
-	emitField(&b, indent, "comment", stringAttr(attrs, "comment"))
-
-	return b.String()
-}
-
 // ---------------------------------------------------------------------------
 // Helpers for nested Terraform blocks
 // ---------------------------------------------------------------------------
@@ -1017,7 +961,6 @@ var resourceTypeMap = map[string]func(map[string]any, string, string) string{
 	"snowflake_grant_privileges_to_share":         convertGrantPrivilegesToShare,
 	"snowflake_table":                             convertTable,
 	"snowflake_view":                              convertView,
-	"snowflake_stage":                             convertStage,
 }
 
 func main() {

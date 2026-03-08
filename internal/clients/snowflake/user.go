@@ -242,9 +242,9 @@ func buildAlterUserStatements(opts AlterUserOptions) ([]string, error) {
 	// DEFAULT_SECONDARY_ROLES = ('ALL') is special syntax — not a simple quoted string.
 	if opts.DefaultSecondaryRoles != nil {
 		if strings.EqualFold(*opts.DefaultSecondaryRoles, "ALL") {
-			sc.UnsafeRaw("DEFAULT_SECONDARY_ROLES = ('ALL')")
+			sc.UnsafeRaw("DEFAULT_SECONDARY_ROLES = ('ALL')") //nolint:forbidigo // static literal
 		} else {
-			sc.UnsafeRaw(fmt.Sprintf("DEFAULT_SECONDARY_ROLES = ('%s')", sqlbuilder.EscapeString(*opts.DefaultSecondaryRoles)))
+			sc.UnsafeRaw(fmt.Sprintf("DEFAULT_SECONDARY_ROLES = ('%s')", sqlbuilder.EscapeString(*opts.DefaultSecondaryRoles))) //nolint:forbidigo // value escaped via EscapeString
 		}
 	}
 

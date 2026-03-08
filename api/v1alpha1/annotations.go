@@ -1,5 +1,7 @@
 package v1alpha1
 
+import "strings"
+
 // Annotation and label keys used by Snowplane controllers and CRDs.
 const (
 	// AnnotationForceNew signals the controller to delete and recreate the
@@ -86,4 +88,52 @@ func IsAbandonOnDelete(annotations map[string]string) bool {
 // to "true", signaling the controller to issue DROP … CASCADE.
 func IsForceDestroy(annotations map[string]string) bool {
 	return annotations[AnnotationForceDestroy] == "true"
+}
+
+// boolAnnotationKeys lists all annotations that accept boolean "true"/"false" values.
+var boolAnnotationKeys = []string{
+	AnnotationForceNew,
+	AnnotationAbandonOnDelete,
+	AnnotationForceDestroy,
+	AnnotationAllowDangerousGrant,
+}
+
+// ambiguousBoolValues are values that look like booleans but are not the
+// canonical "true" that the annotation helpers check for.
+var ambiguousBoolValues = map[string]bool{
+	"True": true, "TRUE": true,
+	"yes": true, "Yes": true, "YES": true,
+	"1":  true,
+	"on": true, "On": true, "ON": true,
+	"false": true, "False": true, "FALSE": true,
+	"no": true, "No": true, "NO": true,
+	"0":   true,
+	"off": true, "Off": true, "OFF": true,
+}
+
+// AmbiguousBoolAnnotations returns a list of human-readable warnings for any
+// annotation that has a boolean-like value other than the canonical "true".
+// The reconciler can emit these as Warning events to alert users about
+// annotations that silently have no effect.
+func AmbiguousBoolAnnotations(annotations map[string]string) []string {
+	var warnings []string
+
+	for _, key := range boolAnnotationKeys {
+		v, ok := annotations[key]
+		if !ok || v == "true" || v == "" {
+			continue
+		}
+
+		if ambiguousBoolValues[v] {
+			// Extract short annotation name for readability (e.g. "force-new").
+			short := key
+			if idx := strings.LastIndex(key, "/"); idx >= 0 {
+				short = key[idx+1:]
+			}
+
+			warnings = append(warnings, "annotation "+short+" has value \""+v+"\" which is ignored; only \"true\" is recognized")
+		}
+	}
+
+	return warnings
 }

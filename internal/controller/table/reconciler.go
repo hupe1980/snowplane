@@ -80,7 +80,12 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 			func(obs *snowflake.TableObservation) bool { return obs.Exists },
 		),
 		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.Table, id snowflake.SchemaObjectIdentifier) error {
-			opts := buildCreateOptions(obj, id)
+			resolvedFKTables, err := resolveFKTableRefs(ctx, c, obj)
+			if err != nil {
+				return err
+			}
+
+			opts := buildCreateOptions(obj, id, resolvedFKTables)
 			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
 			return svc.Create(ctx, opts)
 		}),
@@ -220,7 +225,30 @@ func applyObservation(table *snowplanev1alpha1.Table, obs *snowflake.TableObserv
 	}
 }
 
-func buildCreateOptions(table *snowplanev1alpha1.Table, id snowflake.SchemaObjectIdentifier) snowflake.CreateTableOptions {
+// resolveFKTableRefs resolves all foreign key tableRef references in the
+// table's constraints, returning a map of constraint index → resolved FQN.
+func resolveFKTableRefs(ctx context.Context, c sigs.Client, table *snowplanev1alpha1.Table) (map[int]string, error) {
+	resolved := make(map[int]string)
+
+	for i, constraint := range table.Spec.Constraints {
+		if constraint.Type != snowplanev1alpha1.TableConstraintForeignKey || constraint.ForeignKey == nil {
+			continue
+		}
+
+		if constraint.ForeignKey.TableRef != nil {
+			fqn, err := refresolver.ResolveTableRef(ctx, c, table.Namespace, *constraint.ForeignKey.TableRef)
+			if err != nil {
+				return nil, fmt.Errorf("resolving foreignKey.tableRef in constraint %d: %w", i, err)
+			}
+
+			resolved[i] = fqn
+		}
+	}
+
+	return resolved, nil
+}
+
+func buildCreateOptions(table *snowplanev1alpha1.Table, id snowflake.SchemaObjectIdentifier, resolvedFKTables map[int]string) snowflake.CreateTableOptions {
 	columns := make([]snowflake.CreateTableColumn, len(table.Spec.Columns))
 	for i, col := range table.Spec.Columns {
 		columns[i] = snowflake.CreateTableColumn{
@@ -247,7 +275,13 @@ func buildCreateOptions(table *snowplanev1alpha1.Table, id snowflake.SchemaObjec
 		case snowplanev1alpha1.TableConstraintForeignKey:
 			ct.Type = "FOREIGN KEY"
 			if c.ForeignKey != nil {
-				ct.ForeignKeyTable = c.ForeignKey.Table
+				// Prefer resolved tableRef FQN; fall back to inline table name.
+				if fqn, ok := resolvedFKTables[i]; ok {
+					ct.ForeignKeyTable = fqn
+				} else if c.ForeignKey.Table != nil {
+					ct.ForeignKeyTable = *c.ForeignKey.Table
+				}
+
 				ct.ForeignKeyColumns = c.ForeignKey.Columns
 			}
 		}
@@ -529,12 +563,48 @@ func detectColumnDrift(d *drift.Detector, specCols []snowplanev1alpha1.ColumnDef
 	}
 }
 
-// normaliseType strips whitespace around parentheses for column type comparison.
+// normaliseType canonicalises a Snowflake column type string for comparison.
+// It strips whitespace around parentheses and expands common type aliases
+// to their canonical Snowflake forms so that user-specified types like
+// "VARCHAR" don't trigger false drift against Snowflake's "VARCHAR(16777216)".
 func normaliseType(t string) string {
 	t = strings.TrimSpace(t)
 	t = strings.ReplaceAll(t, " (", "(")
 	t = strings.ReplaceAll(t, "( ", "(")
 	t = strings.ReplaceAll(t, " )", ")")
+	t = strings.ToUpper(t)
+
+	// Expand common Snowflake type aliases to their canonical forms.
+	// Only expand types WITHOUT explicit parameters — if the user wrote
+	// "VARCHAR(100)" we must keep it as-is.
+	if !strings.Contains(t, "(") {
+		switch t {
+		case "VARCHAR", "STRING", "TEXT":
+			return "VARCHAR(16777216)"
+		case "CHAR", "CHARACTER":
+			return "VARCHAR(1)"
+		case "INT", "INTEGER", "BIGINT", "SMALLINT", "TINYINT", "BYTEINT":
+			return "NUMBER(38,0)"
+		case "FLOAT", "FLOAT4", "FLOAT8", "DOUBLE", "DOUBLE PRECISION", "REAL":
+			return "FLOAT"
+		case "BOOLEAN", "BOOL":
+			return "BOOLEAN"
+		case "TIMESTAMP", "DATETIME", "TIMESTAMP_NTZ":
+			return "TIMESTAMP_NTZ(9)"
+		case "TIMESTAMP_LTZ":
+			return "TIMESTAMP_LTZ(9)"
+		case "TIMESTAMP_TZ":
+			return "TIMESTAMP_TZ(9)"
+		case "DATE":
+			return "DATE"
+		case "TIME":
+			return "TIME(9)"
+		case "BINARY", "VARBINARY":
+			return "BINARY(8388608)"
+		case "NUMBER", "NUMERIC", "DECIMAL", "DEC":
+			return "NUMBER(38,0)"
+		}
+	}
 
 	return t
 }

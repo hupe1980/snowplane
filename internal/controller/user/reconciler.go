@@ -84,8 +84,6 @@ func newAdapter(c client.Client, sf ServiceFactory) *reconciler.BaseAdapter[*sno
 				return err
 			}
 
-			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
-
 			if err := svc.Create(ctx, opts); err != nil {
 				return err
 			}
@@ -126,7 +124,7 @@ func newAdapter(c client.Client, sf ServiceFactory) *reconciler.BaseAdapter[*sno
 		DetectDriftFn: func(obj *snowplanev1alpha1.User, obs *reconciler.Observation[*snowflake.UserObservation]) *drift.Result {
 			return detectDrift(obj, obs.Detail)
 		},
-		SupportsCoA:      true,
+		SupportsCoA:      false,
 		LateInitializeFn: lateInitialize,
 		PostUpdateFn:     postUpdate,
 	}

@@ -141,11 +141,11 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 				eiName, err := refresolver.PreReconcileSourceRef(ctx, c, recorder, task,
 					task.Namespace, task.Spec.ErrorIntegrationRef, task.Spec.ErrorIntegrationName, task.Status.ErrorIntegrationName,
 					"ErrorIntegration",
-					func() *snowplanev1alpha1.NotificationIntegration {
-						return &snowplanev1alpha1.NotificationIntegration{}
+					func() *snowplanev1alpha1.QueueNotificationIntegration {
+						return &snowplanev1alpha1.QueueNotificationIntegration{}
 					},
-					snowplanev1alpha1.GroupVersion.WithKind("NotificationIntegration"),
-					func(ni *snowplanev1alpha1.NotificationIntegration) string { return ni.Spec.Name },
+					snowplanev1alpha1.GroupVersion.WithKind("QueueNotificationIntegration"),
+					func(ni *snowplanev1alpha1.QueueNotificationIntegration) string { return ni.Spec.Name },
 				)
 				if err != nil {
 					return err
@@ -159,11 +159,11 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 				siName, err := refresolver.PreReconcileSourceRef(ctx, c, recorder, task,
 					task.Namespace, task.Spec.SuccessIntegrationRef, task.Spec.SuccessIntegrationName, task.Status.SuccessIntegrationName,
 					"SuccessIntegration",
-					func() *snowplanev1alpha1.NotificationIntegration {
-						return &snowplanev1alpha1.NotificationIntegration{}
+					func() *snowplanev1alpha1.QueueNotificationIntegration {
+						return &snowplanev1alpha1.QueueNotificationIntegration{}
 					},
-					snowplanev1alpha1.GroupVersion.WithKind("NotificationIntegration"),
-					func(ni *snowplanev1alpha1.NotificationIntegration) string { return ni.Spec.Name },
+					snowplanev1alpha1.GroupVersion.WithKind("QueueNotificationIntegration"),
+					func(ni *snowplanev1alpha1.QueueNotificationIntegration) string { return ni.Spec.Name },
 				)
 				if err != nil {
 					return err
@@ -336,7 +336,7 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 			}
 
 			bldr.Watches(
-				&snowplanev1alpha1.NotificationIntegration{},
+				&snowplanev1alpha1.QueueNotificationIntegration{},
 				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.TaskList{} }, ".spec.errorIntegrationRef.name", "listing tasks for notification integration watch")),
 			)
 

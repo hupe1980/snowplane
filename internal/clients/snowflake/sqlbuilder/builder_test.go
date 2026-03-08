@@ -464,7 +464,7 @@ func TestValidateKeywordValue(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// SetKeyword / SetQuotedKeyword defense-in-depth (L-17)
+// SetKeyword / SetQuotedKeyword defense-in-depth
 // ---------------------------------------------------------------------------
 
 func TestSetKeyword_ErrorOnInvalidValue(t *testing.T) {

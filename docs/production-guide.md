@@ -231,6 +231,8 @@ spec:
 - **`allowedSchemas`**: Supports `"SCHEMA"` (any database) or `"DATABASE.SCHEMA"` format. Empty = all allowed.
 - **`allowedNamespaceSelector`**: Label selector matching namespaces. Used as OR with the static `allowedNamespaces` list — a namespace is permitted if it matches either.
 
+> **Warning:** When both `allowedNamespaces` is empty and `allowedNamespaceSelector` is nil, **all namespaces** can use the ProviderConfig. This is the default behavior. For multi-tenant production deployments, always configure at least one of these fields or enforce it via a Kyverno/OPA policy (see examples above).
+
 Resources violating these constraints are rejected with `DatabaseNotAllowed` or `SchemaNotAllowed` condition reasons.
 
 ### Pre-flight Validation
@@ -317,6 +319,71 @@ spec:
 
 ---
 
+## SQLStatement Security
+
+The SQLStatement CRD is an intentional escape hatch for executing arbitrary SQL. It is gated behind `--enable-sql-statement` (disabled by default) and carries additional hardening layers.
+
+### Statement-Type Denylist
+
+Block specific SQL statement types at the controller level:
+
+```yaml
+# values.yaml
+controller:
+  enableSQLStatement: true
+  sqlStatementDenylist: "DROP DATABASE,DROP SCHEMA,ALTER USER,DROP USER"
+```
+
+Matching is case-insensitive with word-boundary detection. Denied statements receive a `TerminalError` condition and are never sent to Snowflake. The `snowplane_sqlstatement_denied_total` metric counts rejections.
+
+### Namespace Restriction (ValidatingAdmissionPolicy)
+
+Restrict which namespaces may create SQLStatement resources using a Kubernetes 1.30+ native policy:
+
+```bash
+# Deploy the policy
+kubectl apply -f config/admission/sqlstatement-namespace-restriction.yaml
+
+# Create the allowlist ConfigMap
+kubectl create configmap sqlstatement-namespace-allowlist \
+  --namespace=snowplane-system \
+  --from-literal=allowedNamespaces="data-eng,platform-team"
+```
+
+When the ConfigMap is missing, the policy defaults to **Deny** (fail-closed).
+
+### RBAC Restriction
+
+Limit SQLStatement access to platform teams only:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sqlstatement-admin
+rules:
+  - apiGroups: ["snowplane.hupe1980.github.io"]
+    resources: ["sqlstatements"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sqlstatement-admin-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sqlstatement-admin
+subjects:
+  - kind: Group
+    name: platform-team
+    apiGroup: rbac.authorization.k8s.io
+```
+
+> **Recommendation:** Do not include SQLStatement in the default `snowplane-editor` ClusterRole. Grant access only to teams that need it.
+
+---
+
 ## Observability
 
 ### Metrics
@@ -340,6 +407,8 @@ Key metrics to monitor:
 | `snowplane_resource_health` | Value = 0 (unhealthy) for 10m |
 | `snowplane_circuit_breaker_state` | Value = 2 (open) for 5m |
 | `snowplane_account_rate_limit_waits_total` | Rate increasing — consider tuning `accountQps` |
+| `snowplane_sqlstatement_denied_total` | Any increment — investigate blocked SQL attempts |
+| `snowplane_policy_body_rejections_total` | Any increment — investigate potential injection probing |
 
 ### Grafana Dashboard
 
@@ -371,7 +440,25 @@ logging:
 
 Snowplane supports horizontal scaling via leader election. The active leader handles all reconciliation; standby replicas provide fast failover.
 
-For very large deployments (10K+ managed resources), consider namespace-based sharding:
+For very large deployments (10K+ managed resources), consider hash-based controller sharding:
+
+```bash
+# Deploy 3 sharded replicas
+for i in 0 1 2; do
+  helm install snowplane-shard-$i charts/snowplane/ \
+    --set extraArgs[0]=--shard-id=$i \
+    --set extraArgs[1]=--shard-count=3 \
+    --set leaderElectionID=snowplane-shard-$i
+done
+```
+
+Each shard deterministically owns a subset of resources based on FNV-1a hash of `namespace/name`. Key properties:
+- **Zero coordination** — no shared state or leader election across shards
+- **Deterministic** — the same object always maps to the same shard
+- **Dynamic rescaling** — changing `--shard-count` rebalances on next reconcile cycle
+- **Idempotent** — brief duplicate processing during rollout is harmless
+
+Alternatively, use namespace-based sharding for coarser-grained partitioning:
 
 ```bash
 # Instance 1: teams A and B
@@ -396,6 +483,70 @@ Tune rate limits based on your Snowflake account tier:
 | Business Critical | 100 | 200 |
 
 Per-controller limits (`rateLimit.qps`) ensure fairness — a noisy controller cannot starve others within the account budget.
+
+---
+
+## Multi-Cluster Deployments
+
+### Ownership Conflict Limitation
+
+Snowplane detects ownership conflicts (two CRs managing the same Snowflake resource) using a FQN hash label on each CR. This detection works **within a single Kubernetes cluster only**. Two Snowplane installations in different clusters managing the same Snowflake account will not detect conflicts. Both controllers may issue conflicting ALTER or DROP statements, causing alternating drift corrections.
+
+### Recommended Partitioning Strategies
+
+To safely run Snowplane in multiple clusters, partition by one of the following boundaries:
+
+| Strategy | Description | Best For |
+|----------|-------------|----------|
+| **Account partitioning** | Each cluster manages a different Snowflake account | Multi-account orgs, separate prod/dev |
+| **Database partitioning** | Each cluster manages a non-overlapping set of databases via `allowedDatabases` | Shared account, team-per-cluster |
+| **Namespace partitioning** | Each cluster manages resources in non-overlapping Kubernetes namespaces, each with a separate ProviderConfig scoped to specific databases | GitOps multi-cluster with Flux/Argo |
+| **Read/write split** | One cluster has full management; others use `observeOnly: true` for read-only monitoring | DR/standby, audit dashboards |
+
+Example — database partitioning across two clusters:
+
+```yaml
+# Cluster A: manages analytics databases
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  allowedDatabases: ["ANALYTICS_*", "REPORTING"]
+  # ...credentials...
+```
+
+```yaml
+# Cluster B: manages application databases
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  allowedDatabases: ["APP_*", "STAGING"]
+  # ...credentials...
+```
+
+### Snowflake-Side Safety
+
+For additional protection, use separate Snowflake service users per cluster with role-scoped privileges:
+
+```sql
+-- Cluster A service user: can only manage analytics databases
+CREATE ROLE SNOWPLANE_CLUSTER_A;
+GRANT OWNERSHIP ON DATABASE ANALYTICS_PROD TO ROLE SNOWPLANE_CLUSTER_A;
+GRANT OWNERSHIP ON DATABASE REPORTING TO ROLE SNOWPLANE_CLUSTER_A;
+
+-- Cluster B service user: can only manage app databases
+CREATE ROLE SNOWPLANE_CLUSTER_B;
+GRANT OWNERSHIP ON DATABASE APP_PROD TO ROLE SNOWPLANE_CLUSTER_B;
+GRANT OWNERSHIP ON DATABASE STAGING TO ROLE SNOWPLANE_CLUSTER_B;
+```
+
+This ensures that even if a cluster partition is misconfigured, the Snowflake role boundary prevents cross-partition mutations.
+
+{: .warning }
+> There is no server-side locking mechanism. If two controllers target the same Snowflake object, they will both succeed and fight. Always ensure non-overlapping resource ownership across clusters.
 
 ---
 

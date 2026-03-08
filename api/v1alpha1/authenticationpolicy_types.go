@@ -147,6 +147,7 @@ type AuthenticationPolicySpec struct {
 
 	// Comment is an optional description for the authentication policy.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
@@ -194,7 +195,7 @@ type AuthenticationPolicyStatus struct {
 // AuthenticationPolicy is the Schema for the authenticationpolicies API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=authpol
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

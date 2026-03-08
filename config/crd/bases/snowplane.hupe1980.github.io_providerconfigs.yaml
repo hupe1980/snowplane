@@ -13,6 +13,8 @@ spec:
     kind: ProviderConfig
     listKind: ProviderConfigList
     plural: providerconfigs
+    shortNames:
+    - pc
     singular: providerconfig
   scope: Namespaced
   versions:
@@ -133,6 +135,18 @@ spec:
                 items:
                   type: string
                 type: array
+              allowedRefNamespaces:
+                description: |-
+                  AllowedRefNamespaces restricts which namespaces may be referenced via
+                  cross-namespace ObjectReference fields (e.g. databaseRef.namespace,
+                  schemaRef.namespace, secretRef.namespace).
+                  An empty list means cross-namespace references are unrestricted.
+                  A list containing "*" means all namespaces are allowed.
+                  A list containing only the special value "SAME" means only same-namespace
+                  references are permitted (cross-namespace references are blocked entirely).
+                items:
+                  type: string
+                type: array
               allowedSchemas:
                 description: |-
                   AllowedSchemas restricts which Snowflake schemas may be targeted by resources
@@ -196,10 +210,12 @@ spec:
                   Modern Snowflake account identifiers (orgname-accountname format) encode
                   the region, making this field optional. Legacy account identifiers (xy12345)
                   still require an explicit region.
+                maxLength: 255
                 type: string
               role:
                 description: Role is the Snowflake role to assume. Defaults to the
                   user's default role.
+                maxLength: 255
                 type: string
               user:
                 description: User is the Snowflake user for authentication.
@@ -208,6 +224,7 @@ spec:
                 type: string
               warehouse:
                 description: Warehouse is the default warehouse for the session.
+                maxLength: 255
                 type: string
               workloadIdentity:
                 description: |-

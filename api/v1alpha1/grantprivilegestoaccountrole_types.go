@@ -76,7 +76,7 @@ type GrantPrivilegesToAccountRoleStatus struct {
 // It grants a Snowflake privilege to an account role.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=gptar
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="PRIVILEGE",type=string,JSONPath=`.spec.privilege`,priority=0

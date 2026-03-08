@@ -1,0 +1,16 @@
+# External Volume with a single S3 storage location.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ExternalVolume
+metadata:
+  name: my-external-volume
+  namespace: snowplane-system
+spec:
+  name: MY_EXTERNAL_VOLUME
+  providerRef:
+    name: default
+  storageLocations:
+    - name: my-s3-location
+      storageProvider: S3
+      storageBaseURL: "s3://my-bucket/path/"
+      storageAWSRoleARN: "arn:aws:iam::123456789012:role/myrole"
+  allowWrites: true

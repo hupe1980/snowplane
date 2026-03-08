@@ -277,7 +277,7 @@ func TestResolveSchemaSource_RawName(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Tests: Cross-namespace ObjectReference (T-1)
+// Tests: Cross-namespace ObjectReference
 // --------------------------------------------------------------------------
 
 func TestResolveDatabaseRef_CrossNamespace(t *testing.T) {
@@ -325,4 +325,144 @@ func TestResolveDatabaseRef_SameNamespace_FallsBack(t *testing.T) {
 		snowplanev1alpha1.ObjectReference{Name: "local-db"}) // No Namespace set
 	require.NoError(t, err)
 	assert.Equal(t, `"LOCAL_DB"`, fqn)
+}
+
+// --------------------------------------------------------------------------
+// Tests: ValidateRefNamespace (H3)
+// --------------------------------------------------------------------------
+
+func TestValidateRefNamespace_EmptyTarget_AlwaysAllowed(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateRefNamespace("team-a", "", []string{"SAME"})
+	assert.NoError(t, err)
+}
+
+func TestValidateRefNamespace_SameNamespace_AlwaysAllowed(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateRefNamespace("team-a", "team-a", []string{"SAME"})
+	assert.NoError(t, err)
+}
+
+func TestValidateRefNamespace_NoRestriction_AllowsAll(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateRefNamespace("team-a", "infra", nil)
+	assert.NoError(t, err)
+
+	err = ValidateRefNamespace("team-a", "infra", []string{})
+	assert.NoError(t, err)
+}
+
+func TestValidateRefNamespace_Wildcard_AllowsAll(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateRefNamespace("team-a", "infra", []string{"*"})
+	assert.NoError(t, err)
+}
+
+func TestValidateRefNamespace_SAME_DeniessCrossNamespace(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateRefNamespace("team-a", "infra", []string{"SAME"})
+	assert.ErrorIs(t, err, ErrRefNamespaceNotAllowed)
+	assert.Contains(t, err.Error(), `"infra"`)
+}
+
+func TestValidateRefNamespace_ExplicitList_Allowed(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateRefNamespace("team-a", "infra", []string{"infra", "shared"})
+	assert.NoError(t, err)
+}
+
+func TestValidateRefNamespace_ExplicitList_Denied(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateRefNamespace("team-a", "forbidden", []string{"infra", "shared"})
+	assert.ErrorIs(t, err, ErrRefNamespaceNotAllowed)
+}
+
+func TestValidateRefNamespace_MixedSAME_WithExplicit(t *testing.T) {
+	t.Parallel()
+
+	// "SAME" + explicit: cross-ns to "infra" allowed, to "other" denied
+	err := ValidateRefNamespace("team-a", "infra", []string{"SAME", "infra"})
+	assert.NoError(t, err)
+
+	err = ValidateRefNamespace("team-a", "other", []string{"SAME", "infra"})
+	assert.ErrorIs(t, err, ErrRefNamespaceNotAllowed)
+}
+
+// --------------------------------------------------------------------------
+// Tests: Context-based AllowedRefNamespaces enforcement (H3)
+// --------------------------------------------------------------------------
+
+func TestResolveDatabaseRef_ContextRestriction_Blocked(t *testing.T) {
+	t.Parallel()
+
+	db := readyDB("shared-db", "infra", `"SHARED_DB"`)
+	c := fake.NewClientBuilder().WithScheme(testScheme()).
+		WithRuntimeObjects(db).
+		WithStatusSubresource(&snowplanev1alpha1.Database{}).
+		Build()
+
+	// Inject SAME restriction via context — cross-namespace ref should be blocked.
+	ctx := WithAllowedRefNamespaces(context.Background(), []string{"SAME"})
+	_, err := ResolveDatabaseRef(ctx, c, "team-a",
+		snowplanev1alpha1.ObjectReference{Name: "shared-db", Namespace: "infra"})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrRefNamespaceNotAllowed)
+}
+
+func TestResolveDatabaseRef_ContextRestriction_Allowed(t *testing.T) {
+	t.Parallel()
+
+	db := readyDB("shared-db", "infra", `"SHARED_DB"`)
+	c := fake.NewClientBuilder().WithScheme(testScheme()).
+		WithRuntimeObjects(db).
+		WithStatusSubresource(&snowplanev1alpha1.Database{}).
+		Build()
+
+	// Inject restriction allowing "infra" — cross-namespace ref should succeed.
+	ctx := WithAllowedRefNamespaces(context.Background(), []string{"infra"})
+	fqn, err := ResolveDatabaseRef(ctx, c, "team-a",
+		snowplanev1alpha1.ObjectReference{Name: "shared-db", Namespace: "infra"})
+	require.NoError(t, err)
+	assert.Equal(t, `"SHARED_DB"`, fqn)
+}
+
+func TestResolveDatabaseRef_NoContextRestriction_AllowsCrossNamespace(t *testing.T) {
+	t.Parallel()
+
+	db := readyDB("shared-db", "infra", `"SHARED_DB"`)
+	c := fake.NewClientBuilder().WithScheme(testScheme()).
+		WithRuntimeObjects(db).
+		WithStatusSubresource(&snowplanev1alpha1.Database{}).
+		Build()
+
+	// No context restriction — cross-namespace ref should succeed.
+	fqn, err := ResolveDatabaseRef(context.Background(), c, "team-a",
+		snowplanev1alpha1.ObjectReference{Name: "shared-db", Namespace: "infra"})
+	require.NoError(t, err)
+	assert.Equal(t, `"SHARED_DB"`, fqn)
+}
+
+func TestResolveSecretKeyRef_ContextRestriction_Blocked(t *testing.T) {
+	t.Parallel()
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "creds", Namespace: "infra"},
+		Data:       map[string][]byte{"key": []byte("value")},
+	}
+	c := fake.NewClientBuilder().WithScheme(testScheme()).
+		WithRuntimeObjects(secret).
+		Build()
+
+	ctx := WithAllowedRefNamespaces(context.Background(), []string{"SAME"})
+	_, err := ResolveSecretKeyRef(ctx, c, "team-a",
+		snowplanev1alpha1.SecretKeyReference{Name: "creds", Namespace: "infra", Key: "key"})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrRefNamespaceNotAllowed)
 }

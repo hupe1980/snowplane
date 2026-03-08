@@ -96,8 +96,8 @@ func successfulObservation() *snowflake.AccountRoleObservation {
 			Name:           "DATA_ANALYST",
 			Comment:        "",
 			Owner:          "SECURITYADMIN",
-			GrantedToRoles: 0,
-			GrantedRoles:   0,
+			GrantedToRoles: ptr(int32(0)),
+			GrantedRoles:   ptr(int32(0)),
 		},
 	}
 }
@@ -353,7 +353,7 @@ func TestReconcile_CreatePostObserveError(t *testing.T) {
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myrole", "default"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "post-create observe")
-	assert.Equal(t, 5*time.Second, result.RequeueAfter)
+	assert.Zero(t, result.RequeueAfter, "error return should let controller-runtime apply exponential backoff")
 
 	got := &snowplanev1alpha1.AccountRole{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "myrole", Namespace: "default"}, got))

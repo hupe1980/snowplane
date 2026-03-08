@@ -82,7 +82,6 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 		),
 		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.NetworkRule, id snowflake.SchemaObjectIdentifier) error {
 			opts := buildCreateOptions(obj, id)
-			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
 			return svc.Create(ctx, opts)
 		}),
 		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterNetworkRuleOptions) error {
@@ -102,7 +101,7 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 		DetectDriftFn: func(obj *snowplanev1alpha1.NetworkRule, obs *reconciler.Observation[*snowflake.NetworkRuleObservation]) *drift.Result {
 			return detectDrift(obj, obs.Detail)
 		},
-		SupportsCoA: true,
+		SupportsCoA: false,
 		PreReconcileFn: func(ctx context.Context, nr *snowplanev1alpha1.NetworkRule) error {
 			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, nr,
 				nr.Namespace, nr.Spec.DatabaseRef, nr.Spec.DatabaseName, nr.Status.DatabaseName)

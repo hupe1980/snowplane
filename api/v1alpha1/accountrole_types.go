@@ -7,6 +7,7 @@ import (
 // AccountRoleSpec defines the desired state of an AccountRole.
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="!self.name.contains('.')",message="spec.name must not contain dots (dots break fully qualified name resolution)"
 type AccountRoleSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -16,6 +17,7 @@ type AccountRoleSpec struct {
 	Name string `json:"name"`
 
 	// Comment is an optional description for the role.
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
@@ -34,10 +36,10 @@ type AccountRoleShowOutput struct {
 	Owner string `json:"owner,omitempty"`
 
 	// GrantedToRoles is the number of roles this role is granted to.
-	GrantedToRoles int32 `json:"grantedToRoles,omitempty"`
+	GrantedToRoles *int32 `json:"grantedToRoles,omitempty"`
 
 	// GrantedRoles is the number of roles granted to this role.
-	GrantedRoles int32 `json:"grantedRoles,omitempty"`
+	GrantedRoles *int32 `json:"grantedRoles,omitempty"`
 }
 
 // AccountRoleStatus defines the observed state of an AccountRole.
@@ -56,7 +58,7 @@ type AccountRoleStatus struct {
 // AccountRole is the Schema for the accountroles API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=ar
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

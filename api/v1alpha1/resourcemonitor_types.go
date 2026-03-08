@@ -57,6 +57,7 @@ type ResourceMonitorSpec struct {
 
 	// CreditQuota is the number of credits allocated per frequency interval.
 	// +optional
+	// +kubebuilder:validation:Minimum=1
 	CreditQuota *int32 `json:"creditQuota,omitempty" snowflake:"CREDIT_QUOTA,nounset"`
 
 	// Frequency is the interval at which credit usage resets to 0.
@@ -189,7 +190,7 @@ type ResourceMonitorStatus struct {
 // ResourceMonitor is the Schema for the resourcemonitors API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=resmon
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

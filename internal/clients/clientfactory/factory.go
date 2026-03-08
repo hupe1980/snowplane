@@ -301,7 +301,7 @@ func (f *ClientFactory) evictLRU() {
 
 // closeClient closes a Snowflake client and logs any Close error at debug level.
 // Close errors on database connections are rarely actionable, but logging aids
-// post-mortem diagnostics (L-7).
+// post-mortem diagnostics.
 func (f *ClientFactory) closeClient(c SnowflakeClient, provider, reason string) {
 	if err := c.Close(); err != nil {
 		f.logger.Debug("error closing Snowflake client",

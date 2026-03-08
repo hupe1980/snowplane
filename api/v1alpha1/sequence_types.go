@@ -64,6 +64,7 @@ type SequenceSpec struct {
 
 	// Comment is an optional description for the sequence.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 

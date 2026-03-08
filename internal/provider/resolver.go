@@ -31,7 +31,7 @@ var ErrProviderConfigNotReady = errors.New("ProviderConfig not ready")
 // ProviderCacheKey returns the namespace-qualified cache key for a
 // ProviderConfig. All subsystems (ClientFactory, RateLimiter, CircuitBreaker,
 // metrics) must use this key to avoid cross-namespace collisions when two
-// ProviderConfigs share the same name in different namespaces (C-3).
+// ProviderConfigs share the same name in different namespaces.
 func ProviderCacheKey(namespace, name string) string {
 	return namespace + "/" + name
 }
@@ -51,6 +51,10 @@ type ResolvedProvider struct {
 	// AllowedSchemas is the ProviderConfig's schema restriction list.
 	// Empty means all schemas are allowed. Entries may be "SCHEMA" or "DATABASE.SCHEMA".
 	AllowedSchemas []string
+
+	// AllowedRefNamespaces is the ProviderConfig's cross-namespace reference restriction.
+	// Empty means all namespaces are allowed.
+	AllowedRefNamespaces []string
 }
 
 // ResolveClient resolves the Snowflake client for a managed resource by
@@ -60,7 +64,7 @@ type ResolvedProvider struct {
 // If a circuit breaker is provided, it short-circuits calls to failing providers.
 //
 // Returns a ResolvedProvider containing the client plus provider metadata
-// (name and account) for structured log enrichment (L-3).
+// (name and account) for structured log enrichment.
 func ResolveClient(
 	ctx context.Context,
 	c client.Client,
@@ -114,7 +118,7 @@ func ResolveClient(
 	}
 
 	// Circuit breaker: skip providers with many consecutive failures.
-	// Use namespace-qualified key to isolate per-namespace ProviderConfigs (C-3).
+	// Use namespace-qualified key to isolate per-namespace ProviderConfigs.
 	cacheKey := ProviderCacheKey(pc.Namespace, pc.Name)
 
 	if cb != nil {
@@ -203,12 +207,13 @@ func ResolveClient(
 	}
 
 	return &ResolvedProvider{
-		Client:           sfClient,
-		CacheKey:         cacheKey,
-		Name:             pc.Name,
-		Account:          pc.Spec.Account,
-		AllowedDatabases: pc.Spec.AllowedDatabases,
-		AllowedSchemas:   pc.Spec.AllowedSchemas,
+		Client:               sfClient,
+		CacheKey:             cacheKey,
+		Name:                 pc.Name,
+		Account:              pc.Spec.Account,
+		AllowedDatabases:     pc.Spec.AllowedDatabases,
+		AllowedSchemas:       pc.Spec.AllowedSchemas,
+		AllowedRefNamespaces: pc.Spec.AllowedRefNamespaces,
 	}, nil
 }
 
@@ -306,6 +311,35 @@ func IsSchemaAllowed(resolved *ResolvedProvider, database, schemaName string) bo
 			if strings.EqualFold(entry, schemaName) {
 				return true
 			}
+		}
+	}
+
+	return false
+}
+
+// IsRefNamespaceAllowed checks whether a cross-namespace reference target is
+// permitted by the ProviderConfig's AllowedRefNamespaces restriction.
+// If targetNamespace is empty (same-namespace ref), it is always allowed.
+func IsRefNamespaceAllowed(resolved *ResolvedProvider, sourceNamespace, targetNamespace string) bool {
+	if targetNamespace == "" || targetNamespace == sourceNamespace {
+		return true
+	}
+
+	if len(resolved.AllowedRefNamespaces) == 0 {
+		return true
+	}
+
+	for _, ns := range resolved.AllowedRefNamespaces {
+		if ns == "*" {
+			return true
+		}
+
+		if ns == "SAME" {
+			continue
+		}
+
+		if ns == targetNamespace {
+			return true
 		}
 	}
 

@@ -1,0 +1,26 @@
+# External Volume with multiple cloud storage locations and all options.
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ExternalVolume
+metadata:
+  name: multi-cloud-volume
+  namespace: snowplane-system
+spec:
+  name: MULTI_CLOUD_VOLUME
+  providerRef:
+    name: default
+  storageLocations:
+    - name: primary-s3
+      storageProvider: S3
+      storageBaseURL: "s3://my-bucket/iceberg/"
+      storageAWSRoleARN: "arn:aws:iam::123456789012:role/myrole"
+      encryptionType: AWS_SSE_KMS
+      encryptionKMSKeyID: "1234abcd-12ab-34cd-56ef-1234567890ab"
+    - name: secondary-gcs
+      storageProvider: GCS
+      storageBaseURL: "gcs://my-gcs-bucket/iceberg/"
+    - name: tertiary-azure
+      storageProvider: AZURE
+      storageBaseURL: "azure://myaccount.blob.core.windows.net/mycontainer/iceberg/"
+      azureTenantID: "a123b4c5-1234-123a-a12b-1a23b45678c9"
+  allowWrites: true
+  comment: "Multi-cloud external volume for Iceberg tables"

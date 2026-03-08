@@ -60,15 +60,19 @@ type ViewSpec struct {
 	// permission to create or update View CRs can execute arbitrary SQL.
 	// Ensure RBAC restricts View CR access to trusted principals only.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=255
+	// +kubebuilder:validation:MaxLength=65536
 	Statement string `json:"statement"`
 
 	// Secure enables the SECURE VIEW property.
+	// When nil the attribute is left unmanaged; when false SECURE is
+	// explicitly unset. This is a pointer so that "not set" is
+	// distinguishable from "set to false".
 	// +optional
-	Secure bool `json:"secure,omitempty"`
+	Secure *bool `json:"secure,omitempty"`
 
 	// Comment is an optional description for the view.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// ChangeTracking enables change tracking on the view.
@@ -128,7 +132,7 @@ type ViewStatus struct {
 // View is the Schema for the views API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=vw
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

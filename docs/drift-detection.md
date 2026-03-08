@@ -45,7 +45,8 @@ All resource types support drift detection:
 | Table | `name`, `database`, `schema`, `transient` |
 | View | `name`, `database`, `schema` |
 | MaterializedView | `name`, `database`, `schema`, `statement` |
-| Stage | `name`, `database`, `schema`, `stageType` |
+| InternalStage | `name`, `database`, `schema` |
+| ExternalStage | `name`, `database`, `schema` |
 | Task | `name`, `database`, `schema` |
 | Alert | `name`, `database`, `schema` |
 | StreamOnTable | `name`, `database`, `schema`, `table` |
@@ -58,9 +59,15 @@ All resource types support drift detection:
 | ResourceMonitor | `name` |
 | MaskingPolicy | `name`, `database`, `schema`, `signature` |
 | RowAccessPolicy | `name`, `database`, `schema`, `signature` |
-| StorageIntegration | `name` |
-| SecurityIntegration | `name`, `type` |
-| NotificationIntegration | `name`, `type` |
+| StorageIntegrationAWS | `name` |
+| StorageIntegrationGCS | `name` |
+| StorageIntegrationAzure | `name` |
+| ExternalOAuthIntegration | `name` |
+| SAML2Integration | `name` |
+| SCIMIntegration | `name` |
+| EmailNotificationIntegration | `name` |
+| QueueNotificationIntegration | `name` |
+| WebhookNotificationIntegration | `name` |
 | PasswordPolicy | `name`, `database`, `schema` |
 | NetworkRule | `name`, `database`, `schema`, `type`, `mode` |
 | FileFormat | `name`, `database`, `schema`, `type` |
@@ -69,6 +76,11 @@ All resource types support drift detection:
 | APIIntegration | `name`, `googleAudience`, `azureTenantId` |
 | SecondaryDatabase | `name` |
 | SharedDatabase | `name` |
+| Share | `name` |
+| ExternalFunction | `name`, `database`, `schema`, `args`, `returnType`, `url` |
+| ComputePool | `name`, `instanceFamily` |
+| Service | `name`, `database`, `schema` |
+| ImageRepository | `name`, `database`, `schema` |
 
 ---
 
@@ -120,10 +132,20 @@ Immutable violations require manual intervention — delete/recreate the CR.
 {: .note }
 > Password and RSA key fields are not drift-detected because Snowflake does not expose their current values. Password changes are tracked via `status.lastAppliedPasswordHash`.
 
-### SecurityIntegration
+### ExternalOAuthIntegration
 {: .text-delta }
 
-`comment`, `enabled` (from SHOW), plus sub-type fields from DESCRIBE: ExternalOAuth (`jwsKeysURL`, `anyRoleMode`, `audienceList`, `allowedRoles`, `blockedRoles`, `networkPolicy`), SAML2 (`x509Cert`, `allowedEmailPatterns`, `allowedUserDomains`), SCIM (`networkPolicy`, `syncPassword`)
+`comment`, `enabled` (from SHOW), plus fields from DESCRIBE: `jwsKeysURL`, `anyRoleMode`, `audienceList`, `allowedRoles`, `blockedRoles`, `networkPolicy`
+
+### SAML2Integration
+{: .text-delta }
+
+`comment`, `enabled` (from SHOW), plus fields from DESCRIBE: `x509Cert`, `allowedEmailPatterns`, `allowedUserDomains`
+
+### SCIMIntegration
+{: .text-delta }
+
+`comment`, `enabled` (from SHOW), plus fields from DESCRIBE: `networkPolicy`, `syncPassword`
 
 ### PasswordPolicy
 {: .text-delta }
@@ -145,10 +167,35 @@ Immutable violations require manual intervention — delete/recreate the CR.
 
 `comment`, `schedule`, `warehouse`, `condition`, `action`
 
-### NotificationIntegration
+### EmailNotificationIntegration
 {: .text-delta }
 
-`comment`, `enabled` (from SHOW), plus sub-type fields from DESCRIBE: EMAIL (`allowedRecipients`, `defaultRecipients`, `defaultSubject`), QUEUE (`notificationProvider`, cloud-specific ARNs/endpoints), WEBHOOK (`webhookURL`, `webhookSecret`, `webhookBodyTemplate`, `webhookHeaders`)
+`comment`, `enabled` (from SHOW), plus fields from DESCRIBE: `allowedRecipients`, `defaultRecipients`, `defaultSubject`
+
+### QueueNotificationIntegration
+{: .text-delta }
+
+`comment`, `enabled` (from SHOW), plus fields from DESCRIBE: `notificationProvider`, cloud-specific ARNs/endpoints
+
+### WebhookNotificationIntegration
+{: .text-delta }
+
+`comment`, `enabled` (from SHOW), plus fields from DESCRIBE: `webhookURL`, `webhookSecret`, `webhookBodyTemplate`, `webhookHeaders`
+
+### Share
+{: .text-delta }
+
+`comment`, `accounts` (compared against SHOW SHARES `To` field)
+
+### ComputePool
+{: .text-delta }
+
+`minNodes`, `maxNodes`, `autoResume`, `autoSuspendSecs`, `comment`
+
+### Service
+{: .text-delta }
+
+`minInstances`, `maxInstances`, `autoResume`, `comment`
 
 ---
 

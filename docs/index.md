@@ -26,11 +26,15 @@ Full lifecycle management for every resource — create, alter, drop, drift dete
 | Category | Resources |
 |:---------|:----------|
 | **Core Infrastructure** | Database, Schema, Warehouse |
-| **Data Objects** | Table, View, MaterializedView, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe, Sequence, ExternalTable |
+| **Data Objects** | Table, View, MaterializedView, InternalStage, ExternalStage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe, Sequence, ExternalTable |
 | **Identity & Access** | User, AccountRole, DatabaseRole, GrantPrivilegesToAccountRole, GrantPrivilegesToDatabaseRole, AccountRoleAssignment, DatabaseRoleAssignment, GrantPrivilegesToShare, GrantOwnership |
+| **Data Sharing** | Share |
 | **Orchestration** | Task, Alert |
-| **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration |
+| **Programmability** | FunctionJava, FunctionJavascript, FunctionPython, FunctionScala, FunctionSQL, ProcedureJava, ProcedureJavascript, ProcedurePython, ProcedureScala, ProcedureSQL, ExternalFunction |
+| **Integrations** | StorageIntegrationAWS, StorageIntegrationGCS, StorageIntegrationAzure, ExternalOAuthIntegration, SAML2Integration, SCIMIntegration, EmailNotificationIntegration, QueueNotificationIntegration, WebhookNotificationIntegration, APIIntegration |
+| **API Authentication** | APIAuthenticationIntegration, APIAuthenticationIntegrationWithAuthorizationCodeGrant, APIAuthenticationIntegrationWithClientCredentials, APIAuthenticationIntegrationWithJWTBearer |
 | **Security & Governance** | AuthenticationPolicy, NetworkPolicy, NetworkRule, PasswordPolicy, MaskingPolicy, RowAccessPolicy, Tag, ResourceMonitor |
+| **Snowpark Container Services** | ComputePool, Service, ImageRepository |
 | **Utilities** | FieldExport |
 
 ---
@@ -46,7 +50,7 @@ Full lifecycle management for every resource — create, alter, drop, drift dete
 : Field-level drift detection with structured reporting. Use `detect-only` policy for monitoring without correction.
 
 **Cross-Resource References**
-: Schemas reference Databases; Tables, Views, MaterializedViews, and Stages reference Schemas. Dependency resolution and backoff are automatic. See the [Resource Dependencies](/snowplane/resource-dependencies/) guide for full details.
+: Schemas reference Databases; Tables, Views, MaterializedViews, and Stages (InternalStage, ExternalStage) reference Schemas. Dependency resolution and backoff are automatic. See the [Resource Dependencies](/snowplane/resource-dependencies/) guide for full details.
 
 **Resource Adoption**
 : Adopt pre-existing Snowflake objects via `spec.managementPolicies.adoptionPolicy: adopt` — no data migration needed. Spec fields are automatically late-initialized from observed Snowflake state.

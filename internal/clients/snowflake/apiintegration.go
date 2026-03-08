@@ -229,11 +229,11 @@ func buildAlterAPIIntegrationStatements(opts AlterAPIIntegrationOptions) ([]stri
 	sc.Bool("ENABLED", opts.Enabled)
 
 	if opts.APIAllowedPrefixes != nil {
-		sc.UnsafeRaw(buildStringListClause("API_ALLOWED_PREFIXES", *opts.APIAllowedPrefixes))
+		sc.UnsafeRaw(buildStringListClause("API_ALLOWED_PREFIXES", *opts.APIAllowedPrefixes)) //nolint:forbidigo // values escaped via EscapeString
 	}
 
 	if opts.APIBlockedPrefixes != nil {
-		sc.UnsafeRaw(buildStringListClause("API_BLOCKED_PREFIXES", *opts.APIBlockedPrefixes))
+		sc.UnsafeRaw(buildStringListClause("API_BLOCKED_PREFIXES", *opts.APIBlockedPrefixes)) //nolint:forbidigo // values escaped via EscapeString
 	}
 
 	sc.String("API_AWS_ROLE_ARN", opts.APIAWSRoleARN)

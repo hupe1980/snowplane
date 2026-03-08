@@ -219,7 +219,7 @@ func buildCreateOptions(view *snowplanev1alpha1.View, id snowflake.SchemaObjectI
 	return snowflake.CreateViewOptions{
 		Name:           id,
 		Statement:      view.Spec.Statement,
-		Secure:         view.Spec.Secure,
+		Secure:         snowplanev1alpha1.DerefBool(view.Spec.Secure),
 		Comment:        view.Spec.Comment,
 		ChangeTracking: view.Spec.ChangeTracking,
 	}
@@ -233,7 +233,7 @@ func buildAlterOptions(view *snowplanev1alpha1.View, id snowflake.SchemaObjectId
 	if obs.ShowOutput != nil && view.Spec.Statement != obs.ShowOutput.Text {
 		opts.ReplaceStatement = &snowflake.ReplaceViewStatement{
 			Statement:      view.Spec.Statement,
-			Secure:         view.Spec.Secure,
+			Secure:         snowplanev1alpha1.DerefBool(view.Spec.Secure),
 			Comment:        view.Spec.Comment,
 			ChangeTracking: view.Spec.ChangeTracking,
 		}
@@ -250,12 +250,11 @@ func buildAlterOptions(view *snowplanev1alpha1.View, id snowflake.SchemaObjectId
 	}
 
 	if obs.ShowOutput != nil {
-		// Secure toggle: compare bool values.
-		desiredSecure := view.Spec.Secure
-		observedSecure := obs.ShowOutput.IsSecure
-
-		if desiredSecure != observedSecure {
-			opts.Secure = &desiredSecure
+		// Secure toggle: compare pointer-to-bool against observed value.
+		if view.Spec.Secure != nil {
+			if *view.Spec.Secure != obs.ShowOutput.IsSecure {
+				opts.Secure = view.Spec.Secure
+			}
 		}
 
 		// Change tracking: compare bool values.
@@ -281,7 +280,7 @@ func detectDrift(view *snowplanev1alpha1.View, obs *snowflake.ViewObservation) *
 		// Mutable fields.
 		d.CompareStringValue("STATEMENT", view.Spec.Statement, obs.ShowOutput.Text, false)
 		d.CompareString("COMMENT", view.Spec.Comment, obs.ShowOutput.Comment, false)
-		d.CompareBoolValue("IS_SECURE", view.Spec.Secure, obs.ShowOutput.IsSecure, false)
+		d.CompareBool("IS_SECURE", view.Spec.Secure, &obs.ShowOutput.IsSecure, false)
 
 		if view.Spec.ChangeTracking != nil {
 			d.CompareBoolValue("CHANGE_TRACKING", *view.Spec.ChangeTracking, obs.ShowOutput.ChangeTracking, false)

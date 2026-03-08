@@ -82,7 +82,6 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 		),
 		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.Sequence, id snowflake.SchemaObjectIdentifier) error {
 			opts := buildCreateOptions(obj, id)
-			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
 			return svc.Create(ctx, opts)
 		}),
 		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterSequenceOptions) error {
@@ -102,7 +101,7 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 		DetectDriftFn: func(obj *snowplanev1alpha1.Sequence, obs *reconciler.Observation[*snowflake.SequenceObservation]) *drift.Result {
 			return detectDrift(obj, obs.Detail)
 		},
-		SupportsCoA:      true,
+		SupportsCoA:      false,
 		LateInitializeFn: lateInitialize,
 		PreReconcileFn: func(ctx context.Context, seq *snowplanev1alpha1.Sequence) error {
 			dbFQN, err := refresolver.PreReconcileDatabaseRef(ctx, c, recorder, seq,

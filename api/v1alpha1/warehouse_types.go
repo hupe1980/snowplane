@@ -91,6 +91,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="!(has(self.generation) && has(self.resourceConstraint))",message="spec.generation and spec.resourceConstraint are mutually exclusive"
 // +kubebuilder:validation:XValidation:rule="!has(self.autoSuspend) || self.autoSuspend == 0 || self.autoSuspend >= 60",message="spec.autoSuspend must be 0 (disable) or >= 60 seconds"
+// +kubebuilder:validation:XValidation:rule="!self.name.contains('.')",message="spec.name must not contain dots (dots break fully qualified name resolution)"
 type WarehouseSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -141,6 +142,7 @@ type WarehouseSpec struct {
 	ResourceMonitor *string `json:"resourceMonitor,omitempty" snowflake:"RESOURCE_MONITOR"`
 
 	// Comment is an optional description.
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// EnableQueryAcceleration enables the query acceleration service.
@@ -202,7 +204,7 @@ type WarehouseStatus struct {
 	CommonStatus `json:",inline"`
 
 	// State is the current running state (STARTED, SUSPENDED, RESIZING).
-	State string `json:"state,omitempty"`
+	State WarehouseState `json:"state,omitempty"`
 
 	// ShowOutput stores the last observed SHOW WAREHOUSES output.
 	ShowOutput *WarehouseShowOutput `json:"showOutput,omitempty"`
@@ -224,7 +226,7 @@ type WarehouseStatus struct {
 // Warehouse is the Schema for the warehouses API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=wh
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

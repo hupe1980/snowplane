@@ -23,7 +23,7 @@ Complete field-level documentation for all Snowplane CRDs. Each resource support
 
 > 🏷️ **Annotations:** `snowplane.hupe1980.github.io/force-destroy` enables CASCADE DROP for databases and schemas. `snowplane.hupe1980.github.io/force-new` triggers delete-and-recreate for immutable field changes. `snowplane.hupe1980.github.io/late-initialized` is set to `"true"` after adoption, indicating spec fields were populated from observed state.
 
-> 🔄 **Late-initialization:** When `adoptionPolicy: adopt` is used, nil spec fields are automatically populated from the existing Snowflake resource state (ShowOutput, DescribeOutput, Parameters). This ensures the adopted CR's spec accurately represents the managed state. Supports 23 adapters: Database, SecondaryDatabase, SharedDatabase, Schema, Warehouse, User, Task, PasswordPolicy, Table, Alert, DynamicTable, Sequence, View, Tag, AccountRole, DatabaseRole, StorageIntegration, Stage, Pipe, NetworkPolicy, NotificationIntegration, ResourceMonitor, APIIntegration.
+> 🔄 **Late-initialization:** When `adoptionPolicy: adopt` is used, nil spec fields are automatically populated from the existing Snowflake resource state (ShowOutput, DescribeOutput, Parameters). This ensures the adopted CR's spec accurately represents the managed state. Supports 33 adapters: Database, SecondaryDatabase, SharedDatabase, Schema, Warehouse, User, Task, PasswordPolicy, Table, Alert, DynamicTable, Sequence, View, Tag, AccountRole, DatabaseRole, StorageIntegrationAWS, StorageIntegrationGCS, StorageIntegrationAzure, ExternalVolume, CortexSearchService, GitRepository, Streamlit, InternalStage, ExternalStage, Pipe, NetworkPolicy, EmailNotificationIntegration, QueueNotificationIntegration, WebhookNotificationIntegration, ResourceMonitor, APIIntegration, ComputePool, Service.
 
 > ⏱️ **LastReconcileTime:** Every resource's `status.lastReconcileTime` is stamped on each successful reconcile (create, update, adoption, and post-crash recovery) via `finalizeSpec()`. Use this for SLO dashboards, staleness alerting, and diagnosing whether reconciliation is running for a specific resource.
 
@@ -51,6 +51,7 @@ Complete field-level documentation for all Snowplane CRDs. Each resource support
 | `spec.allowedNamespaceSelector` | `*LabelSelector` | Label selector matching namespaces that may reference this ProviderConfig. Used as OR with `allowedNamespaces`. |
 | `spec.allowedDatabases` | `[]string` | Restrict which Snowflake databases may be targeted by resources using this ProviderConfig. Empty = all allowed. Case-insensitive. |
 | `spec.allowedSchemas` | `[]string` | Restrict which Snowflake schemas may be targeted. Supports `"SCHEMA"` or `"DATABASE.SCHEMA"` format. Empty = all allowed. |
+| `spec.allowedRefNamespaces` | `[]string` | Restrict which Kubernetes namespaces cross-namespace refs may target. Empty = unrestricted. `"*"` = all allowed. `"SAME"` = same-namespace only. Specific names for explicit allow. |
 
 </details>
 
@@ -234,6 +235,8 @@ Complete field-level documentation for all Snowplane CRDs. Each resource support
 
 > ⚠️ **Grant Immutability:** All spec fields are immutable after creation. Changing any field requires deleting and recreating the CR (or using the `force-new` annotation).
 
+> 💡 **Grant DeletionPolicy:** With `deletionPolicy: Delete` (default), deleting the CR issues `REVOKE <privilege>`. With `deletionPolicy: Orphan`, the grant **persists in Snowflake** after the CR is deleted — the privilege remains active. Use `Orphan` when you want to remove the CR from Kubernetes without revoking the Snowflake privilege.
+
 </details>
 
 <details>
@@ -379,21 +382,7 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 
 </details>
 
-<details>
-<summary>�📦 <strong>Stage</strong></summary>
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `spec.name` | `string` | Stage name *(immutable)* |
-| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
-| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
-| `spec.url` | `*string` | External stage URL |
-| `spec.storageIntegration` | `*string` | Storage integration name (requires `url`) |
-| `spec.encryption` | `*StageEncryption` | Encryption settings |
-| `spec.directory` | `*StageDirectoryOptions` | Directory table settings |
-| `spec.fileFormat` | `*string` | File format |
-
-</details>
+> **Note:** The unified `Stage` CRD has been removed. Use `InternalStage` and `ExternalStage` instead.
 
 <details>
 <summary>📤 <strong>FieldExport</strong></summary>
@@ -410,6 +399,8 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 > 📤 **Cross-Resource Data Passing:** FieldExport reads status fields and writes them to ConfigMaps/Secrets. The exported value is tracked by SHA-256 hash to avoid unnecessary writes. On deletion, exported keys are cleaned up.
 >
 > 🔒 **Same-Namespace Security:** FieldExport is restricted to resources in the same namespace — the source resource, target ConfigMap/Secret, and the FieldExport itself must all reside in the same namespace. This prevents cross-namespace privilege escalation (following the ACK model).
+>
+> 🛡️ **Sensitive Field Guard:** Status fields containing sensitive information (OAuth credentials, PII, key fingerprints, AWS ARNs, endpoint URLs) cannot be exported to a ConfigMap — they must target a Secret. The guard covers 20 CRD kinds including all Secret, API Auth Integration, ExternalOAuthIntegration, SAML2Integration, User, StorageIntegrationAWS, StorageIntegrationGCS, StorageIntegrationAzure, ExternalStage, and Pipe types. See `SensitiveStatusPaths` in `api/v1alpha1/sensitive_paths.go` for the full registry.
 
 </details>
 
@@ -582,77 +573,97 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 
 </details>
 
+> **Note:** The unified `StorageIntegration` CRD has been removed. Use `StorageIntegrationAWS`, `StorageIntegrationGCS`, and `StorageIntegrationAzure` instead.
+
 <details>
-<summary>🔌 <strong>StorageIntegration</strong></summary>
+<summary>📦 <strong>ExternalVolume</strong></summary>
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `spec.name` | `string` | Storage integration name *(immutable)* |
-| `spec.type` | `enum` | Integration type: `EXTERNAL_STAGE` *(immutable, default: EXTERNAL_STAGE)* |
-| `spec.enabled` | `*bool` | Whether the integration is active *(default: true)* |
-| `spec.storageProvider` | `enum` | Cloud provider: `S3` / `GCS` / `AZURE` *(immutable)* |
-| `spec.storageAllowedLocations` | `[]string` | Cloud storage URIs the integration can access *(min 1)* |
-| `spec.storageBlockedLocations` | `[]string` | Cloud storage URIs explicitly denied access |
-| `spec.storageAWSRoleARN` | `*string` | IAM role ARN Snowflake assumes for S3 *(required when S3)* |
-| `spec.storageAWSExternalID` | `*string` | Optional external ID for AWS trust relationship *(auto-generated if omitted)* |
-| `spec.azureTenantID` | `*string` | Azure AD tenant ID *(required when AZURE)* |
+| `spec.name` | `string` | External volume name *(immutable)* |
+| `spec.storageLocations` | `[]StorageLocation` | Cloud storage locations *(min 1)* |
+| `spec.storageLocations[].name` | `string` | Location name *(unique within volume)* |
+| `spec.storageLocations[].storageProvider` | `enum` | `S3` / `S3GOV` / `GCS` / `AZURE` |
+| `spec.storageLocations[].storageBaseURL` | `string` | Base URL (e.g. `s3://bucket/path/`) |
+| `spec.storageLocations[].storageAWSRoleARN` | `*string` | IAM role ARN for S3/S3GOV access |
+| `spec.storageLocations[].storageAWSExternalID` | `*string` | External ID for S3/S3GOV trust policy |
+| `spec.storageLocations[].encryptionType` | `*enum` | `AWS_SSE_S3` / `AWS_SSE_KMS` / `GCS_SSE_KMS` / `NONE` |
+| `spec.storageLocations[].encryptionKMSKeyID` | `*string` | KMS key ID for encrypted storage |
+| `spec.storageLocations[].azureTenantID` | `*string` | Azure tenant ID for AZURE locations |
+| `spec.allowWrites` | `*bool` | Whether Snowflake can write *(default: true)* |
 | `spec.comment` | `*string` | Optional description |
-| `status.storageAWSIAMUserARN` | `string` | Snowflake IAM user ARN — needed for IAM trust policy |
-| `status.storageAWSExternalID` | `string` | External ID currently in use (from DESCRIBE) |
 
-> 🔌 **Cloud Integration:** Storage integrations configure secure access between Snowflake and cloud storage (S3, GCS, Azure Blob). Use `status.storageAWSIAMUserARN` to configure your IAM trust policy.
+> 📦 **Iceberg Table Support:** External volumes provide the storage backend for Apache Iceberg tables in Snowflake. A single external volume can span multiple cloud providers with polymorphic storage locations. The controller reconciles storage locations via `ALTER EXTERNAL VOLUME ADD/REMOVE STORAGE_LOCATION` and tracks drift on `ALLOW_WRITES`, `COMMENT`, and storage location membership.
 
 </details>
 
-<details><summary>🔔 <strong>NotificationIntegration</strong></summary>
+<details>
+<summary>🔍 <strong>CortexSearchService</strong></summary>
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `spec.name` | `string` | Notification integration name *(immutable)* |
-| `spec.type` | `enum` | Integration type: `EMAIL` / `QUEUE` / `WEBHOOK` *(immutable)* |
-| `spec.enabled` | `*bool` | Whether the integration is active *(default: true)* |
-| `spec.email.allowedRecipients` | `[]string` | Email addresses that can receive notifications *(required for EMAIL, min 1)* |
-| `spec.email.defaultRecipients` | `[]string` | Default email recipients |
-| `spec.email.defaultSubject` | `*string` | Default email subject line |
-| `spec.queue.notificationProvider` | `enum` | Cloud provider: `AWS_SNS` / `AWS_SQS` / `GCP_PUBSUB` / `AZURE_STORAGE_QUEUE` / `AZURE_EVENT_GRID` *(required for QUEUE)* |
-| `spec.queue.direction` | `enum` | Message direction: `OUTBOUND` / `INBOUND` *(default: OUTBOUND)* |
-| `spec.queue.awsSNSTopicARN` | `*string` | ARN of the SNS topic (AWS_SNS) |
-| `spec.queue.awsSNSRoleARN` | `*string` | IAM role ARN for SNS access (AWS_SNS) |
-| `spec.queue.awsSQSArn` | `*string` | ARN of the SQS queue (AWS_SQS) |
-| `spec.queue.awsSQSRoleARN` | `*string` | IAM role ARN for SQS access (AWS_SQS) |
-| `spec.queue.gcpPubSubTopicName` | `*string` | Pub/Sub topic name (GCP_PUBSUB) |
-| `spec.queue.gcpPubSubSubscriptionName` | `*string` | Pub/Sub subscription name (GCP_PUBSUB) |
-| `spec.queue.azureStorageQueuePrimaryURI` | `*string` | Azure Storage queue endpoint (AZURE_STORAGE_QUEUE) |
-| `spec.queue.azureTenantID` | `*string` | Azure AD tenant ID (Azure providers) |
-| `spec.queue.azureEventGridTopicEndpoint` | `*string` | Event Grid topic endpoint (AZURE_EVENT_GRID) |
-| `spec.webhook.webhookURL` | `string` | Endpoint URL for the webhook *(required for WEBHOOK)* |
-| `spec.webhook.webhookSecret` | `*string` | Secret used to sign webhook payloads |
-| `spec.webhook.webhookBodyTemplate` | `*string` | Custom body template for webhook payload |
-| `spec.webhook.webhookHeaders` | `map[string]string` | Custom HTTP headers for webhook requests |
+| `spec.name` | `string` | Cortex Search Service name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.warehouseRef.name` | `string` | Warehouse CR reference |
+| `spec.on` | `string` | Search column name *(immutable)* |
+| `spec.attributes` | `[]string` | Attribute columns for filtering *(immutable)* |
+| `spec.targetLag` | `string` | Target freshness lag (e.g. `1 hour`) |
+| `spec.query` | `string` | Source data query *(immutable)* |
+| `spec.embeddingModel` | `*string` | Embedding model override *(immutable)* |
+| `spec.refreshMode` | `*enum` | `FULL` / `INCREMENTAL` *(immutable)* |
+| `spec.initialize` | `*enum` | `ON_CREATE` / `ON_SCHEDULE` *(immutable)* |
+| `spec.fullIndexBuildIntervalDays` | `*int32` | Days between full index rebuilds |
 | `spec.comment` | `*string` | Optional description |
-| `status.describeOutput` | `map[string]string` | Key-value pairs from DESCRIBE INTEGRATION |
+| `status.showOutput` | `object` | Last SHOW CORTEX SEARCH SERVICES output |
+| `status.describeOutput` | `object` | Last DESCRIBE output (embedding model, indexing/serving state) |
 
-> 🔔 **Alerting & Events:** Notification integrations deliver alerts and events to email, cloud messaging (SNS, SQS, Pub/Sub, Azure), or webhook endpoints. Each type requires its own sub-config — CEL validation enforces this at admission time.
+> 🔍 **Cortex AI Search:** Cortex Search Services enable semantic and hybrid search over Snowflake data powered by LLM embeddings. The `on` column is the primary text field for search, with optional `attributes` for metadata filtering. Many fields are immutable after creation — to change the search column, query, or embedding model, delete and recreate the service. The controller tracks drift on mutable fields (`targetLag`, `warehouse`, `comment`) and reports indexing/serving state via `status.describeOutput`.
 
 </details>
 
-<details><summary>� <strong>SecurityIntegration</strong></summary>
+<details>
+<summary>📂 <strong>GitRepository</strong></summary>
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `spec.name` | `string` | Security integration name *(immutable)* |
-| `spec.type` | `enum` | Integration type: `EXTERNAL_OAUTH` / `SAML2` / `SCIM` / `API_AUTHENTICATION` *(immutable)* |
-| `spec.enabled` | `*bool` | Whether the integration is active |
-| `spec.externalOAuth` | `*ExternalOAuthConfig` | External OAuth config (when type=EXTERNAL_OAUTH) |
-| `spec.saml2` | `*SAML2Config` | SAML2 SSO config (when type=SAML2) |
-| `spec.scim` | `*SCIMConfig` | SCIM provisioning config (when type=SCIM) |
-| `spec.apiAuthentication` | `*APIAuthenticationConfig` | API Authentication config (when type=API_AUTHENTICATION) |
+| `spec.name` | `string` | Git repository name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.origin` | `string` | HTTPS URL of the Git remote *(immutable)* |
+| `spec.apiIntegration` | `string` | API integration for Git authentication |
+| `spec.gitCredentials` | `*string` | Secret FQN for Git credentials |
 | `spec.comment` | `*string` | Optional description |
-| `status.describeOutput` | `map[string]string` | Key-value pairs from DESCRIBE INTEGRATION |
+| `status.showOutput` | `object` | Last SHOW GIT REPOSITORIES output |
 
-> 🔐 **SSO & Identity:** Security integrations configure federated authentication (SAML2, OAuth), automated user provisioning (SCIM), and programmatic API access. Each type has its own sub-config.
+> 📂 **Git Version Control:** Git Repositories integrate Snowflake with external Git providers for version-controlled code deployment (stored procedures, Streamlit apps, notebooks). The `origin` URL is immutable — to point at a different repository, delete and recreate the resource. The controller tracks drift on mutable fields (`apiIntegration`, `gitCredentials`, `comment`) and supports FETCH for repository synchronization.
 
 </details>
+
+<details>
+<summary>🎨 <strong>Streamlit</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Streamlit app name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
+| `spec.warehouseRef.name` | `string` | Warehouse CR reference |
+| `spec.from` | `*string` | Stage source path *(create-only)* |
+| `spec.mainFile` | `*string` | Main Python file *(default: streamlit_app.py)* |
+| `spec.comment` | `*string` | Optional description |
+| `spec.title` | `*string` | Display title |
+| `spec.externalAccessIntegrations` | `[]string` | External access integrations |
+| `status.showOutput` | `object` | Last SHOW STREAMLITS output |
+| `status.describeOutput` | `object` | Last DESCRIBE output (mainFile, packages, URLs) |
+
+> 🎨 **Snowflake Apps:** Streamlit apps are Snowflake-native interactive Python applications. The `from` field specifies a stage source path at creation time only. The controller uses DESCRIBE output to compare `mainFile` values and tracks drift on mutable fields (`queryWarehouse`, `comment`, `title`). Warehouse is resolved via `warehouseRef` for Kubernetes-native dependency tracking.
+
+</details>
+
+> **Note:** The unified `NotificationIntegration` CRD has been removed. Use `EmailNotificationIntegration`, `QueueNotificationIntegration`, and `WebhookNotificationIntegration` instead.
+
+> **Note:** The unified `SecurityIntegration` CRD has been removed. Use `ExternalOAuthIntegration`, `SAML2Integration`, and `SCIMIntegration` instead.
 
 <details>
 <summary>🔌 <strong>APIIntegration</strong></summary>
@@ -918,6 +929,23 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 
 ---
 
+## Data Sharing
+
+<details>
+<summary>🤝 <strong>Share</strong></summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Share name *(immutable)* |
+| `spec.comment` | `*string` | Optional description |
+| `spec.accounts` | `[]string` | Consumer accounts with access (fully qualified: `ORG.ACCOUNT`) |
+
+> 🤝 **Outbound Sharing:** Shares expose Snowflake databases/schemas to consumer accounts in other Snowflake organizations. The controller manages the account list via `ALTER SHARE ... ADD ACCOUNTS` / `REMOVE ACCOUNTS` and detects drift by comparing the observed `To` field from `SHOW SHARES` output. Account identifiers are normalized to uppercase for comparison.
+
+</details>
+
+---
+
 ## UDFs & Stored Procedures
 
 <details>
@@ -1174,6 +1202,38 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 
 ---
 
+## External Functions
+
+<details>
+<summary>🌐 <strong>ExternalFunction</strong> (shortName: <code>extfn</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Function name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.args` | `[]ExternalFunctionArg` | Function arguments (`name`, `type`) *(immutable)* |
+| `spec.returnType` | `string` | Return data type *(immutable)* |
+| `spec.returnNullValues` | `*bool` | Whether the function can return NULL *(default: true)* |
+| `spec.returnBehavior` | `*string` | `VOLATILE` / `IMMUTABLE` |
+| `spec.apiIntegrationName` | `*string` | API integration name *(XOR with apiIntegrationRef)* |
+| `spec.apiIntegrationRef.name` | `string` | APIIntegration CR reference *(XOR with apiIntegrationName)* |
+| `spec.url` | `string` | HTTPS endpoint invoked by the function *(immutable)* |
+| `spec.headers` | `[]ExternalFunctionHeader` | HTTP headers (`name`, `value`) sent with each request |
+| `spec.maxBatchRows` | `*int32` | Maximum rows per batch request *(min: 1)* |
+| `spec.compression` | `*enum` | `AUTO` / `GZIP` / `DEFLATE` / `NONE` |
+| `spec.requestTranslator` | `*string` | Fully qualified request translator function name |
+| `spec.responseTranslator` | `*string` | Fully qualified response translator function name |
+| `spec.comment` | `*string` | Optional description |
+
+> 🌐 **Remote Services:** External functions call external HTTPS endpoints (AWS Lambda, Azure Functions, GCP Cloud Functions) via API integrations. Use `apiIntegrationRef` to reference an APIIntegration CR and get automatic dependency tracking — the controller watches referenced APIIntegration CRs and re-reconciles when they become ready. Arguments, return type, and URL are immutable — changing them requires recreating the function (use `force-new` annotation). Argument types and return types are validated against safe SQL type patterns. The controller issues `CREATE EXTERNAL FUNCTION` and `DROP FUNCTION` (no ALTER support).
+
+</details>
+
+---
+
 ## API Authentication Integrations
 
 <details>
@@ -1306,6 +1366,68 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 </details>
 
 > 🔒 **Snowflake Secrets:** Secrets are Snowflake-managed credential objects used by external access integrations and UDFs. They are NOT Kubernetes Secrets — they store credentials inside Snowflake for use by functions and procedures. Each variant maps to a different `TYPE` in `CREATE SECRET`.
+
+---
+
+## Snowpark Container Services
+
+<details>
+<summary>💻 <strong>ComputePool</strong> (shortName: <code>cp</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Compute pool name *(immutable)* |
+| `spec.minNodes` | `int32` | Minimum number of nodes *(min: 1)* |
+| `spec.maxNodes` | `int32` | Maximum number of nodes *(min: 1)* |
+| `spec.instanceFamily` | `string` | Compute instance type (e.g. `CPU_X64_XS`, `GPU_NV_S`) *(immutable)* |
+| `spec.autoResume` | `*bool` | Auto-resume when a service/job is submitted |
+| `spec.autoSuspendSecs` | `*int32` | Idle seconds before auto-suspend *(min: 0)* |
+| `spec.comment` | `*string` | Optional description |
+
+> 💻 **Compute Infrastructure:** Compute pools provide the underlying compute for Snowpark Container Services. `instanceFamily` is immutable — changing it requires recreating the pool (use `force-new` annotation). The controller tracks `state` in `status.showOutput.state` and prints it via `kubectl`.
+
+</details>
+
+<details>
+<summary>🚀 <strong>Service</strong> (shortName: <code>svc</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Service name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+| `spec.computePoolName` | `*string` | Compute pool name *(immutable, XOR with computePoolRef)* |
+| `spec.computePoolRef.name` | `string` | ComputePool CR reference *(immutable, XOR with computePoolName)* |
+| `spec.specification` | `string` | Inline YAML/JSON service spec *(max: 64KB, XOR with specificationReference)* |
+| `spec.specificationReference` | `string` | Stage path to spec file (e.g. `@db.schema.stage/spec.yaml`) *(validated, XOR with specification)* |
+| `spec.minInstances` | `*int32` | Minimum compute instances *(min: 0)* |
+| `spec.maxInstances` | `*int32` | Maximum compute instances *(min: 1)* |
+| `spec.autoResume` | `*bool` | Auto-resume the service |
+| `spec.externalAccessIntegrations` | `[]string` | Security integrations granting egress |
+| `spec.comment` | `*string` | Optional description |
+
+> 🚀 **Container Workloads:** Services run containerized applications on Snowpark compute pools. Specify containers inline (`specification`) or reference a stage file (`specificationReference` — validated against `@identifier/path` format). The compute pool is immutable — changing it requires recreating the service (use `force-new` annotation). The controller watches referenced ComputePool CRs and automatically re-reconciles when they become ready.
+
+</details>
+
+<details>
+<summary>📦 <strong>ImageRepository</strong> (shortName: <code>imgrepo</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Image repository name *(immutable)* |
+| `spec.databaseRef.name` | `string` | Database CR reference *(immutable, XOR with databaseName)* |
+| `spec.databaseName` | `string` | Inline database name *(immutable, XOR with databaseRef)* |
+| `spec.schemaRef.name` | `string` | Schema CR reference *(immutable, XOR with schemaName)* |
+| `spec.schemaName` | `string` | Inline schema name *(immutable, XOR with schemaRef)* |
+
+> 📦 **Container Images:** Image repositories store OCI container images for Snowpark Container Services. The repository URL is available in `status.showOutput.repositoryUrl` — use it to push images via `docker push`. All spec fields are immutable — the controller only supports CREATE and DROP (no ALTER).
+
+</details>
+
+> 💡 **SPCS Stack:** A typical Snowpark Container Services deployment requires: (1) a ComputePool for compute resources, (2) an ImageRepository for container images, and (3) a Service to run the workload. Use `computePoolRef` in the Service spec to reference a ComputePool CR and get automatic dependency tracking.
 
 ---
 

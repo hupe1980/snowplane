@@ -121,9 +121,9 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 			stageName, err := refresolver.PreReconcileSourceRef(ctx, c, recorder, obj,
 				obj.Namespace, obj.Spec.StageRef, obj.Spec.StageName, obj.Status.StageName,
 				"Stage",
-				func() *snowplanev1alpha1.Stage { return &snowplanev1alpha1.Stage{} },
-				snowplanev1alpha1.GroupVersion.WithKind("Stage"),
-				func(st *snowplanev1alpha1.Stage) string { return st.Spec.Name },
+				func() *snowplanev1alpha1.InternalStage { return &snowplanev1alpha1.InternalStage{} },
+				snowplanev1alpha1.GroupVersion.WithKind("InternalStage"),
+				func(st *snowplanev1alpha1.InternalStage) string { return st.Spec.Name },
 			)
 			if err != nil {
 				return err
@@ -199,7 +199,7 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 			}
 
 			bldr.Watches(
-				&snowplanev1alpha1.Stage{},
+				&snowplanev1alpha1.InternalStage{},
 				handler.EnqueueRequestsFromMapFunc(refresolver.MapByFieldIndex(c, func() sigs.ObjectList { return &snowplanev1alpha1.StreamOnDirectoryTableList{} }, ".spec.stageRef.name", "listing stream-on-directory-table for stage watch")),
 			)
 

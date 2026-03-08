@@ -34,6 +34,7 @@ type DatabaseRoleSpec struct {
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// Comment is an optional description for the database role.
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
@@ -49,16 +50,16 @@ type DatabaseRoleShowOutput struct {
 	DatabaseName string `json:"databaseName,omitempty"`
 
 	// Comment is the database role description.
-	Comment string `json:"comment,omitempty"`
+	Comment string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Owner is the role that owns this database role.
 	Owner string `json:"owner,omitempty"`
 
 	// GrantedToRoles is the number of roles this database role is granted to.
-	GrantedToRoles int32 `json:"grantedToRoles,omitempty"`
+	GrantedToRoles *int32 `json:"grantedToRoles,omitempty"`
 
 	// GrantedRoles is the number of roles granted to this database role.
-	GrantedRoles int32 `json:"grantedRoles,omitempty"`
+	GrantedRoles *int32 `json:"grantedRoles,omitempty"`
 }
 
 // DatabaseRoleStatus defines the observed state of a DatabaseRole.
@@ -80,7 +81,7 @@ type DatabaseRoleStatus struct {
 // DatabaseRole is the Schema for the databaseroles API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=dbr
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

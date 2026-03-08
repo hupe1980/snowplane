@@ -236,7 +236,7 @@ func buildCreateOptions(obj *snowplanev1alpha1.ProcedureJavascript, id snowflake
 		Body:              &body,
 		ExecuteAs:         obj.Spec.ExecuteAs,
 		NullInputBehavior: obj.Spec.NullInputBehavior,
-		Secure:            obj.Spec.Secure,
+		Secure:            snowplanev1alpha1.DerefBool(obj.Spec.Secure),
 		Comment:           obj.Spec.Comment,
 	}
 

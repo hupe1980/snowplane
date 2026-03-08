@@ -45,7 +45,8 @@ Every Snowplane CRD carries a maturity label (`snowplane.hupe1980.github.io/matu
 | Table | alpha | Column management, schema-level |
 | View | alpha | AS query management, secure views |
 | MaterializedView | alpha | Materialized query results, secure, cluster by |
-| Stage | alpha | Internal/external stages, file format |
+| InternalStage | alpha | Internal stages, file format |
+| ExternalStage | alpha | External stages (S3, GCS, Azure) |
 | Task | alpha | Scheduled SQL, DAG, serverless |
 | Alert | alpha | Condition-based monitoring & notification |
 | StreamOnTable | alpha | CDC on tables |
@@ -58,15 +59,26 @@ Every Snowplane CRD carries a maturity label (`snowplane.hupe1980.github.io/matu
 | ResourceMonitor | alpha | Credit quota monitoring |
 | MaskingPolicy | alpha | Dynamic masking for PII/PCI |
 | RowAccessPolicy | alpha | Row-level security |
-| StorageIntegration | alpha | S3, GCS, Azure integrations |
-| SecurityIntegration | alpha | SAML2, OAuth, SCIM, API auth |
-| NotificationIntegration | alpha | EMAIL, QUEUE, WEBHOOK notifications |
+| StorageIntegrationAWS | alpha | S3 storage integration |
+| StorageIntegrationGCS | alpha | GCS storage integration |
+| StorageIntegrationAzure | alpha | Azure storage integration |
+| ExternalOAuthIntegration | alpha | External OAuth integration |
+| SAML2Integration | alpha | SAML2 integration |
+| SCIMIntegration | alpha | SCIM provisioning integration |
+| EmailNotificationIntegration | alpha | Email notification integration |
+| QueueNotificationIntegration | alpha | Queue notification integration (AWS SNS, Azure Event Grid, GCP Pub/Sub) |
+| WebhookNotificationIntegration | alpha | Webhook notification integration |
 | PasswordPolicy | alpha | Password compliance rules |
 | NetworkRule | alpha | Network identifier groups |
 | FileFormat | alpha | CSV, JSON, Parquet, etc. |
 | Pipe | alpha | Snowpipe continuous loading |
 | DynamicTable | alpha | Auto-refresh materialisation |
 | FieldExport | alpha | ConfigMap/Secret export |
+| Share | alpha | Outbound data sharing, account management |
+| ExternalFunction | alpha | HTTPS external functions, create/drop only |
+| ComputePool | alpha | SPCS compute infrastructure, immutable instanceFamily |
+| Service | alpha | SPCS container workloads, schema-scoped |
+| ImageRepository | alpha | SPCS container image registry, create/drop only |
 | ProviderConfig | **stable** | Core infrastructure, always required |
 
 ---
@@ -137,7 +149,7 @@ func (src *Database) ConvertTo(dstRaw conversion.Hub) error {
 manager --enable-alpha-resources=false
 
 # Disable specific controllers
-manager --disable-controllers=grantprivilegestoaccountrole,stage,view
+manager --disable-controllers=grantprivilegestoaccountrole,internalstage,view
 ```
 
 When disabled:

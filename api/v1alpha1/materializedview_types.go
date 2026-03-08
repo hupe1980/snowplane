@@ -48,15 +48,18 @@ type MaterializedViewSpec struct {
 
 	// Statement is the SELECT query that defines the materialized view. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=255
+	// +kubebuilder:validation:MaxLength=65536
 	Statement string `json:"statement"`
 
 	// Secure specifies whether the materialized view is a secure view.
+	// When nil the attribute is left unmanaged; when false SECURE is
+	// explicitly unset.
 	// +optional
-	Secure bool `json:"secure,omitempty"`
+	Secure *bool `json:"secure,omitempty"`
 
 	// Comment is the materialized view description.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// ClusterBy specifies clustering expressions for the materialized view. Immutable after creation.

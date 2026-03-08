@@ -26,6 +26,7 @@ type SharedDatabaseSpec struct {
 
 	// Comment is an optional description.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// ExternalVolume specifies the external volume for Iceberg table storage.

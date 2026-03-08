@@ -63,7 +63,8 @@ rules:
   - users
   - tables
   - views
-  - stages
+  - externalstages
+  - internalstages
   - tasks
   - tags
   - tagassociations
@@ -81,9 +82,18 @@ rules:
   - externaltables
   - materializedviews
   - pipes
-  - storageintegrations
-  - securityintegrations
+  - storageintegrationawses
+  - storageintegrationgcses
+  - storageintegrationazures
+  - externalvolumes
+  - cortexsearchservices
+  - gitrepositories
+  - streamlits
   - saml2integrations
+  - scimintegrations
+  - emailnotificationintegrations
+  - queuenotificationintegrations
+  - webhooknotificationintegrations
   - externaloauthintegrations
   - apiintegrations
   - secondarydatabases
@@ -100,7 +110,6 @@ rules:
   - authenticationpolicies
   - networkrules
   - alerts
-  - notificationintegrations
   - accountroleassignments
   - databaseroleassignments
   - streamontables
@@ -121,6 +130,11 @@ rules:
   - functionjavas
   - functionscalas
   - sqlstatements
+  - computepools
+  - externalfunctions
+  - imagerepositories
+  - services
+  - shares
   verbs:
   - get
   - list
@@ -144,7 +158,8 @@ rules:
   - users/status
   - tables/status
   - views/status
-  - stages/status
+  - externalstages/status
+  - internalstages/status
   - tasks/status
   - tags/status
   - tagassociations/status
@@ -162,9 +177,18 @@ rules:
   - externaltables/status
   - materializedviews/status
   - pipes/status
-  - storageintegrations/status
-  - securityintegrations/status
+  - storageintegrationawses/status
+  - storageintegrationgcses/status
+  - storageintegrationazures/status
+  - externalvolumes/status
+  - cortexsearchservices/status
+  - gitrepositories/status
+  - streamlits/status
   - saml2integrations/status
+  - scimintegrations/status
+  - emailnotificationintegrations/status
+  - queuenotificationintegrations/status
+  - webhooknotificationintegrations/status
   - externaloauthintegrations/status
   - apiintegrations/status
   - secondarydatabases/status
@@ -181,7 +205,6 @@ rules:
   - authenticationpolicies/status
   - networkrules/status
   - alerts/status
-  - notificationintegrations/status
   - accountroleassignments/status
   - databaseroleassignments/status
   - streamontables/status
@@ -202,6 +225,11 @@ rules:
   - functionjavas/status
   - functionscalas/status
   - sqlstatements/status
+  - computepools/status
+  - externalfunctions/status
+  - imagerepositories/status
+  - services/status
+  - shares/status
   verbs:
   - get
   - patch
@@ -221,7 +249,8 @@ rules:
   - users/finalizers
   - tables/finalizers
   - views/finalizers
-  - stages/finalizers
+  - externalstages/finalizers
+  - internalstages/finalizers
   - tasks/finalizers
   - tags/finalizers
   - tagassociations/finalizers
@@ -239,9 +268,18 @@ rules:
   - externaltables/finalizers
   - materializedviews/finalizers
   - pipes/finalizers
-  - storageintegrations/finalizers
-  - securityintegrations/finalizers
+  - storageintegrationawses/finalizers
+  - storageintegrationgcses/finalizers
+  - storageintegrationazures/finalizers
+  - externalvolumes/finalizers
+  - cortexsearchservices/finalizers
+  - gitrepositories/finalizers
+  - streamlits/finalizers
   - saml2integrations/finalizers
+  - scimintegrations/finalizers
+  - emailnotificationintegrations/finalizers
+  - queuenotificationintegrations/finalizers
+  - webhooknotificationintegrations/finalizers
   - externaloauthintegrations/finalizers
   - apiintegrations/finalizers
   - secondarydatabases/finalizers
@@ -258,7 +296,6 @@ rules:
   - authenticationpolicies/finalizers
   - networkrules/finalizers
   - alerts/finalizers
-  - notificationintegrations/finalizers
   - accountroleassignments/finalizers
   - databaseroleassignments/finalizers
   - streamontables/finalizers
@@ -279,5 +316,10 @@ rules:
   - functionjavas/finalizers
   - functionscalas/finalizers
   - sqlstatements/finalizers
+  - computepools/finalizers
+  - externalfunctions/finalizers
+  - imagerepositories/finalizers
+  - services/finalizers
+  - shares/finalizers
   verbs:
   - update

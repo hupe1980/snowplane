@@ -100,7 +100,7 @@ func TestView_CreateSecure(t *testing.T) {
 		return nil
 	})
 	view := newTestView(viewK8s, sfView, dbK8s, schemaK8s)
-	view.Spec.Secure = true
+	view.Spec.Secure = ptr(true)
 	view.Spec.Statement = "SELECT 1"
 	require.NoError(t, k8sClient.Create(ctx, view))
 	key := types.NamespacedName{Name: viewK8s, Namespace: testNamespace}

@@ -9,18 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/runtime"
-
-	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 )
-
-// metaTypes lists internal k8s API machinery types that get auto-registered
-// in every scheme but are not CRDs.
-var metaTypes = map[string]bool{
-	"CreateOptions": true, "UpdateOptions": true, "DeleteOptions": true,
-	"GetOptions": true, "ListOptions": true, "PatchOptions": true,
-	"WatchEvent": true,
-}
 
 // repoRoot returns the repository root by locating go.mod.
 func repoRoot(t *testing.T) string {
@@ -45,44 +34,42 @@ func repoRoot(t *testing.T) string {
 
 // registeredCRDPlurals returns the set of plural resource names for all
 // CRD types registered with the snowplane v1alpha1 scheme.
+// It reads the actual CRD YAML files in config/crd/bases/ to obtain the
+// authoritative plural names, rather than relying on flect which can
+// disagree with controller-gen for edge cases (e.g. "aws" → "awses").
 func registeredCRDPlurals(t *testing.T) map[string]bool {
 	t.Helper()
 
-	scheme := runtime.NewScheme()
-	require.NoError(t, snowplanev1alpha1.AddToScheme(scheme))
+	root := repoRoot(t)
+	crdDir := filepath.Join(root, "config", "crd", "bases")
 
-	gv := snowplanev1alpha1.GroupVersion
-	knownTypes := scheme.KnownTypes(gv)
+	entries, err := os.ReadDir(crdDir)
+	require.NoError(t, err)
+
+	pluralRE := regexp.MustCompile(`(?m)^\s+plural:\s+(\S+)`)
 
 	plurals := make(map[string]bool)
 
-	for gvk := range knownTypes {
-		if strings.HasSuffix(gvk, "List") {
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue
 		}
 
-		if metaTypes[gvk] {
+		// Only consider CRDs under our API group.
+		if !strings.HasPrefix(entry.Name(), "snowplane.hupe1980.github.io_") {
 			continue
 		}
 
-		lower := strings.ToLower(gvk)
+		data, err := os.ReadFile(filepath.Join(crdDir, entry.Name()))
+		require.NoError(t, err, "reading CRD file %s", entry.Name())
 
-		var plural string
+		m := pluralRE.FindSubmatch(data)
+		require.NotNil(t, m, "no plural: field found in CRD %s", entry.Name())
 
-		switch {
-		case strings.HasSuffix(lower, "policy"):
-			plural = strings.TrimSuffix(lower, "y") + "ies"
-		case strings.HasSuffix(lower, "ss") || strings.HasSuffix(lower, "x") ||
-			strings.HasSuffix(lower, "ch") || strings.HasSuffix(lower, "sh"):
-			plural = lower + "es"
-		case strings.HasSuffix(lower, "s"):
-			plural = lower // already ends in s; kubebuilder treats as plural
-		default:
-			plural = lower + "s"
-		}
-
-		plurals[plural] = true
+		plurals[string(m[1])] = true
 	}
+
+	require.NotEmpty(t, plurals, "no CRD plurals found in %s", crdDir)
 
 	return plurals
 }
@@ -340,7 +327,7 @@ func TestRBACConsistentAcrossRoles(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Kustomize RBAC sync tests (H-1)
+// Kustomize RBAC sync tests
 // --------------------------------------------------------------------------
 
 // TestKustomizeRBACCoversAllCRDs verifies that the kustomize role.yaml contains

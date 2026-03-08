@@ -701,7 +701,7 @@ func validateGrantOnBulk(prefix string, b *GrantOnBulk) []error {
 }
 
 // ---------------------------------------------------------------------------
-// Privilege-to-object-type compatibility (L-15)
+// Privilege-to-object-type compatibility
 // ---------------------------------------------------------------------------
 
 // validAccountPrivileges lists privileges valid for ON ACCOUNT.
@@ -1109,8 +1109,15 @@ func (s *TableSpec) Validate() error {
 			if c.ForeignKey == nil {
 				errs = append(errs, fmt.Errorf("spec.constraints[%d]: foreignKey is required for ForeignKey constraints", i))
 			} else {
-				if c.ForeignKey.Table == "" {
-					errs = append(errs, fmt.Errorf("spec.constraints[%d].foreignKey.table is required", i))
+				hasTable := c.ForeignKey.Table != nil && *c.ForeignKey.Table != ""
+				hasTableRef := c.ForeignKey.TableRef != nil
+
+				if !hasTable && !hasTableRef {
+					errs = append(errs, fmt.Errorf("spec.constraints[%d].foreignKey: exactly one of table or tableRef must be set", i))
+				}
+
+				if hasTable && hasTableRef {
+					errs = append(errs, fmt.Errorf("spec.constraints[%d].foreignKey: table and tableRef are mutually exclusive", i))
 				}
 
 				if len(c.ForeignKey.Columns) == 0 {
@@ -1520,91 +1527,6 @@ func (s *ViewSpec) Validate() error {
 	return errors.Join(errs...)
 }
 
-// Validate checks the StageSpec for configuration errors.
-func (s *StageSpec) Validate() error {
-	var errs []error
-
-	if s.Name == "" {
-		errs = append(errs, errors.New("spec.name is required"))
-	}
-
-	// Exactly one of databaseRef or databaseName must be set.
-	if err := validateDatabaseSource(s.DatabaseRef, s.DatabaseName); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Exactly one of schemaRef or schemaName must be set.
-	if err := validateSchemaSource(s.SchemaRef, s.SchemaName); err != nil {
-		errs = append(errs, err)
-	}
-
-	isExternal := s.URL != nil && *s.URL != ""
-
-	// StorageIntegration is only valid for external stages.
-	if s.StorageIntegration != nil && !isExternal {
-		errs = append(errs, errors.New("spec.storageIntegration requires spec.url (external stage)"))
-	}
-
-	// Cross-validate encryption type against stage type.
-	if s.Encryption != nil {
-		switch strings.ToUpper(s.Encryption.Type) {
-		case "SNOWFLAKE_FULL", "SNOWFLAKE_SSE":
-			if isExternal {
-				errs = append(errs, fmt.Errorf("spec.encryption.type %q is only valid for internal stages", s.Encryption.Type))
-			}
-		case "AWS_CSE", "AWS_SSE_S3", "AWS_SSE_KMS", "GCS_SSE_KMS", "AZURE_CSE", "NONE":
-			if !isExternal {
-				errs = append(errs, fmt.Errorf("spec.encryption.type %q is only valid for external stages (spec.url must be set)", s.Encryption.Type))
-			}
-		}
-	}
-
-	if err := s.CommonSpec.Validate(); err != nil {
-		errs = append(errs, err)
-	}
-
-	return errors.Join(errs...)
-}
-
-// Validate checks the StorageIntegrationSpec for configuration errors.
-func (s *StorageIntegrationSpec) Validate() error {
-	var errs []error
-
-	if s.Name == "" {
-		errs = append(errs, errors.New("spec.name is required"))
-	}
-
-	if len(s.StorageAllowedLocations) == 0 {
-		errs = append(errs, errors.New("spec.storageAllowedLocations must not be empty"))
-	}
-
-	if s.StorageProvider == "" {
-		errs = append(errs, errors.New("spec.storageProvider is required"))
-	}
-
-	// Provider-specific validation.
-	switch strings.ToUpper(s.StorageProvider) {
-	case "S3":
-		if s.StorageAWSRoleARN == nil || *s.StorageAWSRoleARN == "" {
-			errs = append(errs, errors.New("spec.storageAWSRoleARN is required when storageProvider is S3"))
-		}
-	case "AZURE":
-		if s.AzureTenantID == nil || *s.AzureTenantID == "" {
-			errs = append(errs, errors.New("spec.azureTenantID is required when storageProvider is AZURE"))
-		}
-	case "GCS":
-		// GCS requires no additional provider-specific fields.
-	default:
-		errs = append(errs, fmt.Errorf("spec.storageProvider must be one of S3, GCS, AZURE (got: %q)", s.StorageProvider))
-	}
-
-	if err := s.CommonSpec.Validate(); err != nil {
-		errs = append(errs, err)
-	}
-
-	return errors.Join(errs...)
-}
-
 // Validate checks the FileFormatSpec for configuration errors.
 func (s *FileFormatSpec) Validate() error {
 	var errs []error
@@ -1717,85 +1639,6 @@ func (s *DynamicTableSpec) Validate() error {
 
 	if err := validateSourceRef("warehouse", s.WarehouseRef, s.WarehouseName); err != nil {
 		errs = append(errs, err)
-	}
-
-	if err := s.CommonSpec.Validate(); err != nil {
-		errs = append(errs, err)
-	}
-
-	return errors.Join(errs...)
-}
-
-// Validate checks the SecurityIntegrationSpec for configuration errors.
-func (s *SecurityIntegrationSpec) Validate() error {
-	var errs []error
-
-	if s.Name == "" {
-		errs = append(errs, errors.New("spec.name is required"))
-	}
-
-	if s.Type == "" {
-		errs = append(errs, errors.New("spec.type is required"))
-	}
-
-	// Type-specific sub-config validation.
-	switch s.Type {
-	case SecurityIntegrationTypeExternalOAuth:
-		if s.ExternalOAuth == nil {
-			errs = append(errs, errors.New("spec.externalOAuth is required when type is EXTERNAL_OAUTH"))
-		} else {
-			if s.ExternalOAuth.Type == "" {
-				errs = append(errs, errors.New("spec.externalOAuth.type is required"))
-			}
-			if s.ExternalOAuth.Issuer == "" {
-				errs = append(errs, errors.New("spec.externalOAuth.issuer is required"))
-			}
-			if s.ExternalOAuth.TokenUserMappingClaim == "" {
-				errs = append(errs, errors.New("spec.externalOAuth.tokenUserMappingClaim is required"))
-			}
-		}
-	case SecurityIntegrationTypeSAML2:
-		if s.SAML2 == nil {
-			errs = append(errs, errors.New("spec.saml2 is required when type is SAML2"))
-		} else {
-			if s.SAML2.Issuer == "" {
-				errs = append(errs, errors.New("spec.saml2.issuer is required"))
-			}
-			if s.SAML2.SSOURL == "" {
-				errs = append(errs, errors.New("spec.saml2.ssoURL is required"))
-			}
-			if s.SAML2.Provider == "" {
-				errs = append(errs, errors.New("spec.saml2.provider is required"))
-			}
-			if s.SAML2.X509Cert == "" {
-				errs = append(errs, errors.New("spec.saml2.x509Cert is required"))
-			}
-		}
-	case SecurityIntegrationTypeSCIM:
-		if s.SCIM == nil {
-			errs = append(errs, errors.New("spec.scim is required when type is SCIM"))
-		} else {
-			if s.SCIM.SCIMClient == "" {
-				errs = append(errs, errors.New("spec.scim.scimClient is required"))
-			}
-			if s.SCIM.RunAsRole == "" {
-				errs = append(errs, errors.New("spec.scim.runAsRole is required"))
-			}
-		}
-	case SecurityIntegrationTypeAPIAuthentication:
-		if s.APIAuthentication == nil {
-			errs = append(errs, errors.New("spec.apiAuthentication is required when type is API_AUTHENTICATION"))
-		} else {
-			if s.APIAuthentication.OAuthClientID == "" {
-				errs = append(errs, errors.New("spec.apiAuthentication.oauthClientID is required"))
-			}
-			if err := validateRequiredSecretKeyRef("spec.apiAuthentication.oauthClientSecretRef", s.APIAuthentication.OAuthClientSecretRef); err != nil {
-				errs = append(errs, err)
-			}
-			if s.APIAuthentication.OAuthTokenEndpoint == "" {
-				errs = append(errs, errors.New("spec.apiAuthentication.oauthTokenEndpoint is required"))
-			}
-		}
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -2192,7 +2035,8 @@ var ValidFieldExportSourceKinds = map[string]struct{}{
 	"GrantPrivilegesToShare":           {},
 	"Table":                            {},
 	"View":                             {},
-	"Stage":                            {},
+	"ExternalStage":                    {},
+	"InternalStage":                    {},
 	"Task":                             {},
 	"StreamOnTable":                    {},
 	"StreamOnView":                     {},
@@ -2205,9 +2049,13 @@ var ValidFieldExportSourceKinds = map[string]struct{}{
 	"MaskingPolicy":                    {},
 	"RowAccessPolicy":                  {},
 	"GrantOwnership":                   {},
-	"StorageIntegration":               {},
-	"SecurityIntegration":              {},
-	"NotificationIntegration":          {},
+	"StorageIntegrationAWS":            {},
+	"StorageIntegrationGCS":            {},
+	"StorageIntegrationAzure":          {},
+	"ExternalVolume":                   {},
+	"CortexSearchService":              {},
+	"GitRepository":                    {},
+	"Streamlit":                        {},
 	"FileFormat":                       {},
 	"Pipe":                             {},
 	"DynamicTable":                     {},
@@ -2240,13 +2088,22 @@ var ValidFieldExportSourceKinds = map[string]struct{}{
 	"APIAuthenticationIntegrationWithClientCredentials":      {},
 	"APIAuthenticationIntegrationWithAuthorizationCodeGrant": {},
 	"APIAuthenticationIntegrationWithJWTBearer":              {},
-	"SQLStatement":             {},
-	"SAML2Integration":         {},
-	"ExternalOAuthIntegration": {},
-	"APIIntegration":           {},
-	"SecondaryDatabase":        {},
-	"SharedDatabase":           {},
-	"FailoverGroup":            {},
+	"SQLStatement":                   {},
+	"SAML2Integration":               {},
+	"ExternalOAuthIntegration":       {},
+	"SCIMIntegration":                {},
+	"EmailNotificationIntegration":   {},
+	"QueueNotificationIntegration":   {},
+	"WebhookNotificationIntegration": {},
+	"APIIntegration":                 {},
+	"SecondaryDatabase":              {},
+	"SharedDatabase":                 {},
+	"FailoverGroup":                  {},
+	"ComputePool":                    {},
+	"ExternalFunction":               {},
+	"ImageRepository":                {},
+	"Service":                        {},
+	"Share":                          {},
 }
 
 // Validate checks that the FieldExport spec fields are semantically valid.
@@ -2291,6 +2148,13 @@ func (s *FieldExportSpec) Validate() error {
 
 	if s.To.Key == "" {
 		errs = append(errs, errors.New("spec.to.key is required"))
+	}
+
+	// Reject sensitive status paths when target is a ConfigMap (unencrypted).
+	if s.To.Kind == FieldExportTargetConfigMap && IsSensitiveStatusPath(s.From.Resource.Kind, s.From.Path) {
+		errs = append(errs, fmt.Errorf(
+			"spec.from.path %q is sensitive for kind %q and must not be exported to a ConfigMap; use a Secret target instead",
+			s.From.Path, s.From.Resource.Kind))
 	}
 
 	return errors.Join(errs...)
@@ -2498,53 +2362,6 @@ func (s *AccountRoleAssignmentSpec) Validate() error {
 
 	if targetCount != 1 {
 		errs = append(errs, errors.New("spec: exactly one of toRole, toRoleRef, toUser, or toUserRef must be set"))
-	}
-
-	if err := s.CommonSpec.Validate(); err != nil {
-		errs = append(errs, err)
-	}
-
-	return errors.Join(errs...)
-}
-
-// Validate checks the NotificationIntegrationSpec for configuration errors.
-func (s *NotificationIntegrationSpec) Validate() error {
-	var errs []error
-
-	if s.Name == "" {
-		errs = append(errs, errors.New("spec.name is required"))
-	}
-
-	if s.Type == "" {
-		errs = append(errs, errors.New("spec.type is required"))
-	}
-
-	// Type-specific sub-config validation.
-	switch s.Type {
-	case NotificationIntegrationTypeEmail:
-		if s.Email == nil {
-			errs = append(errs, errors.New("spec.email is required when type is EMAIL"))
-		} else {
-			if len(s.Email.AllowedRecipients) == 0 {
-				errs = append(errs, errors.New("spec.email.allowedRecipients is required"))
-			}
-		}
-	case NotificationIntegrationTypeQueue:
-		if s.Queue == nil {
-			errs = append(errs, errors.New("spec.queue is required when type is QUEUE"))
-		} else {
-			if s.Queue.NotificationProvider == "" {
-				errs = append(errs, errors.New("spec.queue.notificationProvider is required"))
-			}
-		}
-	case NotificationIntegrationTypeWebhook:
-		if s.Webhook == nil {
-			errs = append(errs, errors.New("spec.webhook is required when type is WEBHOOK"))
-		} else {
-			if s.Webhook.WebhookURL == "" {
-				errs = append(errs, errors.New("spec.webhook.webhookURL is required"))
-			}
-		}
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {
@@ -2883,6 +2700,146 @@ func (s *SAML2IntegrationSpec) Validate() error {
 
 	if s.X509Cert == "" {
 		errs = append(errs, errors.New("spec.x509Cert is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the ShareSpec for configuration errors.
+func (s *ShareSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	for i, acct := range s.Accounts {
+		if acct == "" {
+			errs = append(errs, fmt.Errorf("spec.accounts[%d]: account identifier must not be empty", i))
+		}
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the ExternalFunctionSpec for configuration errors.
+func (s *ExternalFunctionSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if s.ReturnType == "" {
+		errs = append(errs, errors.New("spec.returnType is required"))
+	}
+
+	if s.APIIntegrationName == nil && s.APIIntegrationRef == nil {
+		errs = append(errs, errors.New("one of spec.apiIntegrationRef or spec.apiIntegrationName is required"))
+	}
+
+	if s.APIIntegrationName != nil && s.APIIntegrationRef != nil {
+		errs = append(errs, errors.New("spec.apiIntegrationRef and spec.apiIntegrationName are mutually exclusive"))
+	}
+
+	if s.URL == "" {
+		errs = append(errs, errors.New("spec.url is required"))
+	}
+
+	if s.Compression != nil {
+		if err := validateEnum("compression", s.Compression,
+			ExternalFunctionCompressionAuto,
+			ExternalFunctionCompressionGZIP,
+			ExternalFunctionCompressionDeflate,
+			ExternalFunctionCompressionNone,
+		); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the ComputePoolSpec for configuration errors.
+func (s *ComputePoolSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if s.MinNodes < 1 {
+		errs = append(errs, errors.New("spec.minNodes must be >= 1"))
+	}
+
+	if s.MaxNodes < 1 {
+		errs = append(errs, errors.New("spec.maxNodes must be >= 1"))
+	}
+
+	if s.MinNodes > s.MaxNodes {
+		errs = append(errs, fmt.Errorf("spec.minNodes (%d) must be <= spec.maxNodes (%d)", s.MinNodes, s.MaxNodes))
+	}
+
+	if s.InstanceFamily == "" {
+		errs = append(errs, errors.New("spec.instanceFamily is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the ServiceSpec for configuration errors.
+func (s *ServiceSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if s.ComputePoolName == nil && s.ComputePoolRef == nil {
+		errs = append(errs, errors.New("one of spec.computePoolRef or spec.computePoolName is required"))
+	}
+
+	if s.ComputePoolName != nil && s.ComputePoolRef != nil {
+		errs = append(errs, errors.New("spec.computePoolRef and spec.computePoolName are mutually exclusive"))
+	}
+
+	if s.Specification == "" && s.SpecificationReference == "" {
+		errs = append(errs, errors.New("one of spec.specification or spec.specificationReference is required"))
+	}
+
+	if s.Specification != "" && s.SpecificationReference != "" {
+		errs = append(errs, errors.New("spec.specification and spec.specificationReference are mutually exclusive"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the ImageRepositorySpec for configuration errors.
+func (s *ImageRepositorySpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
 	}
 
 	if err := s.CommonSpec.Validate(); err != nil {

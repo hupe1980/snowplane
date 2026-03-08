@@ -8,10 +8,15 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -19,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/circuitbreaker"
@@ -40,6 +46,12 @@ const (
 	// DefaultSnowflakeOpTimeout is the default per-operation timeout for
 	// Snowflake CRUD calls (Observe, Create, Alter, Drop).
 	DefaultSnowflakeOpTimeout = 60 * time.Second
+
+	// DefaultReconcileTimeout is the maximum duration for a single Reconcile
+	// call. This prevents a blocked reconcile goroutine from occupying a
+	// worker indefinitely. The controller-runtime default is 10 minutes;
+	// we tighten this to 5 minutes for faster failure detection.
+	DefaultReconcileTimeout = 5 * time.Minute
 
 	// StatusFieldOwner is the SSA field manager for status patches.
 	// Using a dedicated field owner ensures the controller has exclusive
@@ -64,10 +76,12 @@ type GenericReconciler[T ManagedResource, S any, D any] struct {
 	GVK            schema.GroupVersionKind // set during SetupWithManager or manually in tests
 
 	requeueOverride      time.Duration
-	snowflakeOpTimeout   time.Duration // 0 → DefaultSnowflakeOpTimeout
-	maturity             string        // alpha, beta, stable (default: alpha)
-	enableAlphaResources bool          // gate: register alpha controllers only when true
-	disabled             bool          // explicit disable via --disable-controllers
+	snowflakeOpTimeout   time.Duration       // 0 → DefaultSnowflakeOpTimeout
+	reconcileTimeout     time.Duration       // 0 → DefaultReconcileTimeout
+	maturity             string              // alpha, beta, stable (default: alpha)
+	enableAlphaResources bool                // gate: register alpha controllers only when true
+	disabled             bool                // explicit disable via --disable-controllers
+	shardPredicate       predicate.Predicate // optional hash-based shard filter
 }
 
 // WithRequeueInterval overrides the default periodic-resync interval.
@@ -162,6 +176,21 @@ func (r *GenericReconciler[T, S, D]) WithSnowflakeOpTimeout(d time.Duration) *Ge
 	return r
 }
 
+// WithReconcileTimeout overrides the overall reconcile timeout. This is the
+// maximum time a single Reconcile call may take before the context is cancelled.
+func (r *GenericReconciler[T, S, D]) WithReconcileTimeout(d time.Duration) *GenericReconciler[T, S, D] {
+	r.reconcileTimeout = d
+	return r
+}
+
+func (r *GenericReconciler[T, S, D]) getReconcileTimeout() time.Duration {
+	if r.reconcileTimeout > 0 {
+		return r.reconcileTimeout
+	}
+
+	return DefaultReconcileTimeout
+}
+
 // SetupWithManager registers the controller with the manager.
 // Controllers that are explicitly disabled or alpha-maturity controllers with
 // alpha not enabled are skipped.
@@ -196,6 +225,11 @@ func (r *GenericReconciler[T, S, D]) SetupWithManager(mgr ctrl.Manager, maxConcu
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrent}).
 		Named(r.Adapter.ResourceName())
 
+	// Apply sharding predicate when running in multi-shard mode.
+	if r.shardPredicate != nil {
+		bldr = bldr.WithEventFilter(r.shardPredicate)
+	}
+
 	// Let the adapter add resource-specific watches (e.g., Schema -> Database).
 	if wc, ok := r.Adapter.(WatchConfigurer); ok {
 		if fn := wc.SetupWatches(); fn != nil {
@@ -213,8 +247,31 @@ func (r *GenericReconciler[T, S, D]) SetupWithManager(mgr ctrl.Manager, maxConcu
 
 // Reconcile implements the shared reconciliation state machine.
 func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
+	// M6: Overall reconcile timeout guard — prevents a blocked reconcile
+	// goroutine from occupying a worker indefinitely.
+	ctx, reconcileCancel := context.WithTimeout(ctx, r.getReconcileTimeout())
+	defer reconcileCancel()
+
 	resName := r.Adapter.ResourceName()
 	start := time.Now()
+
+	// OpenTelemetry: wrap the entire reconcile in a span.
+	ctx, span := otel.Tracer("snowplane").Start(ctx, "Reconcile/"+resName,
+		trace.WithAttributes(
+			attribute.String("snowplane.resource.type", resName),
+			attribute.String("k8s.namespace", req.Namespace),
+			attribute.String("k8s.name", req.Name),
+		),
+	)
+	defer func() {
+		if retErr != nil {
+			span.RecordError(retErr)
+			span.SetStatus(codes.Error, retErr.Error())
+		} else {
+			span.SetStatus(codes.Ok, "")
+		}
+		span.End()
+	}()
 
 	var providerName string       // populated after provider resolution, used in defer
 	var snowflakeOpAttempted bool // true once an actual Snowflake I/O call is made
@@ -273,6 +330,16 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	logger.Info("reconciling "+resName, "name", obj.GetName(), resName, obj.GetSpecName())
+
+	// L-2: Warn on ambiguous boolean annotation values (e.g. "True" instead of "true").
+	for _, w := range snowplanev1alpha1.AmbiguousBoolAnnotations(obj.GetAnnotations()) {
+		r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonValidationFailed, w)
+	}
+
+	// H3: Inject AllowedRefNamespaces from ProviderConfig into context so that
+	// ref-resolution functions automatically enforce cross-namespace restrictions
+	// during PreReconcile without requiring adapter signature changes.
+	ctx = r.injectAllowedRefNamespaces(ctx, obj)
 
 	// Resource-specific pre-reconcile hook (e.g. Schema resolves databaseRef).
 	if pr, ok := r.Adapter.(PreReconciler[T]); ok {
@@ -389,6 +456,7 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 	// resolution already validates existence via CR readiness).
 	// Adapters can also implement PreFlightChecker for custom checks.
 	if err := r.runPreFlightChecks(ctx, logger, sfClient, obj); err != nil {
+		metrics.RecordPreflightFailure(resName, snowplanev1alpha1.ReasonDependencyNotReady)
 		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonDependencyNotReady,
 			fmt.Sprintf("pre-flight check failed: %v", err))
 		conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonDependencyNotReady, err.Error())
@@ -412,6 +480,21 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 
 	// Handle deletion.
 	if !obj.GetDeletionTimestamp().IsZero() {
+		// ObserveOnly: remove finalizer without dropping the Snowflake resource.
+		if obj.GetManagementPolicies().IsObserveOnly() {
+			logger.Info("observe-only mode: removing finalizer without dropping Snowflake resource", resName, obj.GetSpecName())
+			r.Recorder.Event(obj, corev1.EventTypeNormal, snowplanev1alpha1.ReasonObserveOnly,
+				fmt.Sprintf("Observe-only: %s %q finalizer removed without DROP", resName, obj.GetSpecName()))
+
+			if finalizers.Remove(obj, r.Adapter.FinalizerName()) {
+				if updateErr := r.Client.Update(ctx, obj); updateErr != nil {
+					return ctrl.Result{}, fmt.Errorf("removing finalizer in observe-only delete: %w", updateErr)
+				}
+			}
+
+			return ctrl.Result{}, nil
+		}
+
 		// Mark Snowflake I/O as attempted so the deferred circuit breaker
 		// update fires — reconcileDelete calls Drop() which is real I/O.
 		snowflakeOpAttempted = true
@@ -490,6 +573,12 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 		r.bestEffortPatchStatus(ctx, obj)
 
 		return ctrl.Result{}, fmt.Errorf("adapter %s.Observe returned nil observation", resName)
+	}
+
+	// M-1: ObserveOnly — read Snowflake state and populate status but never
+	// issue CREATE, ALTER, or DROP statements.
+	if obj.GetManagementPolicies().IsObserveOnly() {
+		return r.reconcileObserveOnly(ctx, obj, resName, obs)
 	}
 
 	if !obs.Exists {
@@ -572,6 +661,10 @@ func (r *GenericReconciler[T, S, D]) runPreFlightChecks(ctx context.Context, log
 func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T, statusBase T, svc S, id Identifier) (ctrl.Result, error) {
 	resName := r.Adapter.ResourceName()
 	logger := log.FromContext(ctx)
+
+	ctx, span := otel.Tracer("snowplane").Start(ctx, "Create/"+resName)
+	defer span.End()
+
 	logger.Info("creating "+resName+" in Snowflake", resName, obj.GetSpecName())
 
 	// Mark creation-initiated before issuing the Snowflake CREATE so that
@@ -678,7 +771,7 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 		// controller-runtime applies exponential backoff instead of a
 		// fixed 5-second polling loop.
 		if err != nil {
-			return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("post-create observe: %w", err)
+			return ctrl.Result{}, fmt.Errorf("post-create observe: %w", err)
 		}
 
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
@@ -722,6 +815,9 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T, svc S, id Identifier, obs *Observation[D]) (ctrl.Result, error) {
 	resName := r.Adapter.ResourceName()
 	logger := log.FromContext(ctx)
+
+	ctx, span := otel.Tracer("snowplane").Start(ctx, "Update/"+resName)
+	defer span.End()
 
 	// Fresh timeout ensures ALTER gets the full budget, independent of
 	// how much time the preceding Observe consumed.
@@ -1061,6 +1157,9 @@ func (r *GenericReconciler[T, S, D]) reconcileDelete(ctx context.Context, obj T,
 	resName := r.Adapter.ResourceName()
 	logger := log.FromContext(ctx)
 
+	ctx, span := otel.Tracer("snowplane").Start(ctx, "Delete/"+resName)
+	defer span.End()
+
 	if !finalizers.Has(obj, r.Adapter.FinalizerName()) {
 		return ctrl.Result{}, nil
 	}
@@ -1171,6 +1270,38 @@ func (r *GenericReconciler[T, S, D]) reconcileDelete(ctx context.Context, obj T,
 	return ctrl.Result{}, nil
 }
 
+// reconcileObserveOnly handles the observe-only management policy. It reads
+// the Snowflake resource state and populates the CR status without issuing
+// any CREATE, ALTER, or DROP statements.
+func (r *GenericReconciler[T, S, D]) reconcileObserveOnly(ctx context.Context, obj T, resName string, obs *Observation[D]) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	if !obs.Exists {
+		logger.Info("observe-only: resource does not exist in Snowflake", "resource", resName, "name", obj.GetSpecName())
+		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonObserveOnly,
+			fmt.Sprintf("%s %q does not exist in Snowflake (observe-only — no CREATE will be issued)", resName, obj.GetSpecName()))
+		conditions.SetSynced(obj, "Observe-only mode active — resource not found")
+		r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonObserveOnly,
+			fmt.Sprintf("Observe-only: %s %q not found in Snowflake", resName, obj.GetSpecName()))
+		r.bestEffortPatchStatus(ctx, obj)
+
+		return ctrl.Result{RequeueAfter: r.getRequeueInterval()}, nil
+	}
+
+	logger.Info("observe-only: resource exists, populating status", "resource", resName, "name", obj.GetSpecName())
+
+	r.Adapter.ApplyObservation(obj, obs)
+	conditions.SetReady(obj, fmt.Sprintf("%s is observable (observe-only — no mutations)", resName))
+	conditions.SetSynced(obj, "Observe-only mode active — no CREATE/ALTER/DROP")
+	obj.SetObservedGeneration(obj.GetGeneration())
+
+	if err := r.patchStatus(ctx, obj); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{RequeueAfter: r.getRequeueInterval()}, nil
+}
+
 // patchStatus uses Server-Side Apply (SSA) to update the status subresource.
 // SSA eliminates the need for ResourceVersion-based conflict detection and
 // retry loops — the server resolves ownership via managedFields instead.
@@ -1200,6 +1331,36 @@ func (r *GenericReconciler[T, S, D]) bestEffortPatchStatus(ctx context.Context, 
 	if err := r.patchStatus(ctx, obj); err != nil {
 		log.FromContext(ctx).Error(err, "best-effort status patch failed")
 	}
+}
+
+// injectAllowedRefNamespaces performs a lightweight ProviderConfig lookup to
+// extract AllowedRefNamespaces and inject it into the context. This runs
+// before PreReconcile so that all ref-resolution functions in adapters
+// automatically enforce the restriction without adapter signature changes (H3).
+// On lookup failure (e.g., ProviderConfig not found yet), returns unchanged ctx
+// — the full ResolveClient later will surface the error with proper conditions.
+func (r *GenericReconciler[T, S, D]) injectAllowedRefNamespaces(ctx context.Context, obj T) context.Context {
+	providerRef := obj.GetProviderRef()
+	pcNamespace := obj.GetNamespace()
+
+	if providerRef.Namespace != "" {
+		pcNamespace = providerRef.Namespace
+	}
+
+	pc := &snowplanev1alpha1.ProviderConfig{}
+	pcKey := types.NamespacedName{Namespace: pcNamespace, Name: providerRef.Name}
+
+	if err := r.Client.Get(ctx, pcKey, pc); err != nil {
+		// ProviderConfig may not exist yet — the full ResolveClient will
+		// surface this error later with proper conditions.
+		return ctx
+	}
+
+	if len(pc.Spec.AllowedRefNamespaces) > 0 {
+		return refresolver.WithAllowedRefNamespaces(ctx, pc.Spec.AllowedRefNamespaces)
+	}
+
+	return ctx
 }
 
 // hasCreationInitiated checks whether the creation-initiated annotation is set.
@@ -1262,6 +1423,19 @@ func (r *GenericReconciler[T, S, D]) executeSnowflakeOp(
 	if err := metrics.ObserveSnowflakeOp(resName, opName, func() error {
 		return sfretry.Do(opCtx, sfretry.DefaultOptions(), opFn)
 	}); err != nil {
+		// L7: Record Snowflake error code for observability.
+		if code, ok := snowflake.ExtractErrorCode(err); ok {
+			provRef := obj.GetProviderRef()
+			prov := provRef.Name
+			if ns := provRef.Namespace; ns != "" {
+				prov = ns + "/" + prov
+			} else {
+				prov = obj.GetNamespace() + "/" + prov
+			}
+
+			metrics.RecordSnowflakeErrorCode(prov, code)
+		}
+
 		if snowflake.IsTerminalError(err) {
 			conditions.SetNotReady(obj, snowplanev1alpha1.ReasonTerminalError, err.Error())
 			r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonTerminalError,
@@ -1317,7 +1491,10 @@ func (r *GenericReconciler[T, S, D]) checkLateInit(obj T, obs *Observation[D], l
 	// The any() wrapper is required because Go generics do not allow direct
 	// type assertion from one parameterised interface to another.
 	if li, ok := any(r.Adapter).(LateInitializer[T, D]); ok {
-		if li.LateInitialize(obj, obs) {
+		modified := li.LateInitialize(obj, obs)
+		metrics.RecordLateInit(r.Adapter.ResourceName(), modified)
+
+		if modified {
 			setLateInitializedAnnotation(obj)
 			logger.Info("late-initialized spec fields from observed state", resName, obj.GetSpecName())
 		}
@@ -1334,7 +1511,8 @@ func (r *GenericReconciler[T, S, D]) isCreateOrAlter(obj T) bool {
 // CREATE OR ALTER syntax is not supported by the Snowflake account.
 // Delegates to the shared snowflake.IsCreateOrAlterUnsupported helper
 // which prefers structured error code matching (code 2032), then falls
-// back to string matching.
+// back to targeted string matching for "UNSUPPORTED" and "UNEXPECTED 'OR'"
+// (intentionally excludes generic "SYNTAX ERROR" — see FINDINGS H4).
 func isCreateOrAlterUnsupported(err error) bool {
 	return snowflake.IsCreateOrAlterUnsupported(err)
 }

@@ -316,7 +316,7 @@ func TestDetector_CompareStringValueFold_Drift(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Tests: SafeSummary (M-12)
+// Tests: SafeSummary
 // --------------------------------------------------------------------------
 
 func TestResult_SafeSummary_NoDrift(t *testing.T) {

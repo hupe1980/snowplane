@@ -163,7 +163,8 @@ func managedResourceTypes() []managedResourceEntry {
 		{proto: &snowplanev1alpha1.DatabaseRole{}, newList: func() client.ObjectList { return &snowplanev1alpha1.DatabaseRoleList{} }},
 		{proto: &snowplanev1alpha1.Table{}, newList: func() client.ObjectList { return &snowplanev1alpha1.TableList{} }},
 		{proto: &snowplanev1alpha1.View{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ViewList{} }},
-		{proto: &snowplanev1alpha1.Stage{}, newList: func() client.ObjectList { return &snowplanev1alpha1.StageList{} }},
+		{proto: &snowplanev1alpha1.InternalStage{}, newList: func() client.ObjectList { return &snowplanev1alpha1.InternalStageList{} }},
+		{proto: &snowplanev1alpha1.ExternalStage{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ExternalStageList{} }},
 		{proto: &snowplanev1alpha1.Task{}, newList: func() client.ObjectList { return &snowplanev1alpha1.TaskList{} }},
 		{proto: &snowplanev1alpha1.StreamOnTable{}, newList: func() client.ObjectList { return &snowplanev1alpha1.StreamOnTableList{} }},
 		{proto: &snowplanev1alpha1.StreamOnView{}, newList: func() client.ObjectList { return &snowplanev1alpha1.StreamOnViewList{} }},
@@ -179,15 +180,19 @@ func managedResourceTypes() []managedResourceEntry {
 		{proto: &snowplanev1alpha1.GrantPrivilegesToAccountRole{}, newList: func() client.ObjectList { return &snowplanev1alpha1.GrantPrivilegesToAccountRoleList{} }},
 		{proto: &snowplanev1alpha1.GrantPrivilegesToDatabaseRole{}, newList: func() client.ObjectList { return &snowplanev1alpha1.GrantPrivilegesToDatabaseRoleList{} }},
 		{proto: &snowplanev1alpha1.GrantPrivilegesToShare{}, newList: func() client.ObjectList { return &snowplanev1alpha1.GrantPrivilegesToShareList{} }},
-		{proto: &snowplanev1alpha1.StorageIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.StorageIntegrationList{} }},
+		{proto: &snowplanev1alpha1.StorageIntegrationAWS{}, newList: func() client.ObjectList { return &snowplanev1alpha1.StorageIntegrationAWSList{} }},
+		{proto: &snowplanev1alpha1.StorageIntegrationGCS{}, newList: func() client.ObjectList { return &snowplanev1alpha1.StorageIntegrationGCSList{} }},
+		{proto: &snowplanev1alpha1.StorageIntegrationAzure{}, newList: func() client.ObjectList { return &snowplanev1alpha1.StorageIntegrationAzureList{} }},
 		{proto: &snowplanev1alpha1.FileFormat{}, newList: func() client.ObjectList { return &snowplanev1alpha1.FileFormatList{} }},
 		{proto: &snowplanev1alpha1.Pipe{}, newList: func() client.ObjectList { return &snowplanev1alpha1.PipeList{} }},
 		{proto: &snowplanev1alpha1.DynamicTable{}, newList: func() client.ObjectList { return &snowplanev1alpha1.DynamicTableList{} }},
 		{proto: &snowplanev1alpha1.Alert{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AlertList{} }},
-		{proto: &snowplanev1alpha1.NotificationIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.NotificationIntegrationList{} }},
-		{proto: &snowplanev1alpha1.SecurityIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SecurityIntegrationList{} }},
+		{proto: &snowplanev1alpha1.EmailNotificationIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.EmailNotificationIntegrationList{} }},
+		{proto: &snowplanev1alpha1.QueueNotificationIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.QueueNotificationIntegrationList{} }},
+		{proto: &snowplanev1alpha1.WebhookNotificationIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.WebhookNotificationIntegrationList{} }},
 		{proto: &snowplanev1alpha1.SAML2Integration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SAML2IntegrationList{} }},
 		{proto: &snowplanev1alpha1.ExternalOAuthIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ExternalOAuthIntegrationList{} }},
+		{proto: &snowplanev1alpha1.SCIMIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SCIMIntegrationList{} }},
 		{proto: &snowplanev1alpha1.PasswordPolicy{}, newList: func() client.ObjectList { return &snowplanev1alpha1.PasswordPolicyList{} }},
 		{proto: &snowplanev1alpha1.AuthenticationPolicy{}, newList: func() client.ObjectList { return &snowplanev1alpha1.AuthenticationPolicyList{} }},
 		{proto: &snowplanev1alpha1.NetworkRule{}, newList: func() client.ObjectList { return &snowplanev1alpha1.NetworkRuleList{} }},
@@ -223,6 +228,19 @@ func managedResourceTypes() []managedResourceEntry {
 		}},
 		{proto: &snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBearer{}, newList: func() client.ObjectList { return &snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBearerList{} }},
 		{proto: &snowplanev1alpha1.SQLStatement{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SQLStatementList{} }},
+		{proto: &snowplanev1alpha1.ExternalVolume{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ExternalVolumeList{} }},
+		{proto: &snowplanev1alpha1.CortexSearchService{}, newList: func() client.ObjectList { return &snowplanev1alpha1.CortexSearchServiceList{} }},
+		{proto: &snowplanev1alpha1.GitRepository{}, newList: func() client.ObjectList { return &snowplanev1alpha1.GitRepositoryList{} }},
+		{proto: &snowplanev1alpha1.Streamlit{}, newList: func() client.ObjectList { return &snowplanev1alpha1.StreamlitList{} }},
+		{proto: &snowplanev1alpha1.Share{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ShareList{} }},
+		{proto: &snowplanev1alpha1.ExternalFunction{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ExternalFunctionList{} }},
+		{proto: &snowplanev1alpha1.ComputePool{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ComputePoolList{} }},
+		{proto: &snowplanev1alpha1.ImageRepository{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ImageRepositoryList{} }},
+		{proto: &snowplanev1alpha1.Service{}, newList: func() client.ObjectList { return &snowplanev1alpha1.ServiceList{} }},
+		{proto: &snowplanev1alpha1.FailoverGroup{}, newList: func() client.ObjectList { return &snowplanev1alpha1.FailoverGroupList{} }},
+		{proto: &snowplanev1alpha1.APIIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.APIIntegrationList{} }},
+		{proto: &snowplanev1alpha1.SecondaryDatabase{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SecondaryDatabaseList{} }},
+		{proto: &snowplanev1alpha1.SharedDatabase{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SharedDatabaseList{} }},
 	}
 }
 
@@ -329,7 +347,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 	if err := r.client.Get(ctx, req.NamespacedName, pc); err != nil {
 		if apierrors.IsNotFound(err) {
 			// CR deleted — evict any cached client and clean up metrics.
-			// Use namespace-qualified key to avoid cross-namespace collisions (C-3).
+			// Use namespace-qualified key to avoid cross-namespace collisions.
 			cacheKey := provider.ProviderCacheKey(req.Namespace, req.Name)
 			r.factory.Evict(cacheKey)
 			r.rateLimiter.Evict(cacheKey)
@@ -342,7 +360,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 
 	logger.Info("reconciling ProviderConfig", "name", pc.Name)
 
-	// Namespace-qualified cache key for all subsystems (C-3).
+	// Namespace-qualified cache key for all subsystems.
 	cacheKey := provider.ProviderCacheKey(pc.Namespace, pc.Name)
 
 	// Handle deletion with in-use guard.

@@ -235,3 +235,51 @@ func TestDeleteProviderConfigHealthy(t *testing.T) {
 	g2 := ProviderConfigHealthy.With(prometheus.Labels{"provider": "pc-delete-test", "account": "acct-del"})
 	assert.Equal(t, float64(0), collectGauge(g2))
 }
+
+func TestRecordLateInit_Modified(t *testing.T) {
+	t.Parallel()
+
+	RecordLateInit("test-late-init-mod", true)
+	c := LateInitTotal.With(prometheus.Labels{"controller": "test-late-init-mod", "result": "modified"})
+	assert.GreaterOrEqual(t, collectCounter(c), float64(1))
+}
+
+func TestRecordLateInit_Noop(t *testing.T) {
+	t.Parallel()
+
+	RecordLateInit("test-late-init-noop", false)
+	c := LateInitTotal.With(prometheus.Labels{"controller": "test-late-init-noop", "result": "noop"})
+	assert.GreaterOrEqual(t, collectCounter(c), float64(1))
+}
+
+func TestRecordPreflightFailure(t *testing.T) {
+	t.Parallel()
+
+	RecordPreflightFailure("test-preflight", "DependencyNotReady")
+	c := PreflightFailuresTotal.With(prometheus.Labels{"controller": "test-preflight", "reason": "DependencyNotReady"})
+	assert.GreaterOrEqual(t, collectCounter(c), float64(1))
+}
+
+func TestRecordSnowflakeErrorCode(t *testing.T) {
+	t.Parallel()
+
+	RecordSnowflakeErrorCode("test-sf-err", 2002)
+	c := SnowflakeErrorCodesTotal.With(prometheus.Labels{"provider": "test-sf-err", "code": "2002"})
+	assert.GreaterOrEqual(t, collectCounter(c), float64(1))
+}
+
+func TestRecordSQLStatementExecution_Execute(t *testing.T) {
+	t.Parallel()
+
+	RecordSQLStatementExecution("test-ns-exec", "execute")
+	c := SQLStatementExecutionsTotal.With(prometheus.Labels{"namespace": "test-ns-exec", "operation": "execute"})
+	assert.GreaterOrEqual(t, collectCounter(c), float64(1))
+}
+
+func TestRecordSQLStatementExecution_Revert(t *testing.T) {
+	t.Parallel()
+
+	RecordSQLStatementExecution("test-ns-revert", "revert")
+	c := SQLStatementExecutionsTotal.With(prometheus.Labels{"namespace": "test-ns-revert", "operation": "revert"})
+	assert.GreaterOrEqual(t, collectCounter(c), float64(1))
+}

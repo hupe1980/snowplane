@@ -74,7 +74,7 @@ just e2e-teardown-kind # hack/teardown-e2e-kind.sh
 | `role_test.go`           | AccountRole + DatabaseRole lifecycle          |
 | `table_test.go`          | Table lifecycle (database + schema deps)      |
 | `view_test.go`           | View lifecycle (database + schema + table)    |
-| `stage_test.go`          | Stage lifecycle (database + schema deps)      |
+| `internalstage_test.go`  | InternalStage lifecycle (database + schema deps) |
 | `cross_resource_test.go` | Database -> Schema -> DatabaseRole chain      |
 | `fieldexport_test.go`    | FieldExport -> ConfigMap / Secret             |
 | `adoption_test.go`       | Pre-create in SF -> adopt via annotation      |

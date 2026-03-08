@@ -710,49 +710,6 @@ func TestConvertView_NilName(t *testing.T) {
 	assert.Equal(t, "", result)
 }
 
-func TestConvertStage_Internal(t *testing.T) {
-	t.Parallel()
-
-	attrs := map[string]any{
-		"name":     "MY_STAGE",
-		"database": "MY_DB",
-		"schema":   "PUBLIC",
-		"comment":  "internal stage",
-	}
-
-	result := convertStage(attrs, "default", "default")
-	assert.Contains(t, result, "kind: Stage")
-	assert.Contains(t, result, "name: my-db-public-my-stage")
-	assert.Contains(t, result, "name: 'MY_STAGE'")
-	assert.Contains(t, result, "databaseRef:")
-	assert.Contains(t, result, "schemaRef:")
-	assert.Contains(t, result, "comment: 'internal stage'")
-	assert.NotContains(t, result, "url:")
-}
-
-func TestConvertStage_External(t *testing.T) {
-	t.Parallel()
-
-	attrs := map[string]any{
-		"name":                "S3_STAGE",
-		"database":            "MY_DB",
-		"schema":              "PUBLIC",
-		"url":                 "s3://my-bucket/path/",
-		"storage_integration": "MY_S3_INT",
-	}
-
-	result := convertStage(attrs, "default", "default")
-	assert.Contains(t, result, "url: 's3://my-bucket/path/'")
-	assert.Contains(t, result, "storageIntegration: 'MY_S3_INT'")
-}
-
-func TestConvertStage_NilName(t *testing.T) {
-	t.Parallel()
-
-	result := convertStage(map[string]any{}, "default", "default")
-	assert.Equal(t, "", result)
-}
-
 func TestApiVersion(t *testing.T) {
 	t.Parallel()
 

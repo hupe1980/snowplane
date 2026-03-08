@@ -134,6 +134,7 @@ type TableConstraintSpec struct {
 
 	// Comment for the constraint.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 

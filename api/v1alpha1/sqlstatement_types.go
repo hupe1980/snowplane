@@ -15,6 +15,7 @@ type SQLStatementExpectation struct {
 
 	// Value is the expected column value (case-insensitive string comparison).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=4096
 	Value string `json:"value"`
 }
 
@@ -35,6 +36,7 @@ type SQLStatementSpec struct {
 	// For idempotent statements, use IF NOT EXISTS or CREATE OR REPLACE patterns.
 	// Multi-statement SQL (separated by semicolons) is supported.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=65536
 	Execute string `json:"execute"`
 
 	// Revert is the SQL statement to run when deleting the resource.
@@ -42,6 +44,8 @@ type SQLStatementSpec struct {
 	// When omitted, no SQL is executed on deletion (orphan behavior for the
 	// Snowflake-side resource, though the Kubernetes CR is still deleted).
 	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=65536
 	Revert *string `json:"revert,omitempty"`
 
 	// Observe is a SQL query whose result set is used for existence checks
@@ -51,6 +55,8 @@ type SQLStatementSpec struct {
 	// Execute runs once and the resource stays in Ready state without drift
 	// detection.
 	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=65536
 	Observe *string `json:"observe,omitempty"`
 
 	// ObserveExpect defines column/value expectations that the observe query

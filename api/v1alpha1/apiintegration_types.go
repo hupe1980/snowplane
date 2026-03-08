@@ -60,6 +60,7 @@ type APIIntegrationSpec struct {
 
 	// Comment is an optional comment for the integration.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 

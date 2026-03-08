@@ -73,12 +73,12 @@ type RowAccessPolicySpec struct {
 
 	// Body is the SQL expression that returns BOOLEAN to determine row visibility.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:MaxLength=65536
 	Body string `json:"body" snowflake:"BODY,always"`
 
 	// Comment is an optional description for the row access policy.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
@@ -159,7 +159,7 @@ type RowAccessPolicyStatus struct {
 // RowAccessPolicy is the Schema for the rowaccesspolicies API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=rap
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

@@ -28,21 +28,28 @@ type UserSpec struct {
 
 	// LoginName is the name that the user enters to log into the system.
 	// Defaults to the user Name if not set.
+	// +kubebuilder:validation:MaxLength=255
 	LoginName *string `json:"loginName,omitempty" snowflake:"LOGIN_NAME"`
 
 	// DisplayName is the user's display name in the Snowflake UI.
+	// +kubebuilder:validation:MaxLength=255
 	DisplayName *string `json:"displayName,omitempty" snowflake:"DISPLAY_NAME"`
 
 	// Email is the user's email address.
+	// +kubebuilder:validation:MaxLength=255
+	// +kubebuilder:validation:Pattern=`^[^@\s]+@[^@\s]+\.[^@\s]+$`
 	Email *string `json:"email,omitempty" snowflake:"EMAIL"`
 
 	// FirstName is the user's first name.
+	// +kubebuilder:validation:MaxLength=255
 	FirstName *string `json:"firstName,omitempty" snowflake:"FIRST_NAME"`
 
 	// LastName is the user's last name.
+	// +kubebuilder:validation:MaxLength=255
 	LastName *string `json:"lastName,omitempty" snowflake:"LAST_NAME"`
 
 	// Comment is an optional description for the user.
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Password references a Kubernetes Secret containing the user's password.
@@ -63,16 +70,20 @@ type UserSpec struct {
 	Type *UserType `json:"type,omitempty"`
 
 	// DefaultRole is the default role assigned to the user on login.
+	// +kubebuilder:validation:MaxLength=255
 	DefaultRole *string `json:"defaultRole,omitempty" snowflake:"DEFAULT_ROLE"`
 
 	// DefaultSecondaryRoles specifies secondary roles activated on login.
 	// Set to "ALL" to enable all granted roles as secondary.
+	// +kubebuilder:validation:MaxLength=255
 	DefaultSecondaryRoles *string `json:"defaultSecondaryRoles,omitempty" snowflake:"DEFAULT_SECONDARY_ROLES"`
 
 	// DefaultWarehouse is the default virtual warehouse for the user.
+	// +kubebuilder:validation:MaxLength=255
 	DefaultWarehouse *string `json:"defaultWarehouse,omitempty" snowflake:"DEFAULT_WAREHOUSE"`
 
 	// DefaultNamespace is the default database.schema namespace for the user.
+	// +kubebuilder:validation:MaxLength=511
 	DefaultNamespace *string `json:"defaultNamespace,omitempty" snowflake:"DEFAULT_NAMESPACE"`
 
 	// MustChangePassword forces a password change on next login.
@@ -82,6 +93,7 @@ type UserSpec struct {
 	Disabled *bool `json:"disabled,omitempty" snowflake:"DISABLED"`
 
 	// MiddleName is the user's middle name.
+	// +kubebuilder:validation:MaxLength=255
 	MiddleName *string `json:"middleName,omitempty" snowflake:"MIDDLE_NAME"`
 
 	// DaysToExpiry sets the number of days after which the user's login
@@ -105,6 +117,7 @@ type UserSpec struct {
 	// NetworkPolicy assigns a user-level network policy that overrides the
 	// account-level network policy. Set to the name of an existing Snowflake
 	// network policy.
+	// +kubebuilder:validation:MaxLength=255
 	NetworkPolicy *string `json:"networkPolicy,omitempty" snowflake:"NETWORK_POLICY"`
 
 	// DisableMFA disables multi-factor authentication for the user when set
@@ -230,7 +243,7 @@ type UserStatus struct {
 // User is the Schema for the users API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=usr
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

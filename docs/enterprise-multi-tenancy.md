@@ -24,7 +24,7 @@ Snowplane provides a layered isolation model for enterprise multi-tenancy:
 | **ProviderConfig binding** | `allowedNamespaces`, `allowedNamespaceSelector` | Which namespaces can use a given set of Snowflake credentials |
 | **Snowflake scope** | `allowedDatabases`, `allowedSchemas` | Which Snowflake databases/schemas a team can target |
 | **Snowflake role** | `spec.role`, `--allowed-roles` | Which Snowflake permissions are available |
-| **Cross-namespace refs** | `databaseRef.namespace`, `schemaRef.namespace` | Shared infrastructure references across namespaces |
+| **Cross-namespace refs** | `databaseRef.namespace`, `schemaRef.namespace`, `allowedRefNamespaces` | Shared infrastructure references across namespaces (restricted by `allowedRefNamespaces`) |
 
 ---
 
@@ -218,6 +218,31 @@ spec:
 When `namespace` is omitted, the reference resolves within the same namespace as the referencing resource (backward-compatible).
 
 Cross-namespace references preserve **readiness gating** — the controller checks that the referenced resource exists and has `Ready=True` before proceeding. This prevents opaque SQL errors when dependencies aren't ready yet.
+
+#### Restricting Cross-Namespace References
+
+Use `allowedRefNamespaces` on ProviderConfig to restrict which namespaces cross-namespace refs may target:
+
+```yaml
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  allowedRefNamespaces:
+    - SAME          # Allow refs within the same namespace
+    - infra         # Allow refs to the shared infrastructure namespace
+  # ...
+```
+
+| Value | Semantics |
+|:------|:----------|
+| *(empty list)* | No restriction — all namespaces allowed (default) |
+| `"*"` | All namespaces explicitly allowed |
+| `"SAME"` | Only same-namespace references allowed |
+| `"ns-a"`, `"ns-b"` | Only the listed namespaces allowed |
+
+Violations are rejected with a `RefNamespaceNotAllowed` condition reason. No Snowflake SQL is issued.
 
 ### Snowflake Role Restriction
 

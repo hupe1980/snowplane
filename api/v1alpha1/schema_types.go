@@ -35,6 +35,7 @@ type SchemaSpec struct {
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// Comment is an optional description for the schema.
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// DataRetentionTimeInDays specifies the Time Travel retention period (0–90 days).
@@ -55,7 +56,9 @@ type SchemaSpec struct {
 	Transient bool `json:"transient,omitempty"`
 
 	// ManagedAccess enables managed access mode for the schema.
-	ManagedAccess bool `json:"managedAccess,omitempty"`
+	// Set to true to enable, false to explicitly disable. Omit to leave unmanaged.
+	// +optional
+	ManagedAccess *bool `json:"managedAccess,omitempty" snowflake:"MANAGED_ACCESS"`
 
 	// DefaultDDLCollation sets the default collation for string columns.
 	DefaultDDLCollation *string `json:"defaultDDLCollation,omitempty" snowflake:"DEFAULT_DDL_COLLATION"`
@@ -122,7 +125,7 @@ type SchemaStatus struct {
 // Schema is the Schema for the schemas API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=sch
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

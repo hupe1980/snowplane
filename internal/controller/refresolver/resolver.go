@@ -17,6 +17,27 @@ import (
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
 )
 
+// contextKey is an unexported type for context keys in this package.
+type contextKey struct{ name string }
+
+// allowedRefNamespacesKey is the context key for AllowedRefNamespaces.
+var allowedRefNamespacesKey = &contextKey{"allowedRefNamespaces"}
+
+// WithAllowedRefNamespaces returns a child context carrying the ProviderConfig's
+// AllowedRefNamespaces restriction. This is injected by the generic reconciler
+// before PreReconcile so that all ref-resolution functions automatically enforce
+// the restriction without requiring signature changes in adapters.
+func WithAllowedRefNamespaces(ctx context.Context, namespaces []string) context.Context {
+	return context.WithValue(ctx, allowedRefNamespacesKey, namespaces)
+}
+
+// AllowedRefNamespacesFromContext extracts the AllowedRefNamespaces from context.
+// Returns nil if not set (no restriction).
+func AllowedRefNamespacesFromContext(ctx context.Context) []string {
+	v, _ := ctx.Value(allowedRefNamespacesKey).([]string)
+	return v
+}
+
 // ErrReferenceNotFound indicates the referenced resource does not exist.
 var ErrReferenceNotFound = errors.New("referenced resource not found")
 
@@ -25,6 +46,44 @@ var ErrReferenceNotReady = errors.New("referenced resource is not ready")
 
 // ErrNeitherRefNorNameSet indicates neither a reference nor a raw name was provided.
 var ErrNeitherRefNorNameSet = errors.New("neither ref nor name is set")
+
+// ErrRefNamespaceNotAllowed indicates a cross-namespace reference targets a
+// namespace not permitted by the ProviderConfig's AllowedRefNamespaces.
+var ErrRefNamespaceNotAllowed = errors.New("cross-namespace reference not allowed")
+
+// ValidateRefNamespace checks whether a cross-namespace reference is permitted.
+// sourceNamespace is the namespace of the referencing resource.
+// targetNamespace is the namespace being referenced (may be empty for same-ns refs).
+// allowedRefNamespaces is the ProviderConfig's AllowedRefNamespaces list.
+// Returns nil if the reference is allowed, or ErrRefNamespaceNotAllowed if denied.
+func ValidateRefNamespace(sourceNamespace, targetNamespace string, allowedRefNamespaces []string) error {
+	// Same-namespace references are always allowed.
+	if targetNamespace == "" || targetNamespace == sourceNamespace {
+		return nil
+	}
+
+	// No restriction configured — allow all.
+	if len(allowedRefNamespaces) == 0 {
+		return nil
+	}
+
+	for _, ns := range allowedRefNamespaces {
+		if ns == "*" {
+			return nil
+		}
+
+		// "SAME" = only same-namespace; already handled above.
+		if ns == "SAME" {
+			continue
+		}
+
+		if ns == targetNamespace {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("%w: namespace %q is not in allowedRefNamespaces", ErrRefNamespaceNotAllowed, targetNamespace)
+}
 
 // ReferableObject is a Kubernetes object that exposes conditions and a
 // fully qualified Snowflake name in its status.
@@ -38,6 +97,8 @@ type ReferableObject interface {
 // checks that it is Ready, and returns its fullyQualifiedName from status.
 // If refNamespace is non-empty, it overrides the default namespace for
 // cross-namespace references (T-1: enterprise platform/project-team model).
+// Cross-namespace references are validated against the ProviderConfig's
+// AllowedRefNamespaces restriction carried in ctx (H3).
 //
 // The factory function creates an empty instance of the correct Go type.
 func ResolveLocalRef(
@@ -48,6 +109,11 @@ func ResolveLocalRef(
 	refNamespace string,
 	factory func() ReferableObject,
 ) (string, error) {
+	// H3: Validate cross-namespace reference against AllowedRefNamespaces from context.
+	if err := ValidateRefNamespace(namespace, refNamespace, AllowedRefNamespacesFromContext(ctx)); err != nil {
+		return "", err
+	}
+
 	obj := factory()
 
 	// Cross-namespace override: if the ref carries an explicit namespace, use it.
@@ -98,6 +164,26 @@ func ResolveDatabaseRef(
 		})
 
 		return db
+	})
+}
+
+// ResolveTableRef resolves a ObjectReference to a Table CR, returning
+// the Snowflake fully qualified table name (e.g. "DB"."SCHEMA"."TABLE").
+func ResolveTableRef(
+	ctx context.Context,
+	c client.Client,
+	namespace string,
+	ref snowplanev1alpha1.ObjectReference,
+) (string, error) {
+	return ResolveLocalRef(ctx, c, namespace, ref.Name, ref.Namespace, func() ReferableObject {
+		t := &snowplanev1alpha1.Table{}
+		t.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   snowplanev1alpha1.GroupVersion.Group,
+			Version: snowplanev1alpha1.GroupVersion.Version,
+			Kind:    "Table",
+		})
+
+		return t
 	})
 }
 
@@ -182,12 +268,18 @@ func ResolveUserRef(
 }
 
 // ResolveSecretKeyRef reads the value at the specified key from a Kubernetes Secret.
+// Cross-namespace secret references are validated against AllowedRefNamespaces from ctx (H3).
 func ResolveSecretKeyRef(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
 	ref snowplanev1alpha1.SecretKeyReference,
 ) (string, error) {
+	// H3: Validate cross-namespace reference from context.
+	if err := ValidateRefNamespace(namespace, ref.Namespace, AllowedRefNamespacesFromContext(ctx)); err != nil {
+		return "", err
+	}
+
 	secretNS := ref.Namespace
 	if secretNS == "" {
 		secretNS = namespace
@@ -277,6 +369,7 @@ func SourceName(ref *snowplanev1alpha1.ObjectReference, name *string) string {
 // When ref is set, it fetches the CR by name (with cross-namespace support),
 // checks it is Ready, and returns the value from extractName (typically spec.name).
 // When rawName is set, it is returned as-is. Exactly one of ref or rawName must be non-nil.
+// Cross-namespace references are validated against AllowedRefNamespaces from ctx (H3).
 func ResolveSourceRef[T interface {
 	client.Object
 	conditions.ConditionedObject
@@ -291,6 +384,11 @@ func ResolveSourceRef[T interface {
 	extractName func(T) string,
 ) (string, error) {
 	if ref != nil {
+		// H3: Validate cross-namespace reference from context.
+		if err := ValidateRefNamespace(namespace, ref.Namespace, AllowedRefNamespacesFromContext(ctx)); err != nil {
+			return "", err
+		}
+
 		obj := newObj()
 		obj.GetObjectKind().SetGroupVersionKind(gvk)
 

@@ -69,6 +69,9 @@ spec:
             {{- if .Values.controller.enableSQLStatement }}
             - --enable-sql-statement
             {{- end }}
+            {{- with .Values.controller.sqlStatementDenylist }}
+            - --sql-statement-denylist={{ . }}
+            {{- end }}
             {{- if .Values.logging.development }}
             - --development
             {{- end }}

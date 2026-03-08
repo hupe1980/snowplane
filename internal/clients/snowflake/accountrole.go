@@ -194,8 +194,8 @@ func scanAccountRoleShowOutput(rows *sql.Rows, name string) (*v1alpha1.AccountRo
 			Name:           m["name"],
 			Comment:        m["comment"],
 			Owner:          m["owner"],
-			GrantedToRoles: grantedToRoles,
-			GrantedRoles:   grantedRoles,
+			GrantedToRoles: &grantedToRoles,
+			GrantedRoles:   &grantedRoles,
 		}, nil
 	})
 }

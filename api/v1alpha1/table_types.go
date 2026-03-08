@@ -36,6 +36,7 @@ type ColumnDefinition struct {
 
 	// Comment is an optional description for the column.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
@@ -51,11 +52,22 @@ const (
 )
 
 // ForeignKeyReference defines the target of a FOREIGN KEY constraint.
+//
+// +kubebuilder:validation:XValidation:rule="(has(self.tableRef) && !has(self.table)) || (!has(self.tableRef) && has(self.table))",message="exactly one of foreignKey.tableRef or foreignKey.table must be set"
 type ForeignKeyReference struct {
+	// TableRef references a Table CR managed by Snowplane.
+	// The controller resolves its fullyQualifiedName at creation time.
+	// Mutually exclusive with Table.
+	// +optional
+	TableRef *ObjectReference `json:"tableRef,omitempty"`
+
 	// Table is the fully qualified name of the referenced table (e.g. "ANALYTICS"."PUBLIC"."ORDERS").
+	// Use this when the target table is NOT managed by Snowplane.
+	// Mutually exclusive with TableRef.
+	// +optional
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=255
-	Table string `json:"table"`
+	Table *string `json:"table,omitempty"`
 
 	// Columns lists the column names in the referenced table.
 	// +kubebuilder:validation:MinItems=1
@@ -133,6 +145,8 @@ type TableSpec struct {
 
 	// Columns defines the table's column structure.
 	// +kubebuilder:validation:MinItems=1
+	// +listType=map
+	// +listMapKey=name
 	Columns []ColumnDefinition `json:"columns"`
 
 	// Constraints defines table-level constraints (PRIMARY KEY, UNIQUE, FOREIGN KEY).
@@ -142,6 +156,7 @@ type TableSpec struct {
 
 	// Comment is an optional description for the table.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Transient indicates this is a transient table (no Fail-safe). Immutable after creation.
@@ -237,7 +252,7 @@ type TableStatus struct {
 // Table is the Schema for the tables API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=tbl
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

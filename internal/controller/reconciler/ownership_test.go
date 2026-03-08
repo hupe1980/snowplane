@@ -61,7 +61,7 @@ func newOwnershipReconciler(adapter *mockAdapter, objs ...runtime.Object) *recon
 }
 
 // ---------------------------------------------------------------------------
-// Tests: Ownership conflict detection (H-3)
+// Tests: Ownership conflict detection
 // ---------------------------------------------------------------------------
 
 func TestReconcile_Adoption_OwnershipConflict_Rejected(t *testing.T) {

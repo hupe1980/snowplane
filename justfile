@@ -67,7 +67,7 @@ uninstall:
     kubectl delete -f config/crd/bases/
 
 # Run all checks (CI equivalent)
-ci: lint vet security test build
+ci: lint vet security test build verify-crds verify-helm verify-fieldexport-kinds
 
 # Generate deepcopy methods, CRD manifests, and accessor boilerplate
 generate:
@@ -86,6 +86,10 @@ sync-crds: manifests
 # Verify Helm chart CRDs match generated CRDs (CI check)
 verify-crds:
     @diff -rq config/crd/bases/ charts/snowplane/crds/ || (echo "ERROR: CRD drift detected. Run 'just sync-crds' to fix." && exit 1)
+
+# Verify FieldExport CEL kind allowlist matches the gen-accessors registry (CI check)
+verify-fieldexport-kinds:
+    @go test ./api/v1alpha1/ -run TestFieldExportCELKindsInSync -count=1
 
 # Lint the Helm chart
 helm-lint:

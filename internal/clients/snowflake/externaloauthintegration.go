@@ -213,7 +213,7 @@ func buildAlterExternalOAuthIntegrationStatements(opts AlterExternalOAuthIntegra
 	sc.Bool("ENABLED", opts.Enabled)
 
 	if opts.TokenUserMappingClaim != nil {
-		sc.UnsafeRaw(fmt.Sprintf("EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM = '%s'", sqlbuilder.EscapeString(*opts.TokenUserMappingClaim)))
+		sc.UnsafeRaw(fmt.Sprintf("EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM = '%s'", sqlbuilder.EscapeString(*opts.TokenUserMappingClaim))) //nolint:forbidigo // value escaped via EscapeString
 	}
 
 	if opts.JWSKeysURL != nil {
@@ -221,19 +221,19 @@ func buildAlterExternalOAuthIntegrationStatements(opts AlterExternalOAuthIntegra
 	}
 
 	if opts.AudienceList != nil {
-		sc.UnsafeRaw(buildStringListClause("EXTERNAL_OAUTH_AUDIENCE_LIST", *opts.AudienceList))
+		sc.UnsafeRaw(buildStringListClause("EXTERNAL_OAUTH_AUDIENCE_LIST", *opts.AudienceList)) //nolint:forbidigo // values escaped via EscapeString
 	}
 
 	if opts.AllowedRoles != nil {
-		sc.UnsafeRaw(buildStringListClause("EXTERNAL_OAUTH_ALLOWED_ROLES_LIST", *opts.AllowedRoles))
+		sc.UnsafeRaw(buildStringListClause("EXTERNAL_OAUTH_ALLOWED_ROLES_LIST", *opts.AllowedRoles)) //nolint:forbidigo // values escaped via EscapeString
 	}
 
 	if opts.BlockedRoles != nil {
-		sc.UnsafeRaw(buildStringListClause("EXTERNAL_OAUTH_BLOCKED_ROLES_LIST", *opts.BlockedRoles))
+		sc.UnsafeRaw(buildStringListClause("EXTERNAL_OAUTH_BLOCKED_ROLES_LIST", *opts.BlockedRoles)) //nolint:forbidigo // values escaped via EscapeString
 	}
 
 	if opts.AnyRoleMode != nil {
-		sc.UnsafeRaw(fmt.Sprintf("EXTERNAL_OAUTH_ANY_ROLE_MODE = %s", *opts.AnyRoleMode))
+		sc.UnsafeRaw(fmt.Sprintf("EXTERNAL_OAUTH_ANY_ROLE_MODE = %s", *opts.AnyRoleMode)) //nolint:forbidigo // Snowflake keyword validated by CRD enum
 	}
 
 	if opts.ScopeDelimiter != nil {

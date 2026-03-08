@@ -71,13 +71,13 @@ func TestDeployment_CustomControllerFlags(t *testing.T) {
 		"controller.requeueInterval=10m",
 		"controller.snowflakeOpTimeout=120s",
 		"controller.allowedRoles=SYSADMIN\\,DBA",
-		"controller.disableControllers=stage\\,view",
+		"controller.disableControllers=internalstage\\,view",
 	)
 	assert.Contains(t, out, "--max-concurrent-reconciles=10")
 	assert.Contains(t, out, "--requeue-interval=10m")
 	assert.Contains(t, out, "--snowflake-op-timeout=120s")
 	assert.Contains(t, out, "--allowed-roles=SYSADMIN,DBA")
-	assert.Contains(t, out, "--disable-controllers=stage,view")
+	assert.Contains(t, out, "--disable-controllers=internalstage,view")
 }
 
 func TestDeployment_RateLimitFlags(t *testing.T) {

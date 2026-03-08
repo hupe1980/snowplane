@@ -262,7 +262,7 @@ func buildAlterAPIAuthIntegrationStatements(opts AlterAPIAuthenticationIntegrati
 	sc.Int32("OAUTH_ACCESS_TOKEN_VALIDITY", opts.OAuthAccessTokenValidity)
 
 	if opts.OAuthAllowedScopes != nil {
-		sc.UnsafeRaw(buildStringListClause("OAUTH_ALLOWED_SCOPES", *opts.OAuthAllowedScopes))
+		sc.UnsafeRaw(buildStringListClause("OAUTH_ALLOWED_SCOPES", *opts.OAuthAllowedScopes)) //nolint:forbidigo // values escaped via EscapeString
 	}
 
 	// Grant-type specific parameters.

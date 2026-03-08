@@ -195,8 +195,8 @@ func scanDatabaseRoleShowOutput(rows *sql.Rows, name string) (*v1alpha1.Database
 			DatabaseName:   m["database_name"],
 			Comment:        m["comment"],
 			Owner:          m["owner"],
-			GrantedToRoles: grantedToRoles,
-			GrantedRoles:   grantedRoles,
+			GrantedToRoles: &grantedToRoles,
+			GrantedRoles:   &grantedRoles,
 		}, nil
 	})
 }

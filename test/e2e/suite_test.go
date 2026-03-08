@@ -93,9 +93,6 @@ var (
 	gvrView = schema.GroupVersionResource{
 		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "views",
 	}
-	gvrStage = schema.GroupVersionResource{
-		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "stages",
-	}
 	gvrFieldExport = schema.GroupVersionResource{
 		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "fieldexports",
 	}
@@ -654,7 +651,6 @@ func cleanupK8sCRs() {
 		gvrTag,
 		gvrNetworkPolicy,
 		gvrAPIIntegration,
-		gvrStage,
 		gvrView,
 		gvrTable,
 		gvrSchema,
@@ -1090,32 +1086,6 @@ func newViewCR(name, sfName, dbRefName, schemaRefName, statement string) *unstru
 					"name": schemaRefName,
 				},
 				"comment": "e2e test view",
-				"providerRef": map[string]interface{}{
-					"name": providerName,
-				},
-			},
-		},
-	}
-}
-
-func newStageCR(name, sfName, dbRefName, schemaRefName, comment string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "snowplane.hupe1980.github.io/v1alpha1",
-			"kind":       "Stage",
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": testNamespace,
-			},
-			"spec": map[string]interface{}{
-				"name":    sfName,
-				"comment": comment,
-				"databaseRef": map[string]interface{}{
-					"name": dbRefName,
-				},
-				"schemaRef": map[string]interface{}{
-					"name": schemaRefName,
-				},
 				"providerRef": map[string]interface{}{
 					"name": providerName,
 				},

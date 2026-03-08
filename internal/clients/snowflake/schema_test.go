@@ -41,7 +41,7 @@ func TestBuildCreateSchemaSQL_ManagedAccess(t *testing.T) {
 
 	sql, err := buildCreateSchemaSQL(CreateSchemaOptions{
 		Name:          NewDatabaseObjectIdentifier("ANALYTICS", "SECURE"),
-		ManagedAccess: true,
+		ManagedAccess: ptr(true),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, `CREATE SCHEMA IF NOT EXISTS "ANALYTICS"."SECURE" WITH MANAGED ACCESS`, sql)
@@ -58,7 +58,7 @@ func TestBuildCreateSchemaSQL_AllOptions(t *testing.T) {
 	sql, err := buildCreateSchemaSQL(CreateSchemaOptions{
 		Name:                       NewDatabaseObjectIdentifier("DB", "FULL_SCHEMA"),
 		Transient:                  true,
-		ManagedAccess:              true,
+		ManagedAccess:              ptr(true),
 		Comment:                    ptr("test schema"),
 		DataRetentionTimeInDays:    ptr(int32(7)),
 		MaxDataExtensionTimeInDays: ptr(int32(14)),
@@ -157,7 +157,7 @@ func TestAlterSchemaOptions_Validate(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Tests: UNSET support (C-2)
+// Tests: UNSET support
 // --------------------------------------------------------------------------
 
 func TestAlterSchemaOptions_HasChanges_UnsetFields(t *testing.T) {

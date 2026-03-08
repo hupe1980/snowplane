@@ -93,6 +93,23 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
+	// Sensitive field guard: reject sensitive-path → ConfigMap exports.
+	// This check runs before general validation so it produces a specific,
+	// actionable condition reason (SensitiveFieldGuard) rather than a generic
+	// ValidationFailed. The guard also acts as defense-in-depth if CEL
+	// admission is bypassed (e.g. --validate=false or direct API).
+	if fe.Spec.To.Kind == snowplanev1alpha1.FieldExportTargetConfigMap &&
+		snowplanev1alpha1.IsSensitiveStatusPath(fe.Spec.From.Resource.Kind, fe.Spec.From.Path) {
+		msg := fmt.Sprintf("path %q is sensitive for kind %q and must not be exported to a ConfigMap; use a Secret target",
+			fe.Spec.From.Path, fe.Spec.From.Resource.Kind)
+		conditions.SetNotReady(&fe, snowplanev1alpha1.ReasonSensitiveFieldGuard, msg)
+		conditions.SetNotSynced(&fe, snowplanev1alpha1.ReasonSensitiveFieldGuard, msg)
+		r.recorder.Event(&fe, corev1.EventTypeWarning, snowplanev1alpha1.ReasonSensitiveFieldGuard, msg)
+		r.bestEffortPatchStatus(ctx, &fe)
+
+		return ctrl.Result{}, nil // Terminal — do not requeue.
+	}
+
 	// Defense-in-depth: validate spec beyond what CEL rules enforce.
 	if err := fe.Spec.Validate(); err != nil {
 		msg := fmt.Sprintf("validation failed: %v", err)
@@ -618,7 +635,8 @@ func sourceResourceTypes() []client.Object {
 		&snowplanev1alpha1.GrantOwnership{},
 		&snowplanev1alpha1.Table{},
 		&snowplanev1alpha1.View{},
-		&snowplanev1alpha1.Stage{},
+		&snowplanev1alpha1.ExternalStage{},
+		&snowplanev1alpha1.InternalStage{},
 		&snowplanev1alpha1.Task{},
 		&snowplanev1alpha1.StreamOnTable{},
 		&snowplanev1alpha1.StreamOnView{},
@@ -636,15 +654,21 @@ func sourceResourceTypes() []client.Object {
 		&snowplanev1alpha1.AuthenticationPolicy{},
 		&snowplanev1alpha1.FileFormat{},
 		&snowplanev1alpha1.Pipe{},
-		&snowplanev1alpha1.StorageIntegration{},
-		&snowplanev1alpha1.SecurityIntegration{},
+		&snowplanev1alpha1.StorageIntegrationAWS{},
+		&snowplanev1alpha1.StorageIntegrationGCS{},
+		&snowplanev1alpha1.StorageIntegrationAzure{},
+		&snowplanev1alpha1.ExternalVolume{},
+		&snowplanev1alpha1.CortexSearchService{},
 		&snowplanev1alpha1.SAML2Integration{},
 		&snowplanev1alpha1.ExternalOAuthIntegration{},
+		&snowplanev1alpha1.SCIMIntegration{},
 		&snowplanev1alpha1.APIIntegration{},
 		&snowplanev1alpha1.SecondaryDatabase{},
 		&snowplanev1alpha1.SharedDatabase{},
 		&snowplanev1alpha1.FailoverGroup{},
-		&snowplanev1alpha1.NotificationIntegration{},
+		&snowplanev1alpha1.EmailNotificationIntegration{},
+		&snowplanev1alpha1.QueueNotificationIntegration{},
+		&snowplanev1alpha1.WebhookNotificationIntegration{},
 		&snowplanev1alpha1.TagAssociation{},
 		&snowplanev1alpha1.NetworkPolicyAttachment{},
 		&snowplanev1alpha1.PasswordPolicyAttachment{},
@@ -671,6 +695,13 @@ func sourceResourceTypes() []client.Object {
 		&snowplanev1alpha1.APIAuthenticationIntegrationWithAuthorizationCodeGrant{},
 		&snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBearer{},
 		&snowplanev1alpha1.SQLStatement{},
+		&snowplanev1alpha1.ComputePool{},
+		&snowplanev1alpha1.ExternalFunction{},
+		&snowplanev1alpha1.ImageRepository{},
+		&snowplanev1alpha1.Service{},
+		&snowplanev1alpha1.Share{},
+		&snowplanev1alpha1.GitRepository{},
+		&snowplanev1alpha1.Streamlit{},
 	}
 }
 

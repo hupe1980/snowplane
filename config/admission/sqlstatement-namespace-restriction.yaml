@@ -1,0 +1,66 @@
+# ValidatingAdmissionPolicy: restrict SQLStatement creation to allowed namespaces.
+#
+# This policy prevents SQLStatement resources from being created in namespaces
+# that are not explicitly allowed, providing an additional layer of defense
+# beyond Kubernetes RBAC for this high-privilege CRD.
+#
+# Requires Kubernetes 1.30+ (ValidatingAdmissionPolicy GA).
+#
+# To use this policy:
+# 1. Deploy the ValidatingAdmissionPolicy below.
+# 2. Deploy the ValidatingAdmissionPolicyBinding and set the allowed namespaces
+#    in the param ConfigMap.
+# 3. Create the ConfigMap in the controller namespace with the allowed namespaces.
+#
+# Example ConfigMap:
+#   apiVersion: v1
+#   kind: ConfigMap
+#   metadata:
+#     name: sqlstatement-namespace-allowlist
+#     namespace: snowplane-system
+#   data:
+#     allowedNamespaces: "data-eng,platform-team,etl-jobs"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: sqlstatement-namespace-restriction
+spec:
+  failurePolicy: Fail
+  paramKind:
+    apiVersion: v1
+    kind: ConfigMap
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - snowplane.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+        resources:
+          - sqlstatements
+  validations:
+    - expression: >-
+        params.data.?allowedNamespaces.orValue("").split(",").exists(ns, ns.trim() == object.metadata.namespace)
+      message: >-
+        SQLStatement resources may only be created in namespaces listed in
+        the sqlstatement-namespace-allowlist ConfigMap. Contact your platform
+        team to request access.
+      messageExpression: >-
+        "namespace " + object.metadata.namespace + " is not allowed for SQLStatement resources"
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: sqlstatement-namespace-restriction
+spec:
+  policyName: sqlstatement-namespace-restriction
+  paramRef:
+    name: sqlstatement-namespace-allowlist
+    namespace: snowplane-system
+    parameterNotFoundAction: Deny
+  validationActions:
+    - Deny
+    - Audit

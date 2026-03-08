@@ -200,63 +200,6 @@ func newTestNetworkPolicy(name, sfName string) *snowplanev1alpha1.NetworkPolicy 
 	}
 }
 
-func newTestSecurityIntegration(name, sfName string) *snowplanev1alpha1.SecurityIntegration {
-	return &snowplanev1alpha1.SecurityIntegration{
-		ObjectMeta: ctrl.ObjectMeta{
-			Name:      name,
-			Namespace: testNamespace,
-		},
-		Spec: snowplanev1alpha1.SecurityIntegrationSpec{
-			CommonSpec: snowplanev1alpha1.CommonSpec{
-				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
-			},
-			Name: sfName,
-			Type: snowplanev1alpha1.SecurityIntegrationTypeSCIM,
-			SCIM: &snowplanev1alpha1.SCIMConfig{
-				SCIMClient: "GENERIC",
-				RunAsRole:  "GENERIC_SCIM_PROVISIONER",
-			},
-		},
-	}
-}
-
-func newTestNotificationIntegration(name, sfName string) *snowplanev1alpha1.NotificationIntegration {
-	return &snowplanev1alpha1.NotificationIntegration{
-		ObjectMeta: ctrl.ObjectMeta{
-			Name:      name,
-			Namespace: testNamespace,
-		},
-		Spec: snowplanev1alpha1.NotificationIntegrationSpec{
-			CommonSpec: snowplanev1alpha1.CommonSpec{
-				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
-			},
-			Name: sfName,
-			Type: snowplanev1alpha1.NotificationIntegrationTypeEmail,
-			Email: &snowplanev1alpha1.EmailNotificationConfig{
-				AllowedRecipients: []string{"admin@example.com"},
-			},
-		},
-	}
-}
-
-func newTestStorageIntegration(name, sfName string) *snowplanev1alpha1.StorageIntegration {
-	return &snowplanev1alpha1.StorageIntegration{
-		ObjectMeta: ctrl.ObjectMeta{
-			Name:      name,
-			Namespace: testNamespace,
-		},
-		Spec: snowplanev1alpha1.StorageIntegrationSpec{
-			CommonSpec: snowplanev1alpha1.CommonSpec{
-				ProviderRef: snowplanev1alpha1.ProviderReference{Name: "default-pc"},
-			},
-			Name:                    sfName,
-			Type:                    snowplanev1alpha1.StorageIntegrationTypeExternalStage,
-			StorageProvider:         "GCS",
-			StorageAllowedLocations: []string{"gcs://mybucket/mypath/"},
-		},
-	}
-}
-
 func newTestResourceMonitor(name, sfName string) *snowplanev1alpha1.ResourceMonitor {
 	return &snowplanev1alpha1.ResourceMonitor{
 		ObjectMeta: ctrl.ObjectMeta{
@@ -410,48 +353,6 @@ func passwordPolicyObservation(name, dbName, schemaName, owner string) *snowflak
 			DatabaseName: dbName,
 			SchemaName:   schemaName,
 			Owner:        owner,
-		},
-	}
-}
-
-func securityIntegrationObservation(name string) *snowflake.SecurityIntegrationObservation {
-	return &snowflake.SecurityIntegrationObservation{
-		Exists: true,
-		ShowOutput: &snowplanev1alpha1.SecurityIntegrationShowOutput{
-			CreatedOn: "2024-01-01",
-			Name:      name,
-			Type:      "SCIM",
-			Category:  "SECURITY",
-			Enabled:   true,
-		},
-	}
-}
-
-func notificationIntegrationObservation(name string) *snowflake.NotificationIntegrationObservation {
-	return &snowflake.NotificationIntegrationObservation{
-		Exists: true,
-		ShowOutput: &snowplanev1alpha1.NotificationIntegrationShowOutput{
-			CreatedOn: "2024-01-01",
-			Name:      name,
-			Type:      "EMAIL",
-			Category:  "NOTIFICATION",
-			Enabled:   true,
-		},
-		DescribeOutput: map[string]string{
-			"ALLOWED_RECIPIENTS": "admin@example.com",
-		},
-	}
-}
-
-func storageIntegrationObservation(name string) *snowflake.StorageIntegrationObservation {
-	return &snowflake.StorageIntegrationObservation{
-		Exists: true,
-		ShowOutput: &snowplanev1alpha1.StorageIntegrationShowOutput{
-			CreatedOn: "2024-01-01",
-			Name:      name,
-			Type:      "EXTERNAL_STAGE",
-			Category:  "STORAGE",
-			Enabled:   true,
 		},
 	}
 }

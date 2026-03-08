@@ -102,6 +102,13 @@ type Config struct {
 
 	// PingTimeout overrides the default timeout for health checks.
 	PingTimeout time.Duration
+
+	// StatementTimeoutSeconds sets the Snowflake session parameter
+	// STATEMENT_TIMEOUT_IN_SECONDS, which limits the maximum execution time
+	// for any single SQL statement. When set, this is passed as a connection
+	// parameter so every connection in the pool inherits the limit.
+	// A value of 0 means no server-side timeout (Snowflake default).
+	StatementTimeoutSeconds int
 }
 
 func (c *Config) maxOpenConns() int {
@@ -236,6 +243,18 @@ func NewClient(cfg Config) (*Client, error) {
 		User:      cfg.User,
 		Role:      cfg.Role,
 		Warehouse: cfg.Warehouse,
+	}
+
+	// M8: Set STATEMENT_TIMEOUT_IN_SECONDS as a session parameter so that
+	// Snowflake enforces a server-side timeout matching the Go-side context
+	// timeout. This ensures long-running DDL is cancelled on the Snowflake
+	// side, not just on the client side (which leaves the query consuming
+	// warehouse credits until Snowflake detects the client disconnect).
+	if cfg.StatementTimeoutSeconds > 0 {
+		timeoutStr := fmt.Sprintf("%d", cfg.StatementTimeoutSeconds)
+		sfConfig.Params = map[string]*string{
+			"STATEMENT_TIMEOUT_IN_SECONDS": &timeoutStr,
+		}
 	}
 
 	// Configure authentication.

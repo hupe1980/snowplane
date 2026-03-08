@@ -243,7 +243,7 @@ func TestCheckHealth_MultipleUnhealthy(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Tests: LRU eviction and max size (L-18)
+// Tests: LRU eviction and max size
 // --------------------------------------------------------------------------
 
 func TestGetOrCreate_MaxSizeEvictsLRU(t *testing.T) {
@@ -340,7 +340,7 @@ func TestEvict_RemovesFromLRUOrder(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: Idle TTL (M-5)
+// Tests: Idle TTL
 // ---------------------------------------------------------------------------
 
 func TestGetOrCreate_IdleTTL_EvictsExpiredClient(t *testing.T) {
@@ -385,7 +385,7 @@ func TestGetOrCreate_IdleTTL_Zero_NeverExpires(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: Startup grace period (L-2)
+// Tests: Startup grace period
 // ---------------------------------------------------------------------------
 
 func TestCheckHealth_StartupGrace_PassesWhenNoClients(t *testing.T) {
@@ -432,7 +432,7 @@ func TestCheckHealth_StartupGrace_FailsWithUnhealthyClient(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: Close error logging (L-7)
+// Tests: Close error logging
 // ---------------------------------------------------------------------------
 
 type closeErrorClient struct {
@@ -489,7 +489,7 @@ func TestCloseClient_SilentOnSuccess(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: O(1) LRU with container/list (L-1)
+// Tests: O(1) LRU with container/list
 // ---------------------------------------------------------------------------
 
 func TestGetOrCreate_LRU_LargeScale_O1(t *testing.T) {
@@ -533,7 +533,7 @@ func TestHasStaleHash(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: Singleflight deduplication (L-8)
+// Tests: Singleflight deduplication
 // ---------------------------------------------------------------------------
 
 func TestGetOrCreate_Singleflight_DeduplicatesConcurrent(t *testing.T) {

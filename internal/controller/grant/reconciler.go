@@ -179,6 +179,9 @@ func newGrantPrivilegesToAccountRoleAdapter(c sigs.Client, recorder record.Event
 				logger.V(1).Info("grantprivilegestoaccountrole references resolved")
 			}
 
+			// M-2: Warn on unrecognised privilege names (advisory, non-blocking).
+			warnUnknownPrivilege(recorder, g, g.Spec.ResolvedPrivilege())
+
 			return nil
 		},
 
@@ -384,6 +387,9 @@ func newGrantPrivilegesToDatabaseRoleAdapter(c sigs.Client, recorder record.Even
 				logger.V(1).Info("grantprivilegestodatabaserole references resolved")
 			}
 
+			// M-2: Warn on unrecognised privilege names (advisory, non-blocking).
+			warnUnknownPrivilege(recorder, g, g.Spec.ResolvedPrivilege())
+
 			return nil
 		},
 
@@ -477,7 +483,7 @@ func NewGrantPrivilegesToShareReconcilerWithServiceFactory(
 		newGrantPrivilegesToShareAdapter(c, recorder, sf))
 }
 
-func newGrantPrivilegesToShareAdapter(_ sigs.Client, _ record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.GrantPrivilegesToShare, Service, *snowflake.GrantObservation] {
+func newGrantPrivilegesToShareAdapter(_ sigs.Client, recorder record.EventRecorder, sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.GrantPrivilegesToShare, Service, *snowflake.GrantObservation] {
 	return &reconciler.BaseAdapter[*snowplanev1alpha1.GrantPrivilegesToShare, Service, *snowflake.GrantObservation]{
 		ResourceNameVal:  "grantprivilegestoshare",
 		FinalizerNameVal: grantPrivilegesToShareFinalizer,
@@ -486,6 +492,12 @@ func newGrantPrivilegesToShareAdapter(_ sigs.Client, _ record.EventRecorder, sf 
 
 		BuildIdentifierFn: func(g *snowplanev1alpha1.GrantPrivilegesToShare) (reconciler.Identifier, error) {
 			return buildGrantPrivilegesToShareIdentifier(&g.Spec.On, g.Spec.Privilege, g.Spec.Share), nil
+		},
+
+		PreReconcileFn: func(_ context.Context, g *snowplanev1alpha1.GrantPrivilegesToShare) error {
+			// M-2: Warn on unrecognised privilege names (advisory, non-blocking).
+			warnUnknownPrivilege(recorder, g, g.Spec.Privilege)
+			return nil
 		},
 
 		ObserveFn: func(ctx context.Context, svc Service, id reconciler.Identifier) (*reconciler.Observation[*snowflake.GrantObservation], error) {

@@ -13,6 +13,8 @@ spec:
     kind: ProcedurePython
     listKind: ProcedurePythonList
     plural: procedurepythons
+    shortNames:
+    - procpy
     singular: procedurepython
   scope: Namespaced
   versions:
@@ -100,6 +102,7 @@ spec:
                 type: string
               comment:
                 description: Comment is an optional description for the procedure.
+                maxLength: 10000
                 type: string
               databaseName:
                 description: DatabaseName is the Snowflake database identifier (e.g.
@@ -188,6 +191,14 @@ spec:
                     - correct
                     - detect-only
                     type: string
+                  observeOnly:
+                    description: |-
+                      ObserveOnly puts the resource into read-only mode. When true the
+                      controller will Observe the Snowflake resource and populate status
+                      but will never issue CREATE, ALTER, or DROP statements. Deletion
+                      of the CR removes the finalizer without dropping the Snowflake
+                      resource. Defaults to false.
+                    type: boolean
                 type: object
               name:
                 description: Name is the Snowflake procedure name. Immutable after
@@ -347,7 +358,8 @@ spec:
                 || self.schemaName == oldSelf.schemaName)
             - message: spec.arguments is immutable (delete and recreate the resource
                 to change)
-              rule: self.arguments == oldSelf.arguments
+              rule: has(oldSelf.arguments) == has(self.arguments) && (!has(self.arguments)
+                || self.arguments == oldSelf.arguments)
             - message: spec.returns is immutable (delete and recreate the resource
                 to change)
               rule: self.returns == oldSelf.returns

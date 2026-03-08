@@ -149,8 +149,6 @@ func buildCreateOptions(ctx context.Context, c client.Client, obj *snowplanev1al
 		return snowflake.CreateAPIAuthenticationIntegrationOptions{}, fmt.Errorf("resolving oauthClientSecretRef: %w", err)
 	}
 
-	enabled := obj.Spec.Enabled
-
 	opts := snowflake.CreateAPIAuthenticationIntegrationOptions{
 		Name:              id,
 		OAuthGrantType:    snowflake.OAuthGrantTypeClientCredentials,
@@ -159,7 +157,7 @@ func buildCreateOptions(ctx context.Context, c client.Client, obj *snowplanev1al
 		Comment:           obj.Spec.Comment,
 	}
 
-	opts.Enabled = &enabled
+	opts.Enabled = obj.Spec.Enabled
 	opts.OAuthTokenEndpoint = obj.Spec.OAuthTokenEndpoint
 
 	if obj.Spec.OAuthClientAuthMethod != nil {
@@ -185,9 +183,8 @@ func buildAlterOptions(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithCl
 
 	opts.UnsetFields = tracked.ComputeUnset(&obj.Spec, obj.Status.TrackedParameters)
 
-	if obs == nil || obs.ShowOutput == nil || obj.Spec.Enabled != obs.ShowOutput.Enabled {
-		enabled := obj.Spec.Enabled
-		opts.Enabled = &enabled
+	if obj.Spec.Enabled != nil && (obs == nil || obs.ShowOutput == nil || *obj.Spec.Enabled != obs.ShowOutput.Enabled) {
+		opts.Enabled = obj.Spec.Enabled
 	}
 
 	opts.OAuthTokenEndpoint = obj.Spec.OAuthTokenEndpoint
@@ -225,7 +222,7 @@ func detectDrift(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithClientCr
 		d.CompareString("COMMENT", obj.Spec.Comment, obs.ShowOutput.Comment, false)
 
 		obsEnabled := obs.ShowOutput.Enabled
-		d.CompareBool("ENABLED", &obj.Spec.Enabled, &obsEnabled, false)
+		d.CompareBool("ENABLED", obj.Spec.Enabled, &obsEnabled, false)
 	}
 
 	if obs.DescribeOutput != nil {

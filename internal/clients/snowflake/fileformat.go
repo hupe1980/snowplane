@@ -305,7 +305,7 @@ func buildAlterFileFormatStatements(opts AlterFileFormatOptions) ([]string, erro
 			quoted[i] = fmt.Sprintf("'%s'", sqlbuilder.EscapeString(v))
 		}
 
-		sc.UnsafeRaw(fmt.Sprintf("NULL_IF = (%s)", strings.Join(quoted, ", ")))
+		sc.UnsafeRaw(fmt.Sprintf("NULL_IF = (%s)", strings.Join(quoted, ", "))) //nolint:forbidigo // elements individually escaped via EscapeString
 	}
 
 	return sqlbuilder.BuildAlterStatements("FILE FORMAT", fqn, &sc, opts.UnsetFields)

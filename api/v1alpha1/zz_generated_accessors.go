@@ -977,123 +977,243 @@ func (rap *RowAccessPolicy) GetSpecSchemaName() *string {
 }
 
 // ---------------------------------------------------------------------------
-// Stage
+// ExternalStage
 // ---------------------------------------------------------------------------
 
-func (s *Stage) GetConditions() []metav1.Condition {
-	return s.Status.Conditions
+func (es *ExternalStage) GetConditions() []metav1.Condition {
+	return es.Status.Conditions
 }
 
-func (s *Stage) SetConditions(conditions []metav1.Condition) {
-	s.Status.Conditions = conditions
+func (es *ExternalStage) SetConditions(conditions []metav1.Condition) {
+	es.Status.Conditions = conditions
 }
 
-func (s *Stage) GetDeletionPolicy() DeletionPolicy {
-	if s.Spec.DeletionPolicy == "" {
+func (es *ExternalStage) GetDeletionPolicy() DeletionPolicy {
+	if es.Spec.DeletionPolicy == "" {
 		return DeletionPolicyDelete
 	}
 
-	return s.Spec.DeletionPolicy
+	return es.Spec.DeletionPolicy
 }
 
-func (s *Stage) GetFullyQualifiedName() string {
-	return s.Status.FullyQualifiedName
+func (es *ExternalStage) GetFullyQualifiedName() string {
+	return es.Status.FullyQualifiedName
 }
 
-func (s *Stage) GetProviderRef() ProviderReference {
-	return s.Spec.ProviderRef
+func (es *ExternalStage) GetProviderRef() ProviderReference {
+	return es.Spec.ProviderRef
 }
 
-func (s *Stage) GetSpecName() string {
-	return s.Spec.Name
+func (es *ExternalStage) GetSpecName() string {
+	return es.Spec.Name
 }
 
-func (s *Stage) GetUseRole() *string {
-	return s.Spec.UseRole
+func (es *ExternalStage) GetUseRole() *string {
+	return es.Spec.UseRole
 }
 
-func (s *Stage) GetPaused() bool {
-	return s.Spec.Paused
+func (es *ExternalStage) GetPaused() bool {
+	return es.Spec.Paused
 }
 
-func (s *Stage) GetManagementPolicies() ManagementPolicies {
-	return s.Spec.ManagementPolicies
+func (es *ExternalStage) GetManagementPolicies() ManagementPolicies {
+	return es.Spec.ManagementPolicies
 }
 
-func (s *Stage) SetCreateOrAlter(val *bool) {
-	s.Spec.ManagementPolicies.CreateOrAlter = val
+func (es *ExternalStage) SetCreateOrAlter(val *bool) {
+	es.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
-func (s *Stage) GetObservedGeneration() int64 {
-	return s.Status.ObservedGeneration
+func (es *ExternalStage) GetObservedGeneration() int64 {
+	return es.Status.ObservedGeneration
 }
 
-func (s *Stage) SetObservedGeneration(val int64) {
-	s.Status.ObservedGeneration = val
+func (es *ExternalStage) SetObservedGeneration(val int64) {
+	es.Status.ObservedGeneration = val
 }
 
-func (s *Stage) GetLastAppliedSpecHash() string {
-	return s.Status.LastAppliedSpecHash
+func (es *ExternalStage) GetLastAppliedSpecHash() string {
+	return es.Status.LastAppliedSpecHash
 }
 
-func (s *Stage) SetLastAppliedSpecHash(val string) {
-	s.Status.LastAppliedSpecHash = val
+func (es *ExternalStage) SetLastAppliedSpecHash(val string) {
+	es.Status.LastAppliedSpecHash = val
 }
 
-func (s *Stage) GetLastReconcileTime() *metav1.Time {
-	return s.Status.LastReconcileTime
+func (es *ExternalStage) GetLastReconcileTime() *metav1.Time {
+	return es.Status.LastReconcileTime
 }
 
-func (s *Stage) SetLastReconcileTime(val *metav1.Time) {
-	s.Status.LastReconcileTime = val
+func (es *ExternalStage) SetLastReconcileTime(val *metav1.Time) {
+	es.Status.LastReconcileTime = val
 }
 
-func (s *Stage) ValidateSpec() error {
-	return s.Spec.Validate()
+func (es *ExternalStage) ValidateSpec() error {
+	return es.Spec.Validate()
 }
 
-func (s *Stage) ComputeSpecHash() (string, error) {
-	return ComputeSpecHash(s.Spec)
+func (es *ExternalStage) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(es.Spec)
 }
 
-func (s *Stage) GetOwner() string {
-	if s.Status.ShowOutput != nil {
-		return s.Status.ShowOutput.Owner
+func (es *ExternalStage) GetOwner() string {
+	if es.Status.ShowOutput != nil {
+		return es.Status.ShowOutput.Owner
 	}
 
 	return ""
 }
 
-func (s *Stage) GetTrackedParametersList() []string {
-	return s.Status.TrackedParameters
+func (es *ExternalStage) GetTrackedParametersList() []string {
+	return es.Status.TrackedParameters
 }
 
-func (s *Stage) SetTrackedParametersList(val []string) {
-	s.Status.TrackedParameters = val
+func (es *ExternalStage) SetTrackedParametersList(val []string) {
+	es.Status.TrackedParameters = val
 }
 
-func (s *Stage) GetScopeDatabaseName() string {
-	return s.Status.DatabaseName
+func (es *ExternalStage) GetScopeDatabaseName() string {
+	return es.Status.DatabaseName
 }
 
-func (s *Stage) GetSpecDatabaseRef() *ObjectReference {
-	return s.Spec.DatabaseRef
+func (es *ExternalStage) GetSpecDatabaseRef() *ObjectReference {
+	return es.Spec.DatabaseRef
 }
 
-func (s *Stage) GetSpecDatabaseName() *string {
-	return s.Spec.DatabaseName
+func (es *ExternalStage) GetSpecDatabaseName() *string {
+	return es.Spec.DatabaseName
 }
 
-func (s *Stage) GetScopeSchemaName() string {
-	return s.Status.SchemaName
+func (es *ExternalStage) GetScopeSchemaName() string {
+	return es.Status.SchemaName
 }
 
-func (s *Stage) GetSpecSchemaRef() *ObjectReference {
-	return s.Spec.SchemaRef
+func (es *ExternalStage) GetSpecSchemaRef() *ObjectReference {
+	return es.Spec.SchemaRef
 }
 
-func (s *Stage) GetSpecSchemaName() *string {
-	return s.Spec.SchemaName
+func (es *ExternalStage) GetSpecSchemaName() *string {
+	return es.Spec.SchemaName
+}
+
+// ---------------------------------------------------------------------------
+// InternalStage
+// ---------------------------------------------------------------------------
+
+func (is *InternalStage) GetConditions() []metav1.Condition {
+	return is.Status.Conditions
+}
+
+func (is *InternalStage) SetConditions(conditions []metav1.Condition) {
+	is.Status.Conditions = conditions
+}
+
+func (is *InternalStage) GetDeletionPolicy() DeletionPolicy {
+	if is.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return is.Spec.DeletionPolicy
+}
+
+func (is *InternalStage) GetFullyQualifiedName() string {
+	return is.Status.FullyQualifiedName
+}
+
+func (is *InternalStage) GetProviderRef() ProviderReference {
+	return is.Spec.ProviderRef
+}
+
+func (is *InternalStage) GetSpecName() string {
+	return is.Spec.Name
+}
+
+func (is *InternalStage) GetUseRole() *string {
+	return is.Spec.UseRole
+}
+
+func (is *InternalStage) GetPaused() bool {
+	return is.Spec.Paused
+}
+
+func (is *InternalStage) GetManagementPolicies() ManagementPolicies {
+	return is.Spec.ManagementPolicies
+}
+
+func (is *InternalStage) SetCreateOrAlter(val *bool) {
+	is.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (is *InternalStage) GetObservedGeneration() int64 {
+	return is.Status.ObservedGeneration
+}
+
+func (is *InternalStage) SetObservedGeneration(val int64) {
+	is.Status.ObservedGeneration = val
+}
+
+func (is *InternalStage) GetLastAppliedSpecHash() string {
+	return is.Status.LastAppliedSpecHash
+}
+
+func (is *InternalStage) SetLastAppliedSpecHash(val string) {
+	is.Status.LastAppliedSpecHash = val
+}
+
+func (is *InternalStage) GetLastReconcileTime() *metav1.Time {
+	return is.Status.LastReconcileTime
+}
+
+func (is *InternalStage) SetLastReconcileTime(val *metav1.Time) {
+	is.Status.LastReconcileTime = val
+}
+
+func (is *InternalStage) ValidateSpec() error {
+	return is.Spec.Validate()
+}
+
+func (is *InternalStage) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(is.Spec)
+}
+
+func (is *InternalStage) GetOwner() string {
+	if is.Status.ShowOutput != nil {
+		return is.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (is *InternalStage) GetTrackedParametersList() []string {
+	return is.Status.TrackedParameters
+}
+
+func (is *InternalStage) SetTrackedParametersList(val []string) {
+	is.Status.TrackedParameters = val
+}
+
+func (is *InternalStage) GetScopeDatabaseName() string {
+	return is.Status.DatabaseName
+}
+
+func (is *InternalStage) GetSpecDatabaseRef() *ObjectReference {
+	return is.Spec.DatabaseRef
+}
+
+func (is *InternalStage) GetSpecDatabaseName() *string {
+	return is.Spec.DatabaseName
+}
+
+func (is *InternalStage) GetScopeSchemaName() string {
+	return is.Status.SchemaName
+}
+
+func (is *InternalStage) GetSpecSchemaRef() *ObjectReference {
+	return is.Spec.SchemaRef
+}
+
+func (is *InternalStage) GetSpecSchemaName() *string {
+	return is.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -2363,96 +2483,492 @@ func (rm *ResourceMonitor) SetTrackedParametersList(val []string) {
 }
 
 // ---------------------------------------------------------------------------
-// StorageIntegration
+// ExternalVolume
 // ---------------------------------------------------------------------------
 
-func (si *StorageIntegration) GetConditions() []metav1.Condition {
-	return si.Status.Conditions
+func (ev *ExternalVolume) GetConditions() []metav1.Condition {
+	return ev.Status.Conditions
 }
 
-func (si *StorageIntegration) SetConditions(conditions []metav1.Condition) {
-	si.Status.Conditions = conditions
+func (ev *ExternalVolume) SetConditions(conditions []metav1.Condition) {
+	ev.Status.Conditions = conditions
 }
 
-func (si *StorageIntegration) GetDeletionPolicy() DeletionPolicy {
-	if si.Spec.DeletionPolicy == "" {
+func (ev *ExternalVolume) GetDeletionPolicy() DeletionPolicy {
+	if ev.Spec.DeletionPolicy == "" {
 		return DeletionPolicyDelete
 	}
 
-	return si.Spec.DeletionPolicy
+	return ev.Spec.DeletionPolicy
 }
 
-func (si *StorageIntegration) GetFullyQualifiedName() string {
-	return si.Status.FullyQualifiedName
+func (ev *ExternalVolume) GetFullyQualifiedName() string {
+	return ev.Status.FullyQualifiedName
 }
 
-func (si *StorageIntegration) GetProviderRef() ProviderReference {
-	return si.Spec.ProviderRef
+func (ev *ExternalVolume) GetProviderRef() ProviderReference {
+	return ev.Spec.ProviderRef
 }
 
-func (si *StorageIntegration) GetSpecName() string {
-	return si.Spec.Name
+func (ev *ExternalVolume) GetSpecName() string {
+	return ev.Spec.Name
 }
 
-func (si *StorageIntegration) GetUseRole() *string {
-	return si.Spec.UseRole
+func (ev *ExternalVolume) GetUseRole() *string {
+	return ev.Spec.UseRole
 }
 
-func (si *StorageIntegration) GetPaused() bool {
-	return si.Spec.Paused
+func (ev *ExternalVolume) GetPaused() bool {
+	return ev.Spec.Paused
 }
 
-func (si *StorageIntegration) GetManagementPolicies() ManagementPolicies {
-	return si.Spec.ManagementPolicies
+func (ev *ExternalVolume) GetManagementPolicies() ManagementPolicies {
+	return ev.Spec.ManagementPolicies
 }
 
-func (si *StorageIntegration) SetCreateOrAlter(val *bool) {
-	si.Spec.ManagementPolicies.CreateOrAlter = val
+func (ev *ExternalVolume) SetCreateOrAlter(val *bool) {
+	ev.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
-func (si *StorageIntegration) GetObservedGeneration() int64 {
-	return si.Status.ObservedGeneration
+func (ev *ExternalVolume) GetObservedGeneration() int64 {
+	return ev.Status.ObservedGeneration
 }
 
-func (si *StorageIntegration) SetObservedGeneration(val int64) {
-	si.Status.ObservedGeneration = val
+func (ev *ExternalVolume) SetObservedGeneration(val int64) {
+	ev.Status.ObservedGeneration = val
 }
 
-func (si *StorageIntegration) GetLastAppliedSpecHash() string {
-	return si.Status.LastAppliedSpecHash
+func (ev *ExternalVolume) GetLastAppliedSpecHash() string {
+	return ev.Status.LastAppliedSpecHash
 }
 
-func (si *StorageIntegration) SetLastAppliedSpecHash(val string) {
-	si.Status.LastAppliedSpecHash = val
+func (ev *ExternalVolume) SetLastAppliedSpecHash(val string) {
+	ev.Status.LastAppliedSpecHash = val
 }
 
-func (si *StorageIntegration) GetLastReconcileTime() *metav1.Time {
-	return si.Status.LastReconcileTime
+func (ev *ExternalVolume) GetLastReconcileTime() *metav1.Time {
+	return ev.Status.LastReconcileTime
 }
 
-func (si *StorageIntegration) SetLastReconcileTime(val *metav1.Time) {
-	si.Status.LastReconcileTime = val
+func (ev *ExternalVolume) SetLastReconcileTime(val *metav1.Time) {
+	ev.Status.LastReconcileTime = val
 }
 
-func (si *StorageIntegration) ValidateSpec() error {
-	return si.Spec.Validate()
+func (ev *ExternalVolume) ValidateSpec() error {
+	return ev.Spec.Validate()
 }
 
-func (si *StorageIntegration) ComputeSpecHash() (string, error) {
-	return ComputeSpecHash(si.Spec)
+func (ev *ExternalVolume) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(ev.Spec)
 }
 
-func (si *StorageIntegration) GetOwner() string {
+func (ev *ExternalVolume) GetOwner() string {
+	// SHOW EXTERNAL VOLUMES does not return an owner column.
+	return ""
+}
+
+func (ev *ExternalVolume) GetTrackedParametersList() []string {
+	return ev.Status.TrackedParameters
+}
+
+func (ev *ExternalVolume) SetTrackedParametersList(val []string) {
+	ev.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// StorageIntegrationAWS
+// ---------------------------------------------------------------------------
+
+func (sia *StorageIntegrationAWS) GetConditions() []metav1.Condition {
+	return sia.Status.Conditions
+}
+
+func (sia *StorageIntegrationAWS) SetConditions(conditions []metav1.Condition) {
+	sia.Status.Conditions = conditions
+}
+
+func (sia *StorageIntegrationAWS) GetDeletionPolicy() DeletionPolicy {
+	if sia.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return sia.Spec.DeletionPolicy
+}
+
+func (sia *StorageIntegrationAWS) GetFullyQualifiedName() string {
+	return sia.Status.FullyQualifiedName
+}
+
+func (sia *StorageIntegrationAWS) GetProviderRef() ProviderReference {
+	return sia.Spec.ProviderRef
+}
+
+func (sia *StorageIntegrationAWS) GetSpecName() string {
+	return sia.Spec.Name
+}
+
+func (sia *StorageIntegrationAWS) GetUseRole() *string {
+	return sia.Spec.UseRole
+}
+
+func (sia *StorageIntegrationAWS) GetPaused() bool {
+	return sia.Spec.Paused
+}
+
+func (sia *StorageIntegrationAWS) GetManagementPolicies() ManagementPolicies {
+	return sia.Spec.ManagementPolicies
+}
+
+func (sia *StorageIntegrationAWS) SetCreateOrAlter(val *bool) {
+	sia.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (sia *StorageIntegrationAWS) GetObservedGeneration() int64 {
+	return sia.Status.ObservedGeneration
+}
+
+func (sia *StorageIntegrationAWS) SetObservedGeneration(val int64) {
+	sia.Status.ObservedGeneration = val
+}
+
+func (sia *StorageIntegrationAWS) GetLastAppliedSpecHash() string {
+	return sia.Status.LastAppliedSpecHash
+}
+
+func (sia *StorageIntegrationAWS) SetLastAppliedSpecHash(val string) {
+	sia.Status.LastAppliedSpecHash = val
+}
+
+func (sia *StorageIntegrationAWS) GetLastReconcileTime() *metav1.Time {
+	return sia.Status.LastReconcileTime
+}
+
+func (sia *StorageIntegrationAWS) SetLastReconcileTime(val *metav1.Time) {
+	sia.Status.LastReconcileTime = val
+}
+
+func (sia *StorageIntegrationAWS) ValidateSpec() error {
+	return sia.Spec.Validate()
+}
+
+func (sia *StorageIntegrationAWS) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(sia.Spec)
+}
+
+func (sia *StorageIntegrationAWS) GetOwner() string {
 	// SHOW STORAGE INTEGRATIONS does not return an owner column.
 	return ""
 }
 
-func (si *StorageIntegration) GetTrackedParametersList() []string {
-	return si.Status.TrackedParameters
+func (sia *StorageIntegrationAWS) GetTrackedParametersList() []string {
+	return sia.Status.TrackedParameters
 }
 
-func (si *StorageIntegration) SetTrackedParametersList(val []string) {
-	si.Status.TrackedParameters = val
+func (sia *StorageIntegrationAWS) SetTrackedParametersList(val []string) {
+	sia.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// StorageIntegrationAzure
+// ---------------------------------------------------------------------------
+
+func (siaz *StorageIntegrationAzure) GetConditions() []metav1.Condition {
+	return siaz.Status.Conditions
+}
+
+func (siaz *StorageIntegrationAzure) SetConditions(conditions []metav1.Condition) {
+	siaz.Status.Conditions = conditions
+}
+
+func (siaz *StorageIntegrationAzure) GetDeletionPolicy() DeletionPolicy {
+	if siaz.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return siaz.Spec.DeletionPolicy
+}
+
+func (siaz *StorageIntegrationAzure) GetFullyQualifiedName() string {
+	return siaz.Status.FullyQualifiedName
+}
+
+func (siaz *StorageIntegrationAzure) GetProviderRef() ProviderReference {
+	return siaz.Spec.ProviderRef
+}
+
+func (siaz *StorageIntegrationAzure) GetSpecName() string {
+	return siaz.Spec.Name
+}
+
+func (siaz *StorageIntegrationAzure) GetUseRole() *string {
+	return siaz.Spec.UseRole
+}
+
+func (siaz *StorageIntegrationAzure) GetPaused() bool {
+	return siaz.Spec.Paused
+}
+
+func (siaz *StorageIntegrationAzure) GetManagementPolicies() ManagementPolicies {
+	return siaz.Spec.ManagementPolicies
+}
+
+func (siaz *StorageIntegrationAzure) SetCreateOrAlter(val *bool) {
+	siaz.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (siaz *StorageIntegrationAzure) GetObservedGeneration() int64 {
+	return siaz.Status.ObservedGeneration
+}
+
+func (siaz *StorageIntegrationAzure) SetObservedGeneration(val int64) {
+	siaz.Status.ObservedGeneration = val
+}
+
+func (siaz *StorageIntegrationAzure) GetLastAppliedSpecHash() string {
+	return siaz.Status.LastAppliedSpecHash
+}
+
+func (siaz *StorageIntegrationAzure) SetLastAppliedSpecHash(val string) {
+	siaz.Status.LastAppliedSpecHash = val
+}
+
+func (siaz *StorageIntegrationAzure) GetLastReconcileTime() *metav1.Time {
+	return siaz.Status.LastReconcileTime
+}
+
+func (siaz *StorageIntegrationAzure) SetLastReconcileTime(val *metav1.Time) {
+	siaz.Status.LastReconcileTime = val
+}
+
+func (siaz *StorageIntegrationAzure) ValidateSpec() error {
+	return siaz.Spec.Validate()
+}
+
+func (siaz *StorageIntegrationAzure) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(siaz.Spec)
+}
+
+func (siaz *StorageIntegrationAzure) GetOwner() string {
+	// SHOW STORAGE INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (siaz *StorageIntegrationAzure) GetTrackedParametersList() []string {
+	return siaz.Status.TrackedParameters
+}
+
+func (siaz *StorageIntegrationAzure) SetTrackedParametersList(val []string) {
+	siaz.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// StorageIntegrationGCS
+// ---------------------------------------------------------------------------
+
+func (sig *StorageIntegrationGCS) GetConditions() []metav1.Condition {
+	return sig.Status.Conditions
+}
+
+func (sig *StorageIntegrationGCS) SetConditions(conditions []metav1.Condition) {
+	sig.Status.Conditions = conditions
+}
+
+func (sig *StorageIntegrationGCS) GetDeletionPolicy() DeletionPolicy {
+	if sig.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return sig.Spec.DeletionPolicy
+}
+
+func (sig *StorageIntegrationGCS) GetFullyQualifiedName() string {
+	return sig.Status.FullyQualifiedName
+}
+
+func (sig *StorageIntegrationGCS) GetProviderRef() ProviderReference {
+	return sig.Spec.ProviderRef
+}
+
+func (sig *StorageIntegrationGCS) GetSpecName() string {
+	return sig.Spec.Name
+}
+
+func (sig *StorageIntegrationGCS) GetUseRole() *string {
+	return sig.Spec.UseRole
+}
+
+func (sig *StorageIntegrationGCS) GetPaused() bool {
+	return sig.Spec.Paused
+}
+
+func (sig *StorageIntegrationGCS) GetManagementPolicies() ManagementPolicies {
+	return sig.Spec.ManagementPolicies
+}
+
+func (sig *StorageIntegrationGCS) SetCreateOrAlter(val *bool) {
+	sig.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (sig *StorageIntegrationGCS) GetObservedGeneration() int64 {
+	return sig.Status.ObservedGeneration
+}
+
+func (sig *StorageIntegrationGCS) SetObservedGeneration(val int64) {
+	sig.Status.ObservedGeneration = val
+}
+
+func (sig *StorageIntegrationGCS) GetLastAppliedSpecHash() string {
+	return sig.Status.LastAppliedSpecHash
+}
+
+func (sig *StorageIntegrationGCS) SetLastAppliedSpecHash(val string) {
+	sig.Status.LastAppliedSpecHash = val
+}
+
+func (sig *StorageIntegrationGCS) GetLastReconcileTime() *metav1.Time {
+	return sig.Status.LastReconcileTime
+}
+
+func (sig *StorageIntegrationGCS) SetLastReconcileTime(val *metav1.Time) {
+	sig.Status.LastReconcileTime = val
+}
+
+func (sig *StorageIntegrationGCS) ValidateSpec() error {
+	return sig.Spec.Validate()
+}
+
+func (sig *StorageIntegrationGCS) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(sig.Spec)
+}
+
+func (sig *StorageIntegrationGCS) GetOwner() string {
+	// SHOW STORAGE INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (sig *StorageIntegrationGCS) GetTrackedParametersList() []string {
+	return sig.Status.TrackedParameters
+}
+
+func (sig *StorageIntegrationGCS) SetTrackedParametersList(val []string) {
+	sig.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// CortexSearchService
+// ---------------------------------------------------------------------------
+
+func (css *CortexSearchService) GetConditions() []metav1.Condition {
+	return css.Status.Conditions
+}
+
+func (css *CortexSearchService) SetConditions(conditions []metav1.Condition) {
+	css.Status.Conditions = conditions
+}
+
+func (css *CortexSearchService) GetDeletionPolicy() DeletionPolicy {
+	if css.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return css.Spec.DeletionPolicy
+}
+
+func (css *CortexSearchService) GetFullyQualifiedName() string {
+	return css.Status.FullyQualifiedName
+}
+
+func (css *CortexSearchService) GetProviderRef() ProviderReference {
+	return css.Spec.ProviderRef
+}
+
+func (css *CortexSearchService) GetSpecName() string {
+	return css.Spec.Name
+}
+
+func (css *CortexSearchService) GetUseRole() *string {
+	return css.Spec.UseRole
+}
+
+func (css *CortexSearchService) GetPaused() bool {
+	return css.Spec.Paused
+}
+
+func (css *CortexSearchService) GetManagementPolicies() ManagementPolicies {
+	return css.Spec.ManagementPolicies
+}
+
+func (css *CortexSearchService) SetCreateOrAlter(val *bool) {
+	css.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (css *CortexSearchService) GetObservedGeneration() int64 {
+	return css.Status.ObservedGeneration
+}
+
+func (css *CortexSearchService) SetObservedGeneration(val int64) {
+	css.Status.ObservedGeneration = val
+}
+
+func (css *CortexSearchService) GetLastAppliedSpecHash() string {
+	return css.Status.LastAppliedSpecHash
+}
+
+func (css *CortexSearchService) SetLastAppliedSpecHash(val string) {
+	css.Status.LastAppliedSpecHash = val
+}
+
+func (css *CortexSearchService) GetLastReconcileTime() *metav1.Time {
+	return css.Status.LastReconcileTime
+}
+
+func (css *CortexSearchService) SetLastReconcileTime(val *metav1.Time) {
+	css.Status.LastReconcileTime = val
+}
+
+func (css *CortexSearchService) ValidateSpec() error {
+	return css.Spec.Validate()
+}
+
+func (css *CortexSearchService) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(css.Spec)
+}
+
+func (css *CortexSearchService) GetOwner() string {
+	// SHOW CORTEX SEARCH SERVICES does not return an owner column.
+	return ""
+}
+
+func (css *CortexSearchService) GetTrackedParametersList() []string {
+	return css.Status.TrackedParameters
+}
+
+func (css *CortexSearchService) SetTrackedParametersList(val []string) {
+	css.Status.TrackedParameters = val
+}
+
+func (css *CortexSearchService) GetScopeDatabaseName() string {
+	return css.Status.DatabaseName
+}
+
+func (css *CortexSearchService) GetSpecDatabaseRef() *ObjectReference {
+	return css.Spec.DatabaseRef
+}
+
+func (css *CortexSearchService) GetSpecDatabaseName() *string {
+	return css.Spec.DatabaseName
+}
+
+func (css *CortexSearchService) GetScopeSchemaName() string {
+	return css.Status.SchemaName
+}
+
+func (css *CortexSearchService) GetSpecSchemaRef() *ObjectReference {
+	return css.Spec.SchemaRef
+}
+
+func (css *CortexSearchService) GetSpecSchemaName() *string {
+	return css.Spec.SchemaName
 }
 
 // ---------------------------------------------------------------------------
@@ -2816,189 +3332,282 @@ func (dt *DynamicTable) GetSpecSchemaName() *string {
 }
 
 // ---------------------------------------------------------------------------
-// NotificationIntegration
+// EmailNotificationIntegration
 // ---------------------------------------------------------------------------
 
-func (ni *NotificationIntegration) GetConditions() []metav1.Condition {
-	return ni.Status.Conditions
+func (eni *EmailNotificationIntegration) GetConditions() []metav1.Condition {
+	return eni.Status.Conditions
 }
 
-func (ni *NotificationIntegration) SetConditions(conditions []metav1.Condition) {
-	ni.Status.Conditions = conditions
+func (eni *EmailNotificationIntegration) SetConditions(conditions []metav1.Condition) {
+	eni.Status.Conditions = conditions
 }
 
-func (ni *NotificationIntegration) GetDeletionPolicy() DeletionPolicy {
-	if ni.Spec.DeletionPolicy == "" {
+func (eni *EmailNotificationIntegration) GetDeletionPolicy() DeletionPolicy {
+	if eni.Spec.DeletionPolicy == "" {
 		return DeletionPolicyDelete
 	}
 
-	return ni.Spec.DeletionPolicy
+	return eni.Spec.DeletionPolicy
 }
 
-func (ni *NotificationIntegration) GetFullyQualifiedName() string {
-	return ni.Status.FullyQualifiedName
+func (eni *EmailNotificationIntegration) GetFullyQualifiedName() string {
+	return eni.Status.FullyQualifiedName
 }
 
-func (ni *NotificationIntegration) GetProviderRef() ProviderReference {
-	return ni.Spec.ProviderRef
+func (eni *EmailNotificationIntegration) GetProviderRef() ProviderReference {
+	return eni.Spec.ProviderRef
 }
 
-func (ni *NotificationIntegration) GetSpecName() string {
-	return ni.Spec.Name
+func (eni *EmailNotificationIntegration) GetSpecName() string {
+	return eni.Spec.Name
 }
 
-func (ni *NotificationIntegration) GetUseRole() *string {
-	return ni.Spec.UseRole
+func (eni *EmailNotificationIntegration) GetUseRole() *string {
+	return eni.Spec.UseRole
 }
 
-func (ni *NotificationIntegration) GetPaused() bool {
-	return ni.Spec.Paused
+func (eni *EmailNotificationIntegration) GetPaused() bool {
+	return eni.Spec.Paused
 }
 
-func (ni *NotificationIntegration) GetManagementPolicies() ManagementPolicies {
-	return ni.Spec.ManagementPolicies
+func (eni *EmailNotificationIntegration) GetManagementPolicies() ManagementPolicies {
+	return eni.Spec.ManagementPolicies
 }
 
-func (ni *NotificationIntegration) SetCreateOrAlter(val *bool) {
-	ni.Spec.ManagementPolicies.CreateOrAlter = val
+func (eni *EmailNotificationIntegration) SetCreateOrAlter(val *bool) {
+	eni.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
-func (ni *NotificationIntegration) GetObservedGeneration() int64 {
-	return ni.Status.ObservedGeneration
+func (eni *EmailNotificationIntegration) GetObservedGeneration() int64 {
+	return eni.Status.ObservedGeneration
 }
 
-func (ni *NotificationIntegration) SetObservedGeneration(val int64) {
-	ni.Status.ObservedGeneration = val
+func (eni *EmailNotificationIntegration) SetObservedGeneration(val int64) {
+	eni.Status.ObservedGeneration = val
 }
 
-func (ni *NotificationIntegration) GetLastAppliedSpecHash() string {
-	return ni.Status.LastAppliedSpecHash
+func (eni *EmailNotificationIntegration) GetLastAppliedSpecHash() string {
+	return eni.Status.LastAppliedSpecHash
 }
 
-func (ni *NotificationIntegration) SetLastAppliedSpecHash(val string) {
-	ni.Status.LastAppliedSpecHash = val
+func (eni *EmailNotificationIntegration) SetLastAppliedSpecHash(val string) {
+	eni.Status.LastAppliedSpecHash = val
 }
 
-func (ni *NotificationIntegration) GetLastReconcileTime() *metav1.Time {
-	return ni.Status.LastReconcileTime
+func (eni *EmailNotificationIntegration) GetLastReconcileTime() *metav1.Time {
+	return eni.Status.LastReconcileTime
 }
 
-func (ni *NotificationIntegration) SetLastReconcileTime(val *metav1.Time) {
-	ni.Status.LastReconcileTime = val
+func (eni *EmailNotificationIntegration) SetLastReconcileTime(val *metav1.Time) {
+	eni.Status.LastReconcileTime = val
 }
 
-func (ni *NotificationIntegration) ValidateSpec() error {
-	return ni.Spec.Validate()
+func (eni *EmailNotificationIntegration) ValidateSpec() error {
+	return eni.Spec.Validate()
 }
 
-func (ni *NotificationIntegration) ComputeSpecHash() (string, error) {
-	return ComputeSpecHash(ni.Spec)
+func (eni *EmailNotificationIntegration) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(eni.Spec)
 }
 
-func (ni *NotificationIntegration) GetOwner() string {
+func (eni *EmailNotificationIntegration) GetOwner() string {
 	// SHOW NOTIFICATION INTEGRATIONS does not return an owner column.
 	return ""
 }
 
-func (ni *NotificationIntegration) GetTrackedParametersList() []string {
-	return ni.Status.TrackedParameters
+func (eni *EmailNotificationIntegration) GetTrackedParametersList() []string {
+	return eni.Status.TrackedParameters
 }
 
-func (ni *NotificationIntegration) SetTrackedParametersList(val []string) {
-	ni.Status.TrackedParameters = val
+func (eni *EmailNotificationIntegration) SetTrackedParametersList(val []string) {
+	eni.Status.TrackedParameters = val
 }
 
 // ---------------------------------------------------------------------------
-// SecurityIntegration
+// QueueNotificationIntegration
 // ---------------------------------------------------------------------------
 
-func (si *SecurityIntegration) GetConditions() []metav1.Condition {
-	return si.Status.Conditions
+func (qni *QueueNotificationIntegration) GetConditions() []metav1.Condition {
+	return qni.Status.Conditions
 }
 
-func (si *SecurityIntegration) SetConditions(conditions []metav1.Condition) {
-	si.Status.Conditions = conditions
+func (qni *QueueNotificationIntegration) SetConditions(conditions []metav1.Condition) {
+	qni.Status.Conditions = conditions
 }
 
-func (si *SecurityIntegration) GetDeletionPolicy() DeletionPolicy {
-	if si.Spec.DeletionPolicy == "" {
+func (qni *QueueNotificationIntegration) GetDeletionPolicy() DeletionPolicy {
+	if qni.Spec.DeletionPolicy == "" {
 		return DeletionPolicyDelete
 	}
 
-	return si.Spec.DeletionPolicy
+	return qni.Spec.DeletionPolicy
 }
 
-func (si *SecurityIntegration) GetFullyQualifiedName() string {
-	return si.Status.FullyQualifiedName
+func (qni *QueueNotificationIntegration) GetFullyQualifiedName() string {
+	return qni.Status.FullyQualifiedName
 }
 
-func (si *SecurityIntegration) GetProviderRef() ProviderReference {
-	return si.Spec.ProviderRef
+func (qni *QueueNotificationIntegration) GetProviderRef() ProviderReference {
+	return qni.Spec.ProviderRef
 }
 
-func (si *SecurityIntegration) GetSpecName() string {
-	return si.Spec.Name
+func (qni *QueueNotificationIntegration) GetSpecName() string {
+	return qni.Spec.Name
 }
 
-func (si *SecurityIntegration) GetUseRole() *string {
-	return si.Spec.UseRole
+func (qni *QueueNotificationIntegration) GetUseRole() *string {
+	return qni.Spec.UseRole
 }
 
-func (si *SecurityIntegration) GetPaused() bool {
-	return si.Spec.Paused
+func (qni *QueueNotificationIntegration) GetPaused() bool {
+	return qni.Spec.Paused
 }
 
-func (si *SecurityIntegration) GetManagementPolicies() ManagementPolicies {
-	return si.Spec.ManagementPolicies
+func (qni *QueueNotificationIntegration) GetManagementPolicies() ManagementPolicies {
+	return qni.Spec.ManagementPolicies
 }
 
-func (si *SecurityIntegration) SetCreateOrAlter(val *bool) {
-	si.Spec.ManagementPolicies.CreateOrAlter = val
+func (qni *QueueNotificationIntegration) SetCreateOrAlter(val *bool) {
+	qni.Spec.ManagementPolicies.CreateOrAlter = val
 }
 
-func (si *SecurityIntegration) GetObservedGeneration() int64 {
-	return si.Status.ObservedGeneration
+func (qni *QueueNotificationIntegration) GetObservedGeneration() int64 {
+	return qni.Status.ObservedGeneration
 }
 
-func (si *SecurityIntegration) SetObservedGeneration(val int64) {
-	si.Status.ObservedGeneration = val
+func (qni *QueueNotificationIntegration) SetObservedGeneration(val int64) {
+	qni.Status.ObservedGeneration = val
 }
 
-func (si *SecurityIntegration) GetLastAppliedSpecHash() string {
-	return si.Status.LastAppliedSpecHash
+func (qni *QueueNotificationIntegration) GetLastAppliedSpecHash() string {
+	return qni.Status.LastAppliedSpecHash
 }
 
-func (si *SecurityIntegration) SetLastAppliedSpecHash(val string) {
-	si.Status.LastAppliedSpecHash = val
+func (qni *QueueNotificationIntegration) SetLastAppliedSpecHash(val string) {
+	qni.Status.LastAppliedSpecHash = val
 }
 
-func (si *SecurityIntegration) GetLastReconcileTime() *metav1.Time {
-	return si.Status.LastReconcileTime
+func (qni *QueueNotificationIntegration) GetLastReconcileTime() *metav1.Time {
+	return qni.Status.LastReconcileTime
 }
 
-func (si *SecurityIntegration) SetLastReconcileTime(val *metav1.Time) {
-	si.Status.LastReconcileTime = val
+func (qni *QueueNotificationIntegration) SetLastReconcileTime(val *metav1.Time) {
+	qni.Status.LastReconcileTime = val
 }
 
-func (si *SecurityIntegration) ValidateSpec() error {
-	return si.Spec.Validate()
+func (qni *QueueNotificationIntegration) ValidateSpec() error {
+	return qni.Spec.Validate()
 }
 
-func (si *SecurityIntegration) ComputeSpecHash() (string, error) {
-	return ComputeSpecHash(si.Spec)
+func (qni *QueueNotificationIntegration) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(qni.Spec)
 }
 
-func (si *SecurityIntegration) GetOwner() string {
-	// SHOW SECURITY INTEGRATIONS does not return an owner column.
+func (qni *QueueNotificationIntegration) GetOwner() string {
+	// SHOW NOTIFICATION INTEGRATIONS does not return an owner column.
 	return ""
 }
 
-func (si *SecurityIntegration) GetTrackedParametersList() []string {
-	return si.Status.TrackedParameters
+func (qni *QueueNotificationIntegration) GetTrackedParametersList() []string {
+	return qni.Status.TrackedParameters
 }
 
-func (si *SecurityIntegration) SetTrackedParametersList(val []string) {
-	si.Status.TrackedParameters = val
+func (qni *QueueNotificationIntegration) SetTrackedParametersList(val []string) {
+	qni.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// WebhookNotificationIntegration
+// ---------------------------------------------------------------------------
+
+func (wni *WebhookNotificationIntegration) GetConditions() []metav1.Condition {
+	return wni.Status.Conditions
+}
+
+func (wni *WebhookNotificationIntegration) SetConditions(conditions []metav1.Condition) {
+	wni.Status.Conditions = conditions
+}
+
+func (wni *WebhookNotificationIntegration) GetDeletionPolicy() DeletionPolicy {
+	if wni.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return wni.Spec.DeletionPolicy
+}
+
+func (wni *WebhookNotificationIntegration) GetFullyQualifiedName() string {
+	return wni.Status.FullyQualifiedName
+}
+
+func (wni *WebhookNotificationIntegration) GetProviderRef() ProviderReference {
+	return wni.Spec.ProviderRef
+}
+
+func (wni *WebhookNotificationIntegration) GetSpecName() string {
+	return wni.Spec.Name
+}
+
+func (wni *WebhookNotificationIntegration) GetUseRole() *string {
+	return wni.Spec.UseRole
+}
+
+func (wni *WebhookNotificationIntegration) GetPaused() bool {
+	return wni.Spec.Paused
+}
+
+func (wni *WebhookNotificationIntegration) GetManagementPolicies() ManagementPolicies {
+	return wni.Spec.ManagementPolicies
+}
+
+func (wni *WebhookNotificationIntegration) SetCreateOrAlter(val *bool) {
+	wni.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (wni *WebhookNotificationIntegration) GetObservedGeneration() int64 {
+	return wni.Status.ObservedGeneration
+}
+
+func (wni *WebhookNotificationIntegration) SetObservedGeneration(val int64) {
+	wni.Status.ObservedGeneration = val
+}
+
+func (wni *WebhookNotificationIntegration) GetLastAppliedSpecHash() string {
+	return wni.Status.LastAppliedSpecHash
+}
+
+func (wni *WebhookNotificationIntegration) SetLastAppliedSpecHash(val string) {
+	wni.Status.LastAppliedSpecHash = val
+}
+
+func (wni *WebhookNotificationIntegration) GetLastReconcileTime() *metav1.Time {
+	return wni.Status.LastReconcileTime
+}
+
+func (wni *WebhookNotificationIntegration) SetLastReconcileTime(val *metav1.Time) {
+	wni.Status.LastReconcileTime = val
+}
+
+func (wni *WebhookNotificationIntegration) ValidateSpec() error {
+	return wni.Spec.Validate()
+}
+
+func (wni *WebhookNotificationIntegration) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(wni.Spec)
+}
+
+func (wni *WebhookNotificationIntegration) GetOwner() string {
+	// SHOW NOTIFICATION INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (wni *WebhookNotificationIntegration) GetTrackedParametersList() []string {
+	return wni.Status.TrackedParameters
+}
+
+func (wni *WebhookNotificationIntegration) SetTrackedParametersList(val []string) {
+	wni.Status.TrackedParameters = val
 }
 
 // ---------------------------------------------------------------------------
@@ -3092,6 +3701,99 @@ func (si *SAML2Integration) GetTrackedParametersList() []string {
 
 func (si *SAML2Integration) SetTrackedParametersList(val []string) {
 	si.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// SCIMIntegration
+// ---------------------------------------------------------------------------
+
+func (sci *SCIMIntegration) GetConditions() []metav1.Condition {
+	return sci.Status.Conditions
+}
+
+func (sci *SCIMIntegration) SetConditions(conditions []metav1.Condition) {
+	sci.Status.Conditions = conditions
+}
+
+func (sci *SCIMIntegration) GetDeletionPolicy() DeletionPolicy {
+	if sci.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return sci.Spec.DeletionPolicy
+}
+
+func (sci *SCIMIntegration) GetFullyQualifiedName() string {
+	return sci.Status.FullyQualifiedName
+}
+
+func (sci *SCIMIntegration) GetProviderRef() ProviderReference {
+	return sci.Spec.ProviderRef
+}
+
+func (sci *SCIMIntegration) GetSpecName() string {
+	return sci.Spec.Name
+}
+
+func (sci *SCIMIntegration) GetUseRole() *string {
+	return sci.Spec.UseRole
+}
+
+func (sci *SCIMIntegration) GetPaused() bool {
+	return sci.Spec.Paused
+}
+
+func (sci *SCIMIntegration) GetManagementPolicies() ManagementPolicies {
+	return sci.Spec.ManagementPolicies
+}
+
+func (sci *SCIMIntegration) SetCreateOrAlter(val *bool) {
+	sci.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (sci *SCIMIntegration) GetObservedGeneration() int64 {
+	return sci.Status.ObservedGeneration
+}
+
+func (sci *SCIMIntegration) SetObservedGeneration(val int64) {
+	sci.Status.ObservedGeneration = val
+}
+
+func (sci *SCIMIntegration) GetLastAppliedSpecHash() string {
+	return sci.Status.LastAppliedSpecHash
+}
+
+func (sci *SCIMIntegration) SetLastAppliedSpecHash(val string) {
+	sci.Status.LastAppliedSpecHash = val
+}
+
+func (sci *SCIMIntegration) GetLastReconcileTime() *metav1.Time {
+	return sci.Status.LastReconcileTime
+}
+
+func (sci *SCIMIntegration) SetLastReconcileTime(val *metav1.Time) {
+	sci.Status.LastReconcileTime = val
+}
+
+func (sci *SCIMIntegration) ValidateSpec() error {
+	return sci.Spec.Validate()
+}
+
+func (sci *SCIMIntegration) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(sci.Spec)
+}
+
+func (sci *SCIMIntegration) GetOwner() string {
+	// SHOW SECURITY INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (sci *SCIMIntegration) GetTrackedParametersList() []string {
+	return sci.Status.TrackedParameters
+}
+
+func (sci *SCIMIntegration) SetTrackedParametersList(val []string) {
+	sci.Status.TrackedParameters = val
 }
 
 // ---------------------------------------------------------------------------
@@ -7280,3 +7982,789 @@ func (s *SQLStatement) GetOwner() string {
 func (s *SQLStatement) GetTrackedParametersList() []string { return nil }
 
 func (s *SQLStatement) SetTrackedParametersList(_ []string) {}
+
+// ---------------------------------------------------------------------------
+// Share
+// ---------------------------------------------------------------------------
+
+func (sh *Share) GetConditions() []metav1.Condition {
+	return sh.Status.Conditions
+}
+
+func (sh *Share) SetConditions(conditions []metav1.Condition) {
+	sh.Status.Conditions = conditions
+}
+
+func (sh *Share) GetDeletionPolicy() DeletionPolicy {
+	if sh.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return sh.Spec.DeletionPolicy
+}
+
+func (sh *Share) GetFullyQualifiedName() string {
+	return sh.Status.FullyQualifiedName
+}
+
+func (sh *Share) GetProviderRef() ProviderReference {
+	return sh.Spec.ProviderRef
+}
+
+func (sh *Share) GetSpecName() string {
+	return sh.Spec.Name
+}
+
+func (sh *Share) GetUseRole() *string {
+	return sh.Spec.UseRole
+}
+
+func (sh *Share) GetPaused() bool {
+	return sh.Spec.Paused
+}
+
+func (sh *Share) GetManagementPolicies() ManagementPolicies {
+	return sh.Spec.ManagementPolicies
+}
+
+func (sh *Share) SetCreateOrAlter(val *bool) {
+	sh.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (sh *Share) GetObservedGeneration() int64 {
+	return sh.Status.ObservedGeneration
+}
+
+func (sh *Share) SetObservedGeneration(val int64) {
+	sh.Status.ObservedGeneration = val
+}
+
+func (sh *Share) GetLastAppliedSpecHash() string {
+	return sh.Status.LastAppliedSpecHash
+}
+
+func (sh *Share) SetLastAppliedSpecHash(val string) {
+	sh.Status.LastAppliedSpecHash = val
+}
+
+func (sh *Share) GetLastReconcileTime() *metav1.Time {
+	return sh.Status.LastReconcileTime
+}
+
+func (sh *Share) SetLastReconcileTime(val *metav1.Time) {
+	sh.Status.LastReconcileTime = val
+}
+
+func (sh *Share) ValidateSpec() error {
+	return sh.Spec.Validate()
+}
+
+func (sh *Share) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(sh.Spec)
+}
+
+func (sh *Share) GetOwner() string {
+	// SHOW SHARES does not expose an owner column in all contexts.
+	return ""
+}
+
+func (sh *Share) GetTrackedParametersList() []string {
+	return sh.Status.TrackedParameters
+}
+
+func (sh *Share) SetTrackedParametersList(val []string) {
+	sh.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// ExternalFunction
+// ---------------------------------------------------------------------------
+
+func (ef *ExternalFunction) GetConditions() []metav1.Condition {
+	return ef.Status.Conditions
+}
+
+func (ef *ExternalFunction) SetConditions(conditions []metav1.Condition) {
+	ef.Status.Conditions = conditions
+}
+
+func (ef *ExternalFunction) GetDeletionPolicy() DeletionPolicy {
+	if ef.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return ef.Spec.DeletionPolicy
+}
+
+func (ef *ExternalFunction) GetFullyQualifiedName() string {
+	return ef.Status.FullyQualifiedName
+}
+
+func (ef *ExternalFunction) GetProviderRef() ProviderReference {
+	return ef.Spec.ProviderRef
+}
+
+func (ef *ExternalFunction) GetSpecName() string {
+	return ef.Spec.Name
+}
+
+func (ef *ExternalFunction) GetUseRole() *string {
+	return ef.Spec.UseRole
+}
+
+func (ef *ExternalFunction) GetPaused() bool {
+	return ef.Spec.Paused
+}
+
+func (ef *ExternalFunction) GetManagementPolicies() ManagementPolicies {
+	return ef.Spec.ManagementPolicies
+}
+
+func (ef *ExternalFunction) SetCreateOrAlter(val *bool) {
+	ef.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (ef *ExternalFunction) GetObservedGeneration() int64 {
+	return ef.Status.ObservedGeneration
+}
+
+func (ef *ExternalFunction) SetObservedGeneration(val int64) {
+	ef.Status.ObservedGeneration = val
+}
+
+func (ef *ExternalFunction) GetLastAppliedSpecHash() string {
+	return ef.Status.LastAppliedSpecHash
+}
+
+func (ef *ExternalFunction) SetLastAppliedSpecHash(val string) {
+	ef.Status.LastAppliedSpecHash = val
+}
+
+func (ef *ExternalFunction) GetLastReconcileTime() *metav1.Time {
+	return ef.Status.LastReconcileTime
+}
+
+func (ef *ExternalFunction) SetLastReconcileTime(val *metav1.Time) {
+	ef.Status.LastReconcileTime = val
+}
+
+func (ef *ExternalFunction) ValidateSpec() error {
+	return ef.Spec.Validate()
+}
+
+func (ef *ExternalFunction) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(ef.Spec)
+}
+
+func (ef *ExternalFunction) GetOwner() string {
+	// SHOW EXTERNAL FUNCTIONS does not return an owner column.
+	return ""
+}
+
+func (ef *ExternalFunction) GetTrackedParametersList() []string {
+	return ef.Status.TrackedParameters
+}
+
+func (ef *ExternalFunction) SetTrackedParametersList(val []string) {
+	ef.Status.TrackedParameters = val
+}
+
+func (ef *ExternalFunction) GetScopeDatabaseName() string {
+	return ef.Status.DatabaseName
+}
+
+func (ef *ExternalFunction) GetSpecDatabaseRef() *ObjectReference {
+	return ef.Spec.DatabaseRef
+}
+
+func (ef *ExternalFunction) GetSpecDatabaseName() *string {
+	return ef.Spec.DatabaseName
+}
+
+func (ef *ExternalFunction) GetScopeSchemaName() string {
+	return ef.Status.SchemaName
+}
+
+func (ef *ExternalFunction) GetSpecSchemaRef() *ObjectReference {
+	return ef.Spec.SchemaRef
+}
+
+func (ef *ExternalFunction) GetSpecSchemaName() *string {
+	return ef.Spec.SchemaName
+}
+
+// ---------------------------------------------------------------------------
+// ComputePool
+// ---------------------------------------------------------------------------
+
+func (cp *ComputePool) GetConditions() []metav1.Condition {
+	return cp.Status.Conditions
+}
+
+func (cp *ComputePool) SetConditions(conditions []metav1.Condition) {
+	cp.Status.Conditions = conditions
+}
+
+func (cp *ComputePool) GetDeletionPolicy() DeletionPolicy {
+	if cp.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return cp.Spec.DeletionPolicy
+}
+
+func (cp *ComputePool) GetFullyQualifiedName() string {
+	return cp.Status.FullyQualifiedName
+}
+
+func (cp *ComputePool) GetProviderRef() ProviderReference {
+	return cp.Spec.ProviderRef
+}
+
+func (cp *ComputePool) GetSpecName() string {
+	return cp.Spec.Name
+}
+
+func (cp *ComputePool) GetUseRole() *string {
+	return cp.Spec.UseRole
+}
+
+func (cp *ComputePool) GetPaused() bool {
+	return cp.Spec.Paused
+}
+
+func (cp *ComputePool) GetManagementPolicies() ManagementPolicies {
+	return cp.Spec.ManagementPolicies
+}
+
+func (cp *ComputePool) SetCreateOrAlter(val *bool) {
+	cp.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (cp *ComputePool) GetObservedGeneration() int64 {
+	return cp.Status.ObservedGeneration
+}
+
+func (cp *ComputePool) SetObservedGeneration(val int64) {
+	cp.Status.ObservedGeneration = val
+}
+
+func (cp *ComputePool) GetLastAppliedSpecHash() string {
+	return cp.Status.LastAppliedSpecHash
+}
+
+func (cp *ComputePool) SetLastAppliedSpecHash(val string) {
+	cp.Status.LastAppliedSpecHash = val
+}
+
+func (cp *ComputePool) GetLastReconcileTime() *metav1.Time {
+	return cp.Status.LastReconcileTime
+}
+
+func (cp *ComputePool) SetLastReconcileTime(val *metav1.Time) {
+	cp.Status.LastReconcileTime = val
+}
+
+func (cp *ComputePool) ValidateSpec() error {
+	return cp.Spec.Validate()
+}
+
+func (cp *ComputePool) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(cp.Spec)
+}
+
+func (cp *ComputePool) GetOwner() string {
+	if cp.Status.ShowOutput != nil {
+		return cp.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (cp *ComputePool) GetTrackedParametersList() []string {
+	return cp.Status.TrackedParameters
+}
+
+func (cp *ComputePool) SetTrackedParametersList(val []string) {
+	cp.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// Service
+// ---------------------------------------------------------------------------
+
+func (svc *Service) GetConditions() []metav1.Condition {
+	return svc.Status.Conditions
+}
+
+func (svc *Service) SetConditions(conditions []metav1.Condition) {
+	svc.Status.Conditions = conditions
+}
+
+func (svc *Service) GetDeletionPolicy() DeletionPolicy {
+	if svc.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return svc.Spec.DeletionPolicy
+}
+
+func (svc *Service) GetFullyQualifiedName() string {
+	return svc.Status.FullyQualifiedName
+}
+
+func (svc *Service) GetProviderRef() ProviderReference {
+	return svc.Spec.ProviderRef
+}
+
+func (svc *Service) GetSpecName() string {
+	return svc.Spec.Name
+}
+
+func (svc *Service) GetUseRole() *string {
+	return svc.Spec.UseRole
+}
+
+func (svc *Service) GetPaused() bool {
+	return svc.Spec.Paused
+}
+
+func (svc *Service) GetManagementPolicies() ManagementPolicies {
+	return svc.Spec.ManagementPolicies
+}
+
+func (svc *Service) SetCreateOrAlter(val *bool) {
+	svc.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (svc *Service) GetObservedGeneration() int64 {
+	return svc.Status.ObservedGeneration
+}
+
+func (svc *Service) SetObservedGeneration(val int64) {
+	svc.Status.ObservedGeneration = val
+}
+
+func (svc *Service) GetLastAppliedSpecHash() string {
+	return svc.Status.LastAppliedSpecHash
+}
+
+func (svc *Service) SetLastAppliedSpecHash(val string) {
+	svc.Status.LastAppliedSpecHash = val
+}
+
+func (svc *Service) GetLastReconcileTime() *metav1.Time {
+	return svc.Status.LastReconcileTime
+}
+
+func (svc *Service) SetLastReconcileTime(val *metav1.Time) {
+	svc.Status.LastReconcileTime = val
+}
+
+func (svc *Service) ValidateSpec() error {
+	return svc.Spec.Validate()
+}
+
+func (svc *Service) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(svc.Spec)
+}
+
+func (svc *Service) GetOwner() string {
+	if svc.Status.ShowOutput != nil {
+		return svc.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (svc *Service) GetTrackedParametersList() []string {
+	return svc.Status.TrackedParameters
+}
+
+func (svc *Service) SetTrackedParametersList(val []string) {
+	svc.Status.TrackedParameters = val
+}
+
+func (svc *Service) GetScopeDatabaseName() string {
+	return svc.Status.DatabaseName
+}
+
+func (svc *Service) GetSpecDatabaseRef() *ObjectReference {
+	return svc.Spec.DatabaseRef
+}
+
+func (svc *Service) GetSpecDatabaseName() *string {
+	return svc.Spec.DatabaseName
+}
+
+func (svc *Service) GetScopeSchemaName() string {
+	return svc.Status.SchemaName
+}
+
+func (svc *Service) GetSpecSchemaRef() *ObjectReference {
+	return svc.Spec.SchemaRef
+}
+
+func (svc *Service) GetSpecSchemaName() *string {
+	return svc.Spec.SchemaName
+}
+
+// ---------------------------------------------------------------------------
+// ImageRepository
+// ---------------------------------------------------------------------------
+
+func (ir *ImageRepository) GetConditions() []metav1.Condition {
+	return ir.Status.Conditions
+}
+
+func (ir *ImageRepository) SetConditions(conditions []metav1.Condition) {
+	ir.Status.Conditions = conditions
+}
+
+func (ir *ImageRepository) GetDeletionPolicy() DeletionPolicy {
+	if ir.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return ir.Spec.DeletionPolicy
+}
+
+func (ir *ImageRepository) GetFullyQualifiedName() string {
+	return ir.Status.FullyQualifiedName
+}
+
+func (ir *ImageRepository) GetProviderRef() ProviderReference {
+	return ir.Spec.ProviderRef
+}
+
+func (ir *ImageRepository) GetSpecName() string {
+	return ir.Spec.Name
+}
+
+func (ir *ImageRepository) GetUseRole() *string {
+	return ir.Spec.UseRole
+}
+
+func (ir *ImageRepository) GetPaused() bool {
+	return ir.Spec.Paused
+}
+
+func (ir *ImageRepository) GetManagementPolicies() ManagementPolicies {
+	return ir.Spec.ManagementPolicies
+}
+
+func (ir *ImageRepository) SetCreateOrAlter(val *bool) {
+	ir.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (ir *ImageRepository) GetObservedGeneration() int64 {
+	return ir.Status.ObservedGeneration
+}
+
+func (ir *ImageRepository) SetObservedGeneration(val int64) {
+	ir.Status.ObservedGeneration = val
+}
+
+func (ir *ImageRepository) GetLastAppliedSpecHash() string {
+	return ir.Status.LastAppliedSpecHash
+}
+
+func (ir *ImageRepository) SetLastAppliedSpecHash(val string) {
+	ir.Status.LastAppliedSpecHash = val
+}
+
+func (ir *ImageRepository) GetLastReconcileTime() *metav1.Time {
+	return ir.Status.LastReconcileTime
+}
+
+func (ir *ImageRepository) SetLastReconcileTime(val *metav1.Time) {
+	ir.Status.LastReconcileTime = val
+}
+
+func (ir *ImageRepository) ValidateSpec() error {
+	return ir.Spec.Validate()
+}
+
+func (ir *ImageRepository) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(ir.Spec)
+}
+
+func (ir *ImageRepository) GetOwner() string {
+	if ir.Status.ShowOutput != nil {
+		return ir.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (ir *ImageRepository) GetTrackedParametersList() []string {
+	return ir.Status.TrackedParameters
+}
+
+func (ir *ImageRepository) SetTrackedParametersList(val []string) {
+	ir.Status.TrackedParameters = val
+}
+
+func (ir *ImageRepository) GetScopeDatabaseName() string {
+	return ir.Status.DatabaseName
+}
+
+func (ir *ImageRepository) GetSpecDatabaseRef() *ObjectReference {
+	return ir.Spec.DatabaseRef
+}
+
+func (ir *ImageRepository) GetSpecDatabaseName() *string {
+	return ir.Spec.DatabaseName
+}
+
+func (ir *ImageRepository) GetScopeSchemaName() string {
+	return ir.Status.SchemaName
+}
+
+func (ir *ImageRepository) GetSpecSchemaRef() *ObjectReference {
+	return ir.Spec.SchemaRef
+}
+
+func (ir *ImageRepository) GetSpecSchemaName() *string {
+	return ir.Spec.SchemaName
+}
+
+// ---------------------------------------------------------------------------
+// GitRepository
+// ---------------------------------------------------------------------------
+
+func (gr *GitRepository) GetConditions() []metav1.Condition {
+	return gr.Status.Conditions
+}
+
+func (gr *GitRepository) SetConditions(conditions []metav1.Condition) {
+	gr.Status.Conditions = conditions
+}
+
+func (gr *GitRepository) GetDeletionPolicy() DeletionPolicy {
+	if gr.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return gr.Spec.DeletionPolicy
+}
+
+func (gr *GitRepository) GetFullyQualifiedName() string {
+	return gr.Status.FullyQualifiedName
+}
+
+func (gr *GitRepository) GetProviderRef() ProviderReference {
+	return gr.Spec.ProviderRef
+}
+
+func (gr *GitRepository) GetSpecName() string {
+	return gr.Spec.Name
+}
+
+func (gr *GitRepository) GetUseRole() *string {
+	return gr.Spec.UseRole
+}
+
+func (gr *GitRepository) GetPaused() bool {
+	return gr.Spec.Paused
+}
+
+func (gr *GitRepository) GetManagementPolicies() ManagementPolicies {
+	return gr.Spec.ManagementPolicies
+}
+
+func (gr *GitRepository) SetCreateOrAlter(val *bool) {
+	gr.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (gr *GitRepository) GetObservedGeneration() int64 {
+	return gr.Status.ObservedGeneration
+}
+
+func (gr *GitRepository) SetObservedGeneration(val int64) {
+	gr.Status.ObservedGeneration = val
+}
+
+func (gr *GitRepository) GetLastAppliedSpecHash() string {
+	return gr.Status.LastAppliedSpecHash
+}
+
+func (gr *GitRepository) SetLastAppliedSpecHash(val string) {
+	gr.Status.LastAppliedSpecHash = val
+}
+
+func (gr *GitRepository) GetLastReconcileTime() *metav1.Time {
+	return gr.Status.LastReconcileTime
+}
+
+func (gr *GitRepository) SetLastReconcileTime(val *metav1.Time) {
+	gr.Status.LastReconcileTime = val
+}
+
+func (gr *GitRepository) ValidateSpec() error {
+	return gr.Spec.Validate()
+}
+
+func (gr *GitRepository) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(gr.Spec)
+}
+
+func (gr *GitRepository) GetOwner() string {
+	if gr.Status.ShowOutput != nil {
+		return gr.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (gr *GitRepository) GetTrackedParametersList() []string {
+	return gr.Status.TrackedParameters
+}
+
+func (gr *GitRepository) SetTrackedParametersList(val []string) {
+	gr.Status.TrackedParameters = val
+}
+
+func (gr *GitRepository) GetScopeDatabaseName() string {
+	return gr.Status.DatabaseName
+}
+
+func (gr *GitRepository) GetSpecDatabaseRef() *ObjectReference {
+	return gr.Spec.DatabaseRef
+}
+
+func (gr *GitRepository) GetSpecDatabaseName() *string {
+	return gr.Spec.DatabaseName
+}
+
+func (gr *GitRepository) GetScopeSchemaName() string {
+	return gr.Status.SchemaName
+}
+
+func (gr *GitRepository) GetSpecSchemaRef() *ObjectReference {
+	return gr.Spec.SchemaRef
+}
+
+func (gr *GitRepository) GetSpecSchemaName() *string {
+	return gr.Spec.SchemaName
+}
+
+// ---------------------------------------------------------------------------
+// Streamlit
+// ---------------------------------------------------------------------------
+
+func (st *Streamlit) GetConditions() []metav1.Condition {
+	return st.Status.Conditions
+}
+
+func (st *Streamlit) SetConditions(conditions []metav1.Condition) {
+	st.Status.Conditions = conditions
+}
+
+func (st *Streamlit) GetDeletionPolicy() DeletionPolicy {
+	if st.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return st.Spec.DeletionPolicy
+}
+
+func (st *Streamlit) GetFullyQualifiedName() string {
+	return st.Status.FullyQualifiedName
+}
+
+func (st *Streamlit) GetProviderRef() ProviderReference {
+	return st.Spec.ProviderRef
+}
+
+func (st *Streamlit) GetSpecName() string {
+	return st.Spec.Name
+}
+
+func (st *Streamlit) GetUseRole() *string {
+	return st.Spec.UseRole
+}
+
+func (st *Streamlit) GetPaused() bool {
+	return st.Spec.Paused
+}
+
+func (st *Streamlit) GetManagementPolicies() ManagementPolicies {
+	return st.Spec.ManagementPolicies
+}
+
+func (st *Streamlit) SetCreateOrAlter(val *bool) {
+	st.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (st *Streamlit) GetObservedGeneration() int64 {
+	return st.Status.ObservedGeneration
+}
+
+func (st *Streamlit) SetObservedGeneration(val int64) {
+	st.Status.ObservedGeneration = val
+}
+
+func (st *Streamlit) GetLastAppliedSpecHash() string {
+	return st.Status.LastAppliedSpecHash
+}
+
+func (st *Streamlit) SetLastAppliedSpecHash(val string) {
+	st.Status.LastAppliedSpecHash = val
+}
+
+func (st *Streamlit) GetLastReconcileTime() *metav1.Time {
+	return st.Status.LastReconcileTime
+}
+
+func (st *Streamlit) SetLastReconcileTime(val *metav1.Time) {
+	st.Status.LastReconcileTime = val
+}
+
+func (st *Streamlit) ValidateSpec() error {
+	return st.Spec.Validate()
+}
+
+func (st *Streamlit) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(st.Spec)
+}
+
+func (st *Streamlit) GetOwner() string {
+	if st.Status.ShowOutput != nil {
+		return st.Status.ShowOutput.Owner
+	}
+
+	return ""
+}
+
+func (st *Streamlit) GetTrackedParametersList() []string {
+	return st.Status.TrackedParameters
+}
+
+func (st *Streamlit) SetTrackedParametersList(val []string) {
+	st.Status.TrackedParameters = val
+}
+
+func (st *Streamlit) GetScopeDatabaseName() string {
+	return st.Status.DatabaseName
+}
+
+func (st *Streamlit) GetSpecDatabaseRef() *ObjectReference {
+	return st.Spec.DatabaseRef
+}
+
+func (st *Streamlit) GetSpecDatabaseName() *string {
+	return st.Spec.DatabaseName
+}
+
+func (st *Streamlit) GetScopeSchemaName() string {
+	return st.Status.SchemaName
+}
+
+func (st *Streamlit) GetSpecSchemaRef() *ObjectReference {
+	return st.Spec.SchemaRef
+}
+
+func (st *Streamlit) GetSpecSchemaName() *string {
+	return st.Spec.SchemaName
+}

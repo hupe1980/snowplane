@@ -47,6 +47,15 @@ All metrics use the `snowplane_` namespace and are exposed on the controller's m
 | `snowplane_orphaned_resources_total` | Counter | `controller` | Orphan-policy deletions |
 | `snowplane_ownership_conflicts_total` | Counter | `controller` | Ownership conflicts detected |
 
+### Operational Visibility
+
+| Metric | Type | Labels | Description |
+|:-------|:-----|:-------|:------------|
+| `snowplane_late_init_total` | Counter | `controller`, `result` | Late-initialization events (`modified` or `noop`) |
+| `snowplane_preflight_failures_total` | Counter | `controller`, `reason` | Pre-flight check failures that delay reconciliation |
+| `snowplane_snowflake_error_codes_total` | Counter | `provider`, `code` | Snowflake errors by numeric error code |
+| `snowplane_sqlstatement_executions_total` | Counter | `namespace`, `name`, `operation` | SQLStatement execute/revert audit trail |
+
 ### Circuit Breaker
 
 | Metric | Type | Labels | Description |
@@ -68,8 +77,8 @@ All metrics use the `snowplane_` namespace and are exposed on the controller's m
 | `snowplane_db_open_connections` | Gauge | `provider` | Current open connections |
 | `snowplane_db_in_use_connections` | Gauge | `provider` | Connections currently in use |
 | `snowplane_db_idle_connections` | Gauge | `provider` | Connections currently idle |
-| `snowplane_db_wait_count_total` | Gauge | `provider` | Total connections waited for |
-| `snowplane_db_wait_duration_seconds_total` | Gauge | `provider` | Time blocked waiting for connections |
+| `snowplane_db_wait_count` | Gauge | `provider` | Cumulative connections waited for (resets on pool recreation) |
+| `snowplane_db_wait_duration_seconds` | Gauge | `provider` | Cumulative time blocked waiting for connections (resets on pool recreation) |
 
 ### Webhook (controller-runtime)
 
@@ -83,6 +92,42 @@ When the validating admission webhook is enabled (`webhook.enabled: true`), cont
 
 {: .note }
 > These metrics use the `controller_runtime_` prefix (not `snowplane_`) because they are emitted by the controller-runtime framework, not Snowplane directly.
+
+---
+
+## OpenTelemetry Tracing
+
+Snowplane supports optional distributed tracing via OpenTelemetry (OTLP gRPC). When enabled, every reconcile operation emits spans that can be collected by any OTLP-compatible backend (Jaeger, Grafana Tempo, etc.).
+
+### Enabling Tracing
+
+Add the following flags to the manager deployment:
+
+```yaml
+args:
+  - --enable-tracing
+  - --otel-endpoint=tempo.monitoring:4317
+  - --otel-sampling-ratio=0.1   # sample 10% of traces
+  - --otel-insecure              # skip TLS (for in-cluster collectors)
+```
+
+| Flag | Default | Description |
+|:-----|:--------|:------------|
+| `--enable-tracing` | `false` | Enable OpenTelemetry tracing |
+| `--otel-endpoint` | `localhost:4317` | OTLP gRPC collector endpoint |
+| `--otel-sampling-ratio` | `1.0` | Trace sampling ratio (0.0–1.0) |
+| `--otel-insecure` | `true` | Use insecure gRPC connection |
+
+### Span Structure
+
+Each reconciliation produces a parent span with child spans:
+
+- **reconcile** — top-level span with resource type, namespace, and name attributes
+  - **reconcile.create** — Snowflake CREATE operation
+  - **reconcile.update** — Snowflake ALTER operation  
+  - **reconcile.delete** — Snowflake DROP operation
+
+Errors are automatically recorded on spans with `otel.status_code=ERROR`.
 
 ---
 

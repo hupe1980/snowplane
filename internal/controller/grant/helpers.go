@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
@@ -257,6 +260,16 @@ func validateImmutableGrantOption(withGrantOption bool, showOutput *snowplanev1a
 	}
 
 	return nil
+}
+
+// warnUnknownPrivilege emits a Warning event if the privilege name is not in
+// the known Snowflake privileges set. This is advisory only — the grant is
+// still attempted because Snowflake may have added new privileges.
+func warnUnknownPrivilege(recorder record.EventRecorder, obj runtime.Object, privilege string) {
+	if !snowplanev1alpha1.IsKnownPrivilege(privilege) {
+		recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonValidationFailed,
+			fmt.Sprintf("privilege %q is not in the known Snowflake privileges set — check for typos", privilege))
+	}
 }
 
 // ---------------------------------------------------------------------------

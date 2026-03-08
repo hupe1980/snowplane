@@ -13,6 +13,8 @@ spec:
     kind: DynamicTable
     listKind: DynamicTableList
     plural: dynamictables
+    shortNames:
+    - dt
     singular: dynamictable
   scope: Namespaced
   versions:
@@ -73,6 +75,7 @@ spec:
                 type: array
               comment:
                 description: Comment is an optional description for the dynamic table.
+                maxLength: 10000
                 type: string
               dataRetentionTimeInDays:
                 description: DataRetentionTimeInDays specifies the Time Travel retention
@@ -153,6 +156,14 @@ spec:
                     - correct
                     - detect-only
                     type: string
+                  observeOnly:
+                    description: |-
+                      ObserveOnly puts the resource into read-only mode. When true the
+                      controller will Observe the Snowflake resource and populate status
+                      but will never issue CREATE, ALTER, or DROP statements. Deletion
+                      of the CR removes the finalizer without dropping the Snowflake
+                      resource. Defaults to false.
+                    type: boolean
                 type: object
               maxDataExtensionTimeInDays:
                 description: |-
@@ -194,7 +205,7 @@ spec:
                 description: |-
                   Query is the SQL query that defines the dynamic table content.
                   This is the AS clause of CREATE DYNAMIC TABLE. Immutable after creation.
-                maxLength: 255
+                maxLength: 65536
                 minLength: 1
                 type: string
               refreshMode:

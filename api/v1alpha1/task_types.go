@@ -85,7 +85,7 @@ type TaskSpec struct {
 
 	// SQLStatement is the SQL code executed when the task runs.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=255
+	// +kubebuilder:validation:MaxLength=65536
 	SQLStatement string `json:"sqlStatement"`
 
 	// After specifies predecessor tasks for DAG scheduling.
@@ -100,6 +100,7 @@ type TaskSpec struct {
 
 	// Comment is an optional description for the task.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// AllowOverlappingExecution allows multiple instances of the task graph to run concurrently.
@@ -327,7 +328,7 @@ type TaskStatus struct {
 // Task is the Schema for the tasks API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=tsk
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

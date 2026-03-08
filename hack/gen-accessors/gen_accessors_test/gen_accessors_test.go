@@ -107,12 +107,12 @@ func TestGeneratedTypeHeaders(t *testing.T) {
 
 	expectedTypes := []string{
 		"Database", "Schema", "Warehouse", "User", "AccountRole", "DatabaseRole",
-		"Tag", "MaskingPolicy", "RowAccessPolicy", "Stage",
+		"Tag", "MaskingPolicy", "RowAccessPolicy",
 		"StreamOnTable", "StreamOnView", "StreamOnExternalTable", "StreamOnDirectoryTable", "StreamOnDynamicTable",
 		"Task", "Alert",
-		"View", "Table", "NetworkPolicy", "ResourceMonitor", "StorageIntegration",
+		"View", "Table", "NetworkPolicy", "ResourceMonitor",
 		"FileFormat", "Pipe", "DynamicTable",
-		"SecurityIntegration", "NotificationIntegration", "PasswordPolicy", "NetworkRule",
+		"PasswordPolicy", "NetworkRule",
 		"GrantPrivilegesToAccountRole", "GrantPrivilegesToDatabaseRole", "GrantPrivilegesToShare", "GrantOwnership",
 		"AccountRoleAssignment", "DatabaseRoleAssignment",
 	}

@@ -10,6 +10,7 @@ linters:
     - errcheck
     - errorlint
     - exhaustive
+    - forbidigo
     - goconst
     - gosec
     - govet
@@ -30,6 +31,13 @@ linters:
     goconst:
       min-len: 3
       min-occurrences: 6
+    forbidigo:
+      forbid:
+        - pattern: \.UnsafeRaw$
+          msg: >-
+            UnsafeRaw bypasses SQL parameterization. Each call site must be
+            reviewed for injection safety. Add //nolint:forbidigo with a
+            justification comment if the usage has been validated.
 
   exclusions:
     rules:
@@ -41,6 +49,7 @@ linters:
           - gosec
           - errorlint
           - noctx
+          - forbidigo
       - path: validation\.go
         linters:
           - goconst

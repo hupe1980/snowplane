@@ -13,6 +13,8 @@ spec:
     kind: User
     listKind: UserList
     plural: users
+    shortNames:
+    - usr
     singular: user
   scope: Namespaced
   versions:
@@ -60,6 +62,7 @@ spec:
             properties:
               comment:
                 description: Comment is an optional description for the user.
+                maxLength: 10000
                 type: string
               daysToExpiry:
                 description: |-
@@ -72,19 +75,23 @@ spec:
               defaultNamespace:
                 description: DefaultNamespace is the default database.schema namespace
                   for the user.
+                maxLength: 511
                 type: string
               defaultRole:
                 description: DefaultRole is the default role assigned to the user
                   on login.
+                maxLength: 255
                 type: string
               defaultSecondaryRoles:
                 description: |-
                   DefaultSecondaryRoles specifies secondary roles activated on login.
                   Set to "ALL" to enable all granted roles as secondary.
+                maxLength: 255
                 type: string
               defaultWarehouse:
                 description: DefaultWarehouse is the default virtual warehouse for
                   the user.
+                maxLength: 255
                 type: string
               deletionPolicy:
                 default: Delete
@@ -106,20 +113,26 @@ spec:
               displayName:
                 description: DisplayName is the user's display name in the Snowflake
                   UI.
+                maxLength: 255
                 type: string
               email:
                 description: Email is the user's email address.
+                maxLength: 255
+                pattern: ^[^@\s]+@[^@\s]+\.[^@\s]+$
                 type: string
               firstName:
                 description: FirstName is the user's first name.
+                maxLength: 255
                 type: string
               lastName:
                 description: LastName is the user's last name.
+                maxLength: 255
                 type: string
               loginName:
                 description: |-
                   LoginName is the name that the user enters to log into the system.
                   Defaults to the user Name if not set.
+                maxLength: 255
                 type: string
               managementPolicies:
                 description: ManagementPolicies specifies lifecycle policies for this
@@ -152,9 +165,18 @@ spec:
                     - correct
                     - detect-only
                     type: string
+                  observeOnly:
+                    description: |-
+                      ObserveOnly puts the resource into read-only mode. When true the
+                      controller will Observe the Snowflake resource and populate status
+                      but will never issue CREATE, ALTER, or DROP statements. Deletion
+                      of the CR removes the finalizer without dropping the Snowflake
+                      resource. Defaults to false.
+                    type: boolean
                 type: object
               middleName:
                 description: MiddleName is the user's middle name.
+                maxLength: 255
                 type: string
               minsToBypassMFA:
                 description: |-
@@ -185,6 +207,7 @@ spec:
                   NetworkPolicy assigns a user-level network policy that overrides the
                   account-level network policy. Set to the name of an existing Snowflake
                   network policy.
+                maxLength: 255
                 type: string
               password:
                 description: Password references a Kubernetes Secret containing the

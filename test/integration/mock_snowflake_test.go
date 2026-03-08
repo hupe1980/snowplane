@@ -28,7 +28,6 @@ func resetMocks() {
 	schemaMockSvc.Reset()
 	tableMockSvc.Reset()
 	viewMockSvc.Reset()
-	stageMockSvc.Reset()
 	warehouseMockSvc.Reset()
 	userMockSvc.Reset()
 	accountRoleMockSvc.Reset()
@@ -40,9 +39,6 @@ func resetMocks() {
 	networkPolicyMockSvc.Reset()
 	maskingPolicyMockSvc.Reset()
 	passwordPolicyMockSvc.Reset()
-	securityIntegrationMockSvc.Reset()
-	notificationIntegrationMockSvc.Reset()
-	storageIntegrationMockSvc.Reset()
 	resourceMonitorMockSvc.Reset()
 	pipeMockSvc.Reset()
 	fileFormatMockSvc.Reset()
@@ -54,6 +50,7 @@ func resetMocks() {
 	apiIntegrationMockSvc.Reset()
 	secondaryDatabaseMockSvc.Reset()
 	sharedDatabaseMockSvc.Reset()
+	resetExtendedMocks()
 }
 
 // ---------------------------------------------------------------------------
@@ -513,104 +510,6 @@ func (m *mockViewService) SetDrop(fn func(ctx context.Context, name snowflake.Sc
 }
 
 func (m *mockViewService) Reset() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.observeFn = nil
-	m.createFn = nil
-	m.alterFn = nil
-	m.dropFn = nil
-}
-
-// ---------------------------------------------------------------------------
-// mockStageService — thread-safe mock for Stage Snowflake operations
-// ---------------------------------------------------------------------------
-
-type mockStageService struct {
-	mu        sync.Mutex
-	observeFn func(ctx context.Context, name snowflake.SchemaObjectIdentifier) (*snowflake.StageObservation, error)
-	createFn  func(ctx context.Context, opts snowflake.CreateStageOptions) error
-	alterFn   func(ctx context.Context, opts snowflake.AlterStageOptions) error
-	dropFn    func(ctx context.Context, name snowflake.SchemaObjectIdentifier) error
-}
-
-func (m *mockStageService) Observe(ctx context.Context, name snowflake.SchemaObjectIdentifier) (*snowflake.StageObservation, error) {
-	m.mu.Lock()
-	fn := m.observeFn
-	m.mu.Unlock()
-
-	if fn != nil {
-		return fn(ctx, name)
-	}
-
-	return &snowflake.StageObservation{Exists: false}, nil
-}
-
-func (m *mockStageService) Create(ctx context.Context, opts snowflake.CreateStageOptions) error {
-	m.mu.Lock()
-	fn := m.createFn
-	m.mu.Unlock()
-
-	if fn != nil {
-		return fn(ctx, opts)
-	}
-
-	return nil
-}
-
-func (m *mockStageService) Alter(ctx context.Context, opts snowflake.AlterStageOptions) error {
-	m.mu.Lock()
-	fn := m.alterFn
-	m.mu.Unlock()
-
-	if fn != nil {
-		return fn(ctx, opts)
-	}
-
-	return nil
-}
-
-func (m *mockStageService) Drop(ctx context.Context, name snowflake.SchemaObjectIdentifier) error {
-	m.mu.Lock()
-	fn := m.dropFn
-	m.mu.Unlock()
-
-	if fn != nil {
-		return fn(ctx, name)
-	}
-
-	return nil
-}
-
-func (m *mockStageService) SetObserve(fn func(ctx context.Context, name snowflake.SchemaObjectIdentifier) (*snowflake.StageObservation, error)) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.observeFn = fn
-}
-
-func (m *mockStageService) SetCreate(fn func(ctx context.Context, opts snowflake.CreateStageOptions) error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.createFn = fn
-}
-
-func (m *mockStageService) SetAlter(fn func(ctx context.Context, opts snowflake.AlterStageOptions) error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.alterFn = fn
-}
-
-func (m *mockStageService) SetDrop(fn func(ctx context.Context, name snowflake.SchemaObjectIdentifier) error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.dropFn = fn
-}
-
-func (m *mockStageService) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

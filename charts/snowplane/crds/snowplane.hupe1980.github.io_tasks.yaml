@@ -13,6 +13,8 @@ spec:
     kind: Task
     listKind: TaskList
     plural: tasks
+    shortNames:
+    - tsk
     singular: task
   scope: Namespaced
   versions:
@@ -104,6 +106,7 @@ spec:
                 type: boolean
               comment:
                 description: Comment is an optional description for the task.
+                maxLength: 10000
                 type: string
               config:
                 description: |-
@@ -240,6 +243,14 @@ spec:
                     - correct
                     - detect-only
                     type: string
+                  observeOnly:
+                    description: |-
+                      ObserveOnly puts the resource into read-only mode. When true the
+                      controller will Observe the Snowflake resource and populate status
+                      but will never issue CREATE, ALTER, or DROP statements. Deletion
+                      of the CR removes the finalizer without dropping the Snowflake
+                      resource. Defaults to false.
+                    type: boolean
                 type: object
               name:
                 description: Name is the Snowflake task name. Immutable after creation.
@@ -327,7 +338,7 @@ spec:
                 type: string
               sqlStatement:
                 description: SQLStatement is the SQL code executed when the task runs.
-                maxLength: 255
+                maxLength: 65536
                 minLength: 1
                 type: string
               successIntegrationName:

@@ -53,6 +53,7 @@ type ProviderConfigSpec struct {
 	// the region, making this field optional. Legacy account identifiers (xy12345)
 	// still require an explicit region.
 	// +optional
+	// +kubebuilder:validation:MaxLength=255
 	Region string `json:"region,omitempty"`
 
 	// User is the Snowflake user for authentication.
@@ -61,9 +62,11 @@ type ProviderConfigSpec struct {
 	User string `json:"user"`
 
 	// Role is the Snowflake role to assume. Defaults to the user's default role.
+	// +kubebuilder:validation:MaxLength=255
 	Role string `json:"role,omitempty"`
 
 	// Warehouse is the default warehouse for the session.
+	// +kubebuilder:validation:MaxLength=255
 	Warehouse string `json:"warehouse,omitempty"`
 
 	// AuthenticationType selects the authentication method.
@@ -114,6 +117,16 @@ type ProviderConfigSpec struct {
 	// Entries are matched case-insensitively.
 	// +optional
 	AllowedSchemas []string `json:"allowedSchemas,omitempty"`
+
+	// AllowedRefNamespaces restricts which namespaces may be referenced via
+	// cross-namespace ObjectReference fields (e.g. databaseRef.namespace,
+	// schemaRef.namespace, secretRef.namespace).
+	// An empty list means cross-namespace references are unrestricted.
+	// A list containing "*" means all namespaces are allowed.
+	// A list containing only the special value "SAME" means only same-namespace
+	// references are permitted (cross-namespace references are blocked entirely).
+	// +optional
+	AllowedRefNamespaces []string `json:"allowedRefNamespaces,omitempty"`
 }
 
 // ProviderCredentials references the Secret(s) holding authentication data.
@@ -197,7 +210,7 @@ type ProviderConfigStatus struct {
 // ProviderConfig configures the Snowflake connection for the Snowplane operator.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=pc
 // +kubebuilder:printcolumn:name="ACCOUNT",type=string,JSONPath=`.spec.account`
 // +kubebuilder:printcolumn:name="AUTH",type=string,JSONPath=`.spec.authenticationType`
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
@@ -354,6 +367,49 @@ func (s *ProviderConfigSpec) IsSchemaAllowed(database, schemaName string) bool {
 			if strings.EqualFold(entry, schemaName) {
 				return true
 			}
+		}
+	}
+
+	return false
+}
+
+// IsRefNamespaceAllowed checks whether a cross-namespace reference target is
+// permitted by this ProviderConfig's AllowedRefNamespaces restriction.
+//
+// Rules:
+//   - Empty list → all namespaces allowed (no restriction)
+//   - "*" in list → all namespaces allowed
+//   - "SAME" in list → only sourceNamespace is allowed (blocks cross-namespace)
+//   - Specific namespace names → only those namespaces are allowed
+//
+// The sourceNamespace is the namespace of the resource performing the reference.
+// The targetNamespace is the namespace being referenced (the ref.Namespace override).
+// If targetNamespace is empty (same-namespace ref), it is always allowed.
+func (s *ProviderConfigSpec) IsRefNamespaceAllowed(sourceNamespace, targetNamespace string) bool {
+	// Same-namespace references are always allowed.
+	if targetNamespace == "" || targetNamespace == sourceNamespace {
+		return true
+	}
+
+	// No restriction configured — allow all.
+	if len(s.AllowedRefNamespaces) == 0 {
+		return true
+	}
+
+	for _, ns := range s.AllowedRefNamespaces {
+		if ns == "*" {
+			return true
+		}
+
+		// "SAME" means only same-namespace refs are allowed.
+		// Since we already handled the same-namespace case above,
+		// reaching here means the ref IS cross-namespace → deny.
+		if ns == "SAME" {
+			continue
+		}
+
+		if ns == targetNamespace {
+			return true
 		}
 	}
 

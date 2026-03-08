@@ -1,0 +1,12 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: Streamlit
+metadata:
+  name: streamlit-sample
+spec:
+  providerRef:
+    name: snowplane-provider
+  name: MY_STREAMLIT_APP
+  databaseName: MY_DATABASE
+  schemaName: MY_SCHEMA
+  warehouseName: MY_WAREHOUSE
+  mainFile: streamlit_app.py

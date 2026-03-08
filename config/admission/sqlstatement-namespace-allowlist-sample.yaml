@@ -1,0 +1,13 @@
+# Sample ConfigMap for SQLStatement namespace allowlist.
+# Lists the namespaces where SQLStatement resources may be created.
+#
+# Customize the allowedNamespaces value with a comma-separated list of
+# namespace names that should be permitted to create SQLStatement resources.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sqlstatement-namespace-allowlist
+  namespace: snowplane-system
+data:
+  # Comma-separated list of allowed namespaces.
+  allowedNamespaces: "data-eng,platform-team"

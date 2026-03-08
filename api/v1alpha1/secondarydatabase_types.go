@@ -26,6 +26,7 @@ type SecondaryDatabaseSpec struct {
 
 	// Comment is an optional description.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// DataRetentionTimeInDays specifies the Time Travel retention period (0-90 days).

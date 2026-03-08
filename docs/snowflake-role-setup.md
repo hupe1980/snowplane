@@ -111,7 +111,7 @@ GRANT CREATE DYNAMIC TABLE ON SCHEMA <db>.<schema> TO ROLE SNOWPLANE_ROLE;
 | `CREATE SCHEMA ON DATABASE` | Schema CRD | Per-database |
 | `CREATE TABLE ON SCHEMA` | Table CRD | Per-schema |
 | `CREATE VIEW ON SCHEMA` | View CRD | Per-schema |
-| `CREATE STAGE ON SCHEMA` | Stage CRD | Per-schema |
+| `CREATE STAGE ON SCHEMA` | InternalStage, ExternalStage CRDs | Per-schema |
 | `CREATE TASK ON SCHEMA` | Task CRD | Per-schema |
 | `EXECUTE TASK ON ACCOUNT` | Task CRD (resume) | Account |
 | `CREATE STREAM ON SCHEMA` | Stream CRD | Per-schema |
@@ -120,8 +120,9 @@ GRANT CREATE DYNAMIC TABLE ON SCHEMA <db>.<schema> TO ROLE SNOWPLANE_ROLE;
 | `CREATE RESOURCE MONITOR ON ACCOUNT` | ResourceMonitor CRD | Account |
 | `CREATE MASKING POLICY ON SCHEMA` | MaskingPolicy CRD | Per-schema |
 | `CREATE ROW ACCESS POLICY ON SCHEMA` | RowAccessPolicy CRD | Per-schema |
-| `CREATE INTEGRATION ON ACCOUNT` | StorageIntegration CRD | Account |
-| `CREATE INTEGRATION ON ACCOUNT` | SecurityIntegration CRD | Account |
+| `CREATE INTEGRATION ON ACCOUNT` | StorageIntegrationAWS, StorageIntegrationGCS, StorageIntegrationAzure CRDs | Account |
+| `CREATE INTEGRATION ON ACCOUNT` | ExternalOAuthIntegration, SAML2Integration, SCIMIntegration CRDs | Account |
+| `CREATE INTEGRATION ON ACCOUNT` | EmailNotificationIntegration, QueueNotificationIntegration, WebhookNotificationIntegration CRDs | Account |
 | `CREATE PASSWORD POLICY ON SCHEMA` | PasswordPolicy CRD | Per-schema |
 | `CREATE NETWORK RULE ON SCHEMA` | NetworkRule CRD | Per-schema |
 | `CREATE FILE FORMAT ON SCHEMA` | FileFormat CRD | Per-schema |

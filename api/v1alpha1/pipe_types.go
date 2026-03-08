@@ -61,7 +61,7 @@ type PipeSpec struct {
 	// This is the core of the pipe — it specifies source stage, target table,
 	// file format, and any transformation logic. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=255
+	// +kubebuilder:validation:MaxLength=65536
 	CopyStatement string `json:"copyStatement"`
 
 	// AutoIngest enables automatic data loading when new files arrive in the stage
@@ -101,6 +101,7 @@ type PipeSpec struct {
 
 	// Comment is an optional description for the pipe.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
@@ -170,7 +171,7 @@ type PipeStatus struct {
 // Pipe is the Schema for the pipes API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=pp
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

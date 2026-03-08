@@ -78,7 +78,7 @@ type DynamicTableSpec struct {
 	// Query is the SQL query that defines the dynamic table content.
 	// This is the AS clause of CREATE DYNAMIC TABLE. Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=255
+	// +kubebuilder:validation:MaxLength=65536
 	Query string `json:"query"`
 
 	// TargetLag specifies the maximum acceptable staleness of the dynamic table.
@@ -111,6 +111,7 @@ type DynamicTableSpec struct {
 
 	// Comment is an optional description for the dynamic table.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Transient indicates this is a transient dynamic table (no Fail-safe).
@@ -198,7 +199,7 @@ type DynamicTableStatus struct {
 // DynamicTable is the Schema for the dynamictables API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=dt
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

@@ -215,7 +215,7 @@ func buildCreateOptions(mv *snowplanev1alpha1.MaterializedView, id snowflake.Sch
 	return snowflake.CreateMaterializedViewOptions{
 		Name:      id,
 		Statement: mv.Spec.Statement,
-		Secure:    mv.Spec.Secure,
+		Secure:    snowplanev1alpha1.DerefBool(mv.Spec.Secure),
 		Comment:   mv.Spec.Comment,
 		ClusterBy: mv.Spec.ClusterBy,
 	}
@@ -232,12 +232,13 @@ func buildAlterOptions(mv *snowplanev1alpha1.MaterializedView, id snowflake.Sche
 	}
 
 	if obs.ShowOutput != nil {
-		// Secure toggle: compare bool values.
-		desiredSecure := mv.Spec.Secure
-		observedSecure := strings.EqualFold(obs.ShowOutput.IsSecure, "true")
+		// Secure toggle: compare pointer-to-bool against observed value.
+		if mv.Spec.Secure != nil {
+			observedSecure := strings.EqualFold(obs.ShowOutput.IsSecure, "true")
 
-		if desiredSecure != observedSecure {
-			opts.Secure = &desiredSecure
+			if *mv.Spec.Secure != observedSecure {
+				opts.Secure = mv.Spec.Secure
+			}
 		}
 	}
 
@@ -256,7 +257,10 @@ func detectDrift(mv *snowplanev1alpha1.MaterializedView, obs *snowflake.Material
 
 		// Mutable fields.
 		d.CompareString("COMMENT", mv.Spec.Comment, obs.ShowOutput.Comment, false)
-		d.CompareBoolValue("IS_SECURE", mv.Spec.Secure, strings.EqualFold(obs.ShowOutput.IsSecure, "true"), false)
+		if mv.Spec.Secure != nil {
+			obsSecure := strings.EqualFold(obs.ShowOutput.IsSecure, "true")
+			d.CompareBool("IS_SECURE", mv.Spec.Secure, &obsSecure, false)
+		}
 	}
 
 	return d.Result()

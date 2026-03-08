@@ -412,34 +412,33 @@ func TestCEL_MaskingPolicy_BodyAllowed(t *testing.T) {
 	t.Cleanup(func() { _ = k8sClient.Delete(ctx, mp) })
 }
 
-// TestCEL_Stage_ImmutableType verifies that the stage type (internal/external)
-// cannot be changed.
-func TestCEL_Stage_ImmutableType(t *testing.T) {
+// TestCEL_ExternalStage_ImmutableURL verifies that the external stage URL
+// cannot be changed after creation.
+func TestCEL_ExternalStage_ImmutableURL(t *testing.T) {
 	t.Parallel()
 
-	extURL := "s3://my-bucket/data/"
-	stage := &snowplanev1alpha1.Stage{
+	stage := &snowplanev1alpha1.ExternalStage{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cel-stage-immutable-type",
+			Name:      "cel-extstage-immutable-url",
 			Namespace: testNamespace,
 		},
-		Spec: snowplanev1alpha1.StageSpec{
+		Spec: snowplanev1alpha1.ExternalStageSpec{
 			Name:         "MY_STAGE",
 			DatabaseName: ptr("MY_DB"),
 			SchemaName:   ptr("MY_SCHEMA"),
-			URL:          &extURL,
+			URL:          "s3://my-bucket/data/",
 		},
 	}
 
 	require.NoError(t, k8sClient.Create(ctx, stage))
 	t.Cleanup(func() { _ = k8sClient.Delete(ctx, stage) })
 
-	// Try to remove URL (convert external -> internal) — should fail.
+	// Try to change URL — should fail.
 	err := updateWithCELCheck(t, types.NamespacedName{Name: stage.Name, Namespace: stage.Namespace}, stage, func() {
-		stage.Spec.URL = nil
+		stage.Spec.URL = "s3://other-bucket/path/"
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "stage type")
+	assert.Contains(t, err.Error(), "immutable")
 }
 
 // TestCEL_User_DefaultType verifies that the User type defaults to PERSON.
@@ -943,16 +942,16 @@ func TestCEL_View_DatabaseNameNoDots(t *testing.T) {
 	assert.Contains(t, err.Error(), "simple identifier")
 }
 
-// TestCEL_Stage_SchemaNameNoDots verifies that Stage's schemaName rejects dots.
-func TestCEL_Stage_SchemaNameNoDots(t *testing.T) {
+// TestCEL_InternalStage_SchemaNameNoDots verifies that InternalStage's schemaName rejects dots.
+func TestCEL_InternalStage_SchemaNameNoDots(t *testing.T) {
 	t.Parallel()
 
-	stg := &snowplanev1alpha1.Stage{
+	stg := &snowplanev1alpha1.InternalStage{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cel-stage-schema-dots",
+			Name:      "cel-intstage-schema-dots",
 			Namespace: testNamespace,
 		},
-		Spec: snowplanev1alpha1.StageSpec{
+		Spec: snowplanev1alpha1.InternalStageSpec{
 			Name:         "MY_STAGE",
 			DatabaseName: ptr("MY_DB"),
 			SchemaName:   ptr("MY_DB.MY_SCHEMA"),

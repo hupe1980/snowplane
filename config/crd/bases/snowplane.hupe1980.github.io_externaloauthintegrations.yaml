@@ -83,6 +83,7 @@ spec:
                 type: array
               comment:
                 description: Comment is an optional comment for the integration.
+                maxLength: 10000
                 type: string
               deletionPolicy:
                 default: Delete
@@ -146,6 +147,14 @@ spec:
                     - correct
                     - detect-only
                     type: string
+                  observeOnly:
+                    description: |-
+                      ObserveOnly puts the resource into read-only mode. When true the
+                      controller will Observe the Snowflake resource and populate status
+                      but will never issue CREATE, ALTER, or DROP statements. Deletion
+                      of the CR removes the finalizer without dropping the Snowflake
+                      resource. Defaults to false.
+                    type: boolean
                 type: object
               name:
                 description: Name is the Snowflake security integration name. Immutable

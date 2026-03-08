@@ -541,7 +541,7 @@ func TestBuildCreateOptions(t *testing.T) {
 	table.Spec.ChangeTracking = testutil.Ptr(true)
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "EVENTS")
 
-	opts := buildCreateOptions(table, id)
+	opts := buildCreateOptions(table, id, nil)
 	assert.Equal(t, "EVENTS", opts.Name.Name())
 	assert.Len(t, opts.Columns, 2)
 	assert.Equal(t, "test table", *opts.Comment)
@@ -563,14 +563,14 @@ func TestBuildCreateOptions_WithConstraints(t *testing.T) {
 			Type:    snowplanev1alpha1.TableConstraintForeignKey,
 			Columns: []string{"PAYLOAD"},
 			ForeignKey: &snowplanev1alpha1.ForeignKeyReference{
-				Table:   "OTHER_TABLE",
+				Table:   testutil.Ptr("OTHER_TABLE"),
 				Columns: []string{"REF_COL"},
 			},
 		},
 	}
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "EVENTS")
 
-	opts := buildCreateOptions(table, id)
+	opts := buildCreateOptions(table, id, nil)
 	require.Len(t, opts.Constraints, 2)
 
 	assert.Equal(t, "pk_id", opts.Constraints[0].Name)
@@ -850,10 +850,36 @@ func TestComputeColumnChanges_TypeChange(t *testing.T) {
 func TestNormaliseType(t *testing.T) {
 	t.Parallel()
 
+	// Whitespace normalization.
 	assert.Equal(t, "NUMBER(38,0)", normaliseType("NUMBER(38,0)"))
 	assert.Equal(t, "NUMBER(38,0)", normaliseType("NUMBER (38,0)"))
 	assert.Equal(t, "NUMBER(38,0)", normaliseType(" NUMBER(38,0) "))
-	assert.Equal(t, "VARCHAR", normaliseType("VARCHAR"))
+
+	// Common type alias expansion.
+	assert.Equal(t, "VARCHAR(16777216)", normaliseType("VARCHAR"))
+	assert.Equal(t, "VARCHAR(16777216)", normaliseType("varchar"))
+	assert.Equal(t, "VARCHAR(16777216)", normaliseType("STRING"))
+	assert.Equal(t, "VARCHAR(16777216)", normaliseType("TEXT"))
+	assert.Equal(t, "VARCHAR(1)", normaliseType("CHAR"))
+	assert.Equal(t, "NUMBER(38,0)", normaliseType("INT"))
+	assert.Equal(t, "NUMBER(38,0)", normaliseType("INTEGER"))
+	assert.Equal(t, "NUMBER(38,0)", normaliseType("BIGINT"))
+	assert.Equal(t, "NUMBER(38,0)", normaliseType("NUMBER"))
+	assert.Equal(t, "FLOAT", normaliseType("FLOAT"))
+	assert.Equal(t, "FLOAT", normaliseType("DOUBLE"))
+	assert.Equal(t, "BOOLEAN", normaliseType("BOOLEAN"))
+	assert.Equal(t, "BOOLEAN", normaliseType("BOOL"))
+	assert.Equal(t, "TIMESTAMP_NTZ(9)", normaliseType("TIMESTAMP"))
+	assert.Equal(t, "TIMESTAMP_NTZ(9)", normaliseType("TIMESTAMP_NTZ"))
+	assert.Equal(t, "TIMESTAMP_LTZ(9)", normaliseType("TIMESTAMP_LTZ"))
+	assert.Equal(t, "TIMESTAMP_TZ(9)", normaliseType("TIMESTAMP_TZ"))
+	assert.Equal(t, "DATE", normaliseType("DATE"))
+	assert.Equal(t, "TIME(9)", normaliseType("TIME"))
+	assert.Equal(t, "BINARY(8388608)", normaliseType("BINARY"))
+
+	// Explicit parameters are preserved.
+	assert.Equal(t, "VARCHAR(100)", normaliseType("VARCHAR(100)"))
+	assert.Equal(t, "NUMBER(10,2)", normaliseType("NUMBER(10,2)"))
 }
 
 // --------------------------------------------------------------------------

@@ -66,7 +66,7 @@ type ManagedResource interface {
 // Identifier is the minimal interface satisfied by all Snowflake resource
 // identifiers (AccountObjectIdentifier, DatabaseObjectIdentifier,
 // SchemaObjectIdentifier, GrantIdentifier). It replaces the previous `any`
-// type, constraining identifier parameters at compile time (B-4).
+// type, constraining identifier parameters at compile time.
 type Identifier interface {
 	FullyQualifiedName() string
 	String() string

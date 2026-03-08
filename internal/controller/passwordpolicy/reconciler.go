@@ -68,7 +68,7 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 		FinalizerNameVal: finalizerName,
 		NewObjectFn:      func() *snowplanev1alpha1.PasswordPolicy { return &snowplanev1alpha1.PasswordPolicy{} },
 		ServiceFactoryFn: sf,
-		SupportsCoA:      true,
+		SupportsCoA:      false,
 		BuildIdentifierFn: func(pp *snowplanev1alpha1.PasswordPolicy) (reconciler.Identifier, error) {
 			dbName := snowflake.ParseDatabaseNameFromFQN(pp.Status.DatabaseName)
 			schemaName := snowflake.ParseSchemaNameFromFQN(pp.Status.SchemaName)
@@ -82,7 +82,6 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 		),
 		CreateFn: reconciler.MakeCreate(func(ctx context.Context, svc Service, obj *snowplanev1alpha1.PasswordPolicy, id snowflake.SchemaObjectIdentifier) error {
 			opts := buildCreateOptions(obj, id)
-			opts.UseCreateOrAlter = obj.GetManagementPolicies().IsCreateOrAlter()
 			return svc.Create(ctx, opts)
 		}),
 		AlterFn: reconciler.MakeAlter(func(ctx context.Context, svc Service, opts *snowflake.AlterPasswordPolicyOptions) error {

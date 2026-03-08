@@ -61,7 +61,7 @@ func TestWarehouse_CreateLifecycle(t *testing.T) {
 	assert.True(t, created.Load(), "Snowflake CREATE should have been called")
 	assert.Equal(t, sfWH, result.Status.ShowOutput.Name)
 	assert.Equal(t, "SYSADMIN", result.Status.ShowOutput.Owner)
-	assert.Equal(t, "STARTED", result.Status.State)
+	assert.Equal(t, snowplanev1alpha1.WarehouseState("STARTED"), result.Status.State)
 	assert.NotEmpty(t, result.Status.FullyQualifiedName)
 	assert.NotEmpty(t, result.Status.LastAppliedSpecHash)
 	assert.Equal(t, result.Generation, result.Status.ObservedGeneration)

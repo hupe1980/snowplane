@@ -1229,3 +1229,115 @@ func TestReconcile_EmitsWarningEventOnPathNotFound(t *testing.T) {
 		t.Fatal("expected a warning event for path-not-found")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Sensitive field guard (defense-in-depth)
+// ---------------------------------------------------------------------------
+
+func TestReconcile_SensitivePath_ConfigMap_Blocked(t *testing.T) {
+	scheme := testutil.TestScheme()
+
+	fe := newFieldExport("test-fe", snowplanev1alpha1.FieldExportSource{
+		Resource: snowplanev1alpha1.FieldExportResourceRef{Kind: "ExternalOAuthIntegration", Name: "si"},
+		Path:     ".status.describeOutput.oauthClientId",
+	}, snowplanev1alpha1.FieldExportTarget{
+		Kind: snowplanev1alpha1.FieldExportTargetConfigMap,
+		Name: "cm",
+		Key:  "k",
+	})
+	fe.Finalizers = []string{"snowplane.hupe1980.github.io/fieldexport"}
+
+	c := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(fe).
+		WithStatusSubresource(fe).
+		Build()
+
+	recorder := record.NewFakeRecorder(10)
+	rec := fieldexport.NewReconciler(c, recorder)
+
+	result, err := rec.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "test-fe", Namespace: testNS},
+	})
+	require.NoError(t, err)
+	assert.Zero(t, result.RequeueAfter) // Terminal — no requeue.
+
+	var updated snowplanev1alpha1.FieldExport
+	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "test-fe", Namespace: testNS}, &updated))
+
+	readyCond := conditions.Get(&updated, snowplanev1alpha1.TypeReady)
+	require.NotNil(t, readyCond)
+	assert.Equal(t, snowplanev1alpha1.ReasonSensitiveFieldGuard, readyCond.Reason)
+	assert.Contains(t, readyCond.Message, "sensitive")
+
+	syncCond := conditions.Get(&updated, snowplanev1alpha1.TypeSynced)
+	require.NotNil(t, syncCond)
+	assert.Equal(t, snowplanev1alpha1.ReasonSensitiveFieldGuard, syncCond.Reason)
+
+	select {
+	case event := <-recorder.Events:
+		assert.Contains(t, event, "Warning")
+		assert.Contains(t, event, "SensitiveFieldGuard")
+	default:
+		t.Fatal("expected a warning event for sensitive field guard")
+	}
+}
+
+func TestReconcile_SensitivePath_Secret_Allowed(t *testing.T) {
+	scheme := testutil.TestScheme()
+
+	fe := newFieldExport("test-fe", snowplanev1alpha1.FieldExportSource{
+		Resource: snowplanev1alpha1.FieldExportResourceRef{Kind: "ExternalOAuthIntegration", Name: "si"},
+		Path:     ".status.describeOutput.oauthClientId",
+	}, snowplanev1alpha1.FieldExportTarget{
+		Kind: snowplanev1alpha1.FieldExportTargetSecret,
+		Name: "sec",
+		Key:  "k",
+	})
+	fe.Finalizers = []string{"snowplane.hupe1980.github.io/fieldexport"}
+
+	// Create an ExternalOAuthIntegration source with the expected field.
+	source := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": snowplanev1alpha1.GroupVersion.String(),
+			"kind":       "ExternalOAuthIntegration",
+			"metadata": map[string]interface{}{
+				"name":      "si",
+				"namespace": testNS,
+			},
+			"status": map[string]interface{}{
+				"conditions": []interface{}{
+					map[string]interface{}{
+						"type":   "Ready",
+						"status": "True",
+					},
+				},
+				"describeOutput": map[string]interface{}{
+					"oauthClientId": "abc123",
+				},
+			},
+		},
+	}
+
+	c := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(fe).
+		WithStatusSubresource(fe).
+		Build()
+	require.NoError(t, c.Create(context.Background(), source))
+
+	recorder := record.NewFakeRecorder(10)
+	rec := fieldexport.NewReconciler(c, recorder)
+
+	result, err := rec.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "test-fe", Namespace: testNS},
+	})
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter) // Periodic requeue, not terminal.
+
+	// Should be Ready — sensitive path to Secret is allowed.
+	var updated snowplanev1alpha1.FieldExport
+	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "test-fe", Namespace: testNS}, &updated))
+
+	readyCond := conditions.Get(&updated, snowplanev1alpha1.TypeReady)
+	require.NotNil(t, readyCond)
+	assert.NotEqual(t, snowplanev1alpha1.ReasonSensitiveFieldGuard, readyCond.Reason)
+}

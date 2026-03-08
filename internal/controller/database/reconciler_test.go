@@ -1158,7 +1158,7 @@ func TestReconcile_CreatePostObserveError(t *testing.T) {
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydb", "default"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "post-create observe")
-	assert.Equal(t, 5*time.Second, result.RequeueAfter)
+	assert.Zero(t, result.RequeueAfter, "error return should let controller-runtime apply exponential backoff")
 
 	got := &snowplanev1alpha1.Database{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "mydb", Namespace: "default"}, got))
@@ -1300,7 +1300,7 @@ func TestReconcile_EventEmission_CreateFails(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Tests: UNSET support (C-2)
+// Tests: UNSET support
 // --------------------------------------------------------------------------
 
 func TestBuildAlterOptions_UnsetDetection(t *testing.T) {
@@ -1438,7 +1438,7 @@ func TestReconcile_UnsetTriggered(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Tests: Recoverable condition (H-4)
+// Tests: Recoverable condition
 // --------------------------------------------------------------------------
 
 func TestReconcile_RecoverableConditionOnTransientError(t *testing.T) {

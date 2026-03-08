@@ -346,3 +346,11 @@ func TestBuildSnowflakeConfig_WorkloadIdentity_TraversalBlocked(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not under an allowed prefix")
 }
+
+func TestBuildSnowflakeConfig_SetsStatementTimeout(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := BuildSnowflakeConfig(newPC(), newSecret(map[string][]byte{"password": []byte("s3cret")}))
+	require.NoError(t, err)
+	assert.Equal(t, 300, cfg.StatementTimeoutSeconds, "default StatementTimeoutSeconds should be 300 (5 minutes)")
+}

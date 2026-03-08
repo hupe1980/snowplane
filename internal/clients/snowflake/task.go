@@ -367,7 +367,7 @@ func buildAlterTaskStatements(opts AlterTaskOptions) (statements []string, err e
 
 	if opts.Config != nil {
 		// CONFIG uses $$ delimiters, not single quotes.
-		sc.UnsafeRaw(fmt.Sprintf("CONFIG = $$%s$$", *opts.Config))
+		sc.UnsafeRaw(fmt.Sprintf("CONFIG = $$%s$$", *opts.Config)) //nolint:forbidigo // dollar-quoted; validated upstream
 	}
 
 	if opts.ErrorIntegration != nil {

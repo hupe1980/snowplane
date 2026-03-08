@@ -206,7 +206,7 @@ func TestReconcile_CreateWarehouse(t *testing.T) {
 	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
 	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeSynced))
 	assert.Equal(t, "SYSADMIN", got.Status.ShowOutput.Owner)
-	assert.Equal(t, "STARTED", got.Status.State)
+	assert.Equal(t, snowplanev1alpha1.WarehouseStateStarted, got.Status.State)
 	assert.NotEmpty(t, got.Status.FullyQualifiedName)
 	assert.Equal(t, int64(1), got.Status.ObservedGeneration)
 }
@@ -833,7 +833,7 @@ func TestApplyObservation(t *testing.T) {
 
 	assert.NotEmpty(t, wh.Status.FullyQualifiedName)
 	assert.Equal(t, "SYSADMIN", wh.Status.ShowOutput.Owner)
-	assert.Equal(t, "STARTED", wh.Status.State)
+	assert.Equal(t, snowplanev1alpha1.WarehouseStateStarted, wh.Status.State)
 	assert.Equal(t, "2024-01-01", wh.Status.ShowOutput.CreatedOn)
 	require.NotNil(t, wh.Status.ShowOutput)
 	assert.Equal(t, "ETL_WH", wh.Status.ShowOutput.Name)

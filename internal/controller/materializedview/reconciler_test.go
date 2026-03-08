@@ -348,7 +348,7 @@ func TestReconcile_CreateSecureMaterializedView(t *testing.T) {
 
 	mv := newTestMaterializedView("mymv", "default")
 	mv.Finalizers = []string{finalizerName}
-	mv.Spec.Secure = true
+	mv.Spec.Secure = testutil.Ptr(true)
 	db := newTestDB("analytics-db", "default")
 	schema := newTestSchema("public-schema", "default")
 
@@ -527,7 +527,7 @@ func TestBuildCreateOptions(t *testing.T) {
 
 	mv := newTestMaterializedView("mymv", "default")
 	mv.Spec.Comment = testutil.Ptr("test mv")
-	mv.Spec.Secure = true
+	mv.Spec.Secure = testutil.Ptr(true)
 	mv.Spec.ClusterBy = []string{"sale_date"}
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "DAILY_SALES")
 
@@ -543,7 +543,7 @@ func TestBuildAlterOptions_SecureToggle(t *testing.T) {
 	t.Parallel()
 
 	mv := newTestMaterializedView("mymv", "default")
-	mv.Spec.Secure = true
+	mv.Spec.Secure = testutil.Ptr(true)
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "DAILY_SALES")
 	obs := successfulObservation() // IsSecure = "false"
 
@@ -556,7 +556,7 @@ func TestBuildAlterOptions_SecureUnset(t *testing.T) {
 	t.Parallel()
 
 	mv := newTestMaterializedView("mymv", "default")
-	mv.Spec.Secure = false // want UNSET
+	mv.Spec.Secure = testutil.Ptr(false) // want UNSET
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "DAILY_SALES")
 	obs := successfulObservation()
 	obs.ShowOutput.IsSecure = "true" // currently secure
@@ -583,7 +583,7 @@ func TestBuildAlterOptions_NoChanges(t *testing.T) {
 	t.Parallel()
 
 	mv := newTestMaterializedView("mymv", "default")
-	mv.Spec.Secure = false
+	mv.Spec.Secure = testutil.Ptr(false)
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "DAILY_SALES")
 	obs := successfulObservation() // Matches spec exactly
 
@@ -628,7 +628,7 @@ func TestDetectDrift_SecureDrift(t *testing.T) {
 	t.Parallel()
 
 	mv := newTestMaterializedView("mymv", "default")
-	mv.Spec.Secure = true
+	mv.Spec.Secure = testutil.Ptr(true)
 
 	obs := &snowflake.MaterializedViewObservation{
 		Exists: true,
@@ -663,7 +663,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	t.Parallel()
 
 	mv := newTestMaterializedView("mymv", "default")
-	mv.Spec.Secure = false
+	mv.Spec.Secure = testutil.Ptr(false)
 
 	obs := &snowflake.MaterializedViewObservation{
 		Exists: true,

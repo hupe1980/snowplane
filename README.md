@@ -21,14 +21,19 @@
 | Category | Resources |
 |----------|-----------|
 | 🗄️ **Core Infrastructure** | Database, Schema, Warehouse |
-| 📊 **Data Objects** | Table, TableConstraint, View, MaterializedView, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, ExternalTable, FileFormat, Pipe, Sequence |
+| 📊 **Data Objects** | Table, TableConstraint, View, MaterializedView, InternalStage, ExternalStage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, ExternalTable, FileFormat, Pipe, Sequence |
 | 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, GrantPrivilegesToAccountRole, GrantPrivilegesToDatabaseRole, AccountRoleAssignment, DatabaseRoleAssignment, GrantPrivilegesToShare, GrantOwnership |
+| 📡 **Data Sharing** | Share |
 | ⏰ **Orchestration** | Task (DAG scheduling, serverless or warehouse-backed), Alert (condition-based monitoring & notification) |
-| 🔧 **Programmability** | ProcedureSQL, ProcedureJavascript, ProcedurePython, ProcedureJava, ProcedureScala, FunctionSQL, FunctionJavascript, FunctionPython, FunctionJava, FunctionScala |
-| 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration, APIIntegration, APIAuthenticationIntegrationWithAuthorizationCodeGrant, APIAuthenticationIntegrationWithClientCredentials, APIAuthenticationIntegrationWithJWTBearer |
+| 🔧 **Programmability** | ProcedureSQL, ProcedureJavascript, ProcedurePython, ProcedureJava, ProcedureScala, FunctionSQL, FunctionJavascript, FunctionPython, FunctionJava, FunctionScala, ExternalFunction |
+| 📦 **Storage** | ExternalVolume (S3/GCS/Azure multi-cloud storage for Iceberg tables) |
+| 🔍 **AI/ML** | CortexSearchService (semantic & hybrid search powered by LLM embeddings) |
+| 📂 **App Development** | GitRepository (Git integration for version-controlled code), Streamlit (Snowflake-native interactive Python apps) |
+| 🔗 **Integrations** | StorageIntegrationAWS, StorageIntegrationGCS, StorageIntegrationAzure, ExternalOAuthIntegration, SAML2Integration, SCIMIntegration, EmailNotificationIntegration, QueueNotificationIntegration, WebhookNotificationIntegration, APIIntegration, APIAuthenticationIntegrationWithAuthorizationCodeGrant, APIAuthenticationIntegrationWithClientCredentials, APIAuthenticationIntegrationWithJWTBearer |
 | 🔒 **Secrets** | SecretWithAuthorizationCodeGrant, SecretWithBasicAuthentication, SecretWithClientCredentials, SecretWithGenericString |
 | 🛡️ **Security & Governance** | NetworkPolicy, NetworkPolicyAttachment, NetworkRule, AuthenticationPolicy, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
 | 📤 **Utilities** | FieldExport (copy status fields into ConfigMaps/Secrets), SQLStatement (escape-hatch for arbitrary SQL), ProviderConfig |
+| 🐳 **Snowpark Container Services** | ComputePool, Service, ImageRepository |
 
 Every resource supports full lifecycle management (create, alter, drop), drift detection, adoption of pre-existing objects, and deletion policies. See the [API Reference](#-api-reference) below for detailed field documentation.
 
@@ -45,6 +50,8 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 - ⚛️ **CREATE OR ALTER** — Atomic `CREATE OR ALTER` enabled by default for Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, AuthenticationPolicy, NetworkRule, RowAccessPolicy & User, with graceful fallback for unsupported Snowflake editions (opt out via `spec.managementPolicies.createOrAlter: false`)
 - 🗑️ **Deletion Policies** — `Delete` (drop resource) or `Orphan` (leave intact)
 - 🏷️ **ForceNew Annotation** — Delete+recreate on immutable field changes
+- 📡 **OpenTelemetry Tracing** — Optional OTLP gRPC tracing for reconcile loop debugging (`--enable-tracing`, `--otel-endpoint`)
+- ⚖️ **Controller Sharding** — Deterministic hash-based horizontal partitioning across controller replicas (`--shard-id`, `--shard-count`)
 
 ### 🔐 Security & Authentication
 
@@ -199,7 +206,7 @@ kubectl get databases
 | `--account-rate-limit-burst` | `100` | Max burst size for per-account aggregate rate limiter |
 | `--requeue-interval` | `5m` | Drift detection re-observe interval |
 | `--enable-alpha-resources` | `true` | Enable alpha-maturity controllers |
-| `--disable-controllers` | `""` | Comma-separated controllers to disable (e.g. `grantprivilegestoaccountrole,stage,view`) |
+| `--disable-controllers` | `""` | Comma-separated controllers to disable (e.g. `grantprivilegestoaccountrole,internalstage,view`) |
 | `--circuit-breaker-threshold` | `5` | Consecutive Snowflake failures before circuit opens |
 | `--circuit-breaker-reset-timeout` | `60s` | Backoff duration before half-open probe |
 | `--allowed-roles` | `""` | Comma-separated allowlist of Snowflake roles permitted in ProviderConfig (case-insensitive; empty = all allowed) |
@@ -295,6 +302,9 @@ All metrics use the `snowplane_` namespace.
 | `snowplane_adoption_total` | Counter | `controller`, `result` | Adoption outcomes |
 | `snowplane_drift_detected_total` | Counter | `controller` | Drift detection events |
 | `snowplane_account_rate_limit_waits_total` | Counter | `provider` | Per-account aggregate rate limiter wait events |
+| `snowplane_late_init_total` | Counter | `controller`, `result` | Late-initialization events |
+| `snowplane_preflight_failures_total` | Counter | `controller`, `reason` | Pre-flight check failures |
+| `snowplane_snowflake_error_codes_total` | Counter | `provider`, `code` | Snowflake errors by error code |
 | `snowplane_circuit_breaker_trips_total` | Counter | `provider` | Circuit breaker trips |
 | `snowplane_circuit_breaker_state` | Gauge | `provider` | Breaker state (0=closed, 1=open, 2=half-open) |
 | `snowplane_providerconfig_healthy` | Gauge | `provider`, `account` | 1=connected, 0=unhealthy |
@@ -302,8 +312,8 @@ All metrics use the `snowplane_` namespace.
 | `snowplane_db_open_connections` | Gauge | `provider` | Current open DB connections per provider |
 | `snowplane_db_in_use_connections` | Gauge | `provider` | In-use DB connections per provider |
 | `snowplane_db_idle_connections` | Gauge | `provider` | Idle DB connections per provider |
-| `snowplane_db_wait_count_total` | Gauge | `provider` | Total DB connection wait count per provider |
-| `snowplane_db_wait_duration_seconds_total` | Gauge | `provider` | Total DB connection wait duration per provider |
+| `snowplane_db_wait_count` | Gauge | `provider` | Cumulative DB connection wait count per provider |
+| `snowplane_db_wait_duration_seconds` | Gauge | `provider` | Cumulative DB connection wait duration per provider |
 
 ### 📉 Grafana Dashboard
 
@@ -324,10 +334,13 @@ Complete field-level documentation for all Snowplane CRDs is available in the **
 |----------|-----------|
 | 🔌 **Provider** | ProviderConfig |
 | 🗄️ **Core Infrastructure** | Database, SecondaryDatabase, SharedDatabase, Schema, Warehouse |
-| 📊 **Data Objects** | Table, View, MaterializedView, Stage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe, Sequence, ExternalTable |
+| 📊 **Data Objects** | Table, View, MaterializedView, InternalStage, ExternalStage, StreamOnTable, StreamOnView, StreamOnExternalTable, StreamOnDirectoryTable, StreamOnDynamicTable, DynamicTable, FileFormat, Pipe, Sequence, ExternalTable |
 | 🎭 **Identity & Access** | User, AccountRole, DatabaseRole, GrantPrivilegesToAccountRole, GrantPrivilegesToDatabaseRole, AccountRoleAssignment, DatabaseRoleAssignment, GrantPrivilegesToShare, GrantOwnership |
 | ⏰ **Orchestration** | Task, Alert |
-| 🔗 **Integrations** | StorageIntegration, SecurityIntegration, NotificationIntegration, APIIntegration |
+| 📦 **Storage** | ExternalVolume |
+| 🔍 **AI/ML** | CortexSearchService |
+| 📂 **App Development** | GitRepository, Streamlit |
+| 🔗 **Integrations** | StorageIntegrationAWS, StorageIntegrationGCS, StorageIntegrationAzure, ExternalOAuthIntegration, SAML2Integration, SCIMIntegration, EmailNotificationIntegration, QueueNotificationIntegration, WebhookNotificationIntegration, APIIntegration, APIAuthenticationIntegrationWithAuthorizationCodeGrant, APIAuthenticationIntegrationWithClientCredentials, APIAuthenticationIntegrationWithJWTBearer |
 | 🛡️ **Security & Governance** | AuthenticationPolicy, NetworkPolicy, NetworkPolicyAttachment, NetworkRule, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
 | 🔧 **Programmability** | ProcedureSQL, ProcedureJavascript, ProcedurePython, ProcedureJava, ProcedureScala, FunctionSQL, FunctionJavascript, FunctionPython, FunctionJava, FunctionScala |
 | 📤 **Utilities** | FieldExport, SQLStatement |
@@ -407,7 +420,8 @@ kubectl apply -f manifests.yaml
 | `snowflake_table` | Table |
 | `snowflake_view` | View |
 | `snowflake_materialized_view` | MaterializedView |
-| `snowflake_stage` | Stage |
+| `snowflake_stage` (internal) | InternalStage |
+| `snowflake_stage` (external) | ExternalStage |
 | `snowflake_procedure_java` | ProcedureJava |
 | `snowflake_procedure_javascript` | ProcedureJavascript |
 | `snowflake_procedure_python` | ProcedurePython |

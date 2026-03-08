@@ -510,6 +510,9 @@ If your resource is a standard managed resource (not a grant or assignment), reg
 {: .warning }
 > Existing sync tests (`TestCELWhitelist_MatchesValidFieldExportSourceKinds` and `TestSourceResourceTypes_MatchesValidKinds`) will **fail** if these three lists are out of sync. Run tests after updating.
 
+{: .note }
+> If your resource stores sensitive information in `.status` (OAuth credentials, PII, key fingerprints, endpoint URLs), add the sensitive path prefixes to `SensitiveStatusPaths` in `api/v1alpha1/sensitive_paths.go`. This prevents FieldExport from copying those fields into ConfigMaps (unencrypted). Users must use Secret targets instead.
+
 ---
 
 ## 10. Register in ProviderConfig In-Use Guard

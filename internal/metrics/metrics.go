@@ -2,6 +2,7 @@
 package metrics
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -106,21 +107,23 @@ var (
 	)
 
 	// DBStatsWaitCount reports cumulative wait count for connections per provider.
+	// This is a cumulative gauge (resets on pool recreation), not a counter.
 	DBStatsWaitCount = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "db_wait_count_total",
-			Help:      "Total number of connections waited for per provider.",
+			Name:      "db_wait_count",
+			Help:      "Cumulative number of connections waited for per provider (resets on pool recreation).",
 		},
 		[]string{"provider"},
 	)
 
 	// DBStatsWaitDuration reports cumulative wait duration for connections per provider.
+	// This is a cumulative gauge (resets on pool recreation), not a counter.
 	DBStatsWaitDuration = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "db_wait_duration_seconds_total",
-			Help:      "Total time blocked waiting for a new connection per provider.",
+			Name:      "db_wait_duration_seconds",
+			Help:      "Cumulative time blocked waiting for a new connection per provider (resets on pool recreation).",
 		},
 		[]string{"provider"},
 	)
@@ -225,6 +228,36 @@ var CircuitBreakerState = prometheus.NewGaugeVec(
 	[]string{"provider"},
 )
 
+// LateInitTotal counts late-initialization events by controller and result.
+var LateInitTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "late_init_total",
+		Help:      "Total number of late-initialization events (spec enriched from observed Snowflake state).",
+	},
+	[]string{"controller", "result"},
+)
+
+// PreflightFailuresTotal counts pre-flight check failures by controller and reason.
+var PreflightFailuresTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "preflight_failures_total",
+		Help:      "Total number of pre-flight check failures that delay reconciliation.",
+	},
+	[]string{"controller", "reason"},
+)
+
+// SnowflakeErrorCodesTotal counts Snowflake errors by provider and error code.
+var SnowflakeErrorCodesTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "snowflake_error_codes_total",
+		Help:      "Total number of Snowflake errors by error code (e.g. 2002=already exists, 3001=not authorized).",
+	},
+	[]string{"provider", "code"},
+)
+
 // ProviderConfigHealthy reports whether each ProviderConfig is healthy
 // (1 = connected/healthy, 0 = unhealthy/disconnected).
 var ProviderConfigHealthy = prometheus.NewGaugeVec(
@@ -234,6 +267,39 @@ var ProviderConfigHealthy = prometheus.NewGaugeVec(
 		Help:      "Whether a ProviderConfig is healthy (1=connected, 0=unhealthy).",
 	},
 	[]string{"provider", "account"},
+)
+
+// SQLStatementExecutionsTotal counts SQLStatement executions by namespace, operation, and result.
+// This is an audit metric for tracking arbitrary SQL execution via the escape-hatch CRD (H1).
+var SQLStatementExecutionsTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "sql_statement_executions_total",
+		Help:      "Total number of SQLStatement SQL executions (audit trail for arbitrary SQL).",
+	},
+	[]string{"namespace", "operation"},
+)
+
+// SQLStatementDeniedTotal counts SQLStatement executions blocked by the
+// statement denylist (H1 hardening). Labels: namespace, operation (execute/revert).
+var SQLStatementDeniedTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "sql_statement_denied_total",
+		Help:      "Total number of SQLStatement executions blocked by the statement denylist.",
+	},
+	[]string{"namespace", "operation"},
+)
+
+// PolicyBodyRejectionsTotal counts policy body validation rejections by
+// the denylist in ValidatePolicyBody (H2 hardening). Labels: controller.
+var PolicyBodyRejectionsTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "policy_body_rejections_total",
+		Help:      "Total number of policy body validation rejections (denylist matches in masking/row-access policy bodies).",
+	},
+	[]string{"controller"},
 )
 
 // RecordAdoption records a successful resource adoption.
@@ -291,6 +357,43 @@ func DeleteProviderConfigHealthy(provider string) {
 	ProviderConfigHealthy.DeletePartialMatch(prometheus.Labels{"provider": provider})
 }
 
+// RecordLateInit records a late-initialization event.
+func RecordLateInit(controller string, modified bool) {
+	result := "noop"
+	if modified {
+		result = "modified"
+	}
+
+	LateInitTotal.With(prometheus.Labels{"controller": controller, "result": result}).Inc()
+}
+
+// RecordPreflightFailure records a pre-flight check failure.
+func RecordPreflightFailure(controller, reason string) {
+	PreflightFailuresTotal.With(prometheus.Labels{"controller": controller, "reason": reason}).Inc()
+}
+
+// RecordSnowflakeErrorCode records a Snowflake error by code.
+func RecordSnowflakeErrorCode(provider string, code int) {
+	SnowflakeErrorCodesTotal.With(prometheus.Labels{"provider": provider, "code": fmt.Sprintf("%d", code)}).Inc()
+}
+
+// RecordSQLStatementExecution records an SQLStatement execution event.
+// operation is one of: "execute", "revert".
+func RecordSQLStatementExecution(namespace, operation string) {
+	SQLStatementExecutionsTotal.With(prometheus.Labels{"namespace": namespace, "operation": operation}).Inc()
+}
+
+// RecordSQLStatementDenied records an SQLStatement execution blocked by the denylist.
+// operation is one of: "execute", "revert".
+func RecordSQLStatementDenied(namespace, operation string) {
+	SQLStatementDeniedTotal.With(prometheus.Labels{"namespace": namespace, "operation": operation}).Inc()
+}
+
+// RecordPolicyBodyRejection records a policy body denylist rejection.
+func RecordPolicyBodyRejection(controller string) {
+	PolicyBodyRejectionsTotal.With(prometheus.Labels{"controller": controller}).Inc()
+}
+
 // ObserveSnowflakeOp instruments a Snowflake operation with duration and result metrics.
 // The callback fn performs the actual operation; any error it returns is propagated.
 func ObserveSnowflakeOp(controller, operation string, fn func() error) error {
@@ -337,7 +440,13 @@ func init() {
 		OwnershipConflictsTotal,
 		CircuitBreakerTripsTotal,
 		CircuitBreakerState,
+		LateInitTotal,
+		PreflightFailuresTotal,
+		SnowflakeErrorCodesTotal,
 		ProviderConfigHealthy,
+		SQLStatementExecutionsTotal,
+		SQLStatementDeniedTotal,
+		PolicyBodyRejectionsTotal,
 		DBStatsMaxOpenConns,
 		DBStatsOpenConns,
 		DBStatsInUse,

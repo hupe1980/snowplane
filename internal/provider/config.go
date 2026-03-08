@@ -27,11 +27,12 @@ var AllowedTokenPathPrefixes = []string{
 // parameter must be nil — the gosnowflake driver reads the token file natively.
 func BuildSnowflakeConfig(pc *snowplanev1alpha1.ProviderConfig, secret *corev1.Secret) (snowflake.Config, error) {
 	cfg := snowflake.Config{
-		Account:   pc.Spec.Account,
-		User:      pc.Spec.User,
-		Region:    pc.Spec.Region,
-		Role:      pc.Spec.Role,
-		Warehouse: pc.Spec.Warehouse,
+		Account:                 pc.Spec.Account,
+		User:                    pc.Spec.User,
+		Region:                  pc.Spec.Region,
+		Role:                    pc.Spec.Role,
+		Warehouse:               pc.Spec.Warehouse,
+		StatementTimeoutSeconds: 300, // 5 minutes — matches DefaultReconcileTimeout
 	}
 
 	switch pc.Spec.AuthenticationType {

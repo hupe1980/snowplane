@@ -199,7 +199,7 @@ func TestIsCreateOrAlterUnsupported(t *testing.T) {
 		{"snowflake error code 2032", &gosnowflake.SnowflakeError{Number: ErrCodeCreateOrAlterUnsupported, Message: "unsupported"}, true},
 		{"string match unsupported", errors.New("SQL compilation error: UNSUPPORTED feature"), true},
 		{"string match unexpected OR", errors.New("SQL compilation error: unexpected 'OR'"), true},
-		{"string match syntax error", errors.New("SQL compilation error: syntax error"), true},
+		{"syntax error no longer matches", errors.New("SQL compilation error: syntax error"), false},
 		{"string match 002032 no longer matches", errors.New("002032 (42601): SQL compilation error"), false},
 		{"wrapped snowflake error 2032", fmt.Errorf("exec failed: %w", &gosnowflake.SnowflakeError{Number: ErrCodeCreateOrAlterUnsupported}), true},
 		{"different snowflake error code", &gosnowflake.SnowflakeError{Number: 9999, Message: "other"}, false},
@@ -209,6 +209,32 @@ func TestIsCreateOrAlterUnsupported(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.expected, IsCreateOrAlterUnsupported(tt.err))
+		})
+	}
+}
+
+func TestExtractErrorCode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      error
+		wantCode int
+		wantOK   bool
+	}{
+		{"nil error", nil, 0, false},
+		{"plain error", errors.New("something broke"), 0, false},
+		{"snowflake error", &gosnowflake.SnowflakeError{Number: 2002}, 2002, true},
+		{"wrapped snowflake error", fmt.Errorf("exec: %w", &gosnowflake.SnowflakeError{Number: 3001}), 3001, true},
+		{"double wrapped", fmt.Errorf("outer: %w", fmt.Errorf("inner: %w", &gosnowflake.SnowflakeError{Number: 1003})), 1003, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			code, ok := ExtractErrorCode(tt.err)
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.wantCode, code)
 		})
 	}
 }

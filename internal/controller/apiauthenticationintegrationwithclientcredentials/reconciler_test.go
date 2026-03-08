@@ -84,7 +84,7 @@ func newTestIntegration(name, namespace string) *snowplanev1alpha1.APIAuthentica
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:          "MY_CC_AUTH",
-			Enabled:       true,
+			Enabled:       testutil.Ptr(true),
 			OAuthClientID: "client-id",
 			OAuthClientSecretRef: snowplanev1alpha1.SecretKeyReference{
 				Name: "oauth-secret",
@@ -510,7 +510,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	obj := &snowplanev1alpha1.APIAuthenticationIntegrationWithClientCredentials{
 		Spec: snowplanev1alpha1.APIAuthenticationIntegrationWithClientCredentialsSpec{
 			Name:    "MY_CC_AUTH",
-			Enabled: true,
+			Enabled: testutil.Ptr(true),
 		},
 	}
 
@@ -531,7 +531,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	obj := &snowplanev1alpha1.APIAuthenticationIntegrationWithClientCredentials{
 		Spec: snowplanev1alpha1.APIAuthenticationIntegrationWithClientCredentialsSpec{
 			Name:    "MY_CC_AUTH",
-			Enabled: true,
+			Enabled: testutil.Ptr(true),
 			Comment: testutil.Ptr("desired"),
 		},
 	}

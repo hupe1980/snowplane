@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -262,7 +261,7 @@ func TestReconcile_CreateSchema(t *testing.T) {
 	assert.Equal(t, "ANALYTICS", capturedOpts.Name.DatabaseName())
 	assert.Equal(t, "PUBLIC", capturedOpts.Name.Name())
 	assert.False(t, capturedOpts.Transient)
-	assert.False(t, capturedOpts.ManagedAccess)
+	assert.Nil(t, capturedOpts.ManagedAccess)
 	got := &snowplanev1alpha1.Schema{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "myschema", Namespace: "default"}, got))
 	assert.True(t, conditions.IsTrue(got, snowplanev1alpha1.TypeReady))
@@ -309,7 +308,7 @@ func TestReconcile_CreateManagedAccessSchema(t *testing.T) {
 	t.Parallel()
 	schema := newTestSchema("myschema", "default")
 	schema.Finalizers = []string{finalizerName}
-	schema.Spec.ManagedAccess = true
+	schema.Spec.ManagedAccess = testutil.Ptr(true)
 	db := newTestDB("analytics-db", "default")
 	var capturedOpts snowflake.CreateSchemaOptions
 	mock := &mockService{
@@ -331,7 +330,8 @@ func TestReconcile_CreateManagedAccessSchema(t *testing.T) {
 	r := newTestReconciler(mock, schema, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
 	require.NoError(t, err)
-	assert.True(t, capturedOpts.ManagedAccess)
+	assert.NotNil(t, capturedOpts.ManagedAccess)
+	assert.True(t, *capturedOpts.ManagedAccess)
 }
 
 func TestReconcile_CreateFails(t *testing.T) {
@@ -645,7 +645,7 @@ func TestBuildCreateOptions(t *testing.T) {
 	tl := snowplanev1alpha1.TraceLevelAlways
 	schema := newTestSchema("myschema", "default")
 	schema.Spec.Transient = true
-	schema.Spec.ManagedAccess = true
+	schema.Spec.ManagedAccess = testutil.Ptr(true)
 	schema.Spec.Comment = testutil.Ptr("test")
 	schema.Spec.DataRetentionTimeInDays = testutil.Ptr(int32(7))
 	schema.Spec.MaxDataExtensionTimeInDays = testutil.Ptr(int32(28))
@@ -658,7 +658,8 @@ func TestBuildCreateOptions(t *testing.T) {
 	id := snowflake.NewDatabaseObjectIdentifier("ANALYTICS", "PUBLIC")
 	opts := buildCreateOptions(schema, id)
 	assert.True(t, opts.Transient)
-	assert.True(t, opts.ManagedAccess)
+	assert.NotNil(t, opts.ManagedAccess)
+	assert.True(t, *opts.ManagedAccess)
 	assert.Equal(t, "test", *opts.Comment)
 	assert.Equal(t, int32(7), *opts.DataRetentionTimeInDays)
 	assert.Equal(t, int32(28), *opts.MaxDataExtensionTimeInDays)
@@ -723,7 +724,7 @@ func TestBuildAlterOptions_AllDiffs(t *testing.T) {
 	schema.Spec.LogLevel = &ll
 	schema.Spec.MetricLevel = &ml
 	schema.Spec.TraceLevel = &tl
-	schema.Spec.ManagedAccess = true
+	schema.Spec.ManagedAccess = testutil.Ptr(true)
 
 	id := snowflake.NewDatabaseObjectIdentifier("ANALYTICS", "PUBLIC")
 	obs := successfulObservation()
@@ -747,7 +748,7 @@ func TestBuildAlterOptions_ManagedAccessDisableDiff(t *testing.T) {
 	t.Parallel()
 
 	schema := newTestSchema("myschema", "default")
-	schema.Spec.ManagedAccess = false
+	schema.Spec.ManagedAccess = testutil.Ptr(false)
 
 	id := snowflake.NewDatabaseObjectIdentifier("ANALYTICS", "PUBLIC")
 	obs := successfulObservation()
@@ -810,7 +811,7 @@ func TestReconcile_ReferencesResolvedCondition(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Tests: UNSET support (C-2)
+// Tests: UNSET support
 // --------------------------------------------------------------------------
 
 func TestBuildAlterOptions_UnsetDetection(t *testing.T) {
@@ -928,7 +929,7 @@ func TestReconcile_UnsetTriggered(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Tests: Recoverable condition (H-4)
+// Tests: Recoverable condition
 // --------------------------------------------------------------------------
 
 func TestReconcile_RecoverableConditionOnTransientError(t *testing.T) {
@@ -1181,7 +1182,7 @@ func TestReconcile_CreatePostObserveError(t *testing.T) {
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("myschema", "default"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "post-create observe")
-	assert.Equal(t, 5*time.Second, result.RequeueAfter)
+	assert.Zero(t, result.RequeueAfter, "error return should let controller-runtime apply exponential backoff")
 
 	got := &snowplanev1alpha1.Schema{}
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "myschema", Namespace: "default"}, got))

@@ -1,0 +1,12 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: GitRepository
+metadata:
+  name: gitrepository-sample
+spec:
+  providerRef:
+    name: snowplane-provider
+  name: MY_GIT_REPO
+  databaseName: MY_DATABASE
+  schemaName: MY_SCHEMA
+  origin: "https://github.com/example/repo.git"
+  apiIntegration: MY_GIT_API_INTEGRATION

@@ -262,7 +262,7 @@ just test-e2e
 
 ## Code Style
 
-- `golangci-lint` enforces style (`.golangci.yml`) — includes `gosec` (security), `errorlint` (error wrapping), `gofmt`, `goimports`
+- `golangci-lint` enforces style (`.golangci.yml`) — includes `gosec` (security), `errorlint` (error wrapping), `gofmt`, `goimports`, `forbidigo` (bans `UnsafeRaw` to prevent SQL injection — new call sites require `//nolint:forbidigo` with a justification comment)
 - All exported functions have doc comments
 - All tests are parallelised (`t.Parallel()`)
 - Constants from `api/v1alpha1/conditions.go` — no magic strings

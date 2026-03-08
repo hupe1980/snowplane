@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	// Automatically set GOMAXPROCS to match the container's CPU quota.
 	// Without this, Go defaults to the host CPU count, causing excessive
@@ -37,11 +39,17 @@ import (
 	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	computepoolctl "github.com/hupe1980/snowplane/internal/controller/computepool"
+	cortexsearchservicectl "github.com/hupe1980/snowplane/internal/controller/cortexsearchservice"
 	database "github.com/hupe1980/snowplane/internal/controller/database"
 	databaserolectl "github.com/hupe1980/snowplane/internal/controller/databaserole"
 	dynamictablectl "github.com/hupe1980/snowplane/internal/controller/dynamictable"
+	emailnotificationintegrationctl "github.com/hupe1980/snowplane/internal/controller/emailnotificationintegration"
+	externalfunctionctl "github.com/hupe1980/snowplane/internal/controller/externalfunction"
 	externaloauthintegrationctl "github.com/hupe1980/snowplane/internal/controller/externaloauthintegration"
+	externalstagectl "github.com/hupe1980/snowplane/internal/controller/externalstage"
 	externaltablectl "github.com/hupe1980/snowplane/internal/controller/externaltable"
+	externalvolumectl "github.com/hupe1980/snowplane/internal/controller/externalvolume"
 	failovergroupctl "github.com/hupe1980/snowplane/internal/controller/failovergroup"
 	fieldexportctl "github.com/hupe1980/snowplane/internal/controller/fieldexport"
 	fileformatctl "github.com/hupe1980/snowplane/internal/controller/fileformat"
@@ -50,15 +58,17 @@ import (
 	functionpythonctl "github.com/hupe1980/snowplane/internal/controller/functionpython"
 	functionscalactl "github.com/hupe1980/snowplane/internal/controller/functionscala"
 	functionsqlctl "github.com/hupe1980/snowplane/internal/controller/functionsql"
+	gitrepositoryctl "github.com/hupe1980/snowplane/internal/controller/gitrepository"
 	grantctl "github.com/hupe1980/snowplane/internal/controller/grant"
 	grantownershipctl "github.com/hupe1980/snowplane/internal/controller/grantownership"
+	imagerepositoryctl "github.com/hupe1980/snowplane/internal/controller/imagerepository"
+	internalstagectl "github.com/hupe1980/snowplane/internal/controller/internalstage"
 	maskingpolicyctl "github.com/hupe1980/snowplane/internal/controller/maskingpolicy"
 	maskingpolicyapplicationctl "github.com/hupe1980/snowplane/internal/controller/maskingpolicyapplication"
 	materializedviewctl "github.com/hupe1980/snowplane/internal/controller/materializedview"
 	networkpolicyctl "github.com/hupe1980/snowplane/internal/controller/networkpolicy"
 	networkpolicyattachmentctl "github.com/hupe1980/snowplane/internal/controller/networkpolicyattachment"
 	networkrulectl "github.com/hupe1980/snowplane/internal/controller/networkrule"
-	notificationintegrationctl "github.com/hupe1980/snowplane/internal/controller/notificationintegration"
 	passwordpolicyctl "github.com/hupe1980/snowplane/internal/controller/passwordpolicy"
 	passwordpolicyattachmentctl "github.com/hupe1980/snowplane/internal/controller/passwordpolicyattachment"
 	pipectl "github.com/hupe1980/snowplane/internal/controller/pipe"
@@ -68,23 +78,28 @@ import (
 	procedurescalactl "github.com/hupe1980/snowplane/internal/controller/procedurescala"
 	proceduresqlctl "github.com/hupe1980/snowplane/internal/controller/proceduresql"
 	providerconfig "github.com/hupe1980/snowplane/internal/controller/providerconfig"
+	queuenotificationintegrationctl "github.com/hupe1980/snowplane/internal/controller/queuenotificationintegration"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	resourcemonitorctl "github.com/hupe1980/snowplane/internal/controller/resourcemonitor"
 	roleassignmentctl "github.com/hupe1980/snowplane/internal/controller/roleassignment"
 	rowaccesspolicyctl "github.com/hupe1980/snowplane/internal/controller/rowaccesspolicy"
 	saml2integrationctl "github.com/hupe1980/snowplane/internal/controller/saml2integration"
 	schemactl "github.com/hupe1980/snowplane/internal/controller/schema"
+	scimintegrationctl "github.com/hupe1980/snowplane/internal/controller/scimintegration"
 	secondarydatabasectl "github.com/hupe1980/snowplane/internal/controller/secondarydatabase"
 	secretwithauthorizationcodegrantctl "github.com/hupe1980/snowplane/internal/controller/secretwithauthorizationcodegrant"
 	secretwithbasicauthenticationctl "github.com/hupe1980/snowplane/internal/controller/secretwithbasicauthentication"
 	secretwithclientcredentialsctl "github.com/hupe1980/snowplane/internal/controller/secretwithclientcredentials"
 	secretwithgenericstringctl "github.com/hupe1980/snowplane/internal/controller/secretwithgenericstring"
-	securityintegrationctl "github.com/hupe1980/snowplane/internal/controller/securityintegration"
 	sequencectl "github.com/hupe1980/snowplane/internal/controller/sequence"
+	servicectl "github.com/hupe1980/snowplane/internal/controller/service"
+	sharectl "github.com/hupe1980/snowplane/internal/controller/share"
 	shareddatabasectl "github.com/hupe1980/snowplane/internal/controller/shareddatabase"
 	sqlstatementctl "github.com/hupe1980/snowplane/internal/controller/sqlstatement"
-	stagectl "github.com/hupe1980/snowplane/internal/controller/stage"
-	storageintegrationctl "github.com/hupe1980/snowplane/internal/controller/storageintegration"
+	storageintegrationawsctl "github.com/hupe1980/snowplane/internal/controller/storageintegrationaws"
+	storageintegrationazurectl "github.com/hupe1980/snowplane/internal/controller/storageintegrationazure"
+	storageintegrationgcsctl "github.com/hupe1980/snowplane/internal/controller/storageintegrationgcs"
+	streamlitctl "github.com/hupe1980/snowplane/internal/controller/streamlit"
 	streamondirectorytablectl "github.com/hupe1980/snowplane/internal/controller/streamondirectorytable"
 	streamondynamictablectl "github.com/hupe1980/snowplane/internal/controller/streamondynamictable"
 	streamonexternaltablectl "github.com/hupe1980/snowplane/internal/controller/streamonexternaltable"
@@ -98,7 +113,10 @@ import (
 	userctl "github.com/hupe1980/snowplane/internal/controller/user"
 	viewctl "github.com/hupe1980/snowplane/internal/controller/view"
 	warehousectl "github.com/hupe1980/snowplane/internal/controller/warehouse"
+	webhooknotificationintegrationctl "github.com/hupe1980/snowplane/internal/controller/webhooknotificationintegration"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
+	"github.com/hupe1980/snowplane/internal/sharding"
+	"github.com/hupe1980/snowplane/internal/tracing"
 	"github.com/hupe1980/snowplane/internal/utils/sanitize"
 	"github.com/hupe1980/snowplane/internal/webhook"
 
@@ -202,6 +220,13 @@ func main() {
 	var webhookPort int
 	var webhookCertDir string
 	var enableSQLStatement bool
+	var sqlStatementDenylist string
+	var enableTracing bool
+	var otelEndpoint string
+	var otelSamplingRatio float64
+	var otelInsecure bool
+	var shardID int
+	var shardCount int
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -226,7 +251,7 @@ func main() {
 	flag.BoolVar(&enableAlphaResources, "enable-alpha-resources", true,
 		"Enable controllers for alpha-maturity CRDs. Set to false to skip alpha resources.")
 	flag.StringVar(&disableControllers, "disable-controllers", "",
-		"Comma-separated list of controller names to disable (e.g. \"grantprivilegestoaccountrole,stage,view\"). "+
+		"Comma-separated list of controller names to disable (e.g. \"grantprivilegestoaccountrole,internalstage,view\"). "+
 			"Pass an invalid name to see the full list of valid controller names.")
 	flag.StringVar(&watchNamespaces, "watch-namespaces", "",
 		"Comma-separated list of namespaces to watch. If empty, all namespaces are watched.")
@@ -244,18 +269,50 @@ func main() {
 	flag.BoolVar(&enableSQLStatement, "enable-sql-statement", false,
 		"Enable the SQLStatement escape-hatch controller. "+
 			"This allows executing arbitrary SQL against Snowflake — use with caution.")
+	flag.StringVar(&sqlStatementDenylist, "sql-statement-denylist", "",
+		"Comma-separated list of SQL keyword patterns to block in SQLStatement execute/revert SQL. "+
+			"Example: \"DROP DATABASE,ALTER USER,DROP SCHEMA\". Empty means no denylist (all statements allowed).")
 	flag.BoolVar(&enableWebhook, "enable-webhook", false,
 		"Enable the ownership-conflict validating admission webhook.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443,
 		"Port for the webhook server (only used when --enable-webhook is set).")
 	flag.StringVar(&webhookCertDir, "webhook-cert-dir", "/tmp/k8s-webhook-server/serving-certs",
 		"Directory containing TLS cert and key for the webhook server.")
+	flag.BoolVar(&enableTracing, "enable-tracing", false,
+		"Enable OpenTelemetry distributed tracing export.")
+	flag.StringVar(&otelEndpoint, "otel-endpoint", "localhost:4317",
+		"gRPC endpoint for the OpenTelemetry Collector (host:port).")
+	flag.Float64Var(&otelSamplingRatio, "otel-sampling-ratio", 1.0,
+		"Trace sampling ratio (0.0–1.0). 1.0 = sample everything, 0.1 = 10%%.")
+	flag.BoolVar(&otelInsecure, "otel-insecure", true,
+		"Use insecure (plaintext) gRPC connection to the OTel Collector.")
+	flag.IntVar(&shardID, "shard-id", 0,
+		"Zero-based shard index for this manager instance (used with --shard-count).")
+	flag.IntVar(&shardCount, "shard-count", 1,
+		"Total number of manager shards. 1 = no sharding (single instance).")
 
 	opts := zap.Options{Development: developmentMode}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// Set up OpenTelemetry tracing.
+	tracingProvider, err := tracing.Setup(context.Background(), tracing.Config{
+		Enabled:       enableTracing,
+		Endpoint:      otelEndpoint,
+		SamplingRatio: otelSamplingRatio,
+		Insecure:      otelInsecure,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to set up OpenTelemetry tracing")
+		os.Exit(1)
+	}
+	defer tracingProvider.Shutdown()
+
+	if enableTracing {
+		setupLog.Info("OpenTelemetry tracing enabled", "endpoint", otelEndpoint, "samplingRatio", otelSamplingRatio)
+	}
 
 	mgrOpts := ctrl.Options{
 		Scheme: scheme,
@@ -325,6 +382,14 @@ func main() {
 	// Parse role allowlist.
 	allowedRolesSet := parseAllowedRoles(allowedRoles)
 
+	// Configure sharding predicate (no-op when shardCount <= 1).
+	shardOpts := sharding.Options{ShardID: shardID, ShardCount: shardCount}
+	var shardPred predicate.Predicate
+	if shardOpts.Enabled() {
+		shardPred = sharding.NewPredicate(shardOpts)
+		setupLog.Info("controller sharding enabled", "shardID", shardID, "shardCount", shardCount)
+	}
+
 	kc := mgr.GetClient()
 
 	// Set up ProviderConfig reconciler.
@@ -355,6 +420,7 @@ func main() {
 		Maturity:                "alpha",
 		AlphaEnabled:            enableAlphaResources,
 		MaxConcurrentReconciles: maxConcurrentReconciles,
+		ShardPredicate:          shardPred,
 	}
 
 	// Declarative controller registration table.
@@ -378,7 +444,8 @@ func main() {
 		{"user", userctl.NewReconciler(kc, factory, controllerRec("user"), rl)},
 		{"table", tablectl.NewReconciler(kc, factory, controllerRec("table"), rl)},
 		{"view", viewctl.NewReconciler(kc, factory, controllerRec("view"), rl)},
-		{"stage", stagectl.NewReconciler(kc, factory, controllerRec("stage"), rl)},
+		{"externalstage", externalstagectl.NewReconciler(kc, factory, controllerRec("externalstage"), rl)},
+		{"internalstage", internalstagectl.NewReconciler(kc, factory, controllerRec("internalstage"), rl)},
 		{"task", taskctl.NewReconciler(kc, factory, controllerRec("task"), rl)},
 		{"streamontable", streamontablectl.NewReconciler(kc, factory, controllerRec("streamontable"), rl)},
 		{"streamonview", streamonviewctl.NewReconciler(kc, factory, controllerRec("streamonview"), rl)},
@@ -391,18 +458,24 @@ func main() {
 		{"maskingpolicy", maskingpolicyctl.NewReconciler(kc, factory, controllerRec("maskingpolicy"), rl)},
 		{"rowaccesspolicy", rowaccesspolicyctl.NewReconciler(kc, factory, controllerRec("rowaccesspolicy"), rl)},
 		{"grantownership", grantownershipctl.NewReconciler(kc, factory, controllerRec("grantownership"), rl)},
-		{"storageintegration", storageintegrationctl.NewReconciler(kc, factory, controllerRec("storageintegration"), rl)},
+		{"externalvolume", externalvolumectl.NewReconciler(kc, factory, controllerRec("externalvolume"), rl)},
+		{"cortexsearchservice", cortexsearchservicectl.NewReconciler(kc, factory, controllerRec("cortexsearchservice"), rl)},
+		{"storageintegrationaws", storageintegrationawsctl.NewReconciler(kc, factory, controllerRec("storageintegrationaws"), rl)},
+		{"storageintegrationazure", storageintegrationazurectl.NewReconciler(kc, factory, controllerRec("storageintegrationazure"), rl)},
+		{"storageintegrationgcs", storageintegrationgcsctl.NewReconciler(kc, factory, controllerRec("storageintegrationgcs"), rl)},
 		{"fileformat", fileformatctl.NewReconciler(kc, factory, controllerRec("fileformat"), rl)},
 		{"pipe", pipectl.NewReconciler(kc, factory, controllerRec("pipe"), rl)},
 		{"dynamictable", dynamictablectl.NewReconciler(kc, factory, controllerRec("dynamictable"), rl)},
-		{"notificationintegration", notificationintegrationctl.NewReconciler(kc, factory, controllerRec("notificationintegration"), rl)},
+		{"emailnotificationintegration", emailnotificationintegrationctl.NewReconciler(kc, factory, controllerRec("emailnotificationintegration"), rl)},
+		{"queuenotificationintegration", queuenotificationintegrationctl.NewReconciler(kc, factory, controllerRec("queuenotificationintegration"), rl)},
+		{"webhooknotificationintegration", webhooknotificationintegrationctl.NewReconciler(kc, factory, controllerRec("webhooknotificationintegration"), rl)},
 		{"saml2integration", saml2integrationctl.NewReconciler(kc, factory, controllerRec("saml2integration"), rl)},
+		{"scimintegration", scimintegrationctl.NewReconciler(kc, factory, controllerRec("scimintegration"), rl)},
 		{"externaloauthintegration", externaloauthintegrationctl.NewReconciler(kc, factory, controllerRec("externaloauthintegration"), rl)},
 		{"failovergroup", failovergroupctl.NewReconciler(kc, factory, controllerRec("failovergroup"), rl)},
 		{"apiintegration", apiintegrationctl.NewReconciler(kc, factory, controllerRec("apiintegration"), rl)},
 		{"secondarydatabase", secondarydatabasectl.NewReconciler(kc, factory, controllerRec("secondarydatabase"), rl)},
 		{"shareddatabase", shareddatabasectl.NewReconciler(kc, factory, controllerRec("shareddatabase"), rl)},
-		{"securityintegration", securityintegrationctl.NewReconciler(kc, factory, controllerRec("securityintegration"), rl)},
 		{"passwordpolicy", passwordpolicyctl.NewReconciler(kc, factory, controllerRec("passwordpolicy"), rl)},
 		{"networkrule", networkrulectl.NewReconciler(kc, factory, controllerRec("networkrule"), rl)},
 		{"accountroleassignment", roleassignmentctl.NewAccountRoleAssignmentReconciler(kc, factory, controllerRec("accountroleassignment"), rl)},
@@ -432,6 +505,13 @@ func main() {
 		{"apiauthenticationintegrationwithclientcredentials", apiauthccctl.NewReconciler(kc, factory, controllerRec("apiauthenticationintegrationwithclientcredentials"), rl)},
 		{"apiauthenticationintegrationwithauthorizationcodegrant", apiauthacgctl.NewReconciler(kc, factory, controllerRec("apiauthenticationintegrationwithauthorizationcodegrant"), rl)},
 		{"apiauthenticationintegrationwithjwtbearer", apiauthjwtctl.NewReconciler(kc, factory, controllerRec("apiauthenticationintegrationwithjwtbearer"), rl)},
+		{"share", sharectl.NewReconciler(kc, factory, controllerRec("share"), rl)},
+		{"externalfunction", externalfunctionctl.NewReconciler(kc, factory, controllerRec("externalfunction"), rl)},
+		{"computepool", computepoolctl.NewReconciler(kc, factory, controllerRec("computepool"), rl)},
+		{"service", servicectl.NewReconciler(kc, factory, controllerRec("service"), rl)},
+		{"imagerepository", imagerepositoryctl.NewReconciler(kc, factory, controllerRec("imagerepository"), rl)},
+		{"gitrepository", gitrepositoryctl.NewReconciler(kc, factory, controllerRec("gitrepository"), rl)},
+		{"streamlit", streamlitctl.NewReconciler(kc, factory, controllerRec("streamlit"), rl)},
 	}
 
 	// Validate --disable-controllers against the registration table (single
@@ -476,7 +556,17 @@ func main() {
 		sqlstmtCfg := cfg
 		sqlstmtCfg.Disabled = false // already gated by enableSQLStatement flag
 
-		if err := sqlstatementctl.NewReconciler(kc, factory, controllerRec("sqlstatement"), rl).Setup(sqlstmtCfg); err != nil {
+		denylist, err := sqlstatementctl.ParseStatementDenylist(sqlStatementDenylist)
+		if err != nil {
+			setupLog.Error(err, "invalid --sql-statement-denylist flag")
+			os.Exit(1)
+		}
+
+		if !denylist.IsEmpty() {
+			setupLog.Info("SQLStatement denylist configured", "patterns", denylist.Len())
+		}
+
+		if err := sqlstatementctl.NewReconciler(kc, factory, controllerRec("sqlstatement"), rl, denylist).Setup(sqlstmtCfg); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "SQLStatement")
 			os.Exit(1)
 		}

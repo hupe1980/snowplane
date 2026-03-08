@@ -28,6 +28,7 @@ import (
 	sqlstmtclient "github.com/hupe1980/snowplane/internal/clients/snowflake/sqlstatement"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
+	"github.com/hupe1980/snowplane/internal/metrics"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
 )
 
@@ -61,6 +62,7 @@ type ServiceFactory func(ctx context.Context, sfClient SnowflakeClient, useRole 
 // would otherwise occur.
 type sqlStatementIdentifier struct {
 	name         string
+	namespace    string // needed for audit metrics
 	observeSQL   string
 	expectations []sqlstmtclient.Expectation
 	revertSQL    string
@@ -77,8 +79,10 @@ type noopAlterOptions struct{}
 func (o *noopAlterOptions) HasChanges() bool { return false }
 
 // NewReconciler returns a new SQLStatement reconciler backed by the generic framework.
-func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter) *reconciler.GenericReconciler[*snowplanev1alpha1.SQLStatement, Service, *sqlstmtclient.Observation] {
-	return NewReconcilerWithServiceFactory(c, factory, recorder, rl,
+// The denylist parameter (may be nil) blocks SQL statements matching configured patterns
+// before they are executed against Snowflake (H1 hardening).
+func NewReconciler(c client.Client, factory *clientfactory.ClientFactory, recorder record.EventRecorder, rl *ratelimit.Limiter, denylist *StatementDenylist) *reconciler.GenericReconciler[*snowplanev1alpha1.SQLStatement, Service, *sqlstmtclient.Observation] {
+	return NewReconcilerWithServiceFactory(c, factory, recorder, rl, denylist,
 		reconciler.MakeServiceFactory(func(exec snowflake.SQLExecutor) Service {
 			return sqlstmtclient.NewClient(exec)
 		}),
@@ -92,13 +96,14 @@ func NewReconcilerWithServiceFactory(
 	factory *clientfactory.ClientFactory,
 	recorder record.EventRecorder,
 	rl *ratelimit.Limiter,
+	denylist *StatementDenylist,
 	sf ServiceFactory,
 ) *reconciler.GenericReconciler[*snowplanev1alpha1.SQLStatement, Service, *sqlstmtclient.Observation] {
-	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(sf))
+	return reconciler.NewGenericReconciler(c, factory, recorder, rl, newAdapter(sf, denylist))
 }
 
 // newAdapter creates the BaseAdapter for SQLStatement resources.
-func newAdapter(sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.SQLStatement, Service, *sqlstmtclient.Observation] {
+func newAdapter(sf ServiceFactory, denylist *StatementDenylist) *reconciler.BaseAdapter[*snowplanev1alpha1.SQLStatement, Service, *sqlstmtclient.Observation] {
 	return &reconciler.BaseAdapter[*snowplanev1alpha1.SQLStatement, Service, *sqlstmtclient.Observation]{
 		ResourceNameVal:  "sqlstatement",
 		FinalizerNameVal: finalizerName,
@@ -121,6 +126,7 @@ func newAdapter(sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.SQ
 
 			return sqlStatementIdentifier{
 				name:         obj.Name,
+				namespace:    obj.Namespace,
 				observeSQL:   observeSQL,
 				expectations: specExpectationsToClient(obj.Spec.ObserveExpect),
 				revertSQL:    revertSQL,
@@ -166,9 +172,18 @@ func newAdapter(sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.SQ
 
 		// Create runs the execute SQL and records the hash.
 		CreateFn: func(ctx context.Context, svc Service, obj *snowplanev1alpha1.SQLStatement, _ reconciler.Identifier) error {
+			// H1: Check execute SQL against statement denylist.
+			if err := denylist.Check(obj.Spec.Execute); err != nil {
+				metrics.RecordSQLStatementDenied(obj.Namespace, "execute")
+				return snowflake.NewTerminalError(err)
+			}
+
 			if err := svc.Execute(ctx, obj.Spec.Execute); err != nil {
 				return err
 			}
+
+			// H1: Audit trail for arbitrary SQL execution.
+			metrics.RecordSQLStatementExecution(obj.Namespace, "execute")
 
 			// Record the execute hash so we can detect changes.
 			obj.Status.ExecuteHash = sqlstmtclient.HashSQL(obj.Spec.Execute)
@@ -189,7 +204,20 @@ func newAdapter(sf ServiceFactory) *reconciler.BaseAdapter[*snowplanev1alpha1.SQ
 				return nil
 			}
 
-			return svc.Revert(ctx, sid.revertSQL)
+			// H1: Check revert SQL against statement denylist.
+			if err := denylist.Check(sid.revertSQL); err != nil {
+				metrics.RecordSQLStatementDenied(sid.namespace, "revert")
+				return snowflake.NewTerminalError(err)
+			}
+
+			if err := svc.Revert(ctx, sid.revertSQL); err != nil {
+				return err
+			}
+
+			// H1: Audit trail for revert SQL execution.
+			metrics.RecordSQLStatementExecution(sid.namespace, "revert")
+
+			return nil
 		},
 
 		ValidateImmutableFn: validateImmutableFields,

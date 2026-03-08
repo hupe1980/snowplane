@@ -289,7 +289,7 @@ func TestReconcile_CreatePostObserveError(t *testing.T) {
 	result, err := r.Reconcile(context.Background(), testutil.ReconcileReq("test-user", "default"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "post-create observe")
-	assert.Equal(t, 5*time.Second, result.RequeueAfter)
+	assert.Zero(t, result.RequeueAfter, "error return should let controller-runtime apply exponential backoff")
 }
 
 // --------------------------------------------------------------------------
@@ -782,7 +782,7 @@ func TestHashSecret(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// Unit: RSA key change detection (L-12)
+// Unit: RSA key change detection
 // --------------------------------------------------------------------------
 
 func TestBuildAlterOptions_RSAKeyChanged(t *testing.T) {

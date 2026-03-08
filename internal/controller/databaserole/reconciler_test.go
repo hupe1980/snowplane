@@ -128,8 +128,8 @@ func newSuccessfulObservation() *snowflake.DatabaseRoleObservation {
 			DatabaseName:   "MY_DB",
 			Comment:        "",
 			Owner:          "SYSADMIN",
-			GrantedToRoles: 0,
-			GrantedRoles:   0,
+			GrantedToRoles: ptr(int32(0)),
+			GrantedRoles:   ptr(int32(0)),
 		},
 	}
 }

@@ -64,7 +64,7 @@ func newTestIntegration(name, namespace string) *snowplanev1alpha1.APIAuthentica
 				ProviderRef:    snowplanev1alpha1.ProviderReference{Name: "default-pc"},
 			},
 			Name:          "MY_JWT_AUTH",
-			Enabled:       true,
+			Enabled:       testutil.Ptr(true),
 			OAuthClientID: "jwt-client",
 			OAuthClientSecretRef: snowplanev1alpha1.SecretKeyReference{
 				Name: "oauth-secret",
@@ -436,7 +436,7 @@ func TestDetectDrift_NoDrift(t *testing.T) {
 	t.Parallel()
 	obj := &snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBearer{
 		Spec: snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBearerSpec{
-			Name: "MY_JWT_AUTH", Enabled: true, OAuthAssertionIssuer: "https://issuer.example.com",
+			Name: "MY_JWT_AUTH", Enabled: testutil.Ptr(true), OAuthAssertionIssuer: "https://issuer.example.com",
 		},
 	}
 	obs := &snowflake.APIAuthenticationIntegrationObservation{
@@ -453,7 +453,7 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	obj := &snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBearer{
 		Spec: snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBearerSpec{
 			Name:                 "MY_JWT_AUTH",
-			Enabled:              true,
+			Enabled:              testutil.Ptr(true),
 			OAuthAssertionIssuer: "https://issuer.example.com",
 			Comment:              testutil.Ptr("desired"),
 		},

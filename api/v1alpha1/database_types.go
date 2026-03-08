@@ -50,6 +50,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.transient == oldSelf.transient",message="spec.transient is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="!self.name.contains('.')",message="spec.name must not contain dots (dots break fully qualified name resolution)"
 type DatabaseSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -59,6 +60,7 @@ type DatabaseSpec struct {
 	Name string `json:"name"`
 
 	// Comment is an optional description for the database.
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// DataRetentionTimeInDays specifies the Time Travel retention period (0–90 days).
@@ -144,7 +146,7 @@ type DatabaseStatus struct {
 // Database is the Schema for the databases API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=db
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

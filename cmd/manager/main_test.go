@@ -11,7 +11,7 @@ import (
 var testControllerNames = []string{
 	"alert", "authenticationpolicy", "database", "schema", "warehouse",
 	"accountrole", "databaserole", "grantprivilegestoaccountrole", "grantprivilegestodatabaserole",
-	"grantprivilegestoshare", "user", "table", "view", "stage", "task", "fieldexport",
+	"grantprivilegestoshare", "user", "table", "view", "task", "fieldexport",
 }
 
 func TestParseDisabledControllers_Empty(t *testing.T) {
@@ -29,18 +29,18 @@ func TestParseDisabledControllers_Single(t *testing.T) {
 
 func TestParseDisabledControllers_Multiple(t *testing.T) {
 	t.Parallel()
-	result := parseDisabledControllers("grantprivilegestoaccountrole,stage,view")
+	result := parseDisabledControllers("grantprivilegestoaccountrole,alert,view")
 	assert.True(t, result["grantprivilegestoaccountrole"])
-	assert.True(t, result["stage"])
+	assert.True(t, result["alert"])
 	assert.True(t, result["view"])
 	assert.False(t, result["database"])
 }
 
 func TestParseDisabledControllers_WithSpaces(t *testing.T) {
 	t.Parallel()
-	result := parseDisabledControllers(" grantprivilegestoaccountrole , stage , view ")
+	result := parseDisabledControllers(" grantprivilegestoaccountrole , alert , view ")
 	assert.True(t, result["grantprivilegestoaccountrole"])
-	assert.True(t, result["stage"])
+	assert.True(t, result["alert"])
 	assert.True(t, result["view"])
 }
 
@@ -61,14 +61,14 @@ func TestValidateDisabledControllers_InvalidName(t *testing.T) {
 
 func TestValidateDisabledControllers_AllValid(t *testing.T) {
 	t.Parallel()
-	disabled := parseDisabledControllers("database,schema,warehouse,accountrole,databaserole,grantprivilegestoaccountrole,grantprivilegestodatabaserole,grantprivilegestoshare,user,table,view,stage,fieldexport")
+	disabled := parseDisabledControllers("database,schema,warehouse,accountrole,databaserole,grantprivilegestoaccountrole,grantprivilegestodatabaserole,grantprivilegestoshare,user,table,view,fieldexport")
 	err := validateDisabledControllers(disabled, testControllerNames)
 	require.NoError(t, err)
-	assert.Equal(t, 13, len(disabled))
+	assert.Equal(t, 12, len(disabled))
 }
 
 // --------------------------------------------------------------------------
-// Tests: parseAllowedRoles (M-4)
+// Tests: parseAllowedRoles
 // --------------------------------------------------------------------------
 
 func TestParseAllowedRoles_Empty(t *testing.T) {
@@ -130,5 +130,5 @@ func TestParseAllowedRoles_OnlyCommasAndSpaces(t *testing.T) {
 // --------------------------------------------------------------------------
 // Tests: validateDisabledControllers — completeness is now guaranteed by
 // design since valid names are derived from the controllers registration
-// table rather than a manually maintained map (M-5).
+// table rather than a manually maintained map.
 // --------------------------------------------------------------------------

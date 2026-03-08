@@ -94,7 +94,8 @@ var types = []TypeDef{
 	{TypeName: "Tag", Receiver: "t", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
 	{TypeName: "MaskingPolicy", Receiver: "mp", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
 	{TypeName: "RowAccessPolicy", Receiver: "rap", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
-	{TypeName: "Stage", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "ExternalStage", Receiver: "es", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "InternalStage", Receiver: "is", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
 	{TypeName: "StreamOnTable", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
 	{TypeName: "StreamOnView", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
 	{TypeName: "StreamOnExternalTable", Receiver: "s", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
@@ -108,7 +109,13 @@ var types = []TypeDef{
 	// Pattern A2 — Standard resources without owner column
 	{TypeName: "NetworkPolicy", Receiver: "np", Owner: OwnerEmpty, OwnerComment: "SHOW NETWORK POLICIES does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "ResourceMonitor", Receiver: "rm", Owner: OwnerEmpty, OwnerComment: "SHOW RESOURCE MONITORS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "StorageIntegration", Receiver: "si", Owner: OwnerEmpty, OwnerComment: "SHOW STORAGE INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "ExternalVolume", Receiver: "ev", Owner: OwnerEmpty, OwnerComment: "SHOW EXTERNAL VOLUMES does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "StorageIntegrationAWS", Receiver: "sia", Owner: OwnerEmpty, OwnerComment: "SHOW STORAGE INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "StorageIntegrationAzure", Receiver: "siaz", Owner: OwnerEmpty, OwnerComment: "SHOW STORAGE INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "StorageIntegrationGCS", Receiver: "sig", Owner: OwnerEmpty, OwnerComment: "SHOW STORAGE INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+
+	// Cortex Search Service — schema-scoped, no owner column in SHOW
+	{TypeName: "CortexSearchService", Receiver: "css", Owner: OwnerEmpty, OwnerComment: "SHOW CORTEX SEARCH SERVICES does not return an owner column.", TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
 
 	// Pattern A3 — Schema-level resources with ShowOutput.Owner (new Phase 5 resources)
 	{TypeName: "FileFormat", Receiver: "ff", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
@@ -116,9 +123,11 @@ var types = []TypeDef{
 	{TypeName: "DynamicTable", Receiver: "dt", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
 
 	// Phase 6 — Wave 2 resources
-	{TypeName: "NotificationIntegration", Receiver: "ni", Owner: OwnerEmpty, OwnerComment: "SHOW NOTIFICATION INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
-	{TypeName: "SecurityIntegration", Receiver: "si", Owner: OwnerEmpty, OwnerComment: "SHOW SECURITY INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "EmailNotificationIntegration", Receiver: "eni", Owner: OwnerEmpty, OwnerComment: "SHOW NOTIFICATION INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "QueueNotificationIntegration", Receiver: "qni", Owner: OwnerEmpty, OwnerComment: "SHOW NOTIFICATION INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "WebhookNotificationIntegration", Receiver: "wni", Owner: OwnerEmpty, OwnerComment: "SHOW NOTIFICATION INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "SAML2Integration", Receiver: "si", Owner: OwnerEmpty, OwnerComment: "SHOW SECURITY INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "SCIMIntegration", Receiver: "sci", Owner: OwnerEmpty, OwnerComment: "SHOW SECURITY INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "ExternalOAuthIntegration", Receiver: "eoi", Owner: OwnerEmpty, OwnerComment: "SHOW SECURITY INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "FailoverGroup", Receiver: "fg", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
 	{TypeName: "APIIntegration", Receiver: "ai", Owner: OwnerEmpty, OwnerComment: "SHOW API INTEGRATIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus},
@@ -177,6 +186,21 @@ var types = []TypeDef{
 
 	// Pattern H — SQLStatement escape-hatch (no ShowOutput, no owner, no tracked params, no spec.name)
 	{TypeName: "SQLStatement", Receiver: "s", SkipGetSpecName: true, Owner: OwnerEmpty, OwnerComment: "SQLStatement executes arbitrary SQL and has no Snowflake owner.", TrackedParams: TrackedParamsNil},
+
+	// Share (account-level, no owner column)
+	{TypeName: "Share", Receiver: "sh", Owner: OwnerEmpty, OwnerComment: "SHOW SHARES does not expose an owner column in all contexts.", TrackedParams: TrackedParamsFromStatus},
+
+	// External Function (schema-scoped, owner from SHOW)
+	{TypeName: "ExternalFunction", Receiver: "ef", Owner: OwnerEmpty, OwnerComment: "SHOW EXTERNAL FUNCTIONS does not return an owner column.", TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+
+	// SPCS — Snowpark Container Services
+	{TypeName: "ComputePool", Receiver: "cp", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus},
+	{TypeName: "Service", Receiver: "svc", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "ImageRepository", Receiver: "ir", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+
+	// App Development
+	{TypeName: "GitRepository", Receiver: "gr", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
+	{TypeName: "Streamlit", Receiver: "st", Owner: OwnerFromShowOutputOwner, TrackedParams: TrackedParamsFromStatus, HasDatabaseScope: true, HasSchemaScope: true},
 }
 
 const accessorTmpl = `// Code generated by hack/gen-accessors/main.go; DO NOT EDIT.
@@ -382,4 +406,63 @@ func main() {
 	lineCount := strings.Count(string(formatted), "\n")
 	methodCount := strings.Count(string(formatted), "func (")
 	fmt.Printf("Generated %s: %d methods across %d types (%d lines)\n", outPath, methodCount, len(types), lineCount)
+
+	// Also generate the FieldExport CEL kind allowlist.
+	generateFieldExportKinds()
+}
+
+// generateFieldExportKinds writes zz_generated_fieldexport_kinds.go containing
+// the list of valid FieldExport source kinds derived from the gen-accessors
+// type registry. This ensures the CEL allowlist in fieldexport_types.go stays
+// in sync with the registered types.
+func generateFieldExportKinds() {
+	// Build sorted kind names and the CEL list string.
+	var kindQuoted []string
+
+	for _, t := range types {
+		kindQuoted = append(kindQuoted, "'"+t.TypeName+"'")
+	}
+
+	celList := strings.Join(kindQuoted, ",")
+
+	src := fmt.Sprintf(`// Code generated by hack/gen-accessors/main.go; DO NOT EDIT.
+
+package v1alpha1
+
+// FieldExportValidKinds is the authoritative list of CRD kind names that can
+// be used as FieldExport sources. It is generated from the gen-accessors type
+// registry and MUST match the CEL allowlist in fieldexport_types.go.
+var FieldExportValidKinds = []string{
+%s}
+
+// FieldExportCELKindList returns the CEL-formatted kind list for the
+// FieldExport XValidation rule: "'Kind1','Kind2',...".
+func FieldExportCELKindList() string {
+	return "%s"
+}
+`, func() string {
+		var lines []string
+		for _, t := range types {
+			lines = append(lines, "\t\""+t.TypeName+"\",\n")
+		}
+		return strings.Join(lines, "")
+	}(), celList)
+
+	formatted, err := format.Source([]byte(src))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "gofmt error for fieldexport kinds: %v\n", err)
+		os.Exit(1)
+	}
+
+	outPath := "zz_generated_fieldexport_kinds.go"
+	if _, err := os.Stat("api/v1alpha1"); err == nil {
+		outPath = "api/v1alpha1/zz_generated_fieldexport_kinds.go"
+	}
+
+	if err := os.WriteFile(outPath, formatted, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "write error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Generated %s: %d valid FieldExport kinds\n", outPath, len(types))
 }

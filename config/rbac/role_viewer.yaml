@@ -22,7 +22,8 @@ rules:
   - users
   - tables
   - views
-  - stages
+  - externalstages
+  - internalstages
   - tasks
   - tags
   - tagassociations
@@ -40,8 +41,13 @@ rules:
   - externaltables
   - materializedviews
   - pipes
-  - storageintegrations
-  - securityintegrations
+  - storageintegrationawses
+  - storageintegrationgcses
+  - storageintegrationazures
+  - externalvolumes
+  - cortexsearchservices
+  - gitrepositories
+  - streamlits
   - saml2integrations
   - externaloauthintegrations
   - apiintegrations
@@ -52,7 +58,10 @@ rules:
   - authenticationpolicies
   - networkrules
   - alerts
-  - notificationintegrations
+  - emailnotificationintegrations
+  - queuenotificationintegrations
+  - webhooknotificationintegrations
+  - scimintegrations
   - accountroleassignments
   - databaseroleassignments
   - streamontables
@@ -80,6 +89,11 @@ rules:
   - apiauthenticationintegrationwithclientcredentials
   - apiauthenticationintegrationwithauthorizationcodegrants
   - apiauthenticationintegrationwithjwtbearers
+  - computepools
+  - externalfunctions
+  - imagerepositories
+  - services
+  - shares
   verbs:
   - get
   - list
@@ -99,7 +113,8 @@ rules:
   - users/status
   - tables/status
   - views/status
-  - stages/status
+  - externalstages/status
+  - internalstages/status
   - tasks/status
   - tags/status
   - tagassociations/status
@@ -117,8 +132,13 @@ rules:
   - externaltables/status
   - materializedviews/status
   - pipes/status
-  - storageintegrations/status
-  - securityintegrations/status
+  - storageintegrationawses/status
+  - storageintegrationgcses/status
+  - storageintegrationazures/status
+  - externalvolumes/status
+  - cortexsearchservices/status
+  - gitrepositories/status
+  - streamlits/status
   - saml2integrations/status
   - externaloauthintegrations/status
   - apiintegrations/status
@@ -129,7 +149,10 @@ rules:
   - authenticationpolicies/status
   - networkrules/status
   - alerts/status
-  - notificationintegrations/status
+  - emailnotificationintegrations/status
+  - queuenotificationintegrations/status
+  - webhooknotificationintegrations/status
+  - scimintegrations/status
   - accountroleassignments/status
   - databaseroleassignments/status
   - streamontables/status
@@ -157,5 +180,10 @@ rules:
   - apiauthenticationintegrationwithclientcredentials/status
   - apiauthenticationintegrationwithauthorizationcodegrants/status
   - apiauthenticationintegrationwithjwtbearers/status
+  - computepools/status
+  - externalfunctions/status
+  - imagerepositories/status
+  - services/status
+  - shares/status
   verbs:
   - get

@@ -66,22 +66,24 @@ type AlertSpec struct {
 	// Examples: "5 MINUTE", "USING CRON 0 9-17 * * SUN America/Los_Angeles".
 	// Omit for alerts triggered on new data (streaming alerts).
 	// +optional
+	// +kubebuilder:validation:MaxLength=1024
 	Schedule *string `json:"schedule,omitempty" snowflake:"SCHEDULE"`
 
 	// Condition is the SQL expression evaluated by the alert.
 	// Must be a SELECT, SHOW, or CALL statement. The alert fires when the
 	// condition returns at least one row.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=255
+	// +kubebuilder:validation:MaxLength=65536
 	Condition string `json:"condition"`
 
 	// Action is the SQL statement executed when the alert condition is met.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=255
+	// +kubebuilder:validation:MaxLength=65536
 	Action string `json:"action"`
 
 	// Comment is an optional description for the alert.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 
 	// Suspend indicates whether the alert should be suspended. Default is true
@@ -119,7 +121,7 @@ type AlertStatus struct {
 // Alert is the Schema for the alerts API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories=snowplane
+// +kubebuilder:resource:categories=snowplane,shortName=alt
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="SYNCED",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
 // +kubebuilder:printcolumn:name="SNOWFLAKE-NAME",type=string,JSONPath=`.spec.name`

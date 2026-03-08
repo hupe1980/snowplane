@@ -13,6 +13,8 @@ spec:
     kind: AccountRole
     listKind: AccountRoleList
     plural: accountroles
+    shortNames:
+    - ar
     singular: accountrole
   scope: Namespaced
   versions:
@@ -60,6 +62,7 @@ spec:
             properties:
               comment:
                 description: Comment is an optional description for the role.
+                maxLength: 10000
                 type: string
               deletionPolicy:
                 default: Delete
@@ -101,6 +104,14 @@ spec:
                     - correct
                     - detect-only
                     type: string
+                  observeOnly:
+                    description: |-
+                      ObserveOnly puts the resource into read-only mode. When true the
+                      controller will Observe the Snowflake resource and populate status
+                      but will never issue CREATE, ALTER, or DROP statements. Deletion
+                      of the CR removes the finalizer without dropping the Snowflake
+                      resource. Defaults to false.
+                    type: boolean
                 type: object
               name:
                 description: Name is the Snowflake role name. Immutable after creation.
@@ -153,6 +164,9 @@ spec:
                 to change)
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
                 || self.useRole == oldSelf.useRole)
+            - message: spec.name must not contain dots (dots break fully qualified
+                name resolution)
+              rule: '!self.name.contains(''.'')'
           status:
             description: AccountRoleStatus defines the observed state of an AccountRole.
             properties:

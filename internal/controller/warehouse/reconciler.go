@@ -159,7 +159,7 @@ func validateImmutableFields(_ context.Context, wh *snowplanev1alpha1.Warehouse)
 func applyObservation(wh *snowplanev1alpha1.Warehouse, obs *snowflake.WarehouseObservation) {
 	if obs.ShowOutput != nil {
 		wh.Status.FullyQualifiedName = snowflake.NewAccountObjectIdentifier(obs.ShowOutput.Name).FullyQualifiedName()
-		wh.Status.State = obs.ShowOutput.State
+		wh.Status.State = snowplanev1alpha1.WarehouseState(obs.ShowOutput.State)
 
 		wh.Status.ShowOutput = obs.ShowOutput
 	}

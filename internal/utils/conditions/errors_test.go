@@ -168,7 +168,7 @@ func TestSetConditionFromError_RoleSwitchTerminal(t *testing.T) {
 	ready := Get(obj, "Ready")
 	require.NotNil(t, ready)
 	assert.Equal(t, "TerminalError", ready.Reason)
-	// SQL fragments are sanitized in condition messages (M-11).
+	// SQL fragments are sanitized in condition messages.
 	assert.Contains(t, ready.Message, "[SQL redacted]")
 	assert.NotContains(t, ready.Message, "GRANT ROLE ENGINEER TO USER")
 	assert.True(t, IsTerminal(obj))

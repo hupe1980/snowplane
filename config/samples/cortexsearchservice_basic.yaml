@@ -1,0 +1,21 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: CortexSearchService
+metadata:
+  name: my-cortex-search-service
+spec:
+  name: MY_CORTEX_SEARCH_SERVICE
+  providerRef:
+    name: default
+  databaseRef:
+    name: my-database
+  schemaRef:
+    name: my-schema
+  warehouseRef:
+    name: my-warehouse
+  on: BODY
+  attributes:
+    - TITLE
+    - CATEGORY
+  targetLag: "1 hour"
+  query: "SELECT BODY, TITLE, CATEGORY FROM MY_DATABASE.MY_SCHEMA.MY_SOURCE_TABLE"
+  comment: "Cortex Search Service managed by Snowplane"

@@ -343,7 +343,7 @@ func TestReconcile_CreateSecureView(t *testing.T) {
 
 	view := newTestView("myview", "default")
 	view.Finalizers = []string{finalizerName}
-	view.Spec.Secure = true
+	view.Spec.Secure = ptr(true)
 	db := newTestDB("analytics-db", "default")
 	schema := newTestSchema("public-schema", "default")
 
@@ -469,7 +469,7 @@ func TestBuildCreateOptions(t *testing.T) {
 
 	view := newTestView("myview", "default")
 	view.Spec.Comment = testutil.Ptr("test view")
-	view.Spec.Secure = true
+	view.Spec.Secure = ptr(true)
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "ACTIVE_USERS")
 
 	opts := buildCreateOptions(view, id)
@@ -483,7 +483,7 @@ func TestBuildAlterOptions_SecureToggle(t *testing.T) {
 	t.Parallel()
 
 	view := newTestView("myview", "default")
-	view.Spec.Secure = true
+	view.Spec.Secure = ptr(true)
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "ACTIVE_USERS")
 	obs := successfulObservation()
 
@@ -498,7 +498,7 @@ func TestBuildAlterOptions_StatementChange(t *testing.T) {
 
 	view := newTestView("myview", "default")
 	view.Spec.Statement = "SELECT id, name FROM users WHERE active = TRUE"
-	view.Spec.Secure = true
+	view.Spec.Secure = ptr(true)
 	view.Spec.Comment = testutil.Ptr("updated comment")
 	id := snowflake.NewSchemaObjectIdentifier("ANALYTICS", "PUBLIC", "ACTIVE_USERS")
 	obs := successfulObservation() // Text = "SELECT * FROM users WHERE active = TRUE"

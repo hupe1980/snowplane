@@ -257,7 +257,7 @@ func buildCreateOptions(obj *snowplanev1alpha1.FunctionPython, id snowflake.Call
 		Secrets:                    secrets,
 		Volatility:                 obj.Spec.Volatility,
 		NullInputBehavior:          obj.Spec.NullInputBehavior,
-		Secure:                     obj.Spec.Secure,
+		Secure:                     snowplanev1alpha1.DerefBool(obj.Spec.Secure),
 		Comment:                    obj.Spec.Comment,
 	}
 
@@ -273,9 +273,8 @@ func buildAlterOptions(obj *snowplanev1alpha1.FunctionPython, id snowflake.Calla
 
 	// Secure: detect toggle against observed state.
 	if obs != nil && obs.ShowOutput != nil {
-		if obj.Spec.Secure != obs.ShowOutput.IsSecure {
-			secure := obj.Spec.Secure
-			opts.Secure = &secure
+		if obj.Spec.Secure != nil && *obj.Spec.Secure != obs.ShowOutput.IsSecure {
+			opts.Secure = obj.Spec.Secure
 		}
 	}
 
@@ -294,7 +293,7 @@ func detectDrift(obj *snowplanev1alpha1.FunctionPython, obs *snowflake.FunctionO
 	if obs.ShowOutput != nil {
 		d.CompareStringValueFold("NAME", obj.Spec.Name, obs.ShowOutput.Name, true)
 		d.CompareString("COMMENT", obj.Spec.Comment, obs.ShowOutput.Description, false)
-		d.CompareBoolValue("IS_SECURE", obj.Spec.Secure, obs.ShowOutput.IsSecure, false)
+		d.CompareBool("IS_SECURE", obj.Spec.Secure, &obs.ShowOutput.IsSecure, false)
 	}
 
 	return d.Result()

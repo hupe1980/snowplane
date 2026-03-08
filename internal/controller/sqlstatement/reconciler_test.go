@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -99,6 +100,7 @@ func newTestReconciler(mock *mockService, objs ...client.Object) *reconciler.Gen
 		testutil.NewTestClientFactory(),
 		record.NewFakeRecorder(16),
 		nil,
+		nil,
 		sf,
 	)
 
@@ -131,6 +133,7 @@ func TestReconcile_StandardSuite(t *testing.T) {
 				c,
 				testutil.NewTestClientFactory(),
 				record.NewFakeRecorder(16),
+				nil,
 				nil,
 				sf,
 			)
@@ -608,7 +611,7 @@ func TestReconcile_Create_EmitsCreatedEvent(t *testing.T) {
 		return mock, func(context.Context) {}, nil
 	}
 
-	r := NewReconcilerWithServiceFactory(c, testutil.NewTestClientFactory(), recorder, nil, sf)
+	r := NewReconcilerWithServiceFactory(c, testutil.NewTestClientFactory(), recorder, nil, nil, sf)
 
 	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("SQLStatement")
 
@@ -621,6 +624,135 @@ func TestReconcile_Create_EmitsCreatedEvent(t *testing.T) {
 	default:
 		t.Fatal("expected created event")
 	}
+}
+
+// --- Denylist Tests ---
+
+func newTestReconcilerWithDenylist(dl *StatementDenylist, mock *mockService, objs ...client.Object) *reconciler.GenericReconciler[*snowplanev1alpha1.SQLStatement, Service, *sqlstmtclient.Observation] {
+	scheme := testutil.TestScheme()
+
+	runtimeObjs := make([]runtime.Object, len(objs))
+	for i, obj := range objs {
+		runtimeObjs[i] = obj
+	}
+
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithRuntimeObjects(runtimeObjs...).
+		WithStatusSubresource(&snowplanev1alpha1.SQLStatement{}).
+		Build()
+
+	sf := func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (Service, func(context.Context), error) {
+		return mock, func(context.Context) {}, nil
+	}
+
+	r := NewReconcilerWithServiceFactory(
+		c,
+		testutil.NewTestClientFactory(),
+		record.NewFakeRecorder(16),
+		nil,
+		dl,
+		sf,
+	)
+
+	r.GVK = snowplanev1alpha1.GroupVersion.WithKind("SQLStatement")
+
+	return r
+}
+
+func TestReconcile_Create_DenylistBlocked(t *testing.T) {
+	t.Parallel()
+
+	var executed bool
+
+	mock := &mockService{
+		executeFn: func(_ context.Context, _ string) error {
+			executed = true
+			return nil
+		},
+	}
+
+	dl, err := NewStatementDenylist([]string{"DROP DATABASE"})
+	require.NoError(t, err)
+
+	stmt := newTestSQLStatement("test-blocked", "default")
+	stmt.Spec.Execute = "DROP DATABASE mydb"
+	stmt.Spec.DangerousAllowDestructive = true
+	stmt.Finalizers = []string{finalizerName}
+
+	r := newTestReconcilerWithDenylist(dl, mock, stmt, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	res, reconcileErr := r.Reconcile(context.Background(), testutil.ReconcileReq("test-blocked", "default"))
+	require.NoError(t, reconcileErr, "terminal error should not be returned as reconcile error")
+	assert.Equal(t, ctrl.Result{}, res, "should not requeue on terminal error")
+	assert.False(t, executed, "execute must NOT be called when denylist blocks")
+
+	// Verify terminal error condition is set on the object.
+	var updated snowplanev1alpha1.SQLStatement
+	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "test-blocked", Namespace: "default"}, &updated))
+
+	readyCond := apimeta.FindStatusCondition(updated.Status.Conditions, snowplanev1alpha1.TypeReady)
+	require.NotNil(t, readyCond)
+	assert.Equal(t, snowplanev1alpha1.ReasonTerminalError, readyCond.Reason)
+	assert.Contains(t, readyCond.Message, "statement denied")
+}
+
+func TestReconcile_Create_DenylistAllowed(t *testing.T) {
+	t.Parallel()
+
+	var executedSQL string
+
+	mock := &mockService{
+		executeFn: func(_ context.Context, sql string) error {
+			executedSQL = sql
+			return nil
+		},
+	}
+
+	dl, err := NewStatementDenylist([]string{"DROP DATABASE"})
+	require.NoError(t, err)
+
+	stmt := newTestSQLStatement("test-allowed", "default")
+	stmt.Spec.Execute = "CREATE TABLE IF NOT EXISTS safe_table (id INT)"
+	stmt.Finalizers = []string{finalizerName}
+
+	r := newTestReconcilerWithDenylist(dl, mock, stmt, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	_, reconcileErr := r.Reconcile(context.Background(), testutil.ReconcileReq("test-allowed", "default"))
+	require.NoError(t, reconcileErr)
+	assert.Equal(t, "CREATE TABLE IF NOT EXISTS safe_table (id INT)", executedSQL, "execute should proceed for allowed SQL")
+}
+
+func TestReconcile_Delete_DenylistBlocked(t *testing.T) {
+	t.Parallel()
+
+	var reverted bool
+
+	mock := &mockService{
+		revertFn: func(_ context.Context, _ string) error {
+			reverted = true
+			return nil
+		},
+	}
+
+	dl, err := NewStatementDenylist([]string{"DROP SCHEMA"})
+	require.NoError(t, err)
+
+	stmt := newTestSQLStatement("test-del-blocked", "default")
+	stmt.Spec.Execute = "CREATE SCHEMA myschema"
+	stmt.Spec.Revert = ptr("DROP SCHEMA myschema")
+	stmt.Spec.DangerousAllowDestructive = true
+	stmt.Finalizers = []string{finalizerName}
+	// Mark for deletion.
+	now := metav1.Now()
+	stmt.DeletionTimestamp = &now
+
+	r := newTestReconcilerWithDenylist(dl, mock, stmt, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+
+	res, reconcileErr := r.Reconcile(context.Background(), testutil.ReconcileReq("test-del-blocked", "default"))
+	require.NoError(t, reconcileErr, "terminal error should not be returned as reconcile error")
+	assert.Equal(t, ctrl.Result{}, res, "should not requeue on terminal error")
+	assert.False(t, reverted, "revert must NOT be called when denylist blocks")
 }
 
 // --- CRNotFound ---

@@ -197,7 +197,7 @@ func TestDeepCopy_UserSpec_PointerIsolation(t *testing.T) {
 }
 
 // TestDeepCopy_GrantOn_NestedPointerIsolation tests the deeply nested
-// GrantOn → GrantOnSchemaObject → *GrantOnBulk chain (L-22).
+// GrantOn → GrantOnSchemaObject → *GrantOnBulk chain.
 func TestDeepCopy_GrantOn_NestedPointerIsolation(t *testing.T) {
 	t.Parallel()
 
@@ -319,21 +319,21 @@ func TestDeepCopy_TableSpec_ColumnPointerIsolation(t *testing.T) {
 	assert.Equal(t, true, *orig.EnableSchemaEvolution)
 }
 
-// TestDeepCopy_StageSpec_NestedStructPointerIsolation tests StageSpec's
+// TestDeepCopy_ExternalStageSpec_NestedStructPointerIsolation tests ExternalStageSpec's
 // nested struct pointers (Encryption, Directory).
-func TestDeepCopy_StageSpec_PointerIsolation(t *testing.T) {
+func TestDeepCopy_ExternalStageSpec_PointerIsolation(t *testing.T) {
 	t.Parallel()
 
-	orig := StageSpec{
+	orig := ExternalStageSpec{
 		Name:               "STG",
-		URL:                ptr("s3://bucket/path"),
+		URL:                "s3://bucket/path",
 		StorageIntegration: ptr("MY_INT"),
 		FileFormat:         ptr("CSV"),
 		Comment:            ptr("original"),
-		Encryption: &StageEncryption{
+		Encryption: &ExternalStageEncryption{
 			Type: "AWS_SSE_S3",
 		},
-		Directory: &StageDirectoryOptions{
+		Directory: &ExternalStageDirectoryOptions{
 			Enable:      true,
 			AutoRefresh: ptr(false),
 		},
@@ -342,7 +342,6 @@ func TestDeepCopy_StageSpec_PointerIsolation(t *testing.T) {
 	copied := orig.DeepCopy()
 
 	// Mutate primitive pointers.
-	*copied.URL = "MUTATED"
 	*copied.StorageIntegration = "MUTATED"
 	*copied.FileFormat = "MUTATED"
 	*copied.Comment = "MUTATED"
@@ -353,7 +352,7 @@ func TestDeepCopy_StageSpec_PointerIsolation(t *testing.T) {
 	*copied.Directory.AutoRefresh = true
 
 	// Original unchanged.
-	assert.Equal(t, "s3://bucket/path", *orig.URL)
+	assert.Equal(t, "s3://bucket/path", orig.URL)
 	assert.Equal(t, "MY_INT", *orig.StorageIntegration)
 	assert.Equal(t, "CSV", *orig.FileFormat)
 	assert.Equal(t, "original", *orig.Comment)

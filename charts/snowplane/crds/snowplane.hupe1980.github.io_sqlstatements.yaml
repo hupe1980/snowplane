@@ -93,6 +93,7 @@ spec:
                   Execute is the SQL statement to run when creating the resource.
                   For idempotent statements, use IF NOT EXISTS or CREATE OR REPLACE patterns.
                   Multi-statement SQL (separated by semicolons) is supported.
+                maxLength: 65536
                 minLength: 1
                 type: string
               idempotent:
@@ -135,6 +136,14 @@ spec:
                     - correct
                     - detect-only
                     type: string
+                  observeOnly:
+                    description: |-
+                      ObserveOnly puts the resource into read-only mode. When true the
+                      controller will Observe the Snowflake resource and populate status
+                      but will never issue CREATE, ALTER, or DROP statements. Deletion
+                      of the CR removes the finalizer without dropping the Snowflake
+                      resource. Defaults to false.
+                    type: boolean
                 type: object
               observe:
                 description: |-
@@ -144,6 +153,8 @@ spec:
                   When omitted, the resource is always considered "not observable" —
                   Execute runs once and the resource stays in Ready state without drift
                   detection.
+                maxLength: 65536
+                minLength: 1
                 type: string
               observeExpect:
                 description: |-
@@ -165,6 +176,7 @@ spec:
                     value:
                       description: Value is the expected column value (case-insensitive
                         string comparison).
+                      maxLength: 4096
                       minLength: 1
                       type: string
                   required:
@@ -203,6 +215,8 @@ spec:
                   This should undo what Execute created (e.g. DROP, REVOKE).
                   When omitted, no SQL is executed on deletion (orphan behavior for the
                   Snowflake-side resource, though the Kubernetes CR is still deleted).
+                maxLength: 65536
+                minLength: 1
                 type: string
               useRole:
                 description: |-

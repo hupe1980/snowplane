@@ -18,7 +18,7 @@ type APIAuthenticationIntegrationWithJWTBearerSpec struct {
 	Name string `json:"name"`
 
 	// Specifies whether this security integration is enabled or disabled.
-	Enabled bool `json:"enabled" snowflake:"ENABLED"`
+	Enabled *bool `json:"enabled" snowflake:"ENABLED"`
 
 	// Specifies the client ID for the OAuth application in the external service.
 	OAuthClientID string `json:"oauthClientId" snowflake:"OAUTH_CLIENT_ID"`
@@ -52,6 +52,7 @@ type APIAuthenticationIntegrationWithJWTBearerSpec struct {
 
 	// Comment for the integration.
 	// +optional
+	// +kubebuilder:validation:MaxLength=10000
 	Comment *string `json:"comment,omitempty" snowflake:"COMMENT"`
 }
 
