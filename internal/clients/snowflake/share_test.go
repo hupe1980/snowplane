@@ -1,6 +1,7 @@
 package snowflake
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -193,4 +194,79 @@ func TestShareClient_Alter_InvalidAccountIdentifier(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.True(t, IsTerminalError(err))
+}
+
+// --------------------------------------------------------------------------
+// Tests: Create SQL generation
+// --------------------------------------------------------------------------
+
+func TestShareClient_Create_SQL(t *testing.T) {
+	t.Parallel()
+
+	var captured string
+	mock := &testSQLExec{
+		execFn: func(_ context.Context, sql string, _ ...any) error {
+			captured = sql
+			return nil
+		},
+	}
+
+	comment := "my share"
+	client := NewShareClient(mock)
+	err := client.Create(t.Context(), CreateShareOptions{
+		Name:    NewAccountObjectIdentifier("MY_SHARE"),
+		Comment: &comment,
+	})
+	require.NoError(t, err)
+
+	assert.Contains(t, captured, `CREATE SHARE "MY_SHARE"`)
+	assert.Contains(t, captured, "COMMENT = 'my share'")
+}
+
+// --------------------------------------------------------------------------
+// Tests: Alter SQL generation
+// --------------------------------------------------------------------------
+
+func TestShareClient_Alter_CommentSQL(t *testing.T) {
+	t.Parallel()
+
+	var captured []string
+	mock := &testSQLExec{
+		execFn: func(_ context.Context, sql string, _ ...any) error {
+			captured = append(captured, sql)
+			return nil
+		},
+	}
+
+	client := NewShareClient(mock)
+	err := client.Alter(t.Context(), AlterShareOptions{
+		Name:    NewAccountObjectIdentifier("MY_SHARE"),
+		Comment: ptr("updated"),
+	})
+	require.NoError(t, err)
+	require.Len(t, captured, 1)
+	assert.Contains(t, captured[0], `ALTER SHARE "MY_SHARE" SET COMMENT = 'updated'`)
+}
+
+func TestShareClient_Alter_AddAndRemoveAccounts(t *testing.T) {
+	t.Parallel()
+
+	var captured []string
+	mock := &testSQLExec{
+		execFn: func(_ context.Context, sql string, _ ...any) error {
+			captured = append(captured, sql)
+			return nil
+		},
+	}
+
+	client := NewShareClient(mock)
+	err := client.Alter(t.Context(), AlterShareOptions{
+		Name:        NewAccountObjectIdentifier("MY_SHARE"),
+		AddAccounts: []string{"ORG1.ACCT1", "ORG2.ACCT2"},
+		RemAccounts: []string{"ORG3.ACCT3"},
+	})
+	require.NoError(t, err)
+	require.Len(t, captured, 2) // ADD + REMOVE statements
+	assert.Contains(t, captured[0], "ADD ACCOUNTS = ORG1.ACCT1, ORG2.ACCT2")
+	assert.Contains(t, captured[1], "REMOVE ACCOUNTS = ORG3.ACCT3")
 }

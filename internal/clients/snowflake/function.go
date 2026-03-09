@@ -126,7 +126,12 @@ func buildFuncArgClause(args []FunctionArgument) string {
 func buildCreateFunctionSQL(opts CreateFunctionOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	sqlbuilder.BuildCreatePreamble(&b, "FUNCTION", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
+	objectType := "FUNCTION"
+	if opts.Secure {
+		objectType = "SECURE FUNCTION"
+	}
+
+	sqlbuilder.BuildCreatePreamble(&b, objectType, opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 	b.WriteString(buildFuncArgClause(opts.Arguments))
 
 	b.WriteString(" RETURNS ")
@@ -184,10 +189,6 @@ func buildCreateFunctionSQL(opts CreateFunctionOptions) (string, error) {
 
 	if opts.Volatility != nil {
 		b.WriteString(" " + *opts.Volatility)
-	}
-
-	if opts.Secure {
-		b.WriteString(" SECURE")
 	}
 
 	b.SetString("COMMENT", opts.Comment)

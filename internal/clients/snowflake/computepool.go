@@ -180,7 +180,7 @@ func (c *ComputePoolClient) Create(ctx context.Context, opts CreateComputePoolOp
 	fmt.Fprintf(&b, " INSTANCE_FAMILY = %s", opts.InstanceFamily)
 
 	if opts.AutoResume != nil {
-		fmt.Fprintf(&b, " AUTO_RESUME = %t", *opts.AutoResume)
+		fmt.Fprintf(&b, " AUTO_RESUME = %s", sqlbuilder.BoolToSQL(*opts.AutoResume))
 	}
 
 	if opts.AutoSuspendSecs != nil {

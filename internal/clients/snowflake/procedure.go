@@ -133,7 +133,12 @@ func buildArgClause(args []ProcedureArgument) string {
 func buildCreateProcedureSQL(opts CreateProcedureOptions) (string, error) {
 	var b sqlbuilder.Builder
 
-	sqlbuilder.BuildCreatePreamble(&b, "PROCEDURE", opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
+	objectType := "PROCEDURE"
+	if opts.Secure {
+		objectType = "SECURE PROCEDURE"
+	}
+
+	sqlbuilder.BuildCreatePreamble(&b, objectType, opts.Name.FullyQualifiedName(), opts.UseCreateOrAlter, false)
 	b.WriteString(buildArgClause(opts.Arguments))
 
 	b.WriteString(" RETURNS ")
@@ -189,10 +194,6 @@ func buildCreateProcedureSQL(opts CreateProcedureOptions) (string, error) {
 		b.WriteString(" " + *opts.NullInputBehavior)
 	}
 
-	if opts.Secure {
-		b.WriteString(" SECURE")
-	}
-
 	if opts.ExecuteAs != nil {
 		b.WriteString(" EXECUTE AS " + *opts.ExecuteAs)
 	}
@@ -238,7 +239,7 @@ func buildAlterProcedureStatements(opts AlterProcedureOptions) ([]string, error)
 
 	// ExecuteAs is a separate SET statement.
 	if opts.ExecuteAs != nil {
-		statements = append(statements, fmt.Sprintf("ALTER PROCEDURE %s SET EXECUTE AS %s", fqn, *opts.ExecuteAs))
+		statements = append(statements, fmt.Sprintf("ALTER PROCEDURE %s EXECUTE AS %s", fqn, *opts.ExecuteAs))
 	}
 
 	// Comment uses SET/UNSET via BuildAlterStatements.
@@ -369,7 +370,8 @@ func matchProcedureArgTypes(argumentsCol string, name string, argTypes []string)
 	}
 
 	for i, st := range showTypes {
-		if !strings.EqualFold(strings.TrimSpace(st), strings.TrimSpace(argTypes[i])) {
+		at := argTypes[i] //nolint:gosec // bounds checked by len(showTypes) == len(argTypes) above
+		if !strings.EqualFold(strings.TrimSpace(st), strings.TrimSpace(at)) {
 			return false
 		}
 	}

@@ -181,7 +181,7 @@ func (c *ServiceClient) Create(ctx context.Context, opts CreateServiceOptions) e
 	}
 
 	if opts.AutoResume != nil {
-		fmt.Fprintf(&b, "\n  AUTO_RESUME = %t", *opts.AutoResume)
+		fmt.Fprintf(&b, "\n  AUTO_RESUME = %s", sqlbuilder.BoolToSQL(*opts.AutoResume))
 	}
 
 	if len(opts.ExternalAccessIntegrations) > 0 {

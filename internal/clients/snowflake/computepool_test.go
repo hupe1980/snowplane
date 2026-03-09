@@ -1,6 +1,7 @@
 package snowflake
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -204,4 +205,95 @@ func TestComputePoolClient_Alter_InvalidName(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.True(t, IsTerminalError(err))
+}
+
+// --------------------------------------------------------------------------
+// Tests: Create SQL generation (verifies BoolToSQL fix)
+// --------------------------------------------------------------------------
+
+func TestComputePoolClient_Create_AutoResumeSQL(t *testing.T) {
+	t.Parallel()
+
+	t.Run("AutoResumeTrue", func(t *testing.T) {
+		t.Parallel()
+
+		var captured string
+		mock := &testSQLExec{
+			execFn: func(_ context.Context, sql string, _ ...any) error {
+				captured = sql
+				return nil
+			},
+		}
+
+		client := NewComputePoolClient(mock)
+		err := client.Create(t.Context(), CreateComputePoolOptions{
+			Name:           NewAccountObjectIdentifier("MY_POOL"),
+			MinNodes:       1,
+			MaxNodes:       3,
+			InstanceFamily: "CPU_X64_XS",
+			AutoResume:     ptr(true),
+		})
+		require.NoError(t, err)
+		assert.Contains(t, captured, "AUTO_RESUME = TRUE")
+		assert.NotContains(t, captured, "AUTO_RESUME = true")
+	})
+
+	t.Run("AutoResumeFalse", func(t *testing.T) {
+		t.Parallel()
+
+		var captured string
+		mock := &testSQLExec{
+			execFn: func(_ context.Context, sql string, _ ...any) error {
+				captured = sql
+				return nil
+			},
+		}
+
+		client := NewComputePoolClient(mock)
+		err := client.Create(t.Context(), CreateComputePoolOptions{
+			Name:           NewAccountObjectIdentifier("MY_POOL"),
+			MinNodes:       1,
+			MaxNodes:       3,
+			InstanceFamily: "CPU_X64_XS",
+			AutoResume:     ptr(false),
+		})
+		require.NoError(t, err)
+		assert.Contains(t, captured, "AUTO_RESUME = FALSE")
+		assert.NotContains(t, captured, "AUTO_RESUME = false")
+	})
+}
+
+func TestComputePoolClient_Create_FullSQL(t *testing.T) {
+	t.Parallel()
+
+	var captured string
+	mock := &testSQLExec{
+		execFn: func(_ context.Context, sql string, _ ...any) error {
+			captured = sql
+			return nil
+		},
+	}
+
+	suspendSecs := int32(300)
+	comment := "it's a pool"
+
+	client := NewComputePoolClient(mock)
+	err := client.Create(t.Context(), CreateComputePoolOptions{
+		Name:            NewAccountObjectIdentifier("MY_POOL"),
+		MinNodes:        2,
+		MaxNodes:        5,
+		InstanceFamily:  "GPU_NV_S",
+		AutoResume:      ptr(true),
+		AutoSuspendSecs: &suspendSecs,
+		Comment:         &comment,
+	})
+	require.NoError(t, err)
+
+	assert.Contains(t, captured, `CREATE COMPUTE POOL "MY_POOL"`)
+	assert.Contains(t, captured, "MIN_NODES = 2")
+	assert.Contains(t, captured, "MAX_NODES = 5")
+	assert.Contains(t, captured, "INSTANCE_FAMILY = GPU_NV_S")
+	assert.Contains(t, captured, "AUTO_RESUME = TRUE")
+	assert.Contains(t, captured, "AUTO_SUSPEND_SECS = 300")
+	assert.Contains(t, captured, "COMMENT = 'it''s a pool'")
 }
