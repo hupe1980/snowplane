@@ -283,3 +283,19 @@ func TestRecordSQLStatementExecution_Revert(t *testing.T) {
 	c := SQLStatementExecutionsTotal.With(prometheus.Labels{"namespace": "test-ns-revert", "operation": "revert"})
 	assert.GreaterOrEqual(t, collectCounter(c), float64(1))
 }
+
+func TestSetShardInfo(t *testing.T) {
+	t.Parallel()
+
+	SetShardInfo(2, 5)
+	g := ShardInfo.With(prometheus.Labels{"shard_id": "2", "shard_count": "5"})
+	assert.Equal(t, float64(1), collectGauge(g))
+}
+
+func TestSetShardInfo_SingleInstance(t *testing.T) {
+	t.Parallel()
+
+	SetShardInfo(0, 1)
+	g := ShardInfo.With(prometheus.Labels{"shard_id": "0", "shard_count": "1"})
+	assert.Equal(t, float64(1), collectGauge(g))
+}

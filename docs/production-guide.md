@@ -440,23 +440,27 @@ logging:
 
 Snowplane supports horizontal scaling via leader election. The active leader handles all reconciliation; standby replicas provide fast failover.
 
-For very large deployments (10K+ managed resources), consider hash-based controller sharding:
+For very large deployments (10K+ managed resources), use hash-based controller sharding to distribute reconciliation across multiple manager instances:
 
 ```bash
-# Deploy 3 sharded replicas
+# Deploy 3 sharded replicas (one Helm release per shard)
 for i in 0 1 2; do
   helm install snowplane-shard-$i charts/snowplane/ \
-    --set extraArgs[0]=--shard-id=$i \
-    --set extraArgs[1]=--shard-count=3 \
-    --set leaderElectionID=snowplane-shard-$i
+    --set sharding.enabled=true \
+    --set sharding.shardID=$i \
+    --set sharding.shardCount=3
 done
 ```
 
-Each shard deterministically owns a subset of resources based on FNV-1a hash of `namespace/name`. Key properties:
-- **Zero coordination** — no shared state or leader election across shards
+Each shard deterministically owns a subset of resources based on FNV-1a hash of `namespace/name`. When sharding is enabled, the leader election ID is automatically suffixed with the shard index (e.g. `snowplane-leader-election-shard-0`) so that each shard independently elects a leader without conflicts.
+
+Key properties:
+- **Zero coordination** — no shared state or external coordination required across shards
 - **Deterministic** — the same object always maps to the same shard
+- **Uniform** — FNV-1a distributes objects evenly across shards
 - **Dynamic rescaling** — changing `--shard-count` rebalances on next reconcile cycle
 - **Idempotent** — brief duplicate processing during rollout is harmless
+- **Complete coverage** — all controller types (including FieldExport and SQLStatement) are shard-aware; only ProviderConfig remains global since every shard needs provider credentials
 
 Alternatively, use namespace-based sharding for coarser-grained partitioning:
 

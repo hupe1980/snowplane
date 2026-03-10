@@ -16,6 +16,7 @@
 package sharding
 
 import (
+	"fmt"
 	"hash/fnv"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +37,19 @@ type Options struct {
 // Enabled returns true when horizontal sharding is active.
 func (o Options) Enabled() bool {
 	return o.ShardCount > 1
+}
+
+// Validate returns an error if the options are invalid.
+func (o Options) Validate() error {
+	if o.ShardCount < 1 {
+		return fmt.Errorf("shard-count must be >= 1, got %d", o.ShardCount)
+	}
+
+	if o.ShardID < 0 || o.ShardID >= o.ShardCount {
+		return fmt.Errorf("shard-id must be in [0, %d), got %d", o.ShardCount, o.ShardID)
+	}
+
+	return nil
 }
 
 // NewPredicate returns a predicate that accepts events only for objects whose

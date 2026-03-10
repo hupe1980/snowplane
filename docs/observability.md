@@ -69,6 +69,12 @@ All metrics use the `snowplane_` namespace and are exposed on the controller's m
 |:-------|:-----|:-------|:------------|
 | `snowplane_providerconfig_healthy` | Gauge | `provider`, `account` | 1 = connected, 0 = unhealthy |
 
+### Sharding
+
+| Metric | Type | Labels | Description |
+|:-------|:-----|:-------|:------------|
+| `snowplane_shard_info` | Gauge | `shard_id`, `shard_count` | Shard configuration for this manager instance (always 1) |
+
 ### Connection Pool
 
 | Metric | Type | Labels | Description |

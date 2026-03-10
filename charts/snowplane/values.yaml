@@ -99,6 +99,18 @@ controller:
   # Increase for large Snowflake accounts or complex operations.
   snowflakeOpTimeout: 60s
 
+# -- Hash-based controller sharding for horizontal scaling.
+# When enabled, each replica deterministically owns a subset of resources
+# based on FNV-1a hash of namespace/name. See docs/production-guide.md.
+sharding:
+  # -- Enable hash-based sharding. Deploy one Helm release per shard,
+  # each with a unique shardID in [0, shardCount).
+  enabled: false
+  # -- Zero-based shard index for this instance.
+  shardID: 0
+  # -- Total number of shards. Must be >= 1.
+  shardCount: 1
+
 # -- Circuit breaker configuration for per-provider failure isolation
 circuitBreaker:
   # -- Consecutive failures before the circuit opens

@@ -245,7 +245,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, fe *snowplanev1alpha1.
 // Target watches: when a target ConfigMap/Secret managed by
 // snowplane-fieldexport is deleted or modified, FieldExports targeting it
 // are immediately re-reconciled to restore the exported value.
-func (r *Reconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrent int) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrent int, shardPredicate predicate.Predicate) error {
 	ctx := context.Background()
 
 	// Index FieldExports by source resource for efficient lookup on source changes.
@@ -275,6 +275,11 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrent int) error
 			builder.WithPredicates(managedByFieldExportPredicate())).
 		Named("fieldexport").
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrent})
+
+	// Apply sharding predicate when running in multi-shard mode.
+	if shardPredicate != nil {
+		bldr = bldr.WithEventFilter(shardPredicate)
+	}
 
 	// Watch all Snowplane managed resource types as potential sources.
 	// Status changes (e.g. Ready condition, showOutput) trigger re-reconciliation

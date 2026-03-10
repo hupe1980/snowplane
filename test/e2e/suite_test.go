@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -125,6 +126,9 @@ var (
 	}
 	gvrAPIIntegration = schema.GroupVersionResource{
 		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "apiintegrations",
+	}
+	gvrProviderConfig = schema.GroupVersionResource{
+		Group: "snowplane.hupe1980.github.io", Version: "v1alpha1", Resource: "providerconfigs",
 	}
 )
 
@@ -318,6 +322,27 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
+	// — Wait for ProviderConfig to become Ready before running tests —
+	// The controller needs time to sync informer caches for all CRDs and
+	// reconcile the ProviderConfig (which connects to Snowflake). Without
+	// this wait the first test may create a CR before the controller is
+	// fully operational, causing a timeout.
+	fmt.Println("==> Waiting for ProviderConfig to become Ready")
+	pcReady := false
+	deadline := time.Now().Add(defaultTimeout)
+	for time.Now().Before(deadline) {
+		if isReady(gvrProviderConfig, "default") {
+			pcReady = true
+			break
+		}
+		time.Sleep(defaultInterval)
+	}
+	if !pcReady {
+		fmt.Fprintf(os.Stderr, "ProviderConfig 'default' did not become Ready within %v\n%s\n", defaultTimeout, dumpConditions(gvrProviderConfig, "default"))
+		os.Exit(1)
+	}
+	fmt.Println("==> ProviderConfig is Ready")
+
 	fmt.Println("==> Setup complete, running E2E tests")
 	code := m.Run()
 
@@ -325,7 +350,7 @@ func TestMain(m *testing.M) {
 	if code != 0 {
 		fmt.Println("==> Dumping controller pod logs (test failure)")
 		if err := runCmd(repoRoot, "kubectl", "--kubeconfig", kubeconfigPath,
-			"-n", testNamespace, "logs", "-l", "app.kubernetes.io/name=snowplane", "--tail=200"); err != nil {
+			"-n", testNamespace, "logs", "-l", "app.kubernetes.io/name=snowplane", "--tail=500"); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: failed to dump controller logs: %v\n", err)
 		}
 	}
@@ -776,7 +801,34 @@ func deleteCR(t *testing.T, gvr schema.GroupVersionResource, name string) {
 
 func waitForReady(t *testing.T, gvr schema.GroupVersionResource, name string) {
 	t.Helper()
+
+	// If the controller hasn't produced any status conditions after a grace
+	// period, the informer cache may not have delivered the initial Create
+	// event yet (cold-start race).  Touching an annotation forces an Update
+	// event that re-enqueues the CR without changing its desired state.
+	nudgeOnce := sync.OnceFunc(func() {
+		obj, err := dynamicClient.Resource(gvr).Namespace(testNamespace).Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return
+		}
+		conditions, _, _ := unstructured.NestedSlice(obj.Object, "status", "conditions")
+		if len(conditions) > 0 {
+			return // controller already processing
+		}
+		ann := obj.GetAnnotations()
+		if ann == nil {
+			ann = make(map[string]string)
+		}
+		ann["snowplane.hupe1980.github.io/nudge"] = time.Now().Format(time.RFC3339)
+		obj.SetAnnotations(ann)
+		_, _ = dynamicClient.Resource(gvr).Namespace(testNamespace).Update(context.Background(), obj, metav1.UpdateOptions{})
+	})
+
+	start := time.Now()
 	require.Eventually(t, func() bool {
+		if time.Since(start) > 30*time.Second {
+			nudgeOnce()
+		}
 		return isReady(gvr, name)
 	}, defaultTimeout, defaultInterval, "%s/%s did not become Ready\n%s", gvr.Resource, name, dumpConditions(gvr, name))
 }

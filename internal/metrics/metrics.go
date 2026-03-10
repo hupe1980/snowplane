@@ -419,6 +419,26 @@ func ObserveSnowflakeOp(controller, operation string, fn func() error) error {
 	return err
 }
 
+// ShardInfo is a gauge that exposes this manager's shard configuration as
+// constant Prometheus labels. Value is always 1 when set.
+var ShardInfo = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "shard_info",
+		Help:      "Shard configuration for this controller manager instance. Value is always 1.",
+	},
+	[]string{"shard_id", "shard_count"},
+)
+
+// SetShardInfo publishes the shard configuration so Prometheus scrapes can
+// identify which shard this replica owns. Call once during startup.
+func SetShardInfo(shardID, shardCount int) {
+	ShardInfo.With(prometheus.Labels{
+		"shard_id":    fmt.Sprintf("%d", shardID),
+		"shard_count": fmt.Sprintf("%d", shardCount),
+	}).Set(1)
+}
+
 // RecordReconcile emits the reconcile result counter.
 // result is one of: "success", "error", "terminal".
 func RecordReconcile(controller string, result string) {
@@ -447,6 +467,7 @@ func init() {
 		SQLStatementExecutionsTotal,
 		SQLStatementDeniedTotal,
 		PolicyBodyRejectionsTotal,
+		ShardInfo,
 		DBStatsMaxOpenConns,
 		DBStatsOpenConns,
 		DBStatsInUse,

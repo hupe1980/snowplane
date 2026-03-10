@@ -87,6 +87,10 @@ spec:
             - --circuit-breaker-threshold={{ .Values.circuitBreaker.threshold }}
             - --circuit-breaker-reset-timeout={{ .Values.circuitBreaker.resetTimeout }}
             - --zap-log-level={{ .Values.logging.level }}
+            {{- if .Values.sharding.enabled }}
+            - --shard-id={{ .Values.sharding.shardID | default 0 }}
+            - --shard-count={{ .Values.sharding.shardCount }}
+            {{- end }}
             {{- if .Values.webhook.enabled }}
             - --enable-webhook
             - --webhook-port={{ .Values.webhook.port }}

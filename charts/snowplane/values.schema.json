@@ -235,6 +235,27 @@
         }
       }
     },
+    "sharding": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Hash-based controller sharding for horizontal scaling.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable hash-based sharding."
+        },
+        "shardID": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based shard index for this instance."
+        },
+        "shardCount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total number of shards."
+        }
+      }
+    },
     "circuitBreaker": {
       "type": "object",
       "additionalProperties": false,

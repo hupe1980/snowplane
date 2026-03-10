@@ -74,6 +74,16 @@ helm upgrade snowplane charts/snowplane/ \
 | `circuitBreaker.threshold` | `5` | Number of consecutive failures before the circuit opens |
 | `circuitBreaker.resetTimeout` | `60s` | Duration the circuit stays open before allowing a probe request |
 
+### Sharding
+
+| Parameter | Default | Description |
+|:----------|:--------|:------------|
+| `sharding.enabled` | `false` | Enable hash-based controller sharding for horizontal scaling |
+| `sharding.shardID` | `0` | Zero-based shard index for this instance |
+| `sharding.shardCount` | `1` | Total number of shards (must be ≥ 1) |
+
+When sharding is enabled, deploy one Helm release per shard. Leader election IDs are automatically suffixed with the shard index. See the [production guide](production-guide.md#horizontal-scaling) for deployment examples.
+
 ### Metrics & Monitoring
 
 | Parameter | Default | Description |

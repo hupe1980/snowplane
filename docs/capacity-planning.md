@@ -210,13 +210,13 @@ For very large deployments (50,000+ resources), use deterministic hash-based sha
 ```bash
 for i in 0 1 2; do
   helm install snowplane-shard-$i charts/snowplane/ \
-    --set extraArgs[0]=--shard-id=$i \
-    --set extraArgs[1]=--shard-count=3 \
-    --set leaderElectionID=snowplane-shard-$i
+    --set sharding.enabled=true \
+    --set sharding.shardID=$i \
+    --set sharding.shardCount=3
 done
 ```
 
-Each shard owns a deterministic subset of resources based on FNV-1a hash of `namespace/name`.
+Each shard owns a deterministic subset of resources based on FNV-1a hash of `namespace/name`. Leader election IDs are automatically made shard-specific, so no manual `leaderElectionID` override is needed.
 
 ---
 

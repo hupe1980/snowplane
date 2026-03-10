@@ -385,7 +385,7 @@ func TestMain(m *testing.M) {
 		recorder,
 	)
 
-	if err := fieldExportReconciler.SetupWithManager(mgr, 1); err != nil {
+	if err := fieldExportReconciler.SetupWithManager(mgr, 1, nil); err != nil {
 		panic("failed to setup fieldexport controller: " + err.Error())
 	}
 

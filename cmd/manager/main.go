@@ -121,7 +121,7 @@ import (
 	"github.com/hupe1980/snowplane/internal/webhook"
 
 	// Register Prometheus metrics in controller-runtime's registry.
-	_ "github.com/hupe1980/snowplane/internal/metrics"
+	appmetrics "github.com/hupe1980/snowplane/internal/metrics"
 )
 
 var (
@@ -297,6 +297,13 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	// Validate sharding flags.
+	shardOpts := sharding.Options{ShardID: shardID, ShardCount: shardCount}
+	if err := shardOpts.Validate(); err != nil {
+		setupLog.Error(err, "invalid sharding configuration")
+		os.Exit(1)
+	}
+
 	// Set up OpenTelemetry tracing.
 	tracingProvider, err := tracing.Setup(context.Background(), tracing.Config{
 		Enabled:       enableTracing,
@@ -312,6 +319,13 @@ func main() {
 
 	if enableTracing {
 		setupLog.Info("OpenTelemetry tracing enabled", "endpoint", otelEndpoint, "samplingRatio", otelSamplingRatio)
+	}
+
+	// When sharding is enabled, make the leader election ID shard-specific
+	// so each shard can independently elect a leader.
+	if shardOpts.Enabled() {
+		leaderElectionID = fmt.Sprintf("%s-shard-%d", leaderElectionID, shardOpts.ShardID)
+		setupLog.Info("shard-aware leader election", "leaderElectionID", leaderElectionID)
 	}
 
 	mgrOpts := ctrl.Options{
@@ -382,13 +396,14 @@ func main() {
 	// Parse role allowlist.
 	allowedRolesSet := parseAllowedRoles(allowedRoles)
 
-	// Configure sharding predicate (no-op when shardCount <= 1).
-	shardOpts := sharding.Options{ShardID: shardID, ShardCount: shardCount}
+	// Configure sharding predicate and emit shard info metric.
 	var shardPred predicate.Predicate
 	if shardOpts.Enabled() {
 		shardPred = sharding.NewPredicate(shardOpts)
-		setupLog.Info("controller sharding enabled", "shardID", shardID, "shardCount", shardCount)
+		setupLog.Info("controller sharding enabled", "shardID", shardOpts.ShardID, "shardCount", shardOpts.ShardCount)
 	}
+
+	appmetrics.SetShardInfo(shardOpts.ShardID, shardOpts.ShardCount)
 
 	kc := mgr.GetClient()
 
@@ -544,7 +559,7 @@ func main() {
 		if err := fieldexportctl.NewReconciler(
 			kc,
 			sanitize.NewSafeRecorderFromEvents(mgr.GetEventRecorder("fieldexport-controller")),
-		).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
+		).SetupWithManager(mgr, maxConcurrentReconciles, shardPred); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "FieldExport")
 			os.Exit(1)
 		}
