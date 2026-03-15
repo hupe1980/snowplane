@@ -299,6 +299,10 @@ spec:
             x-kubernetes-validations:
             - message: spec.name is immutable
               rule: self.name == oldSelf.name
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
           status:
             description: ExternalFunctionStatus defines the observed state of a Snowflake
               External Function.

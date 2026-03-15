@@ -1,0 +1,10 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: SecondaryConnection
+metadata:
+  name: my-secondary-connection
+spec:
+  providerRef:
+    name: default
+  name: MY_SECONDARY_CONN
+  asReplicaOf: "myorg.primary_account.MY_PRIMARY_CONN"
+  comment: "Secondary connection replica managed by Snowplane"

@@ -386,6 +386,51 @@ func TestBuildAlterOptions(t *testing.T) {
 
 		assert.Nil(t, opts.Enabled)
 	})
+
+	t.Run("TokenUserMappingClaimSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+		obj := newTestExternalOAuthIntegration("x", "default")
+		obs := successfulObservation()
+		obs.DescribeOutput["EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM"] = "sub" // matches spec
+
+		id := snowflake.NewAccountObjectIdentifier("MY_OAUTH")
+		opts := buildAlterOptions(obj, id, obs)
+
+		assert.Nil(t, opts.TokenUserMappingClaim)
+	})
+
+	t.Run("TokenUserMappingClaimSentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+		obj := newTestExternalOAuthIntegration("x", "default")
+		obs := successfulObservation()
+		obs.DescribeOutput["EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM"] = "email" // different from spec
+
+		id := snowflake.NewAccountObjectIdentifier("MY_OAUTH")
+		opts := buildAlterOptions(obj, id, obs)
+
+		require.NotNil(t, opts.TokenUserMappingClaim)
+		assert.Equal(t, "sub", *opts.TokenUserMappingClaim)
+	})
+
+	t.Run("AllFieldsSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+		obj := newTestExternalOAuthIntegration("x", "default")
+		obj.Spec.Enabled = testutil.Ptr(true)
+		obj.Spec.AnyRoleMode = testutil.Ptr("DISABLE")
+		obj.Spec.NetworkPolicy = testutil.Ptr("MY_POLICY")
+		obs := successfulObservation()
+		obs.DescribeOutput["EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM"] = "sub"
+		obs.DescribeOutput["EXTERNAL_OAUTH_ANY_ROLE_MODE"] = "DISABLE"
+		obs.DescribeOutput["NETWORK_POLICY"] = "MY_POLICY"
+
+		id := snowflake.NewAccountObjectIdentifier("MY_OAUTH")
+		opts := buildAlterOptions(obj, id, obs)
+
+		assert.Nil(t, opts.Enabled)
+		assert.Nil(t, opts.TokenUserMappingClaim)
+		assert.Nil(t, opts.AnyRoleMode)
+		assert.Nil(t, opts.NetworkPolicy)
+	})
 }
 
 // --------------------------------------------------------------------------
@@ -430,6 +475,28 @@ func TestDetectDrift(t *testing.T) {
 		obs.DescribeOutput["EXTERNAL_OAUTH_JWS_KEYS_URL"] = "https://old.example.com/jwks"
 		result := detectDrift(obj, obs)
 		assert.True(t, result.HasDrift)
+	})
+
+	t.Run("TokenUserMappingClaimDrift", func(t *testing.T) {
+		t.Parallel()
+		obj := newTestExternalOAuthIntegration("x", "default")
+		obj.Spec.TokenUserMappingClaim = "email"
+		obs := successfulObservation()
+		obs.DescribeOutput["EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM"] = "sub"
+		result := detectDrift(obj, obs)
+		assert.True(t, result.HasDrift)
+		assert.Contains(t, result.Summary(), "EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM")
+	})
+
+	t.Run("ScopeDelimiterDrift", func(t *testing.T) {
+		t.Parallel()
+		obj := newTestExternalOAuthIntegration("x", "default")
+		obj.Spec.ScopeDelimiter = testutil.Ptr(",")
+		obs := successfulObservation()
+		obs.DescribeOutput["EXTERNAL_OAUTH_SCOPE_DELIMITER"] = " "
+		result := detectDrift(obj, obs)
+		assert.True(t, result.HasDrift)
+		assert.Contains(t, result.Summary(), "EXTERNAL_OAUTH_SCOPE_DELIMITER")
 	})
 }
 
@@ -537,71 +604,4 @@ func TestApplyObservation(t *testing.T) {
 	assert.NotNil(t, obj.Status.ShowOutput)
 	assert.Equal(t, "MY_OAUTH", obj.Status.ShowOutput.Name)
 	assert.NotNil(t, obj.Status.DescribeOutput)
-}
-
-// --------------------------------------------------------------------------
-// Tests: Helper functions
-// --------------------------------------------------------------------------
-
-func TestDescribeValue(t *testing.T) {
-	t.Parallel()
-
-	t.Run("NilMap", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, "", describeValue(nil, "KEY"))
-	})
-
-	t.Run("ExistingKey", func(t *testing.T) {
-		t.Parallel()
-		m := map[string]string{"KEY": "value"}
-		assert.Equal(t, "value", describeValue(m, "KEY"))
-	})
-
-	t.Run("MissingKey", func(t *testing.T) {
-		t.Parallel()
-		m := map[string]string{"OTHER": "value"}
-		assert.Equal(t, "", describeValue(m, "KEY"))
-	})
-}
-
-func TestStringValueOrEmpty(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Nil", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, "", stringValueOrEmpty(nil))
-	})
-
-	t.Run("Value", func(t *testing.T) {
-		t.Parallel()
-		s := "hello"
-		assert.Equal(t, "hello", stringValueOrEmpty(&s))
-	})
-}
-
-func TestParseCommaListFromMap(t *testing.T) {
-	t.Parallel()
-
-	t.Run("NilMap", func(t *testing.T) {
-		t.Parallel()
-		assert.Nil(t, parseCommaListFromMap(nil, "KEY"))
-	})
-
-	t.Run("EmptyValue", func(t *testing.T) {
-		t.Parallel()
-		m := map[string]string{"KEY": ""}
-		assert.Nil(t, parseCommaListFromMap(m, "KEY"))
-	})
-
-	t.Run("SingleValue", func(t *testing.T) {
-		t.Parallel()
-		m := map[string]string{"KEY": "ROLE_A"}
-		assert.Equal(t, []string{"ROLE_A"}, parseCommaListFromMap(m, "KEY"))
-	})
-
-	t.Run("MultipleValues", func(t *testing.T) {
-		t.Parallel()
-		m := map[string]string{"KEY": "ROLE_A, ROLE_B, ROLE_C"}
-		assert.Equal(t, []string{"ROLE_A", "ROLE_B", "ROLE_C"}, parseCommaListFromMap(m, "KEY"))
-	})
 }

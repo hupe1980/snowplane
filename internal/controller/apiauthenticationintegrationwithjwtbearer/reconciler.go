@@ -197,26 +197,48 @@ func buildAlterOptions(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithJW
 		opts.Enabled = obj.Spec.Enabled
 	}
 
-	opts.OAuthTokenEndpoint = obj.Spec.OAuthTokenEndpoint
-	opts.OAuthAuthorizationEndpoint = obj.Spec.OAuthAuthorizationEndpoint
+	if obj.Spec.OAuthTokenEndpoint != nil {
+		if obs == nil || obs.DescribeOutput == nil || *obj.Spec.OAuthTokenEndpoint != obs.DescribeOutput["OAUTH_TOKEN_ENDPOINT"] {
+			opts.OAuthTokenEndpoint = obj.Spec.OAuthTokenEndpoint
+		}
+	}
 
-	// OAuthAssertionIssuer is always sent because it is required.
-	issuer := obj.Spec.OAuthAssertionIssuer
-	opts.OAuthAssertionIssuer = &issuer
+	if obj.Spec.OAuthAuthorizationEndpoint != nil {
+		if obs == nil || obs.DescribeOutput == nil || *obj.Spec.OAuthAuthorizationEndpoint != obs.DescribeOutput["OAUTH_AUTHORIZATION_ENDPOINT"] {
+			opts.OAuthAuthorizationEndpoint = obj.Spec.OAuthAuthorizationEndpoint
+		}
+	}
+
+	// OAuthAssertionIssuer: diff-check against DESCRIBE output.
+	if obs != nil && obs.DescribeOutput != nil {
+		if obj.Spec.OAuthAssertionIssuer != obs.DescribeOutput["OAUTH_ASSERTION_ISSUER"] {
+			issuer := obj.Spec.OAuthAssertionIssuer
+			opts.OAuthAssertionIssuer = &issuer
+		}
+	} else {
+		issuer := obj.Spec.OAuthAssertionIssuer
+		opts.OAuthAssertionIssuer = &issuer
+	}
 
 	if obj.Spec.OAuthClientAuthMethod != nil {
 		s := string(*obj.Spec.OAuthClientAuthMethod)
-		opts.OAuthClientAuthMethod = &s
+		if obs == nil || obs.DescribeOutput == nil || !strings.EqualFold(s, obs.DescribeOutput["OAUTH_CLIENT_AUTH_METHOD"]) {
+			opts.OAuthClientAuthMethod = &s
+		}
 	}
 
 	if obj.Spec.OAuthAccessTokenValidity != nil {
 		v := int32(*obj.Spec.OAuthAccessTokenValidity) //nolint:gosec // G115: value is within int32 range
-		opts.OAuthAccessTokenValidity = &v
+		if obs == nil || obs.DescribeOutput == nil || fmt.Sprintf("%d", *obj.Spec.OAuthAccessTokenValidity) != obs.DescribeOutput["OAUTH_ACCESS_TOKEN_VALIDITY"] {
+			opts.OAuthAccessTokenValidity = &v
+		}
 	}
 
 	if obj.Spec.OAuthRefreshTokenValidity != nil {
 		v := int32(*obj.Spec.OAuthRefreshTokenValidity) //nolint:gosec // G115: value is within int32 range
-		opts.OAuthRefreshTokenValidity = &v
+		if obs == nil || obs.DescribeOutput == nil || fmt.Sprintf("%d", *obj.Spec.OAuthRefreshTokenValidity) != obs.DescribeOutput["OAUTH_REFRESH_TOKEN_VALIDITY"] {
+			opts.OAuthRefreshTokenValidity = &v
+		}
 	}
 
 	if obj.Spec.Comment != nil {
@@ -254,6 +276,14 @@ func detectDrift(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithJWTBeare
 
 		// Check immutable assertion issuer for drift.
 		d.CompareStringValue("OAUTH_ASSERTION_ISSUER", obj.Spec.OAuthAssertionIssuer, obs.DescribeOutput["OAUTH_ASSERTION_ISSUER"], false)
+
+		if obj.Spec.OAuthAccessTokenValidity != nil {
+			d.CompareStringValue("OAUTH_ACCESS_TOKEN_VALIDITY", fmt.Sprintf("%d", *obj.Spec.OAuthAccessTokenValidity), obs.DescribeOutput["OAUTH_ACCESS_TOKEN_VALIDITY"], false)
+		}
+
+		if obj.Spec.OAuthRefreshTokenValidity != nil {
+			d.CompareStringValue("OAUTH_REFRESH_TOKEN_VALIDITY", fmt.Sprintf("%d", *obj.Spec.OAuthRefreshTokenValidity), obs.DescribeOutput["OAUTH_REFRESH_TOKEN_VALIDITY"], false)
+		}
 	}
 
 	return d.Result()

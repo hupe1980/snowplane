@@ -8,6 +8,9 @@ import (
 //
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.issuer == oldSelf.issuer",message="spec.issuer is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.ssoURL == oldSelf.ssoURL",message="spec.ssoURL is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.provider == oldSelf.provider",message="spec.provider is immutable (delete and recreate the resource to change)"
 type SAML2IntegrationSpec struct {
 	CommonSpec `json:",inline"`
 

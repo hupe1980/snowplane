@@ -174,8 +174,17 @@ func buildAlterOptions(sci *snowplanev1alpha1.SCIMIntegration, id snowflake.Acco
 		}
 	}
 
-	opts.NetworkPolicy = sci.Spec.NetworkPolicy
-	opts.SyncPassword = sci.Spec.SyncPassword
+	if sci.Spec.NetworkPolicy != nil {
+		if obs == nil || obs.DescribeOutput == nil || !strings.EqualFold(*sci.Spec.NetworkPolicy, describeValue(obs, "NETWORK_POLICY")) {
+			opts.NetworkPolicy = sci.Spec.NetworkPolicy
+		}
+	}
+
+	if sci.Spec.SyncPassword != nil {
+		if obs == nil || obs.DescribeOutput == nil || fmt.Sprintf("%t", *sci.Spec.SyncPassword) != strings.ToLower(describeValue(obs, "SYNC_PASSWORD")) {
+			opts.SyncPassword = sci.Spec.SyncPassword
+		}
+	}
 
 	return opts
 }

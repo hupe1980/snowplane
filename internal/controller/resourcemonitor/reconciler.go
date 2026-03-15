@@ -14,6 +14,7 @@ import (
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/controller/helpers"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
@@ -169,7 +170,15 @@ func buildAlterOptions(rm *snowplanev1alpha1.ResourceMonitor, id snowflake.Accou
 	if len(rm.Spec.NotifyUsers) > 0 {
 		users := make([]string, len(rm.Spec.NotifyUsers))
 		copy(users, rm.Spec.NotifyUsers)
-		opts.NotifyUsers = &users
+
+		if obs != nil && obs.ShowOutput != nil {
+			obsUsers := helpers.ParseCommaList(obs.ShowOutput.NotifyUsers)
+			if !helpers.StringSlicesEqualFold(rm.Spec.NotifyUsers, obsUsers) {
+				opts.NotifyUsers = &users
+			}
+		} else {
+			opts.NotifyUsers = &users
+		}
 	}
 
 	// Compare triggers against observed state.
@@ -209,6 +218,12 @@ func detectDrift(rm *snowplanev1alpha1.ResourceMonitor, obs *snowflake.ResourceM
 		specTriggers := normalizeTriggers(rm.Spec.Triggers)
 		obsTriggers := buildObservedTriggers(obs.ShowOutput)
 		d.CompareStringValue("TRIGGERS", specTriggers, obsTriggers, false)
+
+		// NotifyUsers: compare spec list against comma-separated ShowOutput value.
+		if len(rm.Spec.NotifyUsers) > 0 {
+			obsUsers := helpers.ParseCommaList(obs.ShowOutput.NotifyUsers)
+			d.CompareStringSliceFold("NOTIFY_USERS", rm.Spec.NotifyUsers, obsUsers, false)
+		}
 	}
 
 	return d.Result()

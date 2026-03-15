@@ -12,6 +12,7 @@ import (
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/controller/helpers"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
@@ -155,19 +156,46 @@ func buildAlterOptions(obj *snowplanev1alpha1.EmailNotificationIntegration, id s
 		}
 	}
 
-	if len(obj.Spec.AllowedRecipients) > 0 {
-		list := make([]string, len(obj.Spec.AllowedRecipients))
-		copy(list, obj.Spec.AllowedRecipients)
-		opts.AllowedRecipients = &list
-	}
+	if obs != nil && obs.DescribeOutput != nil {
+		dm := obs.DescribeOutput
 
-	if len(obj.Spec.DefaultRecipients) > 0 {
-		list := make([]string, len(obj.Spec.DefaultRecipients))
-		copy(list, obj.Spec.DefaultRecipients)
-		opts.DefaultRecipients = &list
-	}
+		if len(obj.Spec.AllowedRecipients) > 0 {
+			actual := helpers.ParseCommaListFromMap(dm, "ALLOWED_RECIPIENTS")
+			if !helpers.StringSlicesEqualFold(obj.Spec.AllowedRecipients, actual) {
+				list := make([]string, len(obj.Spec.AllowedRecipients))
+				copy(list, obj.Spec.AllowedRecipients)
+				opts.AllowedRecipients = &list
+			}
+		}
 
-	opts.DefaultSubject = obj.Spec.DefaultSubject
+		if len(obj.Spec.DefaultRecipients) > 0 {
+			actual := helpers.ParseCommaListFromMap(dm, "DEFAULT_RECIPIENTS")
+			if !helpers.StringSlicesEqualFold(obj.Spec.DefaultRecipients, actual) {
+				list := make([]string, len(obj.Spec.DefaultRecipients))
+				copy(list, obj.Spec.DefaultRecipients)
+				opts.DefaultRecipients = &list
+			}
+		}
+
+		if obj.Spec.DefaultSubject != nil && *obj.Spec.DefaultSubject != helpers.DescribeValue(dm, "DEFAULT_SUBJECT") {
+			opts.DefaultSubject = obj.Spec.DefaultSubject
+		}
+	} else {
+		// No observation available (first reconciliation): send all fields.
+		if len(obj.Spec.AllowedRecipients) > 0 {
+			list := make([]string, len(obj.Spec.AllowedRecipients))
+			copy(list, obj.Spec.AllowedRecipients)
+			opts.AllowedRecipients = &list
+		}
+
+		if len(obj.Spec.DefaultRecipients) > 0 {
+			list := make([]string, len(obj.Spec.DefaultRecipients))
+			copy(list, obj.Spec.DefaultRecipients)
+			opts.DefaultRecipients = &list
+		}
+
+		opts.DefaultSubject = obj.Spec.DefaultSubject
+	}
 
 	return opts
 }
@@ -186,56 +214,10 @@ func detectDrift(obj *snowplanev1alpha1.EmailNotificationIntegration, obs *snowf
 	}
 
 	if obs.DescribeOutput != nil {
-		compareListFromDescribe(d, "ALLOWED_RECIPIENTS", obj.Spec.AllowedRecipients, obs.DescribeOutput)
-		compareListFromDescribe(d, "DEFAULT_RECIPIENTS", obj.Spec.DefaultRecipients, obs.DescribeOutput)
-		d.CompareStringValue("DEFAULT_SUBJECT", stringValueOrEmpty(obj.Spec.DefaultSubject), describeValue(obs.DescribeOutput, "DEFAULT_SUBJECT"), false)
+		helpers.CompareListFromDescribeMap(d, "ALLOWED_RECIPIENTS", obj.Spec.AllowedRecipients, obs.DescribeOutput, false)
+		helpers.CompareListFromDescribeMap(d, "DEFAULT_RECIPIENTS", obj.Spec.DefaultRecipients, obs.DescribeOutput, false)
+		d.CompareStringValue("DEFAULT_SUBJECT", helpers.StringValueOrEmpty(obj.Spec.DefaultSubject), helpers.DescribeValue(obs.DescribeOutput, "DEFAULT_SUBJECT"), false)
 	}
 
 	return d.Result()
-}
-
-func describeValue(desc map[string]string, key string) string {
-	if desc == nil {
-		return ""
-	}
-
-	return desc[key]
-}
-
-func stringValueOrEmpty(s *string) string {
-	if s == nil {
-		return ""
-	}
-
-	return *s
-}
-
-func compareListFromDescribe(d *drift.Detector, key string, specList []string, desc map[string]string) {
-	descList := parseCommaList(desc, key)
-	specJoined := strings.Join(specList, ",")
-	descJoined := strings.Join(descList, ",")
-	d.CompareStringValueFold(key, specJoined, descJoined, false)
-}
-
-func parseCommaList(desc map[string]string, key string) []string {
-	if desc == nil {
-		return nil
-	}
-
-	raw, ok := desc[key]
-	if !ok || raw == "" {
-		return nil
-	}
-
-	parts := strings.Split(raw, ",")
-	result := make([]string, 0, len(parts))
-
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			result = append(result, p)
-		}
-	}
-
-	return result
 }

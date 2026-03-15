@@ -394,6 +394,21 @@ func RecordPolicyBodyRejection(controller string) {
 	PolicyBodyRejectionsTotal.With(prometheus.Labels{"controller": controller}).Inc()
 }
 
+// NULBytesStrippedTotal counts NUL byte removals by the SQL escaping layer.
+// A non-zero value may indicate binary injection attempts or encoding issues.
+var NULBytesStrippedTotal = prometheus.NewCounter(
+	prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "nul_bytes_stripped_total",
+		Help:      "Total number of NUL bytes stripped from SQL strings. Non-zero may indicate injection attempts.",
+	},
+)
+
+// RecordNULBytesStripped increments the counter by the number of NUL bytes removed.
+func RecordNULBytesStripped(count int) {
+	NULBytesStrippedTotal.Add(float64(count))
+}
+
 // ObserveSnowflakeOp instruments a Snowflake operation with duration and result metrics.
 // The callback fn performs the actual operation; any error it returns is propagated.
 func ObserveSnowflakeOp(controller, operation string, fn func() error) error {
@@ -467,6 +482,7 @@ func init() {
 		SQLStatementExecutionsTotal,
 		SQLStatementDeniedTotal,
 		PolicyBodyRejectionsTotal,
+		NULBytesStrippedTotal,
 		ShardInfo,
 		DBStatsMaxOpenConns,
 		DBStatsOpenConns,

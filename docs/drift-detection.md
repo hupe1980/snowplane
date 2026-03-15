@@ -81,6 +81,10 @@ All resource types support drift detection:
 | ComputePool | `name`, `instanceFamily` |
 | Service | `name`, `database`, `schema` |
 | ImageRepository | `name`, `database`, `schema` |
+| OAuthIntegrationForCustomClients | `name`, `oauthClientType` |
+| OAuthIntegrationForPartnerApplications | `name`, `oauthClient` |
+| PrimaryConnection | `name` |
+| SecondaryConnection | `name`, `asReplicaOf` |
 
 ---
 

@@ -221,6 +221,13 @@ spec:
             x-kubernetes-validations:
             - message: spec.name is immutable (delete and recreate)
               rule: self.name == oldSelf.name
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
+            - message: spec.oauthClientId is immutable (delete and recreate the resource
+                to change)
+              rule: self.oauthClientId == oldSelf.oauthClientId
           status:
             description: APIAuthenticationIntegrationWithJWTBearerStatus defines the
               observed state.

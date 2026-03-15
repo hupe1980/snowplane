@@ -13,6 +13,7 @@ import (
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/controller/helpers"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
@@ -187,22 +188,32 @@ func buildAlterOptions(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithCl
 		opts.Enabled = obj.Spec.Enabled
 	}
 
-	opts.OAuthTokenEndpoint = obj.Spec.OAuthTokenEndpoint
+	if obj.Spec.OAuthTokenEndpoint != nil {
+		if obs == nil || obs.DescribeOutput == nil || *obj.Spec.OAuthTokenEndpoint != obs.DescribeOutput["OAUTH_TOKEN_ENDPOINT"] {
+			opts.OAuthTokenEndpoint = obj.Spec.OAuthTokenEndpoint
+		}
+	}
 
 	if obj.Spec.OAuthClientAuthMethod != nil {
 		s := string(*obj.Spec.OAuthClientAuthMethod)
-		opts.OAuthClientAuthMethod = &s
+		if obs == nil || obs.DescribeOutput == nil || !strings.EqualFold(s, obs.DescribeOutput["OAUTH_CLIENT_AUTH_METHOD"]) {
+			opts.OAuthClientAuthMethod = &s
+		}
 	}
 
 	if obj.Spec.OAuthAccessTokenValidity != nil {
 		v := int32(*obj.Spec.OAuthAccessTokenValidity) //nolint:gosec // G115: value is within int32 range
-		opts.OAuthAccessTokenValidity = &v
+		if obs == nil || obs.DescribeOutput == nil || fmt.Sprintf("%d", *obj.Spec.OAuthAccessTokenValidity) != obs.DescribeOutput["OAUTH_ACCESS_TOKEN_VALIDITY"] {
+			opts.OAuthAccessTokenValidity = &v
+		}
 	}
 
 	if len(obj.Spec.OAuthAllowedScopes) > 0 {
-		scopes := make([]string, len(obj.Spec.OAuthAllowedScopes))
-		copy(scopes, obj.Spec.OAuthAllowedScopes)
-		opts.OAuthAllowedScopes = &scopes
+		if obs == nil || obs.DescribeOutput == nil || !helpers.StringSlicesEqualFold(obj.Spec.OAuthAllowedScopes, helpers.ParseCommaListFromMap(obs.DescribeOutput, "OAUTH_ALLOWED_SCOPES")) {
+			scopes := make([]string, len(obj.Spec.OAuthAllowedScopes))
+			copy(scopes, obj.Spec.OAuthAllowedScopes)
+			opts.OAuthAllowedScopes = &scopes
+		}
 	}
 
 	if obj.Spec.Comment != nil {
@@ -233,6 +244,12 @@ func detectDrift(obj *snowplanev1alpha1.APIAuthenticationIntegrationWithClientCr
 		if obj.Spec.OAuthClientAuthMethod != nil {
 			d.CompareStringValueFold("OAUTH_CLIENT_AUTH_METHOD", string(*obj.Spec.OAuthClientAuthMethod), obs.DescribeOutput["OAUTH_CLIENT_AUTH_METHOD"], false)
 		}
+
+		if obj.Spec.OAuthAccessTokenValidity != nil {
+			d.CompareStringValue("OAUTH_ACCESS_TOKEN_VALIDITY", fmt.Sprintf("%d", *obj.Spec.OAuthAccessTokenValidity), obs.DescribeOutput["OAUTH_ACCESS_TOKEN_VALIDITY"], false)
+		}
+
+		helpers.CompareListFromDescribeMap(d, "OAUTH_ALLOWED_SCOPES", obj.Spec.OAuthAllowedScopes, obs.DescribeOutput, false)
 	}
 
 	return d.Result()

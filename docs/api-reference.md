@@ -23,7 +23,7 @@ Complete field-level documentation for all Snowplane CRDs. Each resource support
 
 > 🏷️ **Annotations:** `snowplane.hupe1980.github.io/force-destroy` enables CASCADE DROP for databases and schemas. `snowplane.hupe1980.github.io/force-new` triggers delete-and-recreate for immutable field changes. `snowplane.hupe1980.github.io/late-initialized` is set to `"true"` after adoption, indicating spec fields were populated from observed state.
 
-> 🔄 **Late-initialization:** When `adoptionPolicy: adopt` is used, nil spec fields are automatically populated from the existing Snowflake resource state (ShowOutput, DescribeOutput, Parameters). This ensures the adopted CR's spec accurately represents the managed state. Supports 33 adapters: Database, SecondaryDatabase, SharedDatabase, Schema, Warehouse, User, Task, PasswordPolicy, Table, Alert, DynamicTable, Sequence, View, Tag, AccountRole, DatabaseRole, StorageIntegrationAWS, StorageIntegrationGCS, StorageIntegrationAzure, ExternalVolume, CortexSearchService, GitRepository, Streamlit, InternalStage, ExternalStage, Pipe, NetworkPolicy, EmailNotificationIntegration, QueueNotificationIntegration, WebhookNotificationIntegration, ResourceMonitor, APIIntegration, ComputePool, Service.
+> 🔄 **Late-initialization:** When `adoptionPolicy: adopt` is used, nil spec fields are automatically populated from the existing Snowflake resource state (ShowOutput, DescribeOutput, Parameters). This ensures the adopted CR's spec accurately represents the managed state. Supports 37 adapters: Database, SecondaryDatabase, SharedDatabase, Schema, Warehouse, User, Task, PasswordPolicy, Table, Alert, DynamicTable, Sequence, View, Tag, AccountRole, DatabaseRole, StorageIntegrationAWS, StorageIntegrationGCS, StorageIntegrationAzure, ExternalVolume, CortexSearchService, GitRepository, Streamlit, InternalStage, ExternalStage, Pipe, NetworkPolicy, EmailNotificationIntegration, QueueNotificationIntegration, WebhookNotificationIntegration, ResourceMonitor, APIIntegration, ComputePool, Service, OAuthIntegrationForCustomClients, OAuthIntegrationForPartnerApplications, PrimaryConnection, SecondaryConnection.
 
 > ⏱️ **LastReconcileTime:** Every resource's `status.lastReconcileTime` is stamped on each successful reconcile (create, update, adoption, and post-crash recovery) via `finalizeSpec()`. Use this for SLO dashboards, staleness alerting, and diagnosing whether reconciliation is running for a specific resource.
 
@@ -333,6 +333,8 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
 | `spec.columns` | `[]ColumnDefinition` | Column definitions (name, type, nullable, default, comment). Column drift is detected and corrected via ADD/DROP/ALTER COLUMN. |
+
+> **Note:** Columns use `+listType=map` with `+listMapKey=name` for server-side apply merge semantics. This means column *ordering* in the manifest does not map to column ordering in Snowflake. Reordering columns in the YAML without changing names has no effect — Snowflake does not support column reordering via `ALTER TABLE`.
 | `spec.constraints` | `[]TableConstraint` | Table constraints (PRIMARY KEY, UNIQUE, FOREIGN KEY) *(immutable)* |
 | `spec.transient` | `bool` | Transient table *(immutable)* |
 | `spec.dataRetentionTimeInDays` | `*int32` | Time Travel retention (0–90) |
@@ -663,7 +665,7 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 
 > **Note:** The unified `NotificationIntegration` CRD has been removed. Use `EmailNotificationIntegration`, `QueueNotificationIntegration`, and `WebhookNotificationIntegration` instead.
 
-> **Note:** The unified `SecurityIntegration` CRD has been removed. Use `ExternalOAuthIntegration`, `SAML2Integration`, and `SCIMIntegration` instead.
+> **Note:** The unified `SecurityIntegration` CRD has been removed. Use `ExternalOAuthIntegration`, `OAuthIntegrationForCustomClients`, `OAuthIntegrationForPartnerApplications`, `SAML2Integration`, and `SCIMIntegration` instead.
 
 <details>
 <summary>🔌 <strong>APIIntegration</strong></summary>
@@ -1565,5 +1567,75 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.targetName` | `string` | User name — required when targetType=`USER` *(immutable)* |
 
 > 🔒 **Policy Attachment:** Attaches a password policy to an account or specific user. Account-level policies apply to all users who don't have a user-level override.
+
+</details>
+
+<details>
+<summary>🔗 <strong>OAuthIntegrationForCustomClients</strong> (shortName: <code>oauthcc</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Snowflake integration name *(immutable)* |
+| `spec.oauthClientType` | `enum` | `PUBLIC` / `CONFIDENTIAL` *(immutable)* |
+| `spec.oauthRedirectURI` | `string` | OAuth redirect URI |
+| `spec.oauthAllowNonTLSRedirectURI` | `*bool` | Allow non-TLS redirect URIs |
+| `spec.oauthEnforcePKCE` | `*bool` | Enforce PKCE for authorization |
+| `spec.oauthUseSecondaryRoles` | `*string` | `IMPLICIT` / `NONE` |
+| `spec.preAuthorizedRolesList` | `[]string` | Roles pre-authorized for the client |
+| `spec.blockedRolesList` | `[]string` | Roles blocked from OAuth access |
+| `spec.oauthIssueRefreshTokens` | `*bool` | Issue refresh tokens |
+| `spec.oauthRefreshTokenValidity` | `*int64` | Refresh token validity in seconds |
+| `spec.networkPolicy` | `*string` | Network policy to apply |
+| `spec.oauthClientRSAPublicKey` | `*string` | RSA public key for JWT |
+| `spec.oauthClientRSAPublicKey2` | `*string` | Second RSA public key for rotation |
+| `spec.comment` | `*string` | Description |
+| `spec.enabled` | `*bool` | Enable/disable the integration |
+
+> 🔗 **Custom OAuth:** Snowflake-hosted OAuth integration for custom client applications. Supports both public and confidential client types with PKCE enforcement.
+
+</details>
+
+<details>
+<summary>🔗 <strong>OAuthIntegrationForPartnerApplications</strong> (shortName: <code>oauthpa</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Snowflake integration name *(immutable)* |
+| `spec.oauthClient` | `enum` | `TABLEAU_DESKTOP` / `TABLEAU_SERVER` / `LOOKER` *(immutable)* |
+| `spec.oauthRedirectURI` | `*string` | OAuth redirect URI |
+| `spec.oauthUseSecondaryRoles` | `*string` | `IMPLICIT` / `NONE` |
+| `spec.oauthIssueRefreshTokens` | `*bool` | Issue refresh tokens |
+| `spec.oauthRefreshTokenValidity` | `*int64` | Refresh token validity in seconds |
+| `spec.blockedRolesList` | `[]string` | Roles blocked from OAuth access |
+| `spec.comment` | `*string` | Description |
+| `spec.enabled` | `*bool` | Enable/disable the integration |
+
+> 🔗 **Partner OAuth:** Snowflake-hosted OAuth integration for partner applications (Tableau Desktop, Tableau Server, Looker).
+
+</details>
+
+<details>
+<summary>🔄 <strong>PrimaryConnection</strong> (shortName: <code>pconn</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Snowflake connection name *(immutable)* |
+| `spec.enableFailoverToAccounts` | `[]string` | Accounts allowed for failover (`orgName.accountName`) |
+| `spec.comment` | `*string` | Description |
+
+> 🔄 **Primary Connection:** Creates a primary connection for HA/failover. Enable failover to specific accounts so secondary connections can be promoted.
+
+</details>
+
+<details>
+<summary>🔄 <strong>SecondaryConnection</strong> (shortName: <code>sconn</code>)</summary>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec.name` | `string` | Snowflake connection name *(immutable)* |
+| `spec.asReplicaOf` | `string` | Fully qualified primary connection (`orgName.accountName.connectionName`) *(immutable)* |
+| `spec.comment` | `*string` | Description |
+
+> 🔄 **Secondary Connection:** Creates a secondary (replica) connection that mirrors a primary connection for HA/failover scenarios.
 
 </details>

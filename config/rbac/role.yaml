@@ -38,6 +38,14 @@ rules:
   verbs:
   - create
   - patch
+# Events (events.k8s.io) — controller-runtime uses this API group by default.
+- apiGroups:
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
 # Leader election.
 - apiGroups:
   - coordination.k8s.io
@@ -135,6 +143,10 @@ rules:
   - imagerepositories
   - services
   - shares
+  - primaryconnections
+  - secondaryconnections
+  - oauthintegrationforcustomclients
+  - oauthintegrationforpartnerapplications
   verbs:
   - get
   - list
@@ -230,6 +242,10 @@ rules:
   - imagerepositories/status
   - services/status
   - shares/status
+  - primaryconnections/status
+  - secondaryconnections/status
+  - oauthintegrationforcustomclients/status
+  - oauthintegrationforpartnerapplications/status
   verbs:
   - get
   - patch
@@ -321,5 +337,9 @@ rules:
   - imagerepositories/finalizers
   - services/finalizers
   - shares/finalizers
+  - primaryconnections/finalizers
+  - secondaryconnections/finalizers
+  - oauthintegrationforcustomclients/finalizers
+  - oauthintegrationforpartnerapplications/finalizers
   verbs:
   - update

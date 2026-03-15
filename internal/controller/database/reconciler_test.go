@@ -852,9 +852,15 @@ func TestReconcile_ImmutableField_FirstReconcile_Skipped(t *testing.T) {
 	db.Spec.Transient = true
 	db.Status.ObservedGeneration = 0
 
+	observeCall := 0
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.DatabaseObservation, error) {
-			return &snowflake.DatabaseObservation{Exists: false}, nil
+			observeCall++
+			if observeCall == 1 {
+				return &snowflake.DatabaseObservation{Exists: false}, nil
+			}
+
+			return &snowflake.DatabaseObservation{Exists: true}, nil
 		},
 		createFn: func(_ context.Context, _ snowflake.CreateDatabaseOptions) error {
 			return nil

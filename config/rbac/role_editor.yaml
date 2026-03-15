@@ -94,6 +94,10 @@ rules:
   - imagerepositories
   - services
   - shares
+  - primaryconnections
+  - secondaryconnections
+  - oauthintegrationforcustomclients
+  - oauthintegrationforpartnerapplications
   verbs:
   - get
   - list
@@ -189,5 +193,9 @@ rules:
   - imagerepositories/status
   - services/status
   - shares/status
+  - primaryconnections/status
+  - secondaryconnections/status
+  - oauthintegrationforcustomclients/status
+  - oauthintegrationforpartnerapplications/status
   verbs:
   - get

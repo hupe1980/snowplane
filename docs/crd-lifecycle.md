@@ -79,6 +79,10 @@ Every Snowplane CRD carries a maturity label (`snowplane.hupe1980.github.io/matu
 | ComputePool | alpha | SPCS compute infrastructure, immutable instanceFamily |
 | Service | alpha | SPCS container workloads, schema-scoped |
 | ImageRepository | alpha | SPCS container image registry, create/drop only |
+| OAuthIntegrationForCustomClients | alpha | Snowflake-hosted OAuth for custom clients |
+| OAuthIntegrationForPartnerApplications | alpha | Partner app OAuth (Tableau, Looker) |
+| PrimaryConnection | alpha | HA/failover primary connection |
+| SecondaryConnection | alpha | HA/failover secondary connection replica |
 | ProviderConfig | **stable** | Core infrastructure, always required |
 
 ---

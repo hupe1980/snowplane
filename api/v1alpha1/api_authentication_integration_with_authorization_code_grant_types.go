@@ -9,6 +9,8 @@ import (
 // authorization code grant flow.
 //
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="self.oauthClientId == oldSelf.oauthClientId",message="spec.oauthClientId is immutable (delete and recreate the resource to change)"
 type APIAuthenticationIntegrationWithAuthorizationCodeGrantSpec struct {
 	CommonSpec `json:",inline"`
 

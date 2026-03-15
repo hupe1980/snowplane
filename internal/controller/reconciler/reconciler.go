@@ -399,6 +399,9 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 
 	// F7: Enforce AllowedDatabases / AllowedSchemas restrictions from the ProviderConfig.
 	// Only runs for resources that implement ScopedResource (schema-scoped CRDs).
+	// Scope violations are terminal: the ProviderConfig allowlist is static config,
+	// so retrying is pointless. When the ProviderConfig is updated, its controller
+	// re-enqueues all dependent CRs automatically via the field indexer.
 	if scoped, ok := any(obj).(ScopedResource); ok {
 		if dbName := scoped.GetScopeDatabaseName(); dbName != "" {
 			if !provider.IsDatabaseAllowed(resolved, dbName) {
@@ -407,7 +410,8 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 				conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonDatabaseNotAllowed, msg)
 				r.bestEffortPatchStatus(ctx, obj)
 
-				return ctrl.Result{}, fmt.Errorf("database not allowed: %s", msg)
+				// Terminal: no retry — ProviderConfig change re-enqueues dependents.
+				return ctrl.Result{}, nil
 			}
 
 			if schemaName := scoped.GetScopeSchemaName(); schemaName != "" {
@@ -417,7 +421,8 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 					conditions.SetNotSynced(obj, snowplanev1alpha1.ReasonSchemaNotAllowed, msg)
 					r.bestEffortPatchStatus(ctx, obj)
 
-					return ctrl.Result{}, fmt.Errorf("schema not allowed: %s", msg)
+					// Terminal: no retry — ProviderConfig change re-enqueues dependents.
+					return ctrl.Result{}, nil
 				}
 			}
 		}
@@ -435,7 +440,6 @@ func (r *GenericReconciler[T, S, D]) Reconcile(ctx context.Context, req ctrl.Req
 		r.bestEffortPatchStatus(ctx, obj)
 
 		if terminal {
-			resName := r.Adapter.ResourceName()
 			r.Recorder.Event(obj, corev1.EventTypeWarning, snowplanev1alpha1.ReasonTerminalError,
 				fmt.Sprintf("Terminal error setting up service client for %s %q: %v", resName, obj.GetSpecName(), err))
 
@@ -767,14 +771,16 @@ func (r *GenericReconciler[T, S, D]) reconcileCreate(ctx context.Context, obj T,
 		// the explicit fast requeue.
 		r.bestEffortPatchStatus(ctx, obj)
 
-		// Return the error (if any) alongside RequeueAfter so that
-		// controller-runtime applies exponential backoff instead of a
-		// fixed 5-second polling loop.
+		// Return an error so that controller-runtime applies exponential
+		// backoff instead of a fixed-interval polling loop.  The
+		// creation-initiated annotation is still present, so the next
+		// reconcile correctly enters the post-create observe path
+		// instead of attempting a duplicate CREATE.
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("post-create observe: %w", err)
 		}
 
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		return ctrl.Result{}, fmt.Errorf("post-create observe: %s created but not yet observable", resName)
 	}
 
 	r.Adapter.ApplyObservation(obj, postObs)
@@ -838,7 +844,7 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 
 	altered := false
 
-	if alterOpts.HasChanges() {
+	if alterOpts != nil && alterOpts.HasChanges() {
 		currentHash, hashErr := obj.ComputeSpecHash()
 		if hashErr != nil {
 			conditions.SetNotReady(obj, snowplanev1alpha1.ReasonTerminalError, hashErr.Error())
@@ -974,14 +980,16 @@ func (r *GenericReconciler[T, S, D]) reconcileUpdate(ctx context.Context, obj T,
 			r.Recorder.Event(obj, corev1.EventTypeNormal, snowplanev1alpha1.ReasonReconcileSuccess, fmt.Sprintf("%s %q updated", resName, obj.GetSpecName()))
 		}
 
-		// Re-observe after successful alter.
+		// Re-observe after successful alter to pick up Snowflake-applied defaults.
 		var reObs *Observation[D]
 
-		if err := sfretry.Do(opCtx, sfretry.DefaultOptions(), func() error {
+		if reObsErr := sfretry.Do(opCtx, sfretry.DefaultOptions(), func() error {
 			var e error
 			reObs, e = r.Adapter.Observe(opCtx, svc, id)
 			return e
-		}); err == nil && reObs != nil && reObs.Exists {
+		}); reObsErr != nil {
+			logger.V(1).Info("post-alter re-observe failed; status will refresh on next periodic reconcile", "resource", resName, "error", reObsErr)
+		} else if reObs != nil && reObs.Exists {
 			r.Adapter.ApplyObservation(obj, reObs)
 		}
 	}

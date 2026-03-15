@@ -69,9 +69,12 @@ import (
 	networkpolicyctl "github.com/hupe1980/snowplane/internal/controller/networkpolicy"
 	networkpolicyattachmentctl "github.com/hupe1980/snowplane/internal/controller/networkpolicyattachment"
 	networkrulectl "github.com/hupe1980/snowplane/internal/controller/networkrule"
+	oauthccctl "github.com/hupe1980/snowplane/internal/controller/oauthintegrationforcustomclients"
+	oauthpactl "github.com/hupe1980/snowplane/internal/controller/oauthintegrationforpartnerapplications"
 	passwordpolicyctl "github.com/hupe1980/snowplane/internal/controller/passwordpolicy"
 	passwordpolicyattachmentctl "github.com/hupe1980/snowplane/internal/controller/passwordpolicyattachment"
 	pipectl "github.com/hupe1980/snowplane/internal/controller/pipe"
+	primaryconnectionctl "github.com/hupe1980/snowplane/internal/controller/primaryconnection"
 	procedurejavactl "github.com/hupe1980/snowplane/internal/controller/procedurejava"
 	procedurejavascriptctl "github.com/hupe1980/snowplane/internal/controller/procedurejavascript"
 	procedurepythonctl "github.com/hupe1980/snowplane/internal/controller/procedurepython"
@@ -86,6 +89,7 @@ import (
 	saml2integrationctl "github.com/hupe1980/snowplane/internal/controller/saml2integration"
 	schemactl "github.com/hupe1980/snowplane/internal/controller/schema"
 	scimintegrationctl "github.com/hupe1980/snowplane/internal/controller/scimintegration"
+	secondaryconnectionctl "github.com/hupe1980/snowplane/internal/controller/secondaryconnection"
 	secondarydatabasectl "github.com/hupe1980/snowplane/internal/controller/secondarydatabase"
 	secretwithauthorizationcodegrantctl "github.com/hupe1980/snowplane/internal/controller/secretwithauthorizationcodegrant"
 	secretwithbasicauthenticationctl "github.com/hupe1980/snowplane/internal/controller/secretwithbasicauthentication"
@@ -123,6 +127,9 @@ import (
 	// Register Prometheus metrics in controller-runtime's registry.
 	appmetrics "github.com/hupe1980/snowplane/internal/metrics"
 )
+
+// version is set at build time via -ldflags "-X main.version=vX.Y.Z".
+var version = "dev" //nolint:gochecknoglobals // build-time injection
 
 var (
 	scheme   = runtime.NewScheme()
@@ -310,6 +317,7 @@ func main() {
 		Endpoint:      otelEndpoint,
 		SamplingRatio: otelSamplingRatio,
 		Insecure:      otelInsecure,
+		Version:       version,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to set up OpenTelemetry tracing")
@@ -527,6 +535,10 @@ func main() {
 		{"imagerepository", imagerepositoryctl.NewReconciler(kc, factory, controllerRec("imagerepository"), rl)},
 		{"gitrepository", gitrepositoryctl.NewReconciler(kc, factory, controllerRec("gitrepository"), rl)},
 		{"streamlit", streamlitctl.NewReconciler(kc, factory, controllerRec("streamlit"), rl)},
+		{"oauthintegrationforcustomclients", oauthccctl.NewReconciler(kc, factory, controllerRec("oauthintegrationforcustomclients"), rl)},
+		{"oauthintegrationforpartnerapplications", oauthpactl.NewReconciler(kc, factory, controllerRec("oauthintegrationforpartnerapplications"), rl)},
+		{"primaryconnection", primaryconnectionctl.NewReconciler(kc, factory, controllerRec("primaryconnection"), rl)},
+		{"secondaryconnection", secondaryconnectionctl.NewReconciler(kc, factory, controllerRec("secondaryconnection"), rl)},
 	}
 
 	// Validate --disable-controllers against the registration table (single

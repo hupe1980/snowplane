@@ -1,0 +1,18 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: OAuthIntegrationForCustomClients
+metadata:
+  name: my-oauth-custom-client
+spec:
+  providerRef:
+    name: default
+  name: MY_OAUTH_CUSTOM_CLIENT
+  oauthClientType: "CONFIDENTIAL"
+  oauthRedirectURI: "https://example.com/oauth/callback"
+  oauthUseSecondaryRoles: "NONE"
+  blockedRolesList:
+    - "ACCOUNTADMIN"
+    - "SECURITYADMIN"
+  oauthIssueRefreshTokens: true
+  oauthRefreshTokenValidity: 86400
+  enabled: true
+  comment: "Custom OAuth integration managed by Snowplane"

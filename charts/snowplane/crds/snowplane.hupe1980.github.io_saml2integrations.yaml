@@ -231,6 +231,15 @@ spec:
                 to change)
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
                 || self.useRole == oldSelf.useRole)
+            - message: spec.issuer is immutable (delete and recreate the resource
+                to change)
+              rule: self.issuer == oldSelf.issuer
+            - message: spec.ssoURL is immutable (delete and recreate the resource
+                to change)
+              rule: self.ssoURL == oldSelf.ssoURL
+            - message: spec.provider is immutable (delete and recreate the resource
+                to change)
+              rule: self.provider == oldSelf.provider
           status:
             description: SAML2IntegrationStatus defines the observed state of a SAML2Integration.
             properties:

@@ -15,6 +15,7 @@ import (
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/controller/helpers"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
@@ -687,6 +688,10 @@ func detectDrift(task *snowplanev1alpha1.Task, obs *snowflake.TaskObservation) *
 		d.CompareInt32("TASK_AUTO_RETRY_ATTEMPTS", task.Spec.TaskAutoRetryAttempts, obs.Parameters.TaskAutoRetryAttempts, false)
 		d.CompareString("LOG_LEVEL", (*string)(task.Spec.LogLevel), obs.Parameters.LogLevel, false)
 		d.CompareInt32("USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS", task.Spec.UserTaskMinimumTriggerIntervalInSeconds, obs.Parameters.UserTaskMinimumTriggerIntervalInSeconds, false)
+		d.CompareString("TARGET_COMPLETION_INTERVAL", task.Spec.TargetCompletionInterval, helpers.StringValueOrEmpty(obs.Parameters.TargetCompletionInterval), false)
+		d.CompareString("SERVERLESS_TASK_MIN_STATEMENT_SIZE", task.Spec.ServerlessTaskMinStatementSize, helpers.StringValueOrEmpty(obs.Parameters.ServerlessTaskMinStatementSize), false)
+		d.CompareString("SERVERLESS_TASK_MAX_STATEMENT_SIZE", task.Spec.ServerlessTaskMaxStatementSize, helpers.StringValueOrEmpty(obs.Parameters.ServerlessTaskMaxStatementSize), false)
+		d.CompareString("USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE", task.Spec.UserTaskManagedInitialWarehouseSize, helpers.StringValueOrEmpty(obs.Parameters.UserTaskManagedInitialWarehouseSize), false)
 	}
 
 	return d.Result()

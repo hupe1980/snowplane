@@ -41,6 +41,10 @@ type Config struct {
 
 	// Insecure disables TLS for the OTLP exporter connection.
 	Insecure bool
+
+	// Version is the service version reported in traces (injected via ldflags).
+	// Falls back to "dev" when empty.
+	Version string
 }
 
 // Provider wraps the OpenTelemetry TracerProvider and provides a convenient
@@ -84,12 +88,17 @@ func Setup(ctx context.Context, cfg Config) (*Provider, error) {
 		sampler = sdktrace.TraceIDRatioBased(cfg.SamplingRatio)
 	}
 
+	version := cfg.Version
+	if version == "" {
+		version = "dev"
+	}
+
 	res, err := resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceName("snowplane"),
-			semconv.ServiceVersion("dev"),
+			semconv.ServiceVersion(version),
 		),
 	)
 	if err != nil {

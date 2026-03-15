@@ -4,6 +4,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // ImageRepositorySpec defines the desired state of a Snowpark Container Services Image Repository.
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 type ImageRepositorySpec struct {
 	CommonSpec `json:",inline"`
 

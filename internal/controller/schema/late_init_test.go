@@ -34,6 +34,7 @@ func TestLateInitialize(t *testing.T) {
 			Detail: &snowflake.SchemaObservation{
 				ShowOutput: &snowplanev1alpha1.SchemaShowOutput{
 					Comment: "schema comment",
+					Options: "MANAGED ACCESS",
 				},
 				Parameters: &snowflake.SchemaParameters{
 					DataRetentionTimeInDays:    ptr(int32(14)),
@@ -52,6 +53,7 @@ func TestLateInitialize(t *testing.T) {
 		assert.True(t, modified)
 
 		assert.Equal(t, "schema comment", *obj.Spec.Comment)
+		assert.Equal(t, true, *obj.Spec.ManagedAccess)
 		assert.Equal(t, int32(14), *obj.Spec.DataRetentionTimeInDays)
 		assert.Equal(t, int32(28), *obj.Spec.MaxDataExtensionTimeInDays)
 		assert.Equal(t, true, *obj.Spec.ReplaceInvalidCharacters)
@@ -91,6 +93,7 @@ func TestLateInitialize(t *testing.T) {
 	t.Run("returns false when all fields already set", func(t *testing.T) {
 		obj := newSchema()
 		obj.Spec.Comment = ptr("c")
+		obj.Spec.ManagedAccess = ptr(false)
 		obj.Spec.DataRetentionTimeInDays = ptr(int32(7))
 		obj.Spec.MaxDataExtensionTimeInDays = ptr(int32(14))
 		obj.Spec.ReplaceInvalidCharacters = ptr(false)
@@ -142,5 +145,39 @@ func TestLateInitialize(t *testing.T) {
 
 		modified := lateInitialize(obj, obs)
 		assert.False(t, modified)
+	})
+
+	t.Run("fills ManagedAccess false when Options is empty", func(t *testing.T) {
+		obj := newSchema()
+		obs := &reconciler.Observation[*snowflake.SchemaObservation]{
+			Exists: true,
+			Detail: &snowflake.SchemaObservation{
+				ShowOutput: &snowplanev1alpha1.SchemaShowOutput{
+					Options: "",
+				},
+			},
+		}
+
+		modified := lateInitialize(obj, obs)
+		assert.True(t, modified)
+		assert.Equal(t, false, *obj.Spec.ManagedAccess)
+	})
+
+	t.Run("does not overwrite existing ManagedAccess", func(t *testing.T) {
+		obj := newSchema()
+		obj.Spec.ManagedAccess = ptr(false)
+
+		obs := &reconciler.Observation[*snowflake.SchemaObservation]{
+			Exists: true,
+			Detail: &snowflake.SchemaObservation{
+				ShowOutput: &snowplanev1alpha1.SchemaShowOutput{
+					Options: "MANAGED ACCESS",
+				},
+			},
+		}
+
+		modified := lateInitialize(obj, obs)
+		assert.False(t, modified)
+		assert.Equal(t, false, *obj.Spec.ManagedAccess)
 	})
 }

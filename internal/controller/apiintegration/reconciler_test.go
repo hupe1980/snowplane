@@ -19,7 +19,6 @@ import (
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
-	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/testutil"
 	"github.com/hupe1980/snowplane/internal/tracked"
 	"github.com/hupe1980/snowplane/internal/utils/conditions"
@@ -366,6 +365,9 @@ func TestBuildAlterOptions(t *testing.T) {
 		obj.Spec.APIBlockedPrefixes = []string{"https://blocked.example.com/"}
 		id := snowflake.NewAccountObjectIdentifier(obj.Spec.Name)
 		obs := successfulObservation()
+		// Make describe output differ so diff-checking triggers the ALTER.
+		obs.DescribeOutput["API_ALLOWED_PREFIXES"] = "https://old-api.example.com/v1/"
+		obs.DescribeOutput["API_BLOCKED_PREFIXES"] = "https://other-blocked.example.com/"
 
 		opts := buildAlterOptions(obj, id, obs)
 		require.NotNil(t, opts.APIAllowedPrefixes)
@@ -402,10 +404,35 @@ func TestBuildAlterOptions(t *testing.T) {
 		obj := newTestAPIIntegration("x", "default")
 		id := snowflake.NewAccountObjectIdentifier(obj.Spec.Name)
 		obs := successfulObservation()
+		// Make describe output differ so diff-checking triggers the ALTER.
+		obs.DescribeOutput["API_AWS_ROLE_ARN"] = "arn:aws:iam::123456789012:role/old-role"
 
 		opts := buildAlterOptions(obj, id, obs)
 		require.NotNil(t, opts.APIAWSRoleARN)
 		assert.Equal(t, "arn:aws:iam::123456789012:role/my-role", *opts.APIAWSRoleARN)
+	})
+
+	t.Run("AWSRoleARNSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestAPIIntegration("x", "default")
+		id := snowflake.NewAccountObjectIdentifier(obj.Spec.Name)
+		obs := successfulObservation() // describe output matches spec
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.Nil(t, opts.APIAWSRoleARN)
+	})
+
+	t.Run("ListFieldsSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestAPIIntegration("x", "default")
+		id := snowflake.NewAccountObjectIdentifier(obj.Spec.Name)
+		obs := successfulObservation() // describe output matches spec
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.Nil(t, opts.APIAllowedPrefixes)
+		assert.Nil(t, opts.APIBlockedPrefixes)
 	})
 }
 
@@ -606,75 +633,4 @@ func TestReconcile_NotFound(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, ctrl.Result{}, result)
-}
-
-// --------------------------------------------------------------------------
-// Tests: Helpers
-// --------------------------------------------------------------------------
-
-func TestParseCommaListFromMap(t *testing.T) {
-	t.Parallel()
-
-	t.Run("NilMap", func(t *testing.T) {
-		t.Parallel()
-
-		result := parseCommaListFromMap(nil, "KEY")
-		assert.Nil(t, result)
-	})
-
-	t.Run("MissingKey", func(t *testing.T) {
-		t.Parallel()
-
-		result := parseCommaListFromMap(map[string]string{"OTHER": "val"}, "KEY")
-		assert.Nil(t, result)
-	})
-
-	t.Run("MultipleValues", func(t *testing.T) {
-		t.Parallel()
-
-		result := parseCommaListFromMap(map[string]string{"KEY": "a, b, c"}, "KEY")
-		assert.Equal(t, []string{"a", "b", "c"}, result)
-	})
-
-	t.Run("WhitespaceOnly", func(t *testing.T) {
-		t.Parallel()
-
-		result := parseCommaListFromMap(map[string]string{"KEY": "  "}, "KEY")
-		assert.Empty(t, result)
-	})
-}
-
-func TestDescribeValue(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, "", describeValue(nil, "key"))
-	assert.Equal(t, "val", describeValue(map[string]string{"key": "val"}, "key"))
-	assert.Equal(t, "", describeValue(map[string]string{"other": "val"}, "key"))
-}
-
-func TestStringValueOrEmpty(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, "", stringValueOrEmpty(nil))
-	assert.Equal(t, "hello", stringValueOrEmpty(testutil.Ptr("hello")))
-}
-
-func TestCompareListFromDescribeMap(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Equal", func(t *testing.T) {
-		t.Parallel()
-
-		d := drift.New()
-		compareListFromDescribeMap(d, "KEY", []string{"a", "b"}, map[string]string{"KEY": "a,b"})
-		assert.False(t, d.Result().HasDrift)
-	})
-
-	t.Run("Different", func(t *testing.T) {
-		t.Parallel()
-
-		d := drift.New()
-		compareListFromDescribeMap(d, "KEY", []string{"a", "b"}, map[string]string{"KEY": "c,d"})
-		assert.True(t, d.Result().HasDrift)
-	})
 }

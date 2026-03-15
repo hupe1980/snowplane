@@ -691,7 +691,7 @@ func TestIsInUse_AllResourceTypes(t *testing.T) {
 			r, factory, _ := newTestReconciler(nil, tt.obj)
 			defer factory.Close()
 
-			inUse, err := r.isInUse(context.Background(), "my-pc")
+			inUse, err := r.isInUse(context.Background(), "default", "my-pc")
 			require.NoError(t, err)
 			assert.True(t, inUse, "%s should mark ProviderConfig as in-use", tt.name)
 		})
@@ -716,7 +716,7 @@ func TestIsInUse_NoReferences(t *testing.T) {
 	r, factory, _ := newTestReconciler(nil, db)
 	defer factory.Close()
 
-	inUse, err := r.isInUse(context.Background(), "my-pc")
+	inUse, err := r.isInUse(context.Background(), "default", "my-pc")
 	require.NoError(t, err)
 	assert.False(t, inUse)
 }
@@ -864,7 +864,7 @@ func (m *mockClient) QueryRow(_ context.Context, _ string, _ ...any) *snowflake.
 // Tests: providerRefExtractor
 // --------------------------------------------------------------------------
 
-func TestProviderRefExtractor_ReturnsName(t *testing.T) {
+func TestProviderRefExtractor_ReturnsNamespacedKey(t *testing.T) {
 	t.Parallel()
 
 	db := &snowplanev1alpha1.Database{
@@ -878,7 +878,7 @@ func TestProviderRefExtractor_ReturnsName(t *testing.T) {
 	}
 
 	got := providerRefExtractor(db)
-	assert.Equal(t, []string{"my-pc"}, got)
+	assert.Equal(t, []string{"default/my-pc"}, got)
 }
 
 func TestProviderRefExtractor_EmptyName(t *testing.T) {

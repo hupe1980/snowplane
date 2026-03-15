@@ -428,3 +428,61 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	assert.True(t, result.HasDrift)
 	assert.Contains(t, result.Summary(), "COMMENT")
 }
+
+// --------------------------------------------------------------------------
+// Tests: buildAlterOptions diff-checking
+// --------------------------------------------------------------------------
+
+func TestBuildAlterOptions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ValueListSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		nr := newTestNetworkRule("mynr", "default")
+		id := snowflake.NewSchemaObjectIdentifier("MY_DB", "PUBLIC", "MY_RULE")
+		obs := successfulObservation()
+
+		opts := buildAlterOptions(nr, id, obs)
+		assert.Nil(t, opts.ValueList, "ValueList should be nil when it matches DESCRIBE output")
+	})
+
+	t.Run("ValueListSentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		nr := newTestNetworkRule("mynr", "default")
+		nr.Spec.ValueList = []string{"172.16.0.0/16"}
+		id := snowflake.NewSchemaObjectIdentifier("MY_DB", "PUBLIC", "MY_RULE")
+		obs := successfulObservation()
+
+		opts := buildAlterOptions(nr, id, obs)
+		require.NotNil(t, opts.ValueList)
+		assert.Equal(t, []string{"172.16.0.0/16"}, *opts.ValueList)
+	})
+
+	t.Run("ValueListSentWhenNoDescribeOutput", func(t *testing.T) {
+		t.Parallel()
+
+		nr := newTestNetworkRule("mynr", "default")
+		id := snowflake.NewSchemaObjectIdentifier("MY_DB", "PUBLIC", "MY_RULE")
+		obs := &snowflake.NetworkRuleObservation{
+			Exists:     true,
+			ShowOutput: successfulObservation().ShowOutput,
+		}
+
+		opts := buildAlterOptions(nr, id, obs)
+		require.NotNil(t, opts.ValueList, "ValueList should be sent when DESCRIBE output is unavailable")
+	})
+
+	t.Run("ValueListOrderIndependent", func(t *testing.T) {
+		t.Parallel()
+
+		nr := newTestNetworkRule("mynr", "default")
+		nr.Spec.ValueList = []string{"192.168.1.0/24", "10.0.0.0/24"} // reversed order
+		id := snowflake.NewSchemaObjectIdentifier("MY_DB", "PUBLIC", "MY_RULE")
+		obs := successfulObservation() // describe has "10.0.0.0/24,192.168.1.0/24"
+
+		opts := buildAlterOptions(nr, id, obs)
+		assert.Nil(t, opts.ValueList, "ValueList should be nil when values match regardless of order")
+	})
+}

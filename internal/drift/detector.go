@@ -273,22 +273,34 @@ func (d *Detector) CompareStringSliceFold(field string, desired, actual []string
 		return d
 	}
 
-	actualSet := make(map[string]struct{}, len(actual))
-	for _, v := range actual {
-		actualSet[strings.ToUpper(strings.TrimSpace(v))] = struct{}{}
+	// Build frequency maps for both sides to handle duplicates correctly.
+	desiredFreq := make(map[string]int, len(desired))
+	for _, v := range desired {
+		desiredFreq[strings.ToUpper(strings.TrimSpace(v))]++
 	}
 
-	for _, v := range desired {
-		if _, ok := actualSet[strings.ToUpper(strings.TrimSpace(v))]; !ok {
-			d.changes = append(d.changes, FieldChange{
-				Field:     field,
-				Desired:   fmt.Sprintf("%v", desired),
-				Actual:    fmt.Sprintf("%v", actual),
-				Immutable: immutable,
-			})
+	actualFreq := make(map[string]int, len(actual))
+	for _, v := range actual {
+		actualFreq[strings.ToUpper(strings.TrimSpace(v))]++
+	}
 
-			return d
+	match := len(desiredFreq) == len(actualFreq)
+	if match {
+		for k, n := range desiredFreq {
+			if actualFreq[k] != n {
+				match = false
+				break
+			}
 		}
+	}
+
+	if !match {
+		d.changes = append(d.changes, FieldChange{
+			Field:     field,
+			Desired:   fmt.Sprintf("%v", desired),
+			Actual:    fmt.Sprintf("%v", actual),
+			Immutable: immutable,
+		})
 	}
 
 	return d

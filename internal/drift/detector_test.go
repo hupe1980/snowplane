@@ -421,3 +421,19 @@ func TestDetector_CompareStringSliceFold_EmptyDesiredSkipped(t *testing.T) {
 	r := d.Result()
 	assert.False(t, r.HasDrift)
 }
+
+func TestDetector_CompareStringSliceFold_DuplicateDesired_DetectsDrift(t *testing.T) {
+	t.Parallel()
+	// desired=["A","A"] actual=["A","B"] — same length, but different multisets.
+	d := New().CompareStringSliceFold("TAGS", []string{"A", "A"}, []string{"A", "B"}, false)
+	r := d.Result()
+	assert.True(t, r.HasDrift, "duplicate desired values with same-length actual should detect drift")
+	assert.Len(t, r.Changes, 1)
+}
+
+func TestDetector_CompareStringSliceFold_DuplicateBothSides_Match(t *testing.T) {
+	t.Parallel()
+	d := New().CompareStringSliceFold("TAGS", []string{"A", "A"}, []string{"A", "A"}, false)
+	r := d.Result()
+	assert.False(t, r.HasDrift, "identical multisets should not report drift")
+}

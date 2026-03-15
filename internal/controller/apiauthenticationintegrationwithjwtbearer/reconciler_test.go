@@ -476,6 +476,158 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
+// Tests: buildAlterOptions diff-checking
+// --------------------------------------------------------------------------
+
+func TestBuildAlterOptions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("TokenEndpointSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthTokenEndpoint = testutil.Ptr("https://token.example.com")
+		id := snowflake.NewAccountObjectIdentifier("MY_JWT_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_TOKEN_ENDPOINT"] = "https://token.example.com"
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.Nil(t, opts.OAuthTokenEndpoint, "OAuthTokenEndpoint should be nil when unchanged")
+	})
+
+	t.Run("TokenEndpointSentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthTokenEndpoint = testutil.Ptr("https://new-token.example.com")
+		id := snowflake.NewAccountObjectIdentifier("MY_JWT_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_TOKEN_ENDPOINT"] = "https://old-token.example.com"
+
+		opts := buildAlterOptions(obj, id, obs)
+		require.NotNil(t, opts.OAuthTokenEndpoint)
+		assert.Equal(t, "https://new-token.example.com", *opts.OAuthTokenEndpoint)
+	})
+
+	t.Run("AuthorizationEndpointSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthAuthorizationEndpoint = testutil.Ptr("https://auth.example.com")
+		id := snowflake.NewAccountObjectIdentifier("MY_JWT_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_AUTHORIZATION_ENDPOINT"] = "https://auth.example.com"
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.Nil(t, opts.OAuthAuthorizationEndpoint, "OAuthAuthorizationEndpoint should be nil when unchanged")
+	})
+
+	t.Run("AssertionIssuerSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		id := snowflake.NewAccountObjectIdentifier("MY_JWT_AUTH")
+		obs := successfulObservation()
+		// successfulObservation already has OAUTH_ASSERTION_ISSUER matching the spec
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.Nil(t, opts.OAuthAssertionIssuer, "OAuthAssertionIssuer should be nil when unchanged")
+	})
+
+	t.Run("AssertionIssuerSentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthAssertionIssuer = "https://new-issuer.example.com"
+		id := snowflake.NewAccountObjectIdentifier("MY_JWT_AUTH")
+		obs := successfulObservation()
+
+		opts := buildAlterOptions(obj, id, obs)
+		require.NotNil(t, opts.OAuthAssertionIssuer)
+		assert.Equal(t, "https://new-issuer.example.com", *opts.OAuthAssertionIssuer)
+	})
+
+	t.Run("ClientAuthMethodSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		method := snowplanev1alpha1.OAuthClientAuthMethodPost
+		obj.Spec.OAuthClientAuthMethod = &method
+		id := snowflake.NewAccountObjectIdentifier("MY_JWT_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_CLIENT_AUTH_METHOD"] = "CLIENT_SECRET_POST"
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.Nil(t, opts.OAuthClientAuthMethod, "OAuthClientAuthMethod should be nil when unchanged")
+	})
+
+	t.Run("AllFieldsSentWhenNoDescribeOutput", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthTokenEndpoint = testutil.Ptr("https://token.example.com")
+		obj.Spec.OAuthAuthorizationEndpoint = testutil.Ptr("https://auth.example.com")
+		method := snowplanev1alpha1.OAuthClientAuthMethodPost
+		obj.Spec.OAuthClientAuthMethod = &method
+		obj.Spec.OAuthAccessTokenValidity = testutil.Ptr(3600)
+		obj.Spec.OAuthRefreshTokenValidity = testutil.Ptr(86400)
+		id := snowflake.NewAccountObjectIdentifier("MY_JWT_AUTH")
+		obs := &snowflake.APIAuthenticationIntegrationObservation{
+			Exists:     true,
+			ShowOutput: successfulObservation().ShowOutput,
+		}
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.NotNil(t, opts.OAuthTokenEndpoint, "Should send when no DESCRIBE output")
+		assert.NotNil(t, opts.OAuthAuthorizationEndpoint, "Should send when no DESCRIBE output")
+		assert.NotNil(t, opts.OAuthAssertionIssuer, "Should send when no DESCRIBE output")
+		assert.NotNil(t, opts.OAuthClientAuthMethod, "Should send when no DESCRIBE output")
+		assert.NotNil(t, opts.OAuthAccessTokenValidity, "Should send when no DESCRIBE output")
+		assert.NotNil(t, opts.OAuthRefreshTokenValidity, "Should send when no DESCRIBE output")
+	})
+
+	t.Run("AccessTokenValiditySkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthAccessTokenValidity = testutil.Ptr(3600)
+		id := snowflake.NewAccountObjectIdentifier("MY_JWT_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_ACCESS_TOKEN_VALIDITY"] = "3600"
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.Nil(t, opts.OAuthAccessTokenValidity, "Should skip when value matches DESCRIBE output")
+	})
+
+	t.Run("AccessTokenValiditySentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthAccessTokenValidity = testutil.Ptr(7200)
+		id := snowflake.NewAccountObjectIdentifier("MY_JWT_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_ACCESS_TOKEN_VALIDITY"] = "3600"
+
+		opts := buildAlterOptions(obj, id, obs)
+		require.NotNil(t, opts.OAuthAccessTokenValidity)
+		assert.Equal(t, int32(7200), *opts.OAuthAccessTokenValidity)
+	})
+
+	t.Run("RefreshTokenValiditySkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthRefreshTokenValidity = testutil.Ptr(86400)
+		id := snowflake.NewAccountObjectIdentifier("MY_JWT_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_REFRESH_TOKEN_VALIDITY"] = "86400"
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.Nil(t, opts.OAuthRefreshTokenValidity, "Should skip when value matches DESCRIBE output")
+	})
+}
+
+// --------------------------------------------------------------------------
 // Tests: Event emission
 // --------------------------------------------------------------------------
 

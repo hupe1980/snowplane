@@ -12,6 +12,7 @@ import (
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/controller/helpers"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
@@ -156,13 +157,32 @@ func buildAlterOptions(obj *snowplanev1alpha1.WebhookNotificationIntegration, id
 		}
 	}
 
-	// WebhookURL is always sent (it's a required nounset field).
-	url := obj.Spec.WebhookURL
-	opts.WebhookURL = &url
+	if obs != nil && obs.DescribeOutput != nil {
+		dm := obs.DescribeOutput
 
-	opts.WebhookSecret = obj.Spec.WebhookSecret
-	opts.WebhookBodyTemplate = obj.Spec.WebhookBodyTemplate
-	opts.WebhookHeaders = obj.Spec.WebhookHeaders
+		if !strings.EqualFold(obj.Spec.WebhookURL, helpers.DescribeValue(dm, "WEBHOOK_URL")) {
+			url := obj.Spec.WebhookURL
+			opts.WebhookURL = &url
+		}
+
+		if obj.Spec.WebhookBodyTemplate != nil && *obj.Spec.WebhookBodyTemplate != helpers.DescribeValue(dm, "WEBHOOK_BODY_TEMPLATE") {
+			opts.WebhookBodyTemplate = obj.Spec.WebhookBodyTemplate
+		}
+
+		// WebhookSecret is masked in DESCRIBE output — always send when set.
+		opts.WebhookSecret = obj.Spec.WebhookSecret
+
+		// WebhookHeaders use a prefix pattern in DESCRIBE — always send when set.
+		opts.WebhookHeaders = obj.Spec.WebhookHeaders
+	} else {
+		// No observation available (first reconciliation): send all fields.
+		url := obj.Spec.WebhookURL
+		opts.WebhookURL = &url
+
+		opts.WebhookSecret = obj.Spec.WebhookSecret
+		opts.WebhookBodyTemplate = obj.Spec.WebhookBodyTemplate
+		opts.WebhookHeaders = obj.Spec.WebhookHeaders
+	}
 
 	return opts
 }
@@ -181,16 +201,11 @@ func detectDrift(obj *snowplanev1alpha1.WebhookNotificationIntegration, obs *sno
 	}
 
 	if obs.DescribeOutput != nil {
-		d.CompareStringValue("WEBHOOK_URL", obj.Spec.WebhookURL, describeValue(obs.DescribeOutput, "WEBHOOK_URL"), false)
+		d.CompareStringValue("WEBHOOK_URL", obj.Spec.WebhookURL, helpers.DescribeValue(obs.DescribeOutput, "WEBHOOK_URL"), false)
+		d.CompareStringValue("WEBHOOK_BODY_TEMPLATE", helpers.StringValueOrEmpty(obj.Spec.WebhookBodyTemplate), helpers.DescribeValue(obs.DescribeOutput, "WEBHOOK_BODY_TEMPLATE"), false)
+		// WEBHOOK_SECRET is masked in DESCRIBE output — skip drift detection.
+		// WEBHOOK_HEADERS use a prefix pattern — skip drift detection.
 	}
 
 	return d.Result()
-}
-
-func describeValue(desc map[string]string, key string) string {
-	if desc == nil {
-		return ""
-	}
-
-	return desc[key]
 }

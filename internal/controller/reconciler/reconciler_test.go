@@ -1132,9 +1132,10 @@ func TestReconcile_PostCreateObserve_NotExists(t *testing.T) {
 	_, err := r.Reconcile(context.Background(), reconcileReq())
 	require.NoError(t, err)
 	// Second: create succeeds but post-create observe returns Exists: false.
-	result, err := r.Reconcile(context.Background(), reconcileReq())
-	require.NoError(t, err)
-	assert.Equal(t, 5*time.Second, result.RequeueAfter, "should requeue quickly when not yet observable")
+	// The reconciler returns an error to trigger exponential backoff.
+	_, err = r.Reconcile(context.Background(), reconcileReq())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not yet observable")
 }
 
 // ---------------------------------------------------------------------------
@@ -1947,11 +1948,11 @@ func TestReconcile_PostCreate_NilObservation_Requeues(t *testing.T) {
 		},
 	}
 	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
-	result, err := r.Reconcile(context.Background(), reconcileReq())
-	// Should requeue with 5s interval for post-create verification.
-	assert.Equal(t, 5*time.Second, result.RequeueAfter, "should requeue after 5s for post-create verification")
-	// err may or may not be set (nil observation without error is non-fatal).
-	_ = err
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	// With nil observation on post-create, the reconciler returns an error
+	// to trigger controller-runtime exponential backoff.
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not yet observable")
 }
 
 func TestReconcile_PreReconcile_Failure_EmitsEvent(t *testing.T) {
@@ -2196,4 +2197,246 @@ func TestReconcile_ObserveOnly_Delete_RemovesFinalizerWithoutDrop(t *testing.T) 
 	}
 
 	assert.True(t, found, "should emit ObserveOnly event on delete")
+}
+
+// ---------------------------------------------------------------------------
+// Tests: Cascade DROP (force-destroy annotation)
+// ---------------------------------------------------------------------------
+
+// mockCascadeAdapter embeds mockAdapter and implements CascadeDropper + CascadeDropSupporter.
+type mockCascadeAdapter struct {
+	mockAdapter
+	cascadeDropFn      func(ctx context.Context, svc any, id reconciler.Identifier) error
+	supportsCascade    bool
+	cascadeDropCalled  int
+	standardDropCalled int
+}
+
+func (m *mockCascadeAdapter) DropCascade(ctx context.Context, svc any, id reconciler.Identifier) error {
+	m.cascadeDropCalled++
+
+	if m.cascadeDropFn != nil {
+		return m.cascadeDropFn(ctx, svc, id)
+	}
+
+	return nil
+}
+
+func (m *mockCascadeAdapter) SupportsCascadeDrop() bool {
+	return m.supportsCascade
+}
+
+func (m *mockCascadeAdapter) Drop(ctx context.Context, svc any, id reconciler.Identifier) error {
+	m.standardDropCalled++
+
+	if m.dropFn != nil {
+		return m.dropFn(ctx, svc, id)
+	}
+
+	return nil
+}
+
+var _ reconciler.CascadeDropper[*snowplanev1alpha1.Database, any] = (*mockCascadeAdapter)(nil)
+var _ reconciler.CascadeDropSupporter = (*mockCascadeAdapter)(nil)
+
+func TestReconcile_Delete_ForceDestroy_CascadeSupported_UsesDropCascade(t *testing.T) {
+	t.Parallel()
+
+	now := metav1.Now()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.DeletionTimestamp = &now
+	db.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationForceDestroy: "true",
+	}
+
+	adapter := &mockCascadeAdapter{
+		supportsCascade: true,
+	}
+	adapter.observeFn = func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+		return &reconciler.Observation[any]{Exists: true}, nil
+	}
+
+	r := newTestReconciler(&adapter.mockAdapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	// Swap the adapter to the cascade one.
+	r.Adapter = adapter
+
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.Equal(t, 1, adapter.cascadeDropCalled, "DropCascade should be called")
+	assert.Equal(t, 0, adapter.standardDropCalled, "standard Drop should NOT be called")
+}
+
+func TestReconcile_Delete_ForceDestroy_CascadeUnsupported_FallsBackToStandardDrop(t *testing.T) {
+	t.Parallel()
+
+	now := metav1.Now()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.DeletionTimestamp = &now
+	db.Annotations = map[string]string{
+		snowplanev1alpha1.AnnotationForceDestroy: "true",
+	}
+
+	adapter := &mockCascadeAdapter{
+		supportsCascade: false,
+	}
+	adapter.observeFn = func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+		return &reconciler.Observation[any]{Exists: true}, nil
+	}
+
+	r := newTestReconciler(&adapter.mockAdapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r.Adapter = adapter
+
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.Equal(t, 0, adapter.cascadeDropCalled, "DropCascade should NOT be called when unsupported")
+	assert.Equal(t, 1, adapter.standardDropCalled, "standard Drop should be called as fallback")
+}
+
+func TestReconcile_Delete_NoForceDestroy_UsesStandardDrop(t *testing.T) {
+	t.Parallel()
+
+	now := metav1.Now()
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.DeletionTimestamp = &now
+	// No force-destroy annotation.
+
+	adapter := &mockCascadeAdapter{
+		supportsCascade: true,
+	}
+	adapter.observeFn = func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+		return &reconciler.Observation[any]{Exists: true}, nil
+	}
+
+	r := newTestReconciler(&adapter.mockAdapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	r.Adapter = adapter
+
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.Equal(t, 0, adapter.cascadeDropCalled, "DropCascade should NOT be called without force-destroy")
+	assert.Equal(t, 1, adapter.standardDropCalled, "standard Drop should be called")
+}
+
+// ---------------------------------------------------------------------------
+// Tests: Cleanup function invocation
+// ---------------------------------------------------------------------------
+
+func TestReconcile_CleanupFunction_CalledOnSuccess(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+
+	cleanupCalled := false
+
+	adapter := &mockAdapter{
+		serviceFromClientFn: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (any, func(context.Context), error) {
+			return "mock-svc", func(_ context.Context) { cleanupCalled = true }, nil
+		},
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "obs"}, nil
+		},
+	}
+
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.True(t, cleanupCalled, "cleanup function should be called after successful reconciliation")
+}
+
+func TestReconcile_CleanupFunction_CalledOnError(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+
+	cleanupCalled := false
+
+	adapter := &mockAdapter{
+		serviceFromClientFn: func(_ context.Context, _ clientfactory.SnowflakeClient, _ string) (any, func(context.Context), error) {
+			return "mock-svc", func(_ context.Context) { cleanupCalled = true }, nil
+		},
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return nil, fmt.Errorf("transient observe failure")
+		},
+	}
+
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	_, err := r.Reconcile(context.Background(), reconcileReq())
+	require.Error(t, err)
+	assert.True(t, cleanupCalled, "cleanup function should be called even on reconciliation error")
+}
+
+// ---------------------------------------------------------------------------
+// Tests: ObserveOnly conditions
+// ---------------------------------------------------------------------------
+
+func TestReconcile_ObserveOnly_ResourceExists_SetsConditions(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.Status.ObservedGeneration = 1
+	observeOnly := true
+	db.Spec.ManagementPolicies.ObserveOnly = &observeOnly
+
+	hash, err := db.ComputeSpecHash()
+	require.NoError(t, err)
+	db.Status.LastAppliedSpecHash = hash
+
+	adapter := &mockAdapter{
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "observed"}, nil
+		},
+	}
+
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	_, err = r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+
+	// Fetch the updated object and verify conditions.
+	var fetched snowplanev1alpha1.Database
+	require.NoError(t, r.Client.Get(context.Background(), client.ObjectKeyFromObject(db), &fetched))
+
+	assert.True(t, conditions.IsTrue(&fetched, snowplanev1alpha1.TypeReady), "Ready condition should be True in observe-only mode")
+	assert.True(t, conditions.IsTrue(&fetched, snowplanev1alpha1.TypeSynced), "Synced condition should be True in observe-only mode")
+	assert.Equal(t, db.Generation, fetched.Status.ObservedGeneration, "ObservedGeneration should be updated")
+}
+
+// ---------------------------------------------------------------------------
+// Tests: BuildAlterOptions nil return
+// ---------------------------------------------------------------------------
+
+func TestReconcile_BuildAlterOptions_ReturnsNil_NoChanges(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB()
+	db.Finalizers = []string{"snowplane.test/database"}
+	db.Status.ObservedGeneration = 1
+
+	hash, err := db.ComputeSpecHash()
+	require.NoError(t, err)
+	db.Status.LastAppliedSpecHash = hash
+
+	alterCalled := false
+
+	adapter := &mockAdapter{
+		observeFn: func(_ context.Context, _ any, _ reconciler.Identifier) (*reconciler.Observation[any], error) {
+			return &reconciler.Observation[any]{Exists: true, Detail: "obs"}, nil
+		},
+		buildAlterOptsFn: func(_ context.Context, _ *snowplanev1alpha1.Database, _ reconciler.Identifier, _ *reconciler.Observation[any]) (reconciler.AlterOptions, error) {
+			return nil, nil // Returns nil AlterOptions, nil error.
+		},
+		alterFn: func(_ context.Context, _ any, _ reconciler.AlterOptions) error {
+			alterCalled = true
+			return nil
+		},
+	}
+
+	r := newTestReconciler(adapter, db, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
+	_, err = r.Reconcile(context.Background(), reconcileReq())
+	require.NoError(t, err)
+	assert.False(t, alterCalled, "Alter should NOT be called when BuildAlterOptions returns nil")
 }

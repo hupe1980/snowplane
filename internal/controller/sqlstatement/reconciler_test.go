@@ -3,7 +3,6 @@ package sqlstatement
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -173,20 +172,18 @@ func TestReconcile_Create_HappyPath(t *testing.T) {
 	stmt.Finalizers = []string{finalizerName}
 	r := newTestReconciler(mock, stmt, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 
-	res, err := r.Reconcile(context.Background(), testutil.ReconcileReq("test-create", "default"))
-	require.NoError(t, err)
+	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("test-create", "default"))
+	// Without observe SQL, post-create verify returns an error to trigger
+	// controller-runtime exponential backoff.
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not yet observable")
 
 	assert.Equal(t, "CREATE TABLE IF NOT EXISTS test_table (id INT)", executedSQL)
 
-	// Without observe SQL, the post-create verify always reports "not yet
-	// observable", but the execute itself succeeded.
 	var updated snowplanev1alpha1.SQLStatement
 	require.NoError(t, r.Client.Get(context.Background(), types.NamespacedName{Name: "test-create", Namespace: "default"}, &updated))
 
 	assert.NotEmpty(t, updated.Status.ExecuteHash)
-
-	// With observe SQL, the reconciler can verify the create and set Ready.
-	assert.Equal(t, 5*time.Second, res.RequeueAfter, "without observe SQL, requeues for post-create check")
 }
 
 func TestReconcile_Create_WithObserve(t *testing.T) {
@@ -416,7 +413,9 @@ func TestReconcile_Observe_NoObserveSQL(t *testing.T) {
 	r := newTestReconciler(mock, stmt, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("test-no-observe", "default"))
-	require.NoError(t, err)
+	// Without observe SQL, post-create verify returns an error for exponential backoff.
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not yet observable")
 	assert.True(t, executeCalled)
 }
 
@@ -545,7 +544,9 @@ func TestReconcile_NoObserve_FirstExecution_ExecutesSQL(t *testing.T) {
 	r := newTestReconciler(mock, stmt, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("test-first-exec", "default"))
-	require.NoError(t, err)
+	// Without observe SQL, post-create verify returns an error for exponential backoff.
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not yet observable")
 	assert.Equal(t, "CREATE TABLE IF NOT EXISTS test_table (id INT)", executedSQL)
 }
 
@@ -719,7 +720,9 @@ func TestReconcile_Create_DenylistAllowed(t *testing.T) {
 	r := newTestReconcilerWithDenylist(dl, mock, stmt, testutil.NewTestPC("default"), testutil.NewTestSecret("default"))
 
 	_, reconcileErr := r.Reconcile(context.Background(), testutil.ReconcileReq("test-allowed", "default"))
-	require.NoError(t, reconcileErr)
+	// Without observe SQL, post-create verify returns an error for exponential backoff.
+	require.Error(t, reconcileErr)
+	assert.Contains(t, reconcileErr.Error(), "not yet observable")
 	assert.Equal(t, "CREATE TABLE IF NOT EXISTS safe_table (id INT)", executedSQL, "execute should proceed for allowed SQL")
 }
 

@@ -15,6 +15,7 @@ import (
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/controller/helpers"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/controller/refresolver"
 	"github.com/hupe1980/snowplane/internal/drift"
@@ -310,8 +311,8 @@ func buildAlterOptions(obj *snowplanev1alpha1.Streamlit, id snowflake.SchemaObje
 			eai := obj.Spec.ExternalAccessIntegrations
 			opts.ExternalAccessIntegrations = &eai
 		} else {
-			actualEAI := parseCommaList(obs.DescribeOutput.ExternalAccessIntegrations)
-			if !stringSliceEqualFold(obj.Spec.ExternalAccessIntegrations, actualEAI) {
+			actualEAI := helpers.ParseCommaList(obs.DescribeOutput.ExternalAccessIntegrations)
+			if !helpers.StringSlicesEqualFold(obj.Spec.ExternalAccessIntegrations, actualEAI) {
 				eai := obj.Spec.ExternalAccessIntegrations
 				opts.ExternalAccessIntegrations = &eai
 			}
@@ -337,51 +338,11 @@ func detectDrift(obj *snowplanev1alpha1.Streamlit, obs *snowflake.StreamlitObser
 
 		// External access integrations.
 		if obs.DescribeOutput != nil {
-			actualEAI := parseCommaList(obs.DescribeOutput.ExternalAccessIntegrations)
+			actualEAI := helpers.ParseCommaList(obs.DescribeOutput.ExternalAccessIntegrations)
 			d.CompareStringSliceFold("EXTERNAL_ACCESS_INTEGRATIONS", obj.Spec.ExternalAccessIntegrations, actualEAI, false)
+			d.CompareString("MAIN_FILE", obj.Spec.MainFile, obs.DescribeOutput.MainFile, false)
 		}
 	}
 
 	return d.Result()
-}
-
-// parseCommaList splits a comma-separated string, trims whitespace, and returns non-empty values.
-func parseCommaList(s string) []string {
-	if s == "" {
-		return nil
-	}
-
-	parts := strings.Split(s, ",")
-	result := make([]string, 0, len(parts))
-
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			result = append(result, p)
-		}
-	}
-
-	return result
-}
-
-// stringSliceEqualFold compares two string slices using case-insensitive, order-independent comparison.
-func stringSliceEqualFold(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	seen := make(map[string]int, len(a))
-	for _, s := range a {
-		seen[strings.ToUpper(s)]++
-	}
-
-	for _, s := range b {
-		key := strings.ToUpper(s)
-		if seen[key] <= 0 {
-			return false
-		}
-		seen[key]--
-	}
-
-	return true
 }

@@ -26,7 +26,7 @@ A deep dive into Snowplane's controller architecture — the generic reconciler,
 │  └────────────────────────────────────────────────────┘     │
 │                                                             │
 │  ┌───────────┐ ┌───────────┐ ┌───────────┐                │
-│  │ Database   │ │ Warehouse │ │ Schema    │  ... (65 CRDs) │
+│  │ Database   │ │ Warehouse │ │ Schema    │  ... (69 CRDs) │
 │  │ Controller │ │ Controller│ │ Controller│                │
 │  └─────┬─────┘ └─────┬─────┘ └─────┬─────┘                │
 │        │              │              │                      │

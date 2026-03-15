@@ -687,9 +687,15 @@ func TestReconcile_ImmutableField_FirstReconcile_Skipped(t *testing.T) {
 	wh.Finalizers = []string{finalizerName}
 	wh.Status.ObservedGeneration = 0
 
+	observeCall := 0
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.AccountObjectIdentifier) (*snowflake.WarehouseObservation, error) {
-			return &snowflake.WarehouseObservation{Exists: false}, nil
+			observeCall++
+			if observeCall == 1 {
+				return &snowflake.WarehouseObservation{Exists: false}, nil
+			}
+
+			return &snowflake.WarehouseObservation{Exists: true}, nil
 		},
 		createFn: func(_ context.Context, _ snowflake.CreateWarehouseOptions) error {
 			return nil

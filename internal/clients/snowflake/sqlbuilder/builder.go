@@ -27,6 +27,9 @@ import (
 //
 // Ref: https://docs.snowflake.com/en/sql-reference/data-types-text#single-quoted-string-constants
 func EscapeString(s string) string {
+	if n := strings.Count(s, "\x00"); n > 0 {
+		metrics.RecordNULBytesStripped(n)
+	}
 	s = strings.ReplaceAll(s, "\x00", "")
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, "'", "''")
@@ -39,6 +42,10 @@ func EscapeString(s string) string {
 // the literal name.  NUL bytes are stripped for the same safety reasons as
 // EscapeString.
 func EscapeLikePattern(s string) string {
+	if n := strings.Count(s, "\x00"); n > 0 {
+		metrics.RecordNULBytesStripped(n)
+	}
+
 	s = strings.ReplaceAll(s, "\x00", "")
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, "'", "''")
@@ -51,6 +58,10 @@ func EscapeLikePattern(s string) string {
 // QuoteIdentifier wraps a name in double quotes, escaping any embedded quotes.
 // NUL bytes are stripped for safety.
 func QuoteIdentifier(name string) string {
+	if n := strings.Count(name, "\x00"); n > 0 {
+		metrics.RecordNULBytesStripped(n)
+	}
+
 	name = strings.ReplaceAll(name, "\x00", "")
 	return fmt.Sprintf(`"%s"`, strings.ReplaceAll(name, `"`, `""`))
 }
@@ -142,7 +153,9 @@ func ValidateIdentifierParts(fqn string) error {
 
 // identifierDenyRe rejects characters and patterns that are never valid in
 // Snowflake object identifiers but could be used for SQL injection.
-var identifierDenyRe = regexp.MustCompile(`(?i:;|--\s|/\*|\*/|\$\$)`)
+// Note: "--" without a trailing \s is correct — Snowflake treats "--"
+// as a line-comment opener regardless of the character that follows.
+var identifierDenyRe = regexp.MustCompile(`(?i:;|--|/\*|\*/|\$\$)`)
 
 // validateIdentifierPart checks a single component of a multi-part identifier.
 func validateIdentifierPart(part string) error {
@@ -220,7 +233,7 @@ func ValidateKeywordValue(s string) error {
 
 // columnTypeRe matches valid Snowflake column type declarations.
 // Permits letters, digits, underscores, parentheses (for precision/scale),
-// commas, spaces, and hyphens (e.g. TIMESTAMP WITH TIME ZONE).
+// commas, and spaces (e.g. TIMESTAMP WITH TIME ZONE).
 // Max length 256 prevents abuse.
 var columnTypeRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_ (),]*$`)
 

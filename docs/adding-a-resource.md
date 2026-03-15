@@ -385,8 +385,8 @@ The `newAdapter` function configures a `BaseAdapter[T, S, D]` with resource-spec
 | `Drop` | Drops the resource from Snowflake |
 | `ValidateImmutableFields` | Checks resource-specific immutability |
 | `BuildAlterOptions` | Diffs spec vs observation → alter options |
-| `ApplyObservation` | Maps observation into the CR status (ShowOutput is assigned directly since both layers share the same type) |
-| `ComputeTrackedParameters` | Returns actively-managed field names (via `tracked.ComputeTracked`) |
+| `ApplyObservation` | Maps observation into the CR status (ShowOutput is assigned directly since both layers share the same type). **Do NOT set `TrackedParameters` here** — the framework handles it via `finalizeSpec()`. |
+| `ComputeTrackedParameters` | Returns actively-managed field names (via `tracked.ComputeTracked`). Called by `finalizeSpec()` at the end of each reconcile — do not call manually in `applyObservation`. |
 | `DetectDrift` | Compares spec vs observation for reporting |
 
 #### Tracked Parameter Struct Tags

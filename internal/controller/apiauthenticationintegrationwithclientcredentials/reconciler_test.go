@@ -550,6 +550,146 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
+// Tests: buildAlterOptions diff-checking
+// --------------------------------------------------------------------------
+
+func TestBuildAlterOptions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("TokenEndpointSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthTokenEndpoint = testutil.Ptr("https://token.example.com")
+		id := snowflake.NewAccountObjectIdentifier("MY_CC_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_TOKEN_ENDPOINT"] = "https://token.example.com"
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.Nil(t, opts.OAuthTokenEndpoint, "OAuthTokenEndpoint should be nil when unchanged")
+	})
+
+	t.Run("TokenEndpointSentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthTokenEndpoint = testutil.Ptr("https://new-token.example.com")
+		id := snowflake.NewAccountObjectIdentifier("MY_CC_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_TOKEN_ENDPOINT"] = "https://old-token.example.com"
+
+		opts := buildAlterOptions(obj, id, obs)
+		require.NotNil(t, opts.OAuthTokenEndpoint)
+		assert.Equal(t, "https://new-token.example.com", *opts.OAuthTokenEndpoint)
+	})
+
+	t.Run("ClientAuthMethodSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		method := snowplanev1alpha1.OAuthClientAuthMethodPost
+		obj.Spec.OAuthClientAuthMethod = &method
+		id := snowflake.NewAccountObjectIdentifier("MY_CC_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_CLIENT_AUTH_METHOD"] = "CLIENT_SECRET_POST"
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.Nil(t, opts.OAuthClientAuthMethod, "OAuthClientAuthMethod should be nil when unchanged")
+	})
+
+	t.Run("ClientAuthMethodSentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		method := snowplanev1alpha1.OAuthClientAuthMethodPost
+		obj.Spec.OAuthClientAuthMethod = &method
+		id := snowflake.NewAccountObjectIdentifier("MY_CC_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_CLIENT_AUTH_METHOD"] = "CLIENT_SECRET_BASIC"
+
+		opts := buildAlterOptions(obj, id, obs)
+		require.NotNil(t, opts.OAuthClientAuthMethod)
+		assert.Equal(t, "CLIENT_SECRET_POST", *opts.OAuthClientAuthMethod)
+	})
+
+	t.Run("AllFieldsSentWhenNoDescribeOutput", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthTokenEndpoint = testutil.Ptr("https://token.example.com")
+		method := snowplanev1alpha1.OAuthClientAuthMethodPost
+		obj.Spec.OAuthClientAuthMethod = &method
+		obj.Spec.OAuthAccessTokenValidity = testutil.Ptr(3600)
+		obj.Spec.OAuthAllowedScopes = []string{"scope1", "scope2"}
+		id := snowflake.NewAccountObjectIdentifier("MY_CC_AUTH")
+		obs := &snowflake.APIAuthenticationIntegrationObservation{
+			Exists:     true,
+			ShowOutput: successfulObservation().ShowOutput,
+		}
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.NotNil(t, opts.OAuthTokenEndpoint, "Should send when no DESCRIBE output")
+		assert.NotNil(t, opts.OAuthClientAuthMethod, "Should send when no DESCRIBE output")
+		assert.NotNil(t, opts.OAuthAccessTokenValidity, "Should send when no DESCRIBE output")
+		assert.NotNil(t, opts.OAuthAllowedScopes, "Should send when no DESCRIBE output")
+	})
+
+	t.Run("AccessTokenValiditySkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthAccessTokenValidity = testutil.Ptr(3600)
+		id := snowflake.NewAccountObjectIdentifier("MY_CC_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_ACCESS_TOKEN_VALIDITY"] = "3600"
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.Nil(t, opts.OAuthAccessTokenValidity, "Should skip when value matches DESCRIBE output")
+	})
+
+	t.Run("AccessTokenValiditySentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthAccessTokenValidity = testutil.Ptr(7200)
+		id := snowflake.NewAccountObjectIdentifier("MY_CC_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_ACCESS_TOKEN_VALIDITY"] = "3600"
+
+		opts := buildAlterOptions(obj, id, obs)
+		require.NotNil(t, opts.OAuthAccessTokenValidity)
+		assert.Equal(t, int32(7200), *opts.OAuthAccessTokenValidity)
+	})
+
+	t.Run("AllowedScopesSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthAllowedScopes = []string{"scope1", "scope2"}
+		id := snowflake.NewAccountObjectIdentifier("MY_CC_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_ALLOWED_SCOPES"] = "scope1,scope2"
+
+		opts := buildAlterOptions(obj, id, obs)
+		assert.Nil(t, opts.OAuthAllowedScopes, "Should skip when scopes match DESCRIBE output")
+	})
+
+	t.Run("AllowedScopesSentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestIntegration("myint", "default")
+		obj.Spec.OAuthAllowedScopes = []string{"scope1", "scope3"}
+		id := snowflake.NewAccountObjectIdentifier("MY_CC_AUTH")
+		obs := successfulObservation()
+		obs.DescribeOutput["OAUTH_ALLOWED_SCOPES"] = "scope1,scope2"
+
+		opts := buildAlterOptions(obj, id, obs)
+		require.NotNil(t, opts.OAuthAllowedScopes)
+		assert.Equal(t, []string{"scope1", "scope3"}, *opts.OAuthAllowedScopes)
+	})
+}
+
+// --------------------------------------------------------------------------
 // Tests: Event emission
 // --------------------------------------------------------------------------
 

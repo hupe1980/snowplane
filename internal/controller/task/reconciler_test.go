@@ -752,6 +752,47 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	assert.Contains(t, result.Summary(), "COMMENT")
 }
 
+func TestDetectDrift_ParameterDrift(t *testing.T) {
+	t.Parallel()
+
+	task := &snowplanev1alpha1.Task{
+		Spec: snowplanev1alpha1.TaskSpec{
+			Name:                                "MY_TASK",
+			SQLStatement:                        "SELECT 1",
+			TargetCompletionInterval:            testutil.Ptr("5m"),
+			ServerlessTaskMinStatementSize:      testutil.Ptr("SMALL"),
+			ServerlessTaskMaxStatementSize:      testutil.Ptr("XLARGE"),
+			UserTaskManagedInitialWarehouseSize: testutil.Ptr("MEDIUM"),
+		},
+		Status: snowplanev1alpha1.TaskStatus{
+			DatabaseName: "MY_DB",
+			SchemaName:   "MY_SCHEMA",
+		},
+	}
+
+	obs := &snowflake.TaskObservation{
+		ShowOutput: &snowplanev1alpha1.TaskShowOutput{
+			Name:         "MY_TASK",
+			DatabaseName: "MY_DB",
+			SchemaName:   "MY_SCHEMA",
+			Definition:   "SELECT 1",
+		},
+		Parameters: &snowflake.TaskParameters{
+			TargetCompletionInterval:            testutil.Ptr("10m"),
+			ServerlessTaskMinStatementSize:      testutil.Ptr("SMALL"),
+			ServerlessTaskMaxStatementSize:      testutil.Ptr("XLARGE"),
+			UserTaskManagedInitialWarehouseSize: testutil.Ptr("LARGE"),
+		},
+	}
+
+	result := detectDrift(task, obs)
+	assert.True(t, result.HasDrift)
+	assert.Contains(t, result.Summary(), "TARGET_COMPLETION_INTERVAL")
+	assert.Contains(t, result.Summary(), "USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE")
+	assert.NotContains(t, result.Summary(), "SERVERLESS_TASK_MIN_STATEMENT_SIZE")
+	assert.NotContains(t, result.Summary(), "SERVERLESS_TASK_MAX_STATEMENT_SIZE")
+}
+
 // --------------------------------------------------------------------------
 // Tests: Event emission
 // --------------------------------------------------------------------------

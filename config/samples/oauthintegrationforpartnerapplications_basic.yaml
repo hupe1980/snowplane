@@ -1,0 +1,17 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: OAuthIntegrationForPartnerApplications
+metadata:
+  name: my-oauth-tableau
+spec:
+  providerRef:
+    name: default
+  name: MY_OAUTH_TABLEAU
+  oauthClient: "TABLEAU_DESKTOP"
+  oauthUseSecondaryRoles: "NONE"
+  blockedRolesList:
+    - "ACCOUNTADMIN"
+    - "SECURITYADMIN"
+  oauthIssueRefreshTokens: true
+  oauthRefreshTokenValidity: 86400
+  enabled: true
+  comment: "Tableau OAuth integration managed by Snowplane"

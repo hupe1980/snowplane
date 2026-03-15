@@ -175,11 +175,35 @@ func buildAlterOptions(si *snowplanev1alpha1.SAML2Integration, id snowflake.Acco
 		opts.AllowedUserDomains = &list
 	}
 
-	opts.SPInitiatedLoginLabel = si.Spec.SPInitiatedLoginPageLabel
-	opts.EnableSPInitiated = si.Spec.EnableSPInitiated
-	opts.ForceAuthn = si.Spec.ForceAuthn
-	opts.RequestedNameIDFormat = si.Spec.RequestedNameIDFormat
-	opts.PostLogoutRedirectURL = si.Spec.PostLogoutRedirectURL
+	if si.Spec.SPInitiatedLoginPageLabel != nil {
+		if obs == nil || obs.DescribeOutput == nil || *si.Spec.SPInitiatedLoginPageLabel != describeValue(obs, "SAML2_SP_INITIATED_LOGIN_PAGE_LABEL") {
+			opts.SPInitiatedLoginLabel = si.Spec.SPInitiatedLoginPageLabel
+		}
+	}
+
+	if si.Spec.EnableSPInitiated != nil {
+		if obs == nil || obs.DescribeOutput == nil || fmt.Sprintf("%t", *si.Spec.EnableSPInitiated) != strings.ToLower(describeValue(obs, "SAML2_ENABLE_SP_INITIATED")) {
+			opts.EnableSPInitiated = si.Spec.EnableSPInitiated
+		}
+	}
+
+	if si.Spec.ForceAuthn != nil {
+		if obs == nil || obs.DescribeOutput == nil || fmt.Sprintf("%t", *si.Spec.ForceAuthn) != strings.ToLower(describeValue(obs, "SAML2_FORCE_AUTHN")) {
+			opts.ForceAuthn = si.Spec.ForceAuthn
+		}
+	}
+
+	if si.Spec.RequestedNameIDFormat != nil {
+		if obs == nil || obs.DescribeOutput == nil || *si.Spec.RequestedNameIDFormat != describeValue(obs, "SAML2_REQUESTED_NAMEID_FORMAT") {
+			opts.RequestedNameIDFormat = si.Spec.RequestedNameIDFormat
+		}
+	}
+
+	if si.Spec.PostLogoutRedirectURL != nil {
+		if obs == nil || obs.DescribeOutput == nil || *si.Spec.PostLogoutRedirectURL != describeValue(obs, "SAML2_POST_LOGOUT_REDIRECT_URL") {
+			opts.PostLogoutRedirectURL = si.Spec.PostLogoutRedirectURL
+		}
+	}
 
 	return opts
 }
@@ -201,6 +225,19 @@ func detectDrift(si *snowplanev1alpha1.SAML2Integration, obs *snowflake.SAML2Int
 		d.CompareStringValue("SAML2_X509_CERT", si.Spec.X509Cert, describeValue(obs, "SAML2_X509_CERT"), false)
 		compareListFromDescribe(d, "ALLOWED_EMAIL_PATTERNS", si.Spec.AllowedEmailPatterns, obs)
 		compareListFromDescribe(d, "ALLOWED_USER_DOMAINS", si.Spec.AllowedUserDomains, obs)
+		d.CompareString("SAML2_SP_INITIATED_LOGIN_PAGE_LABEL", si.Spec.SPInitiatedLoginPageLabel, describeValue(obs, "SAML2_SP_INITIATED_LOGIN_PAGE_LABEL"), false)
+		d.CompareString("SAML2_REQUESTED_NAMEID_FORMAT", si.Spec.RequestedNameIDFormat, describeValue(obs, "SAML2_REQUESTED_NAMEID_FORMAT"), false)
+		d.CompareString("SAML2_POST_LOGOUT_REDIRECT_URL", si.Spec.PostLogoutRedirectURL, describeValue(obs, "SAML2_POST_LOGOUT_REDIRECT_URL"), false)
+
+		if si.Spec.EnableSPInitiated != nil {
+			obsVal := strings.EqualFold(describeValue(obs, "SAML2_ENABLE_SP_INITIATED"), "true")
+			d.CompareBool("SAML2_ENABLE_SP_INITIATED", si.Spec.EnableSPInitiated, &obsVal, false)
+		}
+
+		if si.Spec.ForceAuthn != nil {
+			obsVal := strings.EqualFold(describeValue(obs, "SAML2_FORCE_AUTHN"), "true")
+			d.CompareBool("SAML2_FORCE_AUTHN", si.Spec.ForceAuthn, &obsVal, false)
+		}
 	}
 
 	return d.Result()

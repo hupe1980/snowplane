@@ -9,6 +9,7 @@ import (
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.scimClient == oldSelf.scimClient",message="spec.scimClient is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.runAsRole == oldSelf.runAsRole",message="spec.runAsRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
 type SCIMIntegrationSpec struct {
 	CommonSpec `json:",inline"`
 

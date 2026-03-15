@@ -27,6 +27,10 @@
         "tag": {
           "type": "string",
           "description": "Overrides the image tag (defaults to chart appVersion)."
+        },
+        "digest": {
+          "type": "string",
+          "description": "Image digest for pinning (e.g. sha256:abc...). Overrides tag when set."
         }
       }
     },
@@ -336,6 +340,21 @@
               "type": "string",
               "pattern": "^[0-9]+(s|m|h)$",
               "description": "Scrape interval."
+            }
+          }
+        },
+        "prometheusRule": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Create a PrometheusRule with default alert rules."
+            },
+            "additionalLabels": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "Additional labels for the PrometheusRule."
             }
           }
         }

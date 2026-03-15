@@ -545,31 +545,3 @@ func TestApplyObservation(t *testing.T) {
 	assert.True(t, obj.Status.ShowOutput.IsPrimary)
 	assert.Equal(t, "ACCOUNTADMIN", obj.Status.ShowOutput.Owner)
 }
-
-// --------------------------------------------------------------------------
-// Tests: parseCommaList helper
-// --------------------------------------------------------------------------
-
-func TestParseCommaList(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Empty", func(t *testing.T) {
-		t.Parallel()
-		assert.Nil(t, parseCommaList(""))
-	})
-
-	t.Run("SingleValue", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, []string{"DATABASES"}, parseCommaList("DATABASES"))
-	})
-
-	t.Run("MultipleValues", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, []string{"DATABASES", "ROLES", "USERS"}, parseCommaList("DATABASES, ROLES, USERS"))
-	})
-
-	t.Run("WhitespaceOnly", func(t *testing.T) {
-		t.Parallel()
-		assert.Empty(t, parseCommaList("  "))
-	})
-}

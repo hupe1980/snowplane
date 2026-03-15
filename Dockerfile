@@ -3,6 +3,7 @@ FROM golang:1.25-alpine AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG VERSION=dev
 
 RUN apk add --no-cache git ca-certificates
 
@@ -16,7 +17,7 @@ RUN go mod verify
 # Build
 COPY . .
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
-    -ldflags="-s -w" \
+    -ldflags="-s -w -X main.version=${VERSION}" \
     -o manager ./cmd/manager
 
 # Runtime stage

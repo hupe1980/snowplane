@@ -574,6 +574,15 @@ This ensures that even if a cluster partition is misconfigured, the Snowflake ro
    kubectl get providerconfig -o wide
    ```
 
+### Image Digest Pinning
+
+For supply chain security and reproducible deployments, pin the controller image to a specific digest instead of a mutable tag:
+
+```yaml
+image:
+  digest: "sha256:abc123..."  # overrides image.tag when set
+```
+
 ---
 
 ## Disaster Recovery

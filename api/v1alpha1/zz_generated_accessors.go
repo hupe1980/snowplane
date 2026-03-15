@@ -8768,3 +8768,375 @@ func (st *Streamlit) GetSpecSchemaRef() *ObjectReference {
 func (st *Streamlit) GetSpecSchemaName() *string {
 	return st.Spec.SchemaName
 }
+
+// ---------------------------------------------------------------------------
+// OAuthIntegrationForCustomClients
+// ---------------------------------------------------------------------------
+
+func (occ *OAuthIntegrationForCustomClients) GetConditions() []metav1.Condition {
+	return occ.Status.Conditions
+}
+
+func (occ *OAuthIntegrationForCustomClients) SetConditions(conditions []metav1.Condition) {
+	occ.Status.Conditions = conditions
+}
+
+func (occ *OAuthIntegrationForCustomClients) GetDeletionPolicy() DeletionPolicy {
+	if occ.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return occ.Spec.DeletionPolicy
+}
+
+func (occ *OAuthIntegrationForCustomClients) GetFullyQualifiedName() string {
+	return occ.Status.FullyQualifiedName
+}
+
+func (occ *OAuthIntegrationForCustomClients) GetProviderRef() ProviderReference {
+	return occ.Spec.ProviderRef
+}
+
+func (occ *OAuthIntegrationForCustomClients) GetSpecName() string {
+	return occ.Spec.Name
+}
+
+func (occ *OAuthIntegrationForCustomClients) GetUseRole() *string {
+	return occ.Spec.UseRole
+}
+
+func (occ *OAuthIntegrationForCustomClients) GetPaused() bool {
+	return occ.Spec.Paused
+}
+
+func (occ *OAuthIntegrationForCustomClients) GetManagementPolicies() ManagementPolicies {
+	return occ.Spec.ManagementPolicies
+}
+
+func (occ *OAuthIntegrationForCustomClients) SetCreateOrAlter(val *bool) {
+	occ.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (occ *OAuthIntegrationForCustomClients) GetObservedGeneration() int64 {
+	return occ.Status.ObservedGeneration
+}
+
+func (occ *OAuthIntegrationForCustomClients) SetObservedGeneration(val int64) {
+	occ.Status.ObservedGeneration = val
+}
+
+func (occ *OAuthIntegrationForCustomClients) GetLastAppliedSpecHash() string {
+	return occ.Status.LastAppliedSpecHash
+}
+
+func (occ *OAuthIntegrationForCustomClients) SetLastAppliedSpecHash(val string) {
+	occ.Status.LastAppliedSpecHash = val
+}
+
+func (occ *OAuthIntegrationForCustomClients) GetLastReconcileTime() *metav1.Time {
+	return occ.Status.LastReconcileTime
+}
+
+func (occ *OAuthIntegrationForCustomClients) SetLastReconcileTime(val *metav1.Time) {
+	occ.Status.LastReconcileTime = val
+}
+
+func (occ *OAuthIntegrationForCustomClients) ValidateSpec() error {
+	return occ.Spec.Validate()
+}
+
+func (occ *OAuthIntegrationForCustomClients) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(occ.Spec)
+}
+
+func (occ *OAuthIntegrationForCustomClients) GetOwner() string {
+	// SHOW SECURITY INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (occ *OAuthIntegrationForCustomClients) GetTrackedParametersList() []string {
+	return occ.Status.TrackedParameters
+}
+
+func (occ *OAuthIntegrationForCustomClients) SetTrackedParametersList(val []string) {
+	occ.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// OAuthIntegrationForPartnerApplications
+// ---------------------------------------------------------------------------
+
+func (opa *OAuthIntegrationForPartnerApplications) GetConditions() []metav1.Condition {
+	return opa.Status.Conditions
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) SetConditions(conditions []metav1.Condition) {
+	opa.Status.Conditions = conditions
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) GetDeletionPolicy() DeletionPolicy {
+	if opa.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return opa.Spec.DeletionPolicy
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) GetFullyQualifiedName() string {
+	return opa.Status.FullyQualifiedName
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) GetProviderRef() ProviderReference {
+	return opa.Spec.ProviderRef
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) GetSpecName() string {
+	return opa.Spec.Name
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) GetUseRole() *string {
+	return opa.Spec.UseRole
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) GetPaused() bool {
+	return opa.Spec.Paused
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) GetManagementPolicies() ManagementPolicies {
+	return opa.Spec.ManagementPolicies
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) SetCreateOrAlter(val *bool) {
+	opa.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) GetObservedGeneration() int64 {
+	return opa.Status.ObservedGeneration
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) SetObservedGeneration(val int64) {
+	opa.Status.ObservedGeneration = val
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) GetLastAppliedSpecHash() string {
+	return opa.Status.LastAppliedSpecHash
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) SetLastAppliedSpecHash(val string) {
+	opa.Status.LastAppliedSpecHash = val
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) GetLastReconcileTime() *metav1.Time {
+	return opa.Status.LastReconcileTime
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) SetLastReconcileTime(val *metav1.Time) {
+	opa.Status.LastReconcileTime = val
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) ValidateSpec() error {
+	return opa.Spec.Validate()
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(opa.Spec)
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) GetOwner() string {
+	// SHOW SECURITY INTEGRATIONS does not return an owner column.
+	return ""
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) GetTrackedParametersList() []string {
+	return opa.Status.TrackedParameters
+}
+
+func (opa *OAuthIntegrationForPartnerApplications) SetTrackedParametersList(val []string) {
+	opa.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// PrimaryConnection
+// ---------------------------------------------------------------------------
+
+func (pc *PrimaryConnection) GetConditions() []metav1.Condition {
+	return pc.Status.Conditions
+}
+
+func (pc *PrimaryConnection) SetConditions(conditions []metav1.Condition) {
+	pc.Status.Conditions = conditions
+}
+
+func (pc *PrimaryConnection) GetDeletionPolicy() DeletionPolicy {
+	if pc.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return pc.Spec.DeletionPolicy
+}
+
+func (pc *PrimaryConnection) GetFullyQualifiedName() string {
+	return pc.Status.FullyQualifiedName
+}
+
+func (pc *PrimaryConnection) GetProviderRef() ProviderReference {
+	return pc.Spec.ProviderRef
+}
+
+func (pc *PrimaryConnection) GetSpecName() string {
+	return pc.Spec.Name
+}
+
+func (pc *PrimaryConnection) GetUseRole() *string {
+	return pc.Spec.UseRole
+}
+
+func (pc *PrimaryConnection) GetPaused() bool {
+	return pc.Spec.Paused
+}
+
+func (pc *PrimaryConnection) GetManagementPolicies() ManagementPolicies {
+	return pc.Spec.ManagementPolicies
+}
+
+func (pc *PrimaryConnection) SetCreateOrAlter(val *bool) {
+	pc.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (pc *PrimaryConnection) GetObservedGeneration() int64 {
+	return pc.Status.ObservedGeneration
+}
+
+func (pc *PrimaryConnection) SetObservedGeneration(val int64) {
+	pc.Status.ObservedGeneration = val
+}
+
+func (pc *PrimaryConnection) GetLastAppliedSpecHash() string {
+	return pc.Status.LastAppliedSpecHash
+}
+
+func (pc *PrimaryConnection) SetLastAppliedSpecHash(val string) {
+	pc.Status.LastAppliedSpecHash = val
+}
+
+func (pc *PrimaryConnection) GetLastReconcileTime() *metav1.Time {
+	return pc.Status.LastReconcileTime
+}
+
+func (pc *PrimaryConnection) SetLastReconcileTime(val *metav1.Time) {
+	pc.Status.LastReconcileTime = val
+}
+
+func (pc *PrimaryConnection) ValidateSpec() error {
+	return pc.Spec.Validate()
+}
+
+func (pc *PrimaryConnection) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(pc.Spec)
+}
+
+func (pc *PrimaryConnection) GetOwner() string {
+	// SHOW CONNECTIONS does not return an owner column.
+	return ""
+}
+
+func (pc *PrimaryConnection) GetTrackedParametersList() []string {
+	return pc.Status.TrackedParameters
+}
+
+func (pc *PrimaryConnection) SetTrackedParametersList(val []string) {
+	pc.Status.TrackedParameters = val
+}
+
+// ---------------------------------------------------------------------------
+// SecondaryConnection
+// ---------------------------------------------------------------------------
+
+func (sc *SecondaryConnection) GetConditions() []metav1.Condition {
+	return sc.Status.Conditions
+}
+
+func (sc *SecondaryConnection) SetConditions(conditions []metav1.Condition) {
+	sc.Status.Conditions = conditions
+}
+
+func (sc *SecondaryConnection) GetDeletionPolicy() DeletionPolicy {
+	if sc.Spec.DeletionPolicy == "" {
+		return DeletionPolicyDelete
+	}
+
+	return sc.Spec.DeletionPolicy
+}
+
+func (sc *SecondaryConnection) GetFullyQualifiedName() string {
+	return sc.Status.FullyQualifiedName
+}
+
+func (sc *SecondaryConnection) GetProviderRef() ProviderReference {
+	return sc.Spec.ProviderRef
+}
+
+func (sc *SecondaryConnection) GetSpecName() string {
+	return sc.Spec.Name
+}
+
+func (sc *SecondaryConnection) GetUseRole() *string {
+	return sc.Spec.UseRole
+}
+
+func (sc *SecondaryConnection) GetPaused() bool {
+	return sc.Spec.Paused
+}
+
+func (sc *SecondaryConnection) GetManagementPolicies() ManagementPolicies {
+	return sc.Spec.ManagementPolicies
+}
+
+func (sc *SecondaryConnection) SetCreateOrAlter(val *bool) {
+	sc.Spec.ManagementPolicies.CreateOrAlter = val
+}
+
+func (sc *SecondaryConnection) GetObservedGeneration() int64 {
+	return sc.Status.ObservedGeneration
+}
+
+func (sc *SecondaryConnection) SetObservedGeneration(val int64) {
+	sc.Status.ObservedGeneration = val
+}
+
+func (sc *SecondaryConnection) GetLastAppliedSpecHash() string {
+	return sc.Status.LastAppliedSpecHash
+}
+
+func (sc *SecondaryConnection) SetLastAppliedSpecHash(val string) {
+	sc.Status.LastAppliedSpecHash = val
+}
+
+func (sc *SecondaryConnection) GetLastReconcileTime() *metav1.Time {
+	return sc.Status.LastReconcileTime
+}
+
+func (sc *SecondaryConnection) SetLastReconcileTime(val *metav1.Time) {
+	sc.Status.LastReconcileTime = val
+}
+
+func (sc *SecondaryConnection) ValidateSpec() error {
+	return sc.Spec.Validate()
+}
+
+func (sc *SecondaryConnection) ComputeSpecHash() (string, error) {
+	return ComputeSpecHash(sc.Spec)
+}
+
+func (sc *SecondaryConnection) GetOwner() string {
+	// SHOW CONNECTIONS does not return an owner column.
+	return ""
+}
+
+func (sc *SecondaryConnection) GetTrackedParametersList() []string {
+	return sc.Status.TrackedParameters
+}
+
+func (sc *SecondaryConnection) SetTrackedParametersList(val []string) {
+	sc.Status.TrackedParameters = val
+}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -119,4 +121,96 @@ func TestReconcile_StandardSuite(t *testing.T) {
 		},
 		FinalizerName: finalizerName,
 	}.Run(t)
+}
+
+func successfulObservation() *snowflake.EmailNotificationIntegrationObservation {
+	return &snowflake.EmailNotificationIntegrationObservation{
+		Exists: true,
+		ShowOutput: &snowplanev1alpha1.EmailNotificationIntegrationShowOutput{
+			Name:    "MY_EMAIL_NI",
+			Enabled: true,
+		},
+		DescribeOutput: map[string]string{
+			"ALLOWED_RECIPIENTS": "user@example.com",
+			"DEFAULT_RECIPIENTS": "",
+			"DEFAULT_SUBJECT":    "",
+		},
+	}
+}
+
+func TestBuildAlterOptions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("AllowedRecipientsSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestEmailNotificationIntegration("x", "default")
+		obs := successfulObservation()
+		id := snowflake.NewAccountObjectIdentifier("MY_EMAIL_NI")
+
+		opts := buildAlterOptions(obj, id, obs)
+
+		assert.Nil(t, opts.AllowedRecipients, "should be skipped when unchanged")
+	})
+
+	t.Run("AllowedRecipientsSentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestEmailNotificationIntegration("x", "default")
+		obj.Spec.AllowedRecipients = []string{"new@example.com", "other@example.com"}
+		obs := successfulObservation()
+		id := snowflake.NewAccountObjectIdentifier("MY_EMAIL_NI")
+
+		opts := buildAlterOptions(obj, id, obs)
+
+		require.NotNil(t, opts.AllowedRecipients)
+		assert.ElementsMatch(t, []string{"new@example.com", "other@example.com"}, *opts.AllowedRecipients)
+	})
+
+	t.Run("DefaultSubjectSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		subj := "Alert"
+		obj := newTestEmailNotificationIntegration("x", "default")
+		obj.Spec.DefaultSubject = &subj
+
+		obs := successfulObservation()
+		obs.DescribeOutput["DEFAULT_SUBJECT"] = "Alert"
+		id := snowflake.NewAccountObjectIdentifier("MY_EMAIL_NI")
+
+		opts := buildAlterOptions(obj, id, obs)
+
+		assert.Nil(t, opts.DefaultSubject, "should be skipped when unchanged")
+	})
+
+	t.Run("DefaultSubjectSentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		subj := "New Alert"
+		obj := newTestEmailNotificationIntegration("x", "default")
+		obj.Spec.DefaultSubject = &subj
+
+		obs := successfulObservation()
+		obs.DescribeOutput["DEFAULT_SUBJECT"] = "Old Alert"
+		id := snowflake.NewAccountObjectIdentifier("MY_EMAIL_NI")
+
+		opts := buildAlterOptions(obj, id, obs)
+
+		require.NotNil(t, opts.DefaultSubject)
+		assert.Equal(t, "New Alert", *opts.DefaultSubject)
+	})
+
+	t.Run("AllFieldsSentWhenNoObservation", func(t *testing.T) {
+		t.Parallel()
+
+		subj := "Test"
+		obj := newTestEmailNotificationIntegration("x", "default")
+		obj.Spec.DefaultSubject = &subj
+		id := snowflake.NewAccountObjectIdentifier("MY_EMAIL_NI")
+
+		opts := buildAlterOptions(obj, id, nil)
+
+		require.NotNil(t, opts.AllowedRecipients, "should be sent when no observation")
+		require.NotNil(t, opts.DefaultSubject, "should be sent when no observation")
+	})
 }

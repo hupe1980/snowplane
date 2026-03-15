@@ -339,6 +339,12 @@ func TestMain(m *testing.M) {
 	}
 	if !pcReady {
 		fmt.Fprintf(os.Stderr, "ProviderConfig 'default' did not become Ready within %v\n%s\n", defaultTimeout, dumpConditions(gvrProviderConfig, "default"))
+		// Dump controller logs before exiting.
+		fmt.Fprintln(os.Stderr, "==> Dumping controller pod logs (ProviderConfig not ready)")
+		_ = runCmd(repoRoot, "kubectl", "--kubeconfig", kubeconfigPath,
+			"-n", testNamespace, "logs", "-l", "app.kubernetes.io/name=snowplane", "--tail=200")
+		_ = runCmd(repoRoot, "kubectl", "--kubeconfig", kubeconfigPath,
+			"-n", testNamespace, "get", "pods", "-o", "wide")
 		os.Exit(1)
 	}
 	fmt.Println("==> ProviderConfig is Ready")

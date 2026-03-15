@@ -10,6 +10,9 @@ image:
   pullPolicy: IfNotPresent
   # -- Overrides the image tag (defaults to chart appVersion)
   tag: ""
+  # -- Image digest (e.g. sha256:abc123...). When set, overrides tag for immutable image references.
+  # Recommended for production deployments requiring supply chain security.
+  digest: ""
 
 # -- Image pull secrets
 imagePullSecrets: []
@@ -141,6 +144,11 @@ metrics:
     additionalLabels: {}
     # -- Scrape interval
     interval: 30s
+  prometheusRule:
+    # -- Create a PrometheusRule with default alert rules
+    enabled: false
+    # -- Additional labels for the PrometheusRule
+    additionalLabels: {}
 
 healthProbes:
   # -- Health probe bind address

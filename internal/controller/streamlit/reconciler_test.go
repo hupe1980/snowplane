@@ -7,75 +7,8 @@ import (
 
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/testutil"
 )
-
-func TestParseCommaList(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Empty", func(t *testing.T) {
-		t.Parallel()
-		assert.Nil(t, parseCommaList(""))
-	})
-
-	t.Run("Single", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, []string{"EAI_1"}, parseCommaList("EAI_1"))
-	})
-
-	t.Run("Multiple", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, []string{"EAI_1", "EAI_2", "EAI_3"}, parseCommaList("EAI_1, EAI_2, EAI_3"))
-	})
-
-	t.Run("WhitespaceHandling", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, []string{"A", "B"}, parseCommaList("  A , B  "))
-	})
-
-	t.Run("TrailingComma", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, []string{"A", "B"}, parseCommaList("A,B,"))
-	})
-}
-
-func TestStringSliceEqualFold(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Equal", func(t *testing.T) {
-		t.Parallel()
-		assert.True(t, stringSliceEqualFold([]string{"A", "B"}, []string{"A", "B"}))
-	})
-
-	t.Run("CaseInsensitive", func(t *testing.T) {
-		t.Parallel()
-		assert.True(t, stringSliceEqualFold([]string{"eai_1", "eai_2"}, []string{"EAI_1", "EAI_2"}))
-	})
-
-	t.Run("OrderIndependent", func(t *testing.T) {
-		t.Parallel()
-		assert.True(t, stringSliceEqualFold([]string{"B", "A"}, []string{"A", "B"}))
-	})
-
-	t.Run("DifferentLength", func(t *testing.T) {
-		t.Parallel()
-		assert.False(t, stringSliceEqualFold([]string{"A"}, []string{"A", "B"}))
-	})
-
-	t.Run("DifferentValues", func(t *testing.T) {
-		t.Parallel()
-		assert.False(t, stringSliceEqualFold([]string{"A", "B"}, []string{"A", "C"}))
-	})
-
-	t.Run("BothEmpty", func(t *testing.T) {
-		t.Parallel()
-		assert.True(t, stringSliceEqualFold([]string{}, []string{}))
-	})
-
-	t.Run("BothNil", func(t *testing.T) {
-		t.Parallel()
-		assert.True(t, stringSliceEqualFold(nil, nil))
-	})
-}
 
 func TestBuildAlterOptions_ExternalAccessIntegrations(t *testing.T) {
 	t.Parallel()
@@ -154,4 +87,71 @@ func require(t *testing.T, condition bool, msg string) {
 	if !condition {
 		t.Fatal(msg)
 	}
+}
+
+func TestBuildAlterOptions_MainFile(t *testing.T) {
+	t.Parallel()
+
+	id := snowflake.NewSchemaObjectIdentifier("DB", "SCH", "MY_STREAMLIT")
+
+	t.Run("SkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+		obj := &snowplanev1alpha1.Streamlit{
+			Spec: snowplanev1alpha1.StreamlitSpec{
+				MainFile: testutil.Ptr("app.py"),
+			},
+		}
+		obs := &snowflake.StreamlitObservation{
+			ShowOutput:     &snowplanev1alpha1.StreamlitShowOutput{},
+			DescribeOutput: &snowplanev1alpha1.StreamlitDescribeOutput{MainFile: "app.py"},
+		}
+		opts := buildAlterOptions(obj, id, obs)
+		assert.Nil(t, opts.MainFile, "Should skip when MainFile matches")
+	})
+
+	t.Run("SentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+		obj := &snowplanev1alpha1.Streamlit{
+			Spec: snowplanev1alpha1.StreamlitSpec{
+				MainFile: testutil.Ptr("new_app.py"),
+			},
+		}
+		obs := &snowflake.StreamlitObservation{
+			ShowOutput:     &snowplanev1alpha1.StreamlitShowOutput{},
+			DescribeOutput: &snowplanev1alpha1.StreamlitDescribeOutput{MainFile: "old_app.py"},
+		}
+		opts := buildAlterOptions(obj, id, obs)
+		require(t, opts.MainFile != nil, "MainFile should be set when changed")
+		assert.Equal(t, "new_app.py", *opts.MainFile)
+	})
+}
+
+func TestDetectDrift_MainFileDrift(t *testing.T) {
+	t.Parallel()
+
+	obj := &snowplanev1alpha1.Streamlit{
+		Spec: snowplanev1alpha1.StreamlitSpec{
+			Name:     "MY_STREAMLIT",
+			MainFile: testutil.Ptr("new_app.py"),
+		},
+		Status: snowplanev1alpha1.StreamlitStatus{
+			DatabaseName: "DB",
+			SchemaName:   "SCH",
+		},
+	}
+
+	obs := &snowflake.StreamlitObservation{
+		ShowOutput: &snowplanev1alpha1.StreamlitShowOutput{
+			Name:         "MY_STREAMLIT",
+			DatabaseName: "DB",
+			SchemaName:   "SCH",
+		},
+		DescribeOutput: &snowplanev1alpha1.StreamlitDescribeOutput{
+			MainFile: "old_app.py",
+		},
+	}
+
+	result := detectDrift(obj, obs)
+	assert.True(t, result.HasDrift)
+	assert.Contains(t, result.Summary(), "MAIN_FILE")
 }

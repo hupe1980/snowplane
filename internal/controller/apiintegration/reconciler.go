@@ -12,6 +12,7 @@ import (
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/controller/helpers"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
@@ -160,24 +161,59 @@ func buildAlterOptions(obj *snowplanev1alpha1.APIIntegration, id snowflake.Accou
 		}
 	}
 
-	// API_ALLOWED_PREFIXES is required, always send.
-	if len(obj.Spec.APIAllowedPrefixes) > 0 {
-		list := make([]string, len(obj.Spec.APIAllowedPrefixes))
-		copy(list, obj.Spec.APIAllowedPrefixes)
-		opts.APIAllowedPrefixes = &list
-	}
+	if obs != nil && obs.DescribeOutput != nil {
+		dm := obs.DescribeOutput
 
-	// API_BLOCKED_PREFIXES.
-	if len(obj.Spec.APIBlockedPrefixes) > 0 {
-		list := make([]string, len(obj.Spec.APIBlockedPrefixes))
-		copy(list, obj.Spec.APIBlockedPrefixes)
-		opts.APIBlockedPrefixes = &list
-	}
+		// API_ALLOWED_PREFIXES — diff-check.
+		actualAllowed := helpers.ParseCommaListFromMap(dm, "API_ALLOWED_PREFIXES")
+		if !helpers.StringSlicesEqualFold(obj.Spec.APIAllowedPrefixes, actualAllowed) {
+			if len(obj.Spec.APIAllowedPrefixes) > 0 {
+				list := make([]string, len(obj.Spec.APIAllowedPrefixes))
+				copy(list, obj.Spec.APIAllowedPrefixes)
+				opts.APIAllowedPrefixes = &list
+			}
+		}
 
-	// Provider-specific fields that can be altered.
-	opts.APIAWSRoleARN = obj.Spec.APIAWSRoleARN
-	opts.AzureADAppID = obj.Spec.AzureADApplicationID
-	opts.APIKey = obj.Spec.APIKey
+		// API_BLOCKED_PREFIXES — diff-check.
+		actualBlocked := helpers.ParseCommaListFromMap(dm, "API_BLOCKED_PREFIXES")
+		if !helpers.StringSlicesEqualFold(obj.Spec.APIBlockedPrefixes, actualBlocked) {
+			if len(obj.Spec.APIBlockedPrefixes) > 0 {
+				list := make([]string, len(obj.Spec.APIBlockedPrefixes))
+				copy(list, obj.Spec.APIBlockedPrefixes)
+				opts.APIBlockedPrefixes = &list
+			}
+		}
+
+		// Provider-specific fields — diff-check.
+		if obj.Spec.APIAWSRoleARN != nil && *obj.Spec.APIAWSRoleARN != helpers.DescribeValue(dm, "API_AWS_ROLE_ARN") {
+			opts.APIAWSRoleARN = obj.Spec.APIAWSRoleARN
+		}
+
+		if obj.Spec.AzureADApplicationID != nil && *obj.Spec.AzureADApplicationID != helpers.DescribeValue(dm, "AZURE_AD_APPLICATION_ID") {
+			opts.AzureADAppID = obj.Spec.AzureADApplicationID
+		}
+
+		if obj.Spec.APIKey != nil && *obj.Spec.APIKey != helpers.DescribeValue(dm, "API_KEY") {
+			opts.APIKey = obj.Spec.APIKey
+		}
+	} else {
+		// No observation — send everything unconditionally.
+		if len(obj.Spec.APIAllowedPrefixes) > 0 {
+			list := make([]string, len(obj.Spec.APIAllowedPrefixes))
+			copy(list, obj.Spec.APIAllowedPrefixes)
+			opts.APIAllowedPrefixes = &list
+		}
+
+		if len(obj.Spec.APIBlockedPrefixes) > 0 {
+			list := make([]string, len(obj.Spec.APIBlockedPrefixes))
+			copy(list, obj.Spec.APIBlockedPrefixes)
+			opts.APIBlockedPrefixes = &list
+		}
+
+		opts.APIAWSRoleARN = obj.Spec.APIAWSRoleARN
+		opts.AzureADAppID = obj.Spec.AzureADApplicationID
+		opts.APIKey = obj.Spec.APIKey
+	}
 
 	return opts
 }
@@ -196,64 +232,14 @@ func detectDrift(obj *snowplanev1alpha1.APIIntegration, obs *snowflake.APIIntegr
 	}
 
 	if obs.DescribeOutput != nil {
-		d.CompareStringValue("API_AWS_ROLE_ARN", stringValueOrEmpty(obj.Spec.APIAWSRoleARN), describeValue(obs.DescribeOutput, "API_AWS_ROLE_ARN"), false)
-		d.CompareStringValue("AZURE_AD_APPLICATION_ID", stringValueOrEmpty(obj.Spec.AzureADApplicationID), describeValue(obs.DescribeOutput, "AZURE_AD_APPLICATION_ID"), false)
-		d.CompareStringValue("AZURE_TENANT_ID", stringValueOrEmpty(obj.Spec.AzureTenantID), describeValue(obs.DescribeOutput, "AZURE_TENANT_ID"), true)
-		d.CompareStringValue("GOOGLE_AUDIENCE", stringValueOrEmpty(obj.Spec.GoogleAudience), describeValue(obs.DescribeOutput, "GOOGLE_AUDIENCE"), true)
+		d.CompareStringValue("API_AWS_ROLE_ARN", helpers.StringValueOrEmpty(obj.Spec.APIAWSRoleARN), helpers.DescribeValue(obs.DescribeOutput, "API_AWS_ROLE_ARN"), false)
+		d.CompareStringValue("AZURE_AD_APPLICATION_ID", helpers.StringValueOrEmpty(obj.Spec.AzureADApplicationID), helpers.DescribeValue(obs.DescribeOutput, "AZURE_AD_APPLICATION_ID"), false)
+		d.CompareStringValue("AZURE_TENANT_ID", helpers.StringValueOrEmpty(obj.Spec.AzureTenantID), helpers.DescribeValue(obs.DescribeOutput, "AZURE_TENANT_ID"), true)
+		d.CompareStringValue("GOOGLE_AUDIENCE", helpers.StringValueOrEmpty(obj.Spec.GoogleAudience), helpers.DescribeValue(obs.DescribeOutput, "GOOGLE_AUDIENCE"), true)
 
-		compareListFromDescribeMap(d, "API_ALLOWED_PREFIXES", obj.Spec.APIAllowedPrefixes, obs.DescribeOutput)
-		compareListFromDescribeMap(d, "API_BLOCKED_PREFIXES", obj.Spec.APIBlockedPrefixes, obs.DescribeOutput)
+		helpers.CompareListFromDescribeMap(d, "API_ALLOWED_PREFIXES", obj.Spec.APIAllowedPrefixes, obs.DescribeOutput, false)
+		helpers.CompareListFromDescribeMap(d, "API_BLOCKED_PREFIXES", obj.Spec.APIBlockedPrefixes, obs.DescribeOutput, false)
 	}
 
 	return d.Result()
-}
-
-// describeValue extracts a DESCRIBE output value by key.
-func describeValue(m map[string]string, key string) string {
-	if m == nil {
-		return ""
-	}
-
-	return m[key]
-}
-
-// stringValueOrEmpty returns the value of a string pointer, or "" if nil.
-func stringValueOrEmpty(s *string) string {
-	if s == nil {
-		return ""
-	}
-
-	return *s
-}
-
-// compareListFromDescribeMap compares a spec list against a comma-separated DESCRIBE output value.
-func compareListFromDescribeMap(d *drift.Detector, key string, specList []string, descOutput map[string]string) {
-	descList := parseCommaListFromMap(descOutput, key)
-	specJoined := strings.Join(specList, ",")
-	descJoined := strings.Join(descList, ",")
-	d.CompareStringValueFold(key, specJoined, descJoined, false)
-}
-
-// parseCommaListFromMap extracts a comma-separated list from a map by key.
-func parseCommaListFromMap(m map[string]string, key string) []string {
-	if m == nil {
-		return nil
-	}
-
-	raw, ok := m[key]
-	if !ok || raw == "" {
-		return nil
-	}
-
-	parts := strings.Split(raw, ",")
-	result := make([]string, 0, len(parts))
-
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			result = append(result, p)
-		}
-	}
-
-	return result
 }

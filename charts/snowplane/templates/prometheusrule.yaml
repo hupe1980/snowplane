@@ -1,0 +1,40 @@
+{{- if .Values.metrics.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "snowplane.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snowplane.labels" . | nindent 4 }}
+    {{- with .Values.metrics.prometheusRule.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: snowplane
+      rules:
+        - alert: SnowplaneHighErrorRate
+          expr: rate(snowplane_reconcile_total{result="error"}[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High reconcile error rate for {{`{{ $labels.controller }}`}}"
+            description: "Controller {{`{{ $labels.controller }}`}} has an error rate above 0.1 ops/s for 5 minutes."
+        - alert: SnowplaneCircuitBreakerOpen
+          expr: snowplane_circuit_breaker_state > 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Circuit breaker open for provider {{`{{ $labels.provider }}`}}"
+            description: "The circuit breaker for provider {{`{{ $labels.provider }}`}} has been open for more than 2 minutes."
+        - alert: SnowflakeAPILatencyHigh
+          expr: histogram_quantile(0.99, rate(snowplane_snowflake_operation_duration_seconds_bucket[5m])) > 10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High Snowflake API latency for {{`{{ $labels.operation }}`}}"
+            description: "P99 latency for {{`{{ $labels.operation }}`}} exceeds 10 seconds."
+{{- end }}

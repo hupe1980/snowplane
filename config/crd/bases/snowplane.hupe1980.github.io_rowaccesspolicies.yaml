@@ -261,9 +261,10 @@ spec:
             - message: spec.body contains a blocked SQL pattern (potential privilege
                 escalation)
               rule: '!self.body.contains('';'') && !self.body.upperAscii().contains(''SYSTEM$'')
-                && !self.body.upperAscii().contains(''EXECUTE IMMEDIATE'') && !self.body.upperAscii().contains(''CALL
-                '') && !self.body.upperAscii().contains(''CREATE '') && !self.body.upperAscii().contains(''ALTER
-                '') && !self.body.upperAscii().contains(''DROP '') && !self.body.upperAscii().contains(''GRANT
+                && !self.body.upperAscii().contains(''EXECUTE IMMEDIATE'') && !self.body.upperAscii().contains(''EXECUTE
+                TASK'') && !self.body.upperAscii().contains(''CALL '') && !self.body.upperAscii().contains(''CREATE
+                '') && !self.body.upperAscii().contains(''ALTER '') && !self.body.upperAscii().contains(''DROP
+                '') && !self.body.upperAscii().contains(''TRUNCATE '') && !self.body.upperAscii().contains(''GRANT
                 '') && !self.body.upperAscii().contains(''REVOKE '') && !self.body.upperAscii().contains(''INSERT
                 '') && !self.body.upperAscii().contains(''UPDATE '') && !self.body.upperAscii().contains(''DELETE
                 '') && !self.body.upperAscii().contains(''MERGE '') && !self.body.upperAscii().contains(''COPY

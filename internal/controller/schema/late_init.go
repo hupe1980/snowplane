@@ -21,6 +21,12 @@ func lateInitialize(obj *snowplanev1alpha1.Schema, obs *reconciler.Observation[*
 		if reconciler.LateInitNonZero(&obj.Spec.Comment, detail.ShowOutput.Comment) {
 			modified = true
 		}
+
+		if obj.Spec.ManagedAccess == nil {
+			v := snowflake.IsManagedAccess(detail.ShowOutput)
+			obj.Spec.ManagedAccess = &v
+			modified = true
+		}
 	}
 
 	// Parameters fields

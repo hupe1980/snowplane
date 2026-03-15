@@ -46,6 +46,7 @@ helm upgrade snowplane charts/snowplane/ \
 | `image.repository` | `ghcr.io/hupe1980/snowplane` | Container image |
 | `image.tag` | Chart `appVersion` | Image tag |
 | `image.pullPolicy` | `IfNotPresent` | Image pull policy |
+| `image.digest` | `""` | Image digest for pinning (e.g. `sha256:abc...`); overrides tag when set |
 
 ### Controller
 
@@ -96,6 +97,8 @@ When sharding is enabled, deploy one Helm release per shard. Leader election IDs
 | `metrics.serviceMonitor.enabled` | `false` | Create Prometheus ServiceMonitor |
 | `metrics.serviceMonitor.additionalLabels` | `{}` | Extra labels for ServiceMonitor |
 | `metrics.serviceMonitor.interval` | `30s` | Scrape interval |
+| `metrics.prometheusRule.enabled` | `false` | Create PrometheusRule with default alert rules |
+| `metrics.prometheusRule.additionalLabels` | `{}` | Extra labels for PrometheusRule |
 
 ### Health Probes
 

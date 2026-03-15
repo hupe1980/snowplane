@@ -29,11 +29,12 @@
 | 📦 **Storage** | ExternalVolume (S3/GCS/Azure multi-cloud storage for Iceberg tables) |
 | 🔍 **AI/ML** | CortexSearchService (semantic & hybrid search powered by LLM embeddings) |
 | 📂 **App Development** | GitRepository (Git integration for version-controlled code), Streamlit (Snowflake-native interactive Python apps) |
-| 🔗 **Integrations** | StorageIntegrationAWS, StorageIntegrationGCS, StorageIntegrationAzure, ExternalOAuthIntegration, SAML2Integration, SCIMIntegration, EmailNotificationIntegration, QueueNotificationIntegration, WebhookNotificationIntegration, APIIntegration, APIAuthenticationIntegrationWithAuthorizationCodeGrant, APIAuthenticationIntegrationWithClientCredentials, APIAuthenticationIntegrationWithJWTBearer |
+| 🔗 **Integrations** | StorageIntegrationAWS, StorageIntegrationGCS, StorageIntegrationAzure, ExternalOAuthIntegration, OAuthIntegrationForCustomClients, OAuthIntegrationForPartnerApplications, SAML2Integration, SCIMIntegration, EmailNotificationIntegration, QueueNotificationIntegration, WebhookNotificationIntegration, APIIntegration, APIAuthenticationIntegrationWithAuthorizationCodeGrant, APIAuthenticationIntegrationWithClientCredentials, APIAuthenticationIntegrationWithJWTBearer |
 | 🔒 **Secrets** | SecretWithAuthorizationCodeGrant, SecretWithBasicAuthentication, SecretWithClientCredentials, SecretWithGenericString |
 | 🛡️ **Security & Governance** | NetworkPolicy, NetworkPolicyAttachment, NetworkRule, AuthenticationPolicy, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
 | 📤 **Utilities** | FieldExport (copy status fields into ConfigMaps/Secrets), SQLStatement (escape-hatch for arbitrary SQL), ProviderConfig |
 | 🐳 **Snowpark Container Services** | ComputePool, Service, ImageRepository |
+| 🔄 **Replication & Failover** | FailoverGroup, PrimaryConnection, SecondaryConnection |
 
 Every resource supports full lifecycle management (create, alter, drop), drift detection, adoption of pre-existing objects, and deletion policies. See the [API Reference](#-api-reference) below for detailed field documentation.
 
@@ -314,6 +315,9 @@ All metrics use the `snowplane_` namespace.
 | `snowplane_db_idle_connections` | Gauge | `provider` | Idle DB connections per provider |
 | `snowplane_db_wait_count` | Gauge | `provider` | Cumulative DB connection wait count per provider |
 | `snowplane_db_wait_duration_seconds` | Gauge | `provider` | Cumulative DB connection wait duration per provider |
+| `snowplane_nul_bytes_stripped_total` | Counter | — | NUL bytes removed from SQL strings (security observability) |
+| `snowplane_sql_statement_executions_total` | Counter | `namespace`, `operation` | SQLStatement executions (audit trail) |
+| `snowplane_policy_body_rejections_total` | Counter | `controller` | Policy body denylist rejections |
 
 ### 📉 Grafana Dashboard
 
@@ -325,6 +329,8 @@ Import `config/grafana/snowplane-dashboard.json` via Grafana UI → Dashboards �
 - 🔌 Client pool size & rate limiter waits
 - 🔍 Drift detection frequency per controller
 - 🔌 Circuit breaker state & trip frequency
+- 🏥 ProviderConfig health status
+- 🔗 Connection pool utilization & wait times
 
 ## 📖 API Reference
 
@@ -340,9 +346,10 @@ Complete field-level documentation for all Snowplane CRDs is available in the **
 | 📦 **Storage** | ExternalVolume |
 | 🔍 **AI/ML** | CortexSearchService |
 | 📂 **App Development** | GitRepository, Streamlit |
-| 🔗 **Integrations** | StorageIntegrationAWS, StorageIntegrationGCS, StorageIntegrationAzure, ExternalOAuthIntegration, SAML2Integration, SCIMIntegration, EmailNotificationIntegration, QueueNotificationIntegration, WebhookNotificationIntegration, APIIntegration, APIAuthenticationIntegrationWithAuthorizationCodeGrant, APIAuthenticationIntegrationWithClientCredentials, APIAuthenticationIntegrationWithJWTBearer |
+| 🔗 **Integrations** | StorageIntegrationAWS, StorageIntegrationGCS, StorageIntegrationAzure, ExternalOAuthIntegration, OAuthIntegrationForCustomClients, OAuthIntegrationForPartnerApplications, SAML2Integration, SCIMIntegration, EmailNotificationIntegration, QueueNotificationIntegration, WebhookNotificationIntegration, APIIntegration, APIAuthenticationIntegrationWithAuthorizationCodeGrant, APIAuthenticationIntegrationWithClientCredentials, APIAuthenticationIntegrationWithJWTBearer |
 | 🛡️ **Security & Governance** | AuthenticationPolicy, NetworkPolicy, NetworkPolicyAttachment, NetworkRule, PasswordPolicy, PasswordPolicyAttachment, MaskingPolicy, MaskingPolicyApplication, RowAccessPolicy, Tag, TagAssociation, ResourceMonitor |
 | 🔧 **Programmability** | ProcedureSQL, ProcedureJavascript, ProcedurePython, ProcedureJava, ProcedureScala, FunctionSQL, FunctionJavascript, FunctionPython, FunctionJava, FunctionScala |
+| 🔄 **Replication & Failover** | FailoverGroup, PrimaryConnection, SecondaryConnection |
 | 📤 **Utilities** | FieldExport, SQLStatement |
 
 ## 🔍 Drift Detection

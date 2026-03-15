@@ -241,11 +241,18 @@ func managedResourceTypes() []managedResourceEntry {
 		{proto: &snowplanev1alpha1.APIIntegration{}, newList: func() client.ObjectList { return &snowplanev1alpha1.APIIntegrationList{} }},
 		{proto: &snowplanev1alpha1.SecondaryDatabase{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SecondaryDatabaseList{} }},
 		{proto: &snowplanev1alpha1.SharedDatabase{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SharedDatabaseList{} }},
+		{proto: &snowplanev1alpha1.OAuthIntegrationForCustomClients{}, newList: func() client.ObjectList { return &snowplanev1alpha1.OAuthIntegrationForCustomClientsList{} }},
+		{proto: &snowplanev1alpha1.OAuthIntegrationForPartnerApplications{}, newList: func() client.ObjectList { return &snowplanev1alpha1.OAuthIntegrationForPartnerApplicationsList{} }},
+		{proto: &snowplanev1alpha1.PrimaryConnection{}, newList: func() client.ObjectList { return &snowplanev1alpha1.PrimaryConnectionList{} }},
+		{proto: &snowplanev1alpha1.SecondaryConnection{}, newList: func() client.ObjectList { return &snowplanev1alpha1.SecondaryConnectionList{} }},
 	}
 }
 
-// providerRefExtractor is a field.IndexerFunc that extracts the
-// .spec.providerRef.name value from any ManagedResource.
+// providerRefExtractor is a field.IndexerFunc that extracts a
+// namespace-qualified "namespace/name" key from .spec.providerRef
+// so that isInUse queries are scoped to the correct namespace and
+// identically-named ProviderConfigs in different namespaces do not
+// produce false-positive in-use results.
 func providerRefExtractor(o client.Object) []string {
 	mr, ok := o.(interface {
 		GetProviderRef() snowplanev1alpha1.ProviderReference
@@ -254,11 +261,19 @@ func providerRefExtractor(o client.Object) []string {
 		return nil
 	}
 
-	if name := mr.GetProviderRef().Name; name != "" {
-		return []string{name}
+	ref := mr.GetProviderRef()
+	if ref.Name == "" {
+		return nil
 	}
 
-	return nil
+	// Namespace-qualify: use the CR's own namespace when providerRef
+	// does not specify one (the common case).
+	ns := ref.Namespace
+	if ns == "" {
+		ns = o.GetNamespace()
+	}
+
+	return []string{ns + "/" + ref.Name}
 }
 
 // SetupWithManager sets up the reconciler with the Manager.
@@ -550,7 +565,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, pc *snowplanev1alpha1.
 	}
 
 	// Check if any managed resources still reference this ProviderConfig.
-	inUse, err := r.isInUse(ctx, pc.Name)
+	inUse, err := r.isInUse(ctx, pc.Namespace, pc.Name)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("checking in-use references: %w", err)
 	}
@@ -582,12 +597,14 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, pc *snowplanev1alpha1.
 }
 
 // isInUse checks if any managed resource in the cluster references the given
-// ProviderConfig by name, using the field indexer for O(1) lookups per type.
-func (r *Reconciler) isInUse(ctx context.Context, providerName string) (bool, error) {
+// ProviderConfig by namespace/name, using the field indexer for O(1) lookups per type.
+func (r *Reconciler) isInUse(ctx context.Context, namespace, providerName string) (bool, error) {
+	key := namespace + "/" + providerName
+
 	for _, entry := range managedResourceTypes() {
 		list := entry.newList()
 		if err := r.client.List(ctx, list,
-			client.MatchingFields{providerRefIndex: providerName},
+			client.MatchingFields{providerRefIndex: key},
 			client.Limit(1),
 		); err != nil {
 			return false, err

@@ -12,6 +12,7 @@ import (
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/controller/helpers"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
@@ -166,36 +167,91 @@ func buildAlterOptions(obj *snowplanev1alpha1.ExternalOAuthIntegration, id snowf
 	}
 
 	// TokenUserMappingClaim is always sent (required, cannot be unset).
-	opts.TokenUserMappingClaim = &obj.Spec.TokenUserMappingClaim
+	// But diff-check it when observation is available to avoid redundant ALTER.
+	if obs != nil && obs.DescribeOutput != nil {
+		dm := obs.DescribeOutput
 
-	// JWSKeysURL.
-	if obj.Spec.JWSKeysURL != nil {
-		opts.JWSKeysURL = obj.Spec.JWSKeysURL
+		if obj.Spec.TokenUserMappingClaim != helpers.DescribeValue(dm, "EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM") {
+			claim := obj.Spec.TokenUserMappingClaim
+			opts.TokenUserMappingClaim = &claim
+		}
+
+		// JWSKeysURL.
+		if obj.Spec.JWSKeysURL != nil && *obj.Spec.JWSKeysURL != helpers.DescribeValue(dm, "EXTERNAL_OAUTH_JWS_KEYS_URL") {
+			opts.JWSKeysURL = obj.Spec.JWSKeysURL
+		}
+
+		// List fields — diff-check against describe output.
+		actualAudience := helpers.ParseCommaListFromMap(dm, "EXTERNAL_OAUTH_AUDIENCE_LIST")
+		if !helpers.StringSlicesEqualFold(obj.Spec.AudienceList, actualAudience) {
+			if len(obj.Spec.AudienceList) > 0 {
+				list := make([]string, len(obj.Spec.AudienceList))
+				copy(list, obj.Spec.AudienceList)
+				opts.AudienceList = &list
+			}
+		}
+
+		actualAllowed := helpers.ParseCommaListFromMap(dm, "EXTERNAL_OAUTH_ALLOWED_ROLES_LIST")
+		if !helpers.StringSlicesEqualFold(obj.Spec.AllowedRoles, actualAllowed) {
+			if len(obj.Spec.AllowedRoles) > 0 {
+				list := make([]string, len(obj.Spec.AllowedRoles))
+				copy(list, obj.Spec.AllowedRoles)
+				opts.AllowedRoles = &list
+			}
+		}
+
+		actualBlocked := helpers.ParseCommaListFromMap(dm, "EXTERNAL_OAUTH_BLOCKED_ROLES_LIST")
+		if !helpers.StringSlicesEqualFold(obj.Spec.BlockedRoles, actualBlocked) {
+			if len(obj.Spec.BlockedRoles) > 0 {
+				list := make([]string, len(obj.Spec.BlockedRoles))
+				copy(list, obj.Spec.BlockedRoles)
+				opts.BlockedRoles = &list
+			}
+		}
+
+		// Enum/scalar optional fields — diff-check.
+		if obj.Spec.AnyRoleMode != nil && !strings.EqualFold(*obj.Spec.AnyRoleMode, helpers.DescribeValue(dm, "EXTERNAL_OAUTH_ANY_ROLE_MODE")) {
+			opts.AnyRoleMode = obj.Spec.AnyRoleMode
+		}
+
+		if obj.Spec.ScopeDelimiter != nil && *obj.Spec.ScopeDelimiter != helpers.DescribeValue(dm, "EXTERNAL_OAUTH_SCOPE_DELIMITER") {
+			opts.ScopeDelimiter = obj.Spec.ScopeDelimiter
+		}
+
+		if obj.Spec.NetworkPolicy != nil && *obj.Spec.NetworkPolicy != helpers.DescribeValue(dm, "NETWORK_POLICY") {
+			opts.NetworkPolicy = obj.Spec.NetworkPolicy
+		}
+	} else {
+		// No observation — send everything unconditionally.
+		claim := obj.Spec.TokenUserMappingClaim
+		opts.TokenUserMappingClaim = &claim
+
+		if obj.Spec.JWSKeysURL != nil {
+			opts.JWSKeysURL = obj.Spec.JWSKeysURL
+		}
+
+		if len(obj.Spec.AudienceList) > 0 {
+			list := make([]string, len(obj.Spec.AudienceList))
+			copy(list, obj.Spec.AudienceList)
+			opts.AudienceList = &list
+		}
+
+		if len(obj.Spec.AllowedRoles) > 0 {
+			list := make([]string, len(obj.Spec.AllowedRoles))
+			copy(list, obj.Spec.AllowedRoles)
+			opts.AllowedRoles = &list
+		}
+
+		if len(obj.Spec.BlockedRoles) > 0 {
+			list := make([]string, len(obj.Spec.BlockedRoles))
+			copy(list, obj.Spec.BlockedRoles)
+			opts.BlockedRoles = &list
+		}
+
+		opts.AnyRoleMode = obj.Spec.AnyRoleMode
+		opts.ScopeDelimiter = obj.Spec.ScopeDelimiter
+		opts.NetworkPolicy = obj.Spec.NetworkPolicy
 	}
-
-	// List fields.
-	if len(obj.Spec.AudienceList) > 0 {
-		list := make([]string, len(obj.Spec.AudienceList))
-		copy(list, obj.Spec.AudienceList)
-		opts.AudienceList = &list
-	}
-
-	if len(obj.Spec.AllowedRoles) > 0 {
-		list := make([]string, len(obj.Spec.AllowedRoles))
-		copy(list, obj.Spec.AllowedRoles)
-		opts.AllowedRoles = &list
-	}
-
-	if len(obj.Spec.BlockedRoles) > 0 {
-		list := make([]string, len(obj.Spec.BlockedRoles))
-		copy(list, obj.Spec.BlockedRoles)
-		opts.BlockedRoles = &list
-	}
-
-	// Enum/scalar optional fields.
-	opts.AnyRoleMode = obj.Spec.AnyRoleMode
-	opts.ScopeDelimiter = obj.Spec.ScopeDelimiter
-	opts.NetworkPolicy = obj.Spec.NetworkPolicy
 
 	return opts
 }
@@ -214,65 +270,17 @@ func detectDrift(obj *snowplanev1alpha1.ExternalOAuthIntegration, obs *snowflake
 	}
 
 	if obs.DescribeOutput != nil {
-		d.CompareStringValue("EXTERNAL_OAUTH_JWS_KEYS_URL", stringValueOrEmpty(obj.Spec.JWSKeysURL), describeValue(obs.DescribeOutput, "EXTERNAL_OAUTH_JWS_KEYS_URL"), false)
-		d.CompareStringValueFold("EXTERNAL_OAUTH_ANY_ROLE_MODE", stringValueOrEmpty(obj.Spec.AnyRoleMode), describeValue(obs.DescribeOutput, "EXTERNAL_OAUTH_ANY_ROLE_MODE"), false)
+		d.CompareStringValue("EXTERNAL_OAUTH_JWS_KEYS_URL", helpers.StringValueOrEmpty(obj.Spec.JWSKeysURL), helpers.DescribeValue(obs.DescribeOutput, "EXTERNAL_OAUTH_JWS_KEYS_URL"), false)
+		d.CompareStringValueFold("EXTERNAL_OAUTH_ANY_ROLE_MODE", helpers.StringValueOrEmpty(obj.Spec.AnyRoleMode), helpers.DescribeValue(obs.DescribeOutput, "EXTERNAL_OAUTH_ANY_ROLE_MODE"), false)
 
-		compareListFromDescribeMap(d, "EXTERNAL_OAUTH_AUDIENCE_LIST", obj.Spec.AudienceList, obs.DescribeOutput)
-		compareListFromDescribeMap(d, "EXTERNAL_OAUTH_ALLOWED_ROLES_LIST", obj.Spec.AllowedRoles, obs.DescribeOutput)
-		compareListFromDescribeMap(d, "EXTERNAL_OAUTH_BLOCKED_ROLES_LIST", obj.Spec.BlockedRoles, obs.DescribeOutput)
+		helpers.CompareListFromDescribeMap(d, "EXTERNAL_OAUTH_AUDIENCE_LIST", obj.Spec.AudienceList, obs.DescribeOutput, false)
+		helpers.CompareListFromDescribeMap(d, "EXTERNAL_OAUTH_ALLOWED_ROLES_LIST", obj.Spec.AllowedRoles, obs.DescribeOutput, false)
+		helpers.CompareListFromDescribeMap(d, "EXTERNAL_OAUTH_BLOCKED_ROLES_LIST", obj.Spec.BlockedRoles, obs.DescribeOutput, false)
 
-		d.CompareStringValue("NETWORK_POLICY", stringValueOrEmpty(obj.Spec.NetworkPolicy), describeValue(obs.DescribeOutput, "NETWORK_POLICY"), false)
+		d.CompareStringValue("NETWORK_POLICY", helpers.StringValueOrEmpty(obj.Spec.NetworkPolicy), helpers.DescribeValue(obs.DescribeOutput, "NETWORK_POLICY"), false)
+		d.CompareStringValue("EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM", obj.Spec.TokenUserMappingClaim, helpers.DescribeValue(obs.DescribeOutput, "EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM"), false)
+		d.CompareString("EXTERNAL_OAUTH_SCOPE_DELIMITER", obj.Spec.ScopeDelimiter, helpers.DescribeValue(obs.DescribeOutput, "EXTERNAL_OAUTH_SCOPE_DELIMITER"), false)
 	}
 
 	return d.Result()
-}
-
-// describeValue extracts a DESCRIBE output value by key.
-func describeValue(m map[string]string, key string) string {
-	if m == nil {
-		return ""
-	}
-
-	return m[key]
-}
-
-// stringValueOrEmpty returns the value of a string pointer, or "" if nil.
-func stringValueOrEmpty(s *string) string {
-	if s == nil {
-		return ""
-	}
-
-	return *s
-}
-
-// compareListFromDescribeMap compares a spec list against a comma-separated DESCRIBE output value.
-func compareListFromDescribeMap(d *drift.Detector, key string, specList []string, descOutput map[string]string) {
-	descList := parseCommaListFromMap(descOutput, key)
-	specJoined := strings.Join(specList, ",")
-	descJoined := strings.Join(descList, ",")
-	d.CompareStringValueFold(key, specJoined, descJoined, false)
-}
-
-// parseCommaListFromMap extracts a comma-separated list from a map by key.
-func parseCommaListFromMap(m map[string]string, key string) []string {
-	if m == nil {
-		return nil
-	}
-
-	raw, ok := m[key]
-	if !ok || raw == "" {
-		return nil
-	}
-
-	parts := strings.Split(raw, ",")
-	result := make([]string, 0, len(parts))
-
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			result = append(result, p)
-		}
-	}
-
-	return result
 }

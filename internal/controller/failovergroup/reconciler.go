@@ -12,6 +12,7 @@ import (
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/controller/helpers"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
@@ -114,8 +115,6 @@ func applyObservation(obj *snowplanev1alpha1.FailoverGroup, obs *snowflake.Failo
 		obj.Status.FullyQualifiedName = obs.ShowOutput.Name
 		obj.Status.ShowOutput = obs.ShowOutput
 	}
-
-	obj.Status.TrackedParameters = tracked.ComputeTracked(&obj.Spec)
 }
 
 func buildCreateOptions(obj *snowplanev1alpha1.FailoverGroup, id snowflake.AccountObjectIdentifier) snowflake.CreateFailoverGroupOptions {
@@ -207,11 +206,11 @@ func detectDrift(obj *snowplanev1alpha1.FailoverGroup, obs *snowflake.FailoverGr
 		d.CompareString("COMMENT", obj.Spec.Comment, obs.ShowOutput.Comment, false)
 
 		// Compare object types.
-		obsObjTypes := parseCommaList(obs.ShowOutput.ObjectTypes)
+		obsObjTypes := helpers.ParseCommaList(obs.ShowOutput.ObjectTypes)
 		d.CompareStringSliceFold("OBJECT_TYPES", obj.Spec.ObjectTypes, obsObjTypes, false)
 
 		// Compare allowed accounts.
-		obsAccounts := parseCommaList(obs.ShowOutput.AllowedAccounts)
+		obsAccounts := helpers.ParseCommaList(obs.ShowOutput.AllowedAccounts)
 		d.CompareStringSliceFold("ALLOWED_ACCOUNTS", obj.Spec.AllowedAccounts, obsAccounts, false)
 
 		// Compare replication schedule.
@@ -219,23 +218,4 @@ func detectDrift(obj *snowplanev1alpha1.FailoverGroup, obs *snowflake.FailoverGr
 	}
 
 	return d.Result()
-}
-
-// parseCommaList splits a comma-separated string, trims whitespace, and returns non-empty values.
-func parseCommaList(s string) []string {
-	if s == "" {
-		return nil
-	}
-
-	parts := strings.Split(s, ",")
-	result := make([]string, 0, len(parts))
-
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			result = append(result, p)
-		}
-	}
-
-	return result
 }

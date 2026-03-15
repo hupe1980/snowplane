@@ -20,7 +20,7 @@ const maxConditionMessageLength = 32768
 // It is intentionally broad — the goal is to remove SQL fragments that
 // may be embedded in Snowflake driver error strings.
 var sqlStmtRe = regexp.MustCompile(
-	`(?i)\b(CREATE|ALTER|DROP|SHOW|DESCRIBE|SELECT|INSERT|UPDATE|DELETE|USE ROLE|GRANT|REVOKE)\s+[^:]+`,
+	`(?i)\b(CREATE|ALTER|DROP|SHOW|DESCRIBE|SELECT|INSERT|UPDATE|DELETE|MERGE|TRUNCATE|USE ROLE|GRANT|REVOKE|COPY INTO|CALL|EXECUTE\s+IMMEDIATE|EXECUTE\s+TASK|PUT|GET)\s+[^:]+`,
 )
 
 // dsnRe matches connection-string patterns (DSN, JDBC URLs, etc.).

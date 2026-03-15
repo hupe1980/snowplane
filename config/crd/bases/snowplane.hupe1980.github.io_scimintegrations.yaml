@@ -204,6 +204,10 @@ spec:
             - message: spec.runAsRole is immutable (delete and recreate the resource
                 to change)
               rule: self.runAsRole == oldSelf.runAsRole
+            - message: spec.useRole is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
+                || self.useRole == oldSelf.useRole)
           status:
             description: SCIMIntegrationStatus defines the observed state of a SCIMIntegration.
             properties:

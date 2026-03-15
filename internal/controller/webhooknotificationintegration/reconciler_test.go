@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -107,4 +109,135 @@ func TestReconcile_StandardSuite(t *testing.T) {
 		},
 		FinalizerName: finalizerName,
 	}.Run(t)
+}
+
+func successfulObservation() *snowflake.WebhookNotificationIntegrationObservation {
+	return &snowflake.WebhookNotificationIntegrationObservation{
+		Exists: true,
+		ShowOutput: &snowplanev1alpha1.WebhookNotificationIntegrationShowOutput{
+			Name:    "MY_WEBHOOK",
+			Enabled: true,
+		},
+		DescribeOutput: map[string]string{
+			"WEBHOOK_URL":           "https://example.com/hook",
+			"WEBHOOK_BODY_TEMPLATE": "",
+			"WEBHOOK_SECRET":        "****",
+		},
+	}
+}
+
+func TestBuildAlterOptions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("WebhookURLSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestWebhookNotificationIntegration("x", "default")
+		obs := successfulObservation()
+		id := snowflake.NewAccountObjectIdentifier("MY_WEBHOOK")
+
+		opts := buildAlterOptions(obj, id, obs)
+
+		assert.Nil(t, opts.WebhookURL, "URL should be skipped when unchanged")
+	})
+
+	t.Run("WebhookURLSentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestWebhookNotificationIntegration("x", "default")
+		obj.Spec.WebhookURL = "https://example.com/new-hook"
+		obs := successfulObservation()
+		id := snowflake.NewAccountObjectIdentifier("MY_WEBHOOK")
+
+		opts := buildAlterOptions(obj, id, obs)
+
+		require.NotNil(t, opts.WebhookURL)
+		assert.Equal(t, "https://example.com/new-hook", *opts.WebhookURL)
+	})
+
+	t.Run("BodyTemplateSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		tmpl := "my-template"
+		obj := newTestWebhookNotificationIntegration("x", "default")
+		obj.Spec.WebhookBodyTemplate = &tmpl
+
+		obs := successfulObservation()
+		obs.DescribeOutput["WEBHOOK_BODY_TEMPLATE"] = "my-template"
+		id := snowflake.NewAccountObjectIdentifier("MY_WEBHOOK")
+
+		opts := buildAlterOptions(obj, id, obs)
+
+		assert.Nil(t, opts.WebhookBodyTemplate, "body template should be skipped when unchanged")
+	})
+
+	t.Run("BodyTemplateSentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		tmpl := "new-template"
+		obj := newTestWebhookNotificationIntegration("x", "default")
+		obj.Spec.WebhookBodyTemplate = &tmpl
+
+		obs := successfulObservation()
+		obs.DescribeOutput["WEBHOOK_BODY_TEMPLATE"] = "old-template"
+		id := snowflake.NewAccountObjectIdentifier("MY_WEBHOOK")
+
+		opts := buildAlterOptions(obj, id, obs)
+
+		require.NotNil(t, opts.WebhookBodyTemplate)
+		assert.Equal(t, "new-template", *opts.WebhookBodyTemplate)
+	})
+
+	t.Run("SecretAlwaysSent", func(t *testing.T) {
+		t.Parallel()
+
+		secret := "my-secret"
+		obj := newTestWebhookNotificationIntegration("x", "default")
+		obj.Spec.WebhookSecret = &secret
+		obs := successfulObservation()
+		id := snowflake.NewAccountObjectIdentifier("MY_WEBHOOK")
+
+		opts := buildAlterOptions(obj, id, obs)
+
+		require.NotNil(t, opts.WebhookSecret, "secret should always be sent (masked in DESCRIBE)")
+		assert.Equal(t, "my-secret", *opts.WebhookSecret)
+	})
+
+	t.Run("AllFieldsSentWhenNoObservation", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestWebhookNotificationIntegration("x", "default")
+		id := snowflake.NewAccountObjectIdentifier("MY_WEBHOOK")
+
+		opts := buildAlterOptions(obj, id, nil)
+
+		require.NotNil(t, opts.WebhookURL, "URL should be sent when no observation")
+	})
+}
+
+func TestDetectDrift(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NoDrift", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestWebhookNotificationIntegration("x", "default")
+		obs := successfulObservation()
+
+		result := detectDrift(obj, obs)
+		assert.False(t, result.HasDrift)
+	})
+
+	t.Run("BodyTemplateDrift", func(t *testing.T) {
+		t.Parallel()
+
+		tmpl := "my-template"
+		obj := newTestWebhookNotificationIntegration("x", "default")
+		obj.Spec.WebhookBodyTemplate = &tmpl
+		obs := successfulObservation()
+		obs.DescribeOutput["WEBHOOK_BODY_TEMPLATE"] = "other-template"
+
+		result := detectDrift(obj, obs)
+		assert.True(t, result.HasDrift)
+	})
 }

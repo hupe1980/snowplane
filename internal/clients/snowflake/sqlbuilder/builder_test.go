@@ -840,6 +840,14 @@ func TestValidateIdentifierParts(t *testing.T) {
 		assert.Contains(t, err.Error(), "forbidden")
 	})
 
+	t.Run("RejectLineCommentNoSpace", func(t *testing.T) {
+		t.Parallel()
+		// Snowflake treats -- as a line comment regardless of trailing char.
+		err := ValidateIdentifierParts("TABLE--INJECT")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "forbidden")
+	})
+
 	t.Run("RejectBlockComment", func(t *testing.T) {
 		t.Parallel()
 		err := ValidateIdentifierParts("TABLE /* hidden */")

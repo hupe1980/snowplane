@@ -451,6 +451,29 @@ func TestBuildAlterOptions_NoChanges(t *testing.T) {
 	assert.False(t, opts.HasChanges())
 }
 
+func TestBuildAlterOptions_NotifyUsersSkippedWhenUnchanged(t *testing.T) {
+	t.Parallel()
+	rm := newTestResourceMonitor("myrm", "default")
+	rm.Spec.NotifyUsers = []string{"ADMIN", "DBA"}
+	id := snowflake.NewAccountObjectIdentifier("MY_MONITOR")
+	obs := successfulObservation()
+	obs.ShowOutput.NotifyUsers = "ADMIN, DBA"
+	opts := buildAlterOptions(rm, id, obs)
+	assert.Nil(t, opts.NotifyUsers, "Should skip when users match")
+}
+
+func TestBuildAlterOptions_NotifyUsersSentWhenChanged(t *testing.T) {
+	t.Parallel()
+	rm := newTestResourceMonitor("myrm", "default")
+	rm.Spec.NotifyUsers = []string{"ADMIN", "DBA", "ANALYST"}
+	id := snowflake.NewAccountObjectIdentifier("MY_MONITOR")
+	obs := successfulObservation()
+	obs.ShowOutput.NotifyUsers = "ADMIN, DBA"
+	opts := buildAlterOptions(rm, id, obs)
+	require.NotNil(t, opts.NotifyUsers)
+	assert.ElementsMatch(t, []string{"ADMIN", "DBA", "ANALYST"}, *opts.NotifyUsers)
+}
+
 func TestComputeTrackedParameters(t *testing.T) {
 	t.Parallel()
 	freq := snowplanev1alpha1.ResourceMonitorFrequencyMonthly
@@ -519,6 +542,27 @@ func TestDetectDrift_WithDrift(t *testing.T) {
 	result := detectDrift(rm, obs)
 	assert.True(t, result.HasDrift)
 	assert.Contains(t, result.Summary(), "CREDIT_QUOTA")
+}
+
+func TestDetectDrift_NotifyUsersDrift(t *testing.T) {
+	t.Parallel()
+	rm := &snowplanev1alpha1.ResourceMonitor{
+		Spec: snowplanev1alpha1.ResourceMonitorSpec{
+			Name:        "MY_MONITOR",
+			CreditQuota: testutil.Ptr(int32(100)),
+			NotifyUsers: []string{"ADMIN", "DBA"},
+		},
+	}
+	obs := &snowflake.ResourceMonitorObservation{
+		ShowOutput: &snowplanev1alpha1.ResourceMonitorShowOutput{
+			Name:        "MY_MONITOR",
+			CreditQuota: "100",
+			NotifyUsers: "ADMIN",
+		},
+	}
+	result := detectDrift(rm, obs)
+	assert.True(t, result.HasDrift)
+	assert.Contains(t, result.Summary(), "NOTIFY_USERS")
 }
 
 func TestSpecTriggersToClient(t *testing.T) {

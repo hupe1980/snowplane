@@ -151,6 +151,32 @@ func TestForEvent_DescribeTable(t *testing.T) {
 	assert.Contains(t, got, "[SQL redacted]")
 }
 
+func TestForEvent_AdditionalKeywords(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name, msg, forbidden string
+	}{
+		{"merge", `MERGE INTO target USING source ON target.id = source.id`, "MERGE INTO"},
+		{"truncate", `TRUNCATE TABLE "prod"."public"."users"`, "TRUNCATE TABLE"},
+		{"copy_into", `COPY INTO @stage/file.csv FROM "db"."schema"."table"`, "COPY INTO"},
+		{"call", `CALL my_procedure('arg1', 'arg2')`, "CALL my_procedure"},
+		{"execute_immediate", `EXECUTE IMMEDIATE 'SELECT 1'`, "EXECUTE IMMEDIATE"},
+		{"execute_task", `EXECUTE TASK my_task`, "EXECUTE TASK"},
+		{"put", `PUT file:///tmp/data.csv @~`, "PUT file"},
+		{"get", `GET @~/data.csv file:///tmp/`, "GET @~/data"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := ForEvent(tc.msg)
+			assert.NotContains(t, got, tc.forbidden)
+			assert.Contains(t, got, "[SQL redacted]")
+		})
+	}
+}
+
 // ── SafeRecorder tests ──────────────────────────────────────────────────
 
 func TestSafeRecorder_Event(t *testing.T) {

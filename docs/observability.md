@@ -152,7 +152,23 @@ metrics:
 
 ---
 
+## PrometheusRule
+
+The Helm chart includes an optional PrometheusRule template with default alert rules for high error rates, circuit breaker trips, and Snowflake API latency:
+
+```yaml
+metrics:
+  prometheusRule:
+    enabled: true
+    additionalLabels:
+      release: prometheus
+```
+
+---
+
 ## Example Alert Rules
+
+The following rules are shipped in the PrometheusRule template. You can also create them manually:
 
 ```yaml
 groups:

@@ -707,6 +707,10 @@ func sourceResourceTypes() []client.Object {
 		&snowplanev1alpha1.Share{},
 		&snowplanev1alpha1.GitRepository{},
 		&snowplanev1alpha1.Streamlit{},
+		&snowplanev1alpha1.OAuthIntegrationForCustomClients{},
+		&snowplanev1alpha1.OAuthIntegrationForPartnerApplications{},
+		&snowplanev1alpha1.PrimaryConnection{},
+		&snowplanev1alpha1.SecondaryConnection{},
 	}
 }
 

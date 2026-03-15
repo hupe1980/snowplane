@@ -12,6 +12,7 @@ import (
 	snowplanev1alpha1 "github.com/hupe1980/snowplane/api/v1alpha1"
 	"github.com/hupe1980/snowplane/internal/clients/clientfactory"
 	"github.com/hupe1980/snowplane/internal/clients/snowflake"
+	"github.com/hupe1980/snowplane/internal/controller/helpers"
 	"github.com/hupe1980/snowplane/internal/controller/reconciler"
 	"github.com/hupe1980/snowplane/internal/drift"
 	"github.com/hupe1980/snowplane/internal/ratelimit"
@@ -171,23 +172,66 @@ func buildAlterOptions(obj *snowplanev1alpha1.QueueNotificationIntegration, id s
 		}
 	}
 
-	// Always send provider and direction on alter (they are part of a full reconciliation).
-	provider := obj.Spec.NotificationProvider
-	opts.NotificationProvider = &provider
+	if obs != nil && obs.DescribeOutput != nil {
+		dm := obs.DescribeOutput
 
-	direction := obj.Spec.Direction
-	opts.Direction = &direction
+		// Direction is mutable; only send when changed.
+		if !strings.EqualFold(obj.Spec.Direction, helpers.DescribeValue(dm, "DIRECTION")) {
+			direction := obj.Spec.Direction
+			opts.Direction = &direction
+		}
 
-	// Cloud-provider-specific fields.
-	opts.AWSSNSTopicARN = obj.Spec.AWSSNSTopicARN
-	opts.AWSSNSRoleARN = obj.Spec.AWSSNSRoleARN
-	opts.AWSSQSArn = obj.Spec.AWSSQSArn
-	opts.AWSSQSRoleARN = obj.Spec.AWSSQSRoleARN
-	opts.GCPPubSubTopicName = obj.Spec.GCPPubSubTopicName
-	opts.GCPPubSubSubscriptionName = obj.Spec.GCPPubSubSubscriptionName
-	opts.AzureStorageQueuePrimaryURI = obj.Spec.AzureStorageQueuePrimaryURI
-	opts.AzureTenantID = obj.Spec.AzureTenantID
-	opts.AzureEventGridTopicEndpoint = obj.Spec.AzureEventGridTopicEndpoint
+		// Cloud-provider-specific fields: only send when changed.
+		if obj.Spec.AWSSNSTopicARN != nil && !strings.EqualFold(*obj.Spec.AWSSNSTopicARN, helpers.DescribeValue(dm, "AWS_SNS_TOPIC_ARN")) {
+			opts.AWSSNSTopicARN = obj.Spec.AWSSNSTopicARN
+		}
+
+		if obj.Spec.AWSSNSRoleARN != nil && !strings.EqualFold(*obj.Spec.AWSSNSRoleARN, helpers.DescribeValue(dm, "AWS_SNS_ROLE_ARN")) {
+			opts.AWSSNSRoleARN = obj.Spec.AWSSNSRoleARN
+		}
+
+		if obj.Spec.AWSSQSArn != nil && !strings.EqualFold(*obj.Spec.AWSSQSArn, helpers.DescribeValue(dm, "AWS_SQS_ARN")) {
+			opts.AWSSQSArn = obj.Spec.AWSSQSArn
+		}
+
+		if obj.Spec.AWSSQSRoleARN != nil && !strings.EqualFold(*obj.Spec.AWSSQSRoleARN, helpers.DescribeValue(dm, "AWS_SQS_ROLE_ARN")) {
+			opts.AWSSQSRoleARN = obj.Spec.AWSSQSRoleARN
+		}
+
+		if obj.Spec.GCPPubSubTopicName != nil && !strings.EqualFold(*obj.Spec.GCPPubSubTopicName, helpers.DescribeValue(dm, "GCP_PUBSUB_TOPIC_NAME")) {
+			opts.GCPPubSubTopicName = obj.Spec.GCPPubSubTopicName
+		}
+
+		if obj.Spec.GCPPubSubSubscriptionName != nil && !strings.EqualFold(*obj.Spec.GCPPubSubSubscriptionName, helpers.DescribeValue(dm, "GCP_PUBSUB_SUBSCRIPTION_NAME")) {
+			opts.GCPPubSubSubscriptionName = obj.Spec.GCPPubSubSubscriptionName
+		}
+
+		if obj.Spec.AzureStorageQueuePrimaryURI != nil && !strings.EqualFold(*obj.Spec.AzureStorageQueuePrimaryURI, helpers.DescribeValue(dm, "AZURE_STORAGE_QUEUE_PRIMARY_URI")) {
+			opts.AzureStorageQueuePrimaryURI = obj.Spec.AzureStorageQueuePrimaryURI
+		}
+
+		if obj.Spec.AzureTenantID != nil && !strings.EqualFold(*obj.Spec.AzureTenantID, helpers.DescribeValue(dm, "AZURE_TENANT_ID")) {
+			opts.AzureTenantID = obj.Spec.AzureTenantID
+		}
+
+		if obj.Spec.AzureEventGridTopicEndpoint != nil && !strings.EqualFold(*obj.Spec.AzureEventGridTopicEndpoint, helpers.DescribeValue(dm, "AZURE_EVENT_GRID_TOPIC_ENDPOINT")) {
+			opts.AzureEventGridTopicEndpoint = obj.Spec.AzureEventGridTopicEndpoint
+		}
+	} else {
+		// No observation available (first reconciliation): send all fields.
+		direction := obj.Spec.Direction
+		opts.Direction = &direction
+
+		opts.AWSSNSTopicARN = obj.Spec.AWSSNSTopicARN
+		opts.AWSSNSRoleARN = obj.Spec.AWSSNSRoleARN
+		opts.AWSSQSArn = obj.Spec.AWSSQSArn
+		opts.AWSSQSRoleARN = obj.Spec.AWSSQSRoleARN
+		opts.GCPPubSubTopicName = obj.Spec.GCPPubSubTopicName
+		opts.GCPPubSubSubscriptionName = obj.Spec.GCPPubSubSubscriptionName
+		opts.AzureStorageQueuePrimaryURI = obj.Spec.AzureStorageQueuePrimaryURI
+		opts.AzureTenantID = obj.Spec.AzureTenantID
+		opts.AzureEventGridTopicEndpoint = obj.Spec.AzureEventGridTopicEndpoint
+	}
 
 	return opts
 }
@@ -206,16 +250,18 @@ func detectDrift(obj *snowplanev1alpha1.QueueNotificationIntegration, obs *snowf
 	}
 
 	if obs.DescribeOutput != nil {
-		d.CompareStringValueFold("NOTIFICATION_PROVIDER", obj.Spec.NotificationProvider, describeValue(obs.DescribeOutput, "NOTIFICATION_PROVIDER"), true)
+		d.CompareStringValueFold("NOTIFICATION_PROVIDER", obj.Spec.NotificationProvider, helpers.DescribeValue(obs.DescribeOutput, "NOTIFICATION_PROVIDER"), true)
+		d.CompareStringValueFold("DIRECTION", obj.Spec.Direction, helpers.DescribeValue(obs.DescribeOutput, "DIRECTION"), false)
+		d.CompareStringValue("AWS_SNS_TOPIC_ARN", helpers.StringValueOrEmpty(obj.Spec.AWSSNSTopicARN), helpers.DescribeValue(obs.DescribeOutput, "AWS_SNS_TOPIC_ARN"), false)
+		d.CompareStringValue("AWS_SNS_ROLE_ARN", helpers.StringValueOrEmpty(obj.Spec.AWSSNSRoleARN), helpers.DescribeValue(obs.DescribeOutput, "AWS_SNS_ROLE_ARN"), false)
+		d.CompareStringValue("AWS_SQS_ARN", helpers.StringValueOrEmpty(obj.Spec.AWSSQSArn), helpers.DescribeValue(obs.DescribeOutput, "AWS_SQS_ARN"), false)
+		d.CompareStringValue("AWS_SQS_ROLE_ARN", helpers.StringValueOrEmpty(obj.Spec.AWSSQSRoleARN), helpers.DescribeValue(obs.DescribeOutput, "AWS_SQS_ROLE_ARN"), false)
+		d.CompareStringValue("GCP_PUBSUB_TOPIC_NAME", helpers.StringValueOrEmpty(obj.Spec.GCPPubSubTopicName), helpers.DescribeValue(obs.DescribeOutput, "GCP_PUBSUB_TOPIC_NAME"), false)
+		d.CompareStringValue("GCP_PUBSUB_SUBSCRIPTION_NAME", helpers.StringValueOrEmpty(obj.Spec.GCPPubSubSubscriptionName), helpers.DescribeValue(obs.DescribeOutput, "GCP_PUBSUB_SUBSCRIPTION_NAME"), false)
+		d.CompareStringValue("AZURE_STORAGE_QUEUE_PRIMARY_URI", helpers.StringValueOrEmpty(obj.Spec.AzureStorageQueuePrimaryURI), helpers.DescribeValue(obs.DescribeOutput, "AZURE_STORAGE_QUEUE_PRIMARY_URI"), false)
+		d.CompareStringValue("AZURE_TENANT_ID", helpers.StringValueOrEmpty(obj.Spec.AzureTenantID), helpers.DescribeValue(obs.DescribeOutput, "AZURE_TENANT_ID"), false)
+		d.CompareStringValue("AZURE_EVENT_GRID_TOPIC_ENDPOINT", helpers.StringValueOrEmpty(obj.Spec.AzureEventGridTopicEndpoint), helpers.DescribeValue(obs.DescribeOutput, "AZURE_EVENT_GRID_TOPIC_ENDPOINT"), false)
 	}
 
 	return d.Result()
-}
-
-func describeValue(desc map[string]string, key string) string {
-	if desc == nil {
-		return ""
-	}
-
-	return desc[key]
 }

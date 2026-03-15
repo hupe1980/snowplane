@@ -1,0 +1,12 @@
+apiVersion: snowplane.hupe1980.github.io/v1alpha1
+kind: PrimaryConnection
+metadata:
+  name: my-primary-connection
+spec:
+  providerRef:
+    name: default
+  name: MY_PRIMARY_CONN
+  enableFailoverToAccounts:
+    - "myorg.account2"
+    - "myorg.account3"
+  comment: "Primary connection for HA failover managed by Snowplane"

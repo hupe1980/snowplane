@@ -234,11 +234,28 @@ func buildAlterOptions(nr *snowplanev1alpha1.NetworkRule, id snowflake.SchemaObj
 	opts := snowflake.AlterNetworkRuleOptions{Name: id}
 	opts.UnsetFields = tracked.ComputeUnset(&nr.Spec, nr.Status.TrackedParameters)
 
-	// ValueList is always sent on update to ensure convergence
-	// (not fully available in SHOW output).
-	valueList := make([]string, len(nr.Spec.ValueList))
-	copy(valueList, nr.Spec.ValueList)
-	opts.ValueList = &valueList
+	// ValueList: compare against DESCRIBE output when available.
+	if obs != nil && obs.DescribeOutput != nil {
+		if descValues, ok := obs.DescribeOutput["value_list"]; ok {
+			specSorted := sortedValues(nr.Spec.ValueList)
+			obsSorted := sortedValues(strings.Split(descValues, ","))
+			if !strings.EqualFold(specSorted, obsSorted) {
+				valueList := make([]string, len(nr.Spec.ValueList))
+				copy(valueList, nr.Spec.ValueList)
+				opts.ValueList = &valueList
+			}
+		} else {
+			// DESCRIBE available but value_list key missing — send to converge.
+			valueList := make([]string, len(nr.Spec.ValueList))
+			copy(valueList, nr.Spec.ValueList)
+			opts.ValueList = &valueList
+		}
+	} else {
+		// No DESCRIBE output — send unconditionally to converge.
+		valueList := make([]string, len(nr.Spec.ValueList))
+		copy(valueList, nr.Spec.ValueList)
+		opts.ValueList = &valueList
+	}
 
 	if nr.Spec.Comment != nil {
 		if obs == nil || obs.ShowOutput == nil || *nr.Spec.Comment != obs.ShowOutput.Comment {

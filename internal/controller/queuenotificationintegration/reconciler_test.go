@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -108,4 +110,145 @@ func TestReconcile_StandardSuite(t *testing.T) {
 		},
 		FinalizerName: finalizerName,
 	}.Run(t)
+}
+
+func successfulObservation() *snowflake.QueueNotificationIntegrationObservation {
+	return &snowflake.QueueNotificationIntegrationObservation{
+		Exists: true,
+		ShowOutput: &snowplanev1alpha1.QueueNotificationIntegrationShowOutput{
+			Name:    "MY_QNI",
+			Enabled: true,
+		},
+		DescribeOutput: map[string]string{
+			"NOTIFICATION_PROVIDER":           "AWS_SNS",
+			"DIRECTION":                       "OUTBOUND",
+			"AWS_SNS_TOPIC_ARN":               "",
+			"AWS_SNS_ROLE_ARN":                "",
+			"AWS_SQS_ARN":                     "",
+			"AWS_SQS_ROLE_ARN":                "",
+			"GCP_PUBSUB_TOPIC_NAME":           "",
+			"GCP_PUBSUB_SUBSCRIPTION_NAME":    "",
+			"AZURE_STORAGE_QUEUE_PRIMARY_URI": "",
+			"AZURE_TENANT_ID":                 "",
+			"AZURE_EVENT_GRID_TOPIC_ENDPOINT": "",
+		},
+	}
+}
+
+func TestBuildAlterOptions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("CloudFieldsSkippedWhenUnchanged", func(t *testing.T) {
+		t.Parallel()
+
+		topicARN := "arn:aws:sns:us-east-1:123456789012:my-topic"
+		roleARN := "arn:aws:iam::123456789012:role/my-role"
+
+		obj := newTestQueueNotificationIntegration("x", "default")
+		obj.Spec.AWSSNSTopicARN = &topicARN
+		obj.Spec.AWSSNSRoleARN = &roleARN
+
+		obs := successfulObservation()
+		obs.DescribeOutput["AWS_SNS_TOPIC_ARN"] = topicARN
+		obs.DescribeOutput["AWS_SNS_ROLE_ARN"] = roleARN
+		id := snowflake.NewAccountObjectIdentifier("MY_QNI")
+
+		opts := buildAlterOptions(obj, id, obs)
+
+		assert.Nil(t, opts.AWSSNSTopicARN, "topic ARN should be skipped when unchanged")
+		assert.Nil(t, opts.AWSSNSRoleARN, "role ARN should be skipped when unchanged")
+		assert.Nil(t, opts.Direction, "direction should be skipped when unchanged")
+		assert.Nil(t, opts.NotificationProvider, "immutable provider should not be sent in ALTER")
+	})
+
+	t.Run("CloudFieldsSentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		topicARN := "arn:aws:sns:us-east-1:123456789012:new-topic"
+		roleARN := "arn:aws:iam::123456789012:role/new-role"
+
+		obj := newTestQueueNotificationIntegration("x", "default")
+		obj.Spec.AWSSNSTopicARN = &topicARN
+		obj.Spec.AWSSNSRoleARN = &roleARN
+
+		obs := successfulObservation()
+		obs.DescribeOutput["AWS_SNS_TOPIC_ARN"] = "arn:aws:sns:us-east-1:123456789012:old-topic"
+		obs.DescribeOutput["AWS_SNS_ROLE_ARN"] = "arn:aws:iam::123456789012:role/old-role"
+		id := snowflake.NewAccountObjectIdentifier("MY_QNI")
+
+		opts := buildAlterOptions(obj, id, obs)
+
+		require.NotNil(t, opts.AWSSNSTopicARN)
+		assert.Equal(t, topicARN, *opts.AWSSNSTopicARN)
+		require.NotNil(t, opts.AWSSNSRoleARN)
+		assert.Equal(t, roleARN, *opts.AWSSNSRoleARN)
+	})
+
+	t.Run("DirectionSentWhenChanged", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestQueueNotificationIntegration("x", "default")
+		obj.Spec.Direction = "INBOUND"
+
+		obs := successfulObservation()
+		id := snowflake.NewAccountObjectIdentifier("MY_QNI")
+
+		opts := buildAlterOptions(obj, id, obs)
+
+		require.NotNil(t, opts.Direction)
+		assert.Equal(t, "INBOUND", *opts.Direction)
+	})
+
+	t.Run("AllFieldsSentWhenNoObservation", func(t *testing.T) {
+		t.Parallel()
+
+		topicARN := "arn:aws:sns:us-east-1:123456789012:my-topic"
+		obj := newTestQueueNotificationIntegration("x", "default")
+		obj.Spec.AWSSNSTopicARN = &topicARN
+
+		id := snowflake.NewAccountObjectIdentifier("MY_QNI")
+		opts := buildAlterOptions(obj, id, nil)
+
+		require.NotNil(t, opts.Direction, "direction should be sent when no observation")
+		require.NotNil(t, opts.AWSSNSTopicARN, "cloud field should be sent when no observation")
+	})
+}
+
+func TestDetectDrift(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NoDrift", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestQueueNotificationIntegration("x", "default")
+		obs := successfulObservation()
+
+		result := detectDrift(obj, obs)
+		assert.False(t, result.HasDrift)
+	})
+
+	t.Run("DirectionDrift", func(t *testing.T) {
+		t.Parallel()
+
+		obj := newTestQueueNotificationIntegration("x", "default")
+		obs := successfulObservation()
+		obs.DescribeOutput["DIRECTION"] = "INBOUND"
+
+		result := detectDrift(obj, obs)
+		assert.True(t, result.HasDrift)
+	})
+
+	t.Run("CloudFieldDrift", func(t *testing.T) {
+		t.Parallel()
+
+		topicARN := "arn:aws:sns:us-east-1:123456789012:my-topic"
+		obj := newTestQueueNotificationIntegration("x", "default")
+		obj.Spec.AWSSNSTopicARN = &topicARN
+
+		obs := successfulObservation()
+		obs.DescribeOutput["AWS_SNS_TOPIC_ARN"] = "arn:aws:sns:us-east-1:123456789012:other-topic"
+
+		result := detectDrift(obj, obs)
+		assert.True(t, result.HasDrift)
+	})
 }
