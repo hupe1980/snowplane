@@ -271,6 +271,11 @@ func detectDrift(stage *snowplanev1alpha1.InternalStage, obs *snowflake.Internal
 
 		// Mutable fields.
 		d.CompareString("COMMENT", stage.Spec.Comment, obs.ShowOutput.Comment, false)
+
+		// Directory enabled — drift-detect when the user specified a directory config.
+		if stage.Spec.Directory != nil {
+			d.CompareBoolValue("DIRECTORY_ENABLED", stage.Spec.Directory.Enable, obs.ShowOutput.DirectoryEnabled, false)
+		}
 	}
 
 	return d.Result()

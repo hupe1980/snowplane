@@ -227,7 +227,7 @@ func TestMain(m *testing.M) {
 
 	// Build a ClientFactory that returns our mock client.
 	factory := clientfactory.NewTestClientFactoryWithFn(
-		func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+		func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 			return &mockSnowflakeClient{}, nil
 		},
 	)

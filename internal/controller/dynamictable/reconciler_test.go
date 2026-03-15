@@ -231,14 +231,14 @@ func TestReconcile_UpdateComment(t *testing.T) {
 	obs := successfulObservation()
 	obs.ShowOutput.Comment = "old comment"
 
-	var capturedAlterOpts snowflake.AlterDynamicTableOptions
+	var capturedCreateOpts snowflake.CreateDynamicTableOptions
 
 	mock := &mockService{
 		observeFn: func(_ context.Context, _ snowflake.SchemaObjectIdentifier) (*snowflake.DynamicTableObservation, error) {
 			return obs, nil
 		},
-		alterFn: func(_ context.Context, opts snowflake.AlterDynamicTableOptions) error {
-			capturedAlterOpts = opts
+		createFn: func(_ context.Context, opts snowflake.CreateDynamicTableOptions) error {
+			capturedCreateOpts = opts
 			return nil
 		},
 	}
@@ -248,8 +248,9 @@ func TestReconcile_UpdateComment(t *testing.T) {
 	_, err := r.Reconcile(context.Background(), testutil.ReconcileReq("mydt", "default"))
 	require.NoError(t, err)
 
-	assert.NotNil(t, capturedAlterOpts.Comment)
-	assert.Equal(t, "new comment", *capturedAlterOpts.Comment)
+	// With SupportsCoA=true, updates use CREATE OR ALTER (Create path).
+	assert.NotNil(t, capturedCreateOpts.Comment)
+	assert.Equal(t, "new comment", *capturedCreateOpts.Comment)
 }
 
 // --------------------------------------------------------------------------

@@ -1739,6 +1739,70 @@ func (s *NetworkRuleSpec) Validate() error {
 	return errors.Join(errs...)
 }
 
+// Validate checks the OAuthIntegrationForCustomClientsSpec for configuration errors.
+func (s *OAuthIntegrationForCustomClientsSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the OAuthIntegrationForPartnerApplicationsSpec for configuration errors.
+func (s *OAuthIntegrationForPartnerApplicationsSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the PrimaryConnectionSpec for configuration errors.
+func (s *PrimaryConnectionSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+// Validate checks the SecondaryConnectionSpec for configuration errors.
+func (s *SecondaryConnectionSpec) Validate() error {
+	var errs []error
+
+	if s.Name == "" {
+		errs = append(errs, errors.New("spec.name is required"))
+	}
+
+	if s.AsReplicaOf == "" {
+		errs = append(errs, errors.New("spec.asReplicaOf is required"))
+	}
+
+	if err := s.CommonSpec.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
 // Validate checks the SequenceSpec for configuration errors.
 func (s *SequenceSpec) Validate() error {
 	var errs []error

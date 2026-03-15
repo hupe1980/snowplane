@@ -262,6 +262,7 @@ spec:
                 type: object
             required:
             - account
+            - authenticationType
             - user
             type: object
             x-kubernetes-validations:

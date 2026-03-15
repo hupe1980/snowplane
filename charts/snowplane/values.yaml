@@ -155,6 +155,21 @@ healthProbes:
   bindAddress: ":8081"
   # -- Container port for health probes (must match port in bindAddress)
   containerPort: 8081
+  liveness:
+    # -- Initial delay before liveness probe starts
+    initialDelaySeconds: 15
+    # -- How often to perform the liveness probe
+    periodSeconds: 20
+  readiness:
+    # -- Initial delay before readiness probe starts
+    initialDelaySeconds: 5
+    # -- How often to perform the readiness probe
+    periodSeconds: 10
+  startup:
+    # -- Number of consecutive failures before the container is killed
+    failureThreshold: 60
+    # -- How often to perform the startup probe
+    periodSeconds: 2
 
 rateLimit:
   # -- Maximum sustained queries per second to Snowflake per controller per provider (0 = disabled)

@@ -71,7 +71,7 @@ type ProviderConfigSpec struct {
 
 	// AuthenticationType selects the authentication method.
 	// +kubebuilder:validation:Enum=KeyPair;UsernamePassword;WorkloadIdentity
-	AuthenticationType AuthenticationType `json:"authenticationType,omitempty"`
+	AuthenticationType AuthenticationType `json:"authenticationType"`
 
 	// Credentials references a Kubernetes Secret containing authentication material.
 	// Required for KeyPair and UsernamePassword authentication.

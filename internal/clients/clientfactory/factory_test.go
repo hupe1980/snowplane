@@ -50,7 +50,7 @@ func (u *unhealthyFakeClient) Ping(_ context.Context) error {
 
 func newFakeFactory() (*ClientFactory, *[]*fakeClient) {
 	created := make([]*fakeClient, 0)
-	factory := NewTestClientFactoryWithFn(func(_ snowflake.Config) (SnowflakeClient, error) {
+	factory := NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (SnowflakeClient, error) {
 		c := &fakeClient{}
 		created = append(created, c)
 		return c, nil
@@ -63,7 +63,7 @@ func TestGetOrCreate_NewClient(t *testing.T) {
 	factory, created := newFakeFactory()
 	defer factory.Close()
 
-	client, err := factory.GetOrCreate("default", "hash1", snowflake.Config{})
+	client, err := factory.GetOrCreate(context.Background(), "default", "hash1", snowflake.Config{})
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	assert.Len(t, *created, 1)
@@ -74,10 +74,10 @@ func TestGetOrCreate_CacheHit(t *testing.T) {
 	factory, created := newFakeFactory()
 	defer factory.Close()
 
-	c1, err := factory.GetOrCreate("default", "hash1", snowflake.Config{})
+	c1, err := factory.GetOrCreate(context.Background(), "default", "hash1", snowflake.Config{})
 	require.NoError(t, err)
 
-	c2, err := factory.GetOrCreate("default", "hash1", snowflake.Config{})
+	c2, err := factory.GetOrCreate(context.Background(), "default", "hash1", snowflake.Config{})
 	require.NoError(t, err)
 
 	assert.Same(t, c1, c2)
@@ -89,10 +89,10 @@ func TestGetOrCreate_HashChange(t *testing.T) {
 	factory, created := newFakeFactory()
 	defer factory.Close()
 
-	c1, err := factory.GetOrCreate("default", "hash1", snowflake.Config{})
+	c1, err := factory.GetOrCreate(context.Background(), "default", "hash1", snowflake.Config{})
 	require.NoError(t, err)
 
-	c2, err := factory.GetOrCreate("default", "hash2", snowflake.Config{})
+	c2, err := factory.GetOrCreate(context.Background(), "default", "hash2", snowflake.Config{})
 	require.NoError(t, err)
 
 	assert.NotSame(t, c1, c2)
@@ -105,10 +105,10 @@ func TestGetOrCreate_MultipleProviders(t *testing.T) {
 	factory, created := newFakeFactory()
 	defer factory.Close()
 
-	c1, err := factory.GetOrCreate("prov-a", "h1", snowflake.Config{})
+	c1, err := factory.GetOrCreate(context.Background(), "prov-a", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
-	c2, err := factory.GetOrCreate("prov-b", "h1", snowflake.Config{})
+	c2, err := factory.GetOrCreate(context.Background(), "prov-b", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
 	assert.NotSame(t, c1, c2)
@@ -117,11 +117,11 @@ func TestGetOrCreate_MultipleProviders(t *testing.T) {
 
 func TestGetOrCreate_ConstructorError(t *testing.T) {
 	t.Parallel()
-	factory := NewTestClientFactoryWithFn(func(_ snowflake.Config) (SnowflakeClient, error) {
+	factory := NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (SnowflakeClient, error) {
 		return nil, errors.New("connection refused")
 	})
 
-	c, err := factory.GetOrCreate("default", "h1", snowflake.Config{})
+	c, err := factory.GetOrCreate(context.Background(), "default", "h1", snowflake.Config{})
 	assert.Nil(t, c)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "connection refused")
@@ -132,7 +132,7 @@ func TestEvict(t *testing.T) {
 	factory, created := newFakeFactory()
 	defer factory.Close()
 
-	_, err := factory.GetOrCreate("default", "h1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "default", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
 	factory.Evict("default")
@@ -140,7 +140,7 @@ func TestEvict(t *testing.T) {
 	assert.True(t, (*created)[0].closed.Load())
 
 	// Next GetOrCreate should create a new client.
-	_, err = factory.GetOrCreate("default", "h1", snowflake.Config{})
+	_, err = factory.GetOrCreate(context.Background(), "default", "h1", snowflake.Config{})
 	require.NoError(t, err)
 	assert.Len(t, *created, 2)
 }
@@ -156,10 +156,10 @@ func TestClose(t *testing.T) {
 	t.Parallel()
 	factory, created := newFakeFactory()
 
-	_, err := factory.GetOrCreate("a", "h1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "a", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
-	_, err = factory.GetOrCreate("b", "h2", snowflake.Config{})
+	_, err = factory.GetOrCreate(context.Background(), "b", "h2", snowflake.Config{})
 	require.NoError(t, err)
 
 	factory.Close()
@@ -184,10 +184,10 @@ func TestCheckHealth_AllHealthy(t *testing.T) {
 	factory, _ := newFakeFactory()
 	defer factory.Close()
 
-	_, err := factory.GetOrCreate("a", "h1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "a", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
-	_, err = factory.GetOrCreate("b", "h2", snowflake.Config{})
+	_, err = factory.GetOrCreate(context.Background(), "b", "h2", snowflake.Config{})
 	require.NoError(t, err)
 
 	// Both fakeClients return nil from Ping — health check should pass.
@@ -199,7 +199,7 @@ func TestCheckHealth_OneUnhealthy(t *testing.T) {
 	t.Parallel()
 
 	callCount := 0
-	factory := NewTestClientFactoryWithFn(func(_ snowflake.Config) (SnowflakeClient, error) {
+	factory := NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (SnowflakeClient, error) {
 		callCount++
 		if callCount == 2 {
 			return &unhealthyFakeClient{}, nil
@@ -209,10 +209,10 @@ func TestCheckHealth_OneUnhealthy(t *testing.T) {
 	})
 	defer factory.Close()
 
-	_, err := factory.GetOrCreate("healthy", "h1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "healthy", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
-	_, err = factory.GetOrCreate("unhealthy", "h2", snowflake.Config{})
+	_, err = factory.GetOrCreate(context.Background(), "unhealthy", "h2", snowflake.Config{})
 	require.NoError(t, err)
 
 	err = factory.CheckHealth(nil)
@@ -224,15 +224,15 @@ func TestCheckHealth_OneUnhealthy(t *testing.T) {
 func TestCheckHealth_MultipleUnhealthy(t *testing.T) {
 	t.Parallel()
 
-	factory := NewTestClientFactoryWithFn(func(_ snowflake.Config) (SnowflakeClient, error) {
+	factory := NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (SnowflakeClient, error) {
 		return &unhealthyFakeClient{}, nil
 	})
 	defer factory.Close()
 
-	_, err := factory.GetOrCreate("sick-a", "h1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "sick-a", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
-	_, err = factory.GetOrCreate("sick-b", "h2", snowflake.Config{})
+	_, err = factory.GetOrCreate(context.Background(), "sick-b", "h2", snowflake.Config{})
 	require.NoError(t, err)
 
 	err = factory.CheckHealth(nil)
@@ -253,14 +253,14 @@ func TestGetOrCreate_MaxSizeEvictsLRU(t *testing.T) {
 	factory.WithMaxSize(2)
 	defer factory.Close()
 
-	_, err := factory.GetOrCreate("a", "h1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "a", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
-	_, err = factory.GetOrCreate("b", "h2", snowflake.Config{})
+	_, err = factory.GetOrCreate(context.Background(), "b", "h2", snowflake.Config{})
 	require.NoError(t, err)
 
 	// Adding a third should evict "a" (least recently used).
-	_, err = factory.GetOrCreate("c", "h3", snowflake.Config{})
+	_, err = factory.GetOrCreate(context.Background(), "c", "h3", snowflake.Config{})
 	require.NoError(t, err)
 
 	assert.Len(t, *created, 3)
@@ -276,18 +276,18 @@ func TestGetOrCreate_LRUOrderUpdatedOnAccess(t *testing.T) {
 	factory.WithMaxSize(2)
 	defer factory.Close()
 
-	_, err := factory.GetOrCreate("a", "h1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "a", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
-	_, err = factory.GetOrCreate("b", "h2", snowflake.Config{})
+	_, err = factory.GetOrCreate(context.Background(), "b", "h2", snowflake.Config{})
 	require.NoError(t, err)
 
 	// Access "a" to move it to the end of LRU order.
-	_, err = factory.GetOrCreate("a", "h1", snowflake.Config{})
+	_, err = factory.GetOrCreate(context.Background(), "a", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
 	// Adding "c" should now evict "b" (LRU), not "a".
-	_, err = factory.GetOrCreate("c", "h3", snowflake.Config{})
+	_, err = factory.GetOrCreate(context.Background(), "c", "h3", snowflake.Config{})
 	require.NoError(t, err)
 
 	assert.Len(t, *created, 3)
@@ -304,7 +304,7 @@ func TestGetOrCreate_MaxSizeZeroUnlimited(t *testing.T) {
 	defer factory.Close()
 
 	for i := range 100 {
-		_, err := factory.GetOrCreate(fmt.Sprintf("p%d", i), fmt.Sprintf("h%d", i), snowflake.Config{})
+		_, err := factory.GetOrCreate(context.Background(), fmt.Sprintf("p%d", i), fmt.Sprintf("h%d", i), snowflake.Config{})
 		require.NoError(t, err)
 	}
 
@@ -321,10 +321,10 @@ func TestEvict_RemovesFromLRUOrder(t *testing.T) {
 	factory.WithMaxSize(2)
 	defer factory.Close()
 
-	_, err := factory.GetOrCreate("a", "h1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "a", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
-	_, err = factory.GetOrCreate("b", "h2", snowflake.Config{})
+	_, err = factory.GetOrCreate(context.Background(), "b", "h2", snowflake.Config{})
 	require.NoError(t, err)
 
 	// Evict "a" explicitly.
@@ -332,7 +332,7 @@ func TestEvict_RemovesFromLRUOrder(t *testing.T) {
 	assert.True(t, (*created)[0].closed.Load())
 
 	// Now adding "c" should NOT evict "b" since we only have 1 client.
-	_, err = factory.GetOrCreate("c", "h3", snowflake.Config{})
+	_, err = factory.GetOrCreate(context.Background(), "c", "h3", snowflake.Config{})
 	require.NoError(t, err)
 
 	assert.False(t, (*created)[1].closed.Load(), "'b' should still be open")
@@ -351,12 +351,12 @@ func TestGetOrCreate_IdleTTL_EvictsExpiredClient(t *testing.T) {
 	defer factory.Close()
 
 	// First call — creates client.
-	c1, err := factory.GetOrCreate("p", "h1", snowflake.Config{})
+	c1, err := factory.GetOrCreate(context.Background(), "p", "h1", snowflake.Config{})
 	require.NoError(t, err)
 	require.NotNil(t, c1)
 
 	// Second call with same hash — client should be evicted due to TTL.
-	c2, err := factory.GetOrCreate("p", "h1", snowflake.Config{})
+	c2, err := factory.GetOrCreate(context.Background(), "p", "h1", snowflake.Config{})
 	require.NoError(t, err)
 	require.NotNil(t, c2)
 
@@ -373,10 +373,10 @@ func TestGetOrCreate_IdleTTL_Zero_NeverExpires(t *testing.T) {
 	// idleTTL = 0 (default) — no TTL check.
 	defer factory.Close()
 
-	_, err := factory.GetOrCreate("p", "h1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "p", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
-	_, err = factory.GetOrCreate("p", "h1", snowflake.Config{})
+	_, err = factory.GetOrCreate(context.Background(), "p", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
 	// Should reuse the same client — only 1 created.
@@ -416,14 +416,14 @@ func TestCheckHealth_StartupGrace_ChecksAfterGraceExpires(t *testing.T) {
 func TestCheckHealth_StartupGrace_FailsWithUnhealthyClient(t *testing.T) {
 	t.Parallel()
 
-	factory := NewTestClientFactoryWithFn(func(_ snowflake.Config) (SnowflakeClient, error) {
+	factory := NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (SnowflakeClient, error) {
 		return &unhealthyFakeClient{}, nil
 	})
 	factory.WithStartupGrace(10 * time.Minute) // within grace
 	defer factory.Close()
 
 	// Add an unhealthy client — grace period doesn't protect when clients exist.
-	_, err := factory.GetOrCreate("sick", "h1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "sick", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
 	err = factory.CheckHealth(nil)
@@ -451,13 +451,13 @@ func TestCloseClient_LogsError(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-	factory := NewTestClientFactoryWithFn(func(_ snowflake.Config) (SnowflakeClient, error) {
+	factory := NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (SnowflakeClient, error) {
 		return &closeErrorClient{}, nil
 	})
 	factory.WithLogger(logger)
 	defer factory.Close()
 
-	_, err := factory.GetOrCreate("bad-closer", "h1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "bad-closer", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
 	// Evict triggers Close which returns an error.
@@ -479,7 +479,7 @@ func TestCloseClient_SilentOnSuccess(t *testing.T) {
 	factory.WithLogger(logger)
 	defer factory.Close()
 
-	_, err := factory.GetOrCreate("good", "h1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "good", "h1", snowflake.Config{})
 	require.NoError(t, err)
 
 	factory.Evict("good")
@@ -502,7 +502,7 @@ func TestGetOrCreate_LRU_LargeScale_O1(t *testing.T) {
 	defer factory.Close()
 
 	for i := range 200 {
-		_, err := factory.GetOrCreate(fmt.Sprintf("p%d", i), fmt.Sprintf("h%d", i), snowflake.Config{})
+		_, err := factory.GetOrCreate(context.Background(), fmt.Sprintf("p%d", i), fmt.Sprintf("h%d", i), snowflake.Config{})
 		require.NoError(t, err)
 	}
 
@@ -524,7 +524,7 @@ func TestHasStaleHash(t *testing.T) {
 	factory, _ := newFakeFactory()
 	defer factory.Close()
 
-	_, err := factory.GetOrCreate("p", "hash-v1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "p", "hash-v1", snowflake.Config{})
 	require.NoError(t, err)
 
 	assert.False(t, factory.HasStaleHash("p", "hash-v1"))
@@ -545,7 +545,7 @@ func TestGetOrCreate_Singleflight_DeduplicatesConcurrent(t *testing.T) {
 	// Use a channel to block newFn until all goroutines have started.
 	gate := make(chan struct{})
 
-	factory := NewTestClientFactoryWithFn(func(_ snowflake.Config) (SnowflakeClient, error) {
+	factory := NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (SnowflakeClient, error) {
 		<-gate // wait for signal
 		createCount.Add(1)
 
@@ -564,7 +564,7 @@ func TestGetOrCreate_Singleflight_DeduplicatesConcurrent(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			results[idx], errs[idx] = factory.GetOrCreate("provider-x", "h1", snowflake.Config{})
+			results[idx], errs[idx] = factory.GetOrCreate(context.Background(), "provider-x", "h1", snowflake.Config{})
 		}(i)
 	}
 
@@ -591,7 +591,7 @@ func TestGetOrCreate_Singleflight_DifferentProvidersConcurrent(t *testing.T) {
 
 	gate := make(chan struct{})
 
-	factory := NewTestClientFactoryWithFn(func(_ snowflake.Config) (SnowflakeClient, error) {
+	factory := NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (SnowflakeClient, error) {
 		<-gate
 		createCount.Add(1)
 
@@ -607,7 +607,7 @@ func TestGetOrCreate_Singleflight_DifferentProvidersConcurrent(t *testing.T) {
 			wg.Add(1)
 			go func(p string) {
 				defer wg.Done()
-				_, _ = factory.GetOrCreate(p, "h1", snowflake.Config{})
+				_, _ = factory.GetOrCreate(context.Background(), p, "h1", snowflake.Config{})
 			}(prov)
 		}
 	}
@@ -626,7 +626,7 @@ func TestGetOrCreate_Singleflight_ErrorNotCached(t *testing.T) {
 
 	var callCount atomic.Int32
 
-	factory := NewTestClientFactoryWithFn(func(_ snowflake.Config) (SnowflakeClient, error) {
+	factory := NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (SnowflakeClient, error) {
 		n := callCount.Add(1)
 		if n == 1 {
 			return nil, errors.New("transient failure")
@@ -637,11 +637,11 @@ func TestGetOrCreate_Singleflight_ErrorNotCached(t *testing.T) {
 	defer factory.Close()
 
 	// First call fails.
-	_, err := factory.GetOrCreate("p", "h1", snowflake.Config{})
+	_, err := factory.GetOrCreate(context.Background(), "p", "h1", snowflake.Config{})
 	assert.Error(t, err)
 
 	// Second call should retry (singleflight doesn't cache errors).
-	c, err := factory.GetOrCreate("p", "h1", snowflake.Config{})
+	c, err := factory.GetOrCreate(context.Background(), "p", "h1", snowflake.Config{})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 	assert.Equal(t, int32(2), callCount.Load())
@@ -653,7 +653,7 @@ func TestGetOrCreate_Singleflight_DoesNotBlockOtherProviders(t *testing.T) {
 	// Provider "slow" takes a long time; provider "fast" should not be blocked.
 	slowGate := make(chan struct{})
 
-	factory := NewTestClientFactoryWithFn(func(cfg snowflake.Config) (SnowflakeClient, error) {
+	factory := NewTestClientFactoryWithFn(func(_ context.Context, cfg snowflake.Config) (SnowflakeClient, error) {
 		if cfg.Account == "slow" {
 			<-slowGate
 		}
@@ -670,7 +670,7 @@ func TestGetOrCreate_Singleflight_DoesNotBlockOtherProviders(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		_, _ = factory.GetOrCreate("slow-provider", "h1", snowflake.Config{Account: "slow"})
+		_, _ = factory.GetOrCreate(context.Background(), "slow-provider", "h1", snowflake.Config{Account: "slow"})
 	}()
 
 	// Give slow provider time to start.
@@ -679,7 +679,7 @@ func TestGetOrCreate_Singleflight_DoesNotBlockOtherProviders(t *testing.T) {
 	// Fast provider should complete immediately, not blocked by slow one.
 	done := make(chan struct{})
 	go func() {
-		c, err := factory.GetOrCreate("fast-provider", "h1", snowflake.Config{Account: "fast"})
+		c, err := factory.GetOrCreate(context.Background(), "fast-provider", "h1", snowflake.Config{Account: "fast"})
 		assert.NoError(t, err)
 		assert.NotNil(t, c)
 		close(done)

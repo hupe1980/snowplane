@@ -63,7 +63,7 @@ type ClientFactory struct {
 	mu       sync.RWMutex
 	clients  map[string]*list.Element // provider → *list.Element (value is lruEntry)
 	lruOrder *list.List               // front = LRU (oldest), back = MRU (newest)
-	newFn    func(cfg snowflake.Config) (SnowflakeClient, error)
+	newFn    func(ctx context.Context, cfg snowflake.Config) (SnowflakeClient, error)
 	maxSize  int                // 0 = unlimited
 	idleTTL  time.Duration      // 0 = disabled (default)
 	sfGroup  singleflight.Group // deduplicates concurrent connection attempts per provider
@@ -98,7 +98,7 @@ func NewClientFactory() *ClientFactory {
 	return &ClientFactory{
 		clients:  make(map[string]*list.Element),
 		lruOrder: list.New(),
-		newFn: func(cfg snowflake.Config) (SnowflakeClient, error) {
+		newFn: func(_ context.Context, cfg snowflake.Config) (SnowflakeClient, error) {
 			return snowflake.NewClient(cfg)
 		},
 		startTime: time.Now(),
@@ -138,7 +138,7 @@ func (f *ClientFactory) WithLogger(l *slog.Logger) *ClientFactory {
 }
 
 // NewTestClientFactoryWithFn creates a ClientFactory with a custom constructor for testing.
-func NewTestClientFactoryWithFn(fn func(cfg snowflake.Config) (SnowflakeClient, error)) *ClientFactory {
+func NewTestClientFactoryWithFn(fn func(ctx context.Context, cfg snowflake.Config) (SnowflakeClient, error)) *ClientFactory {
 	return &ClientFactory{
 		clients:   make(map[string]*list.Element),
 		lruOrder:  list.New(),
@@ -156,7 +156,7 @@ func NewTestClientFactoryWithFn(fn func(cfg snowflake.Config) (SnowflakeClient, 
 // only one connection attempt proceeds while others wait and receive the same
 // result. This prevents thundering-herd connection storms during controller
 // restarts or mass reconciliation.
-func (f *ClientFactory) GetOrCreate(provider string, hash string, cfg snowflake.Config) (SnowflakeClient, error) {
+func (f *ClientFactory) GetOrCreate(ctx context.Context, provider string, hash string, cfg snowflake.Config) (SnowflakeClient, error) {
 	// Fast path: check cache under read lock. This avoids the write lock and
 	// singleflight overhead for the common case (cache hit, same hash, TTL ok).
 	if c, ok := f.tryGetCached(provider, hash); ok {
@@ -169,7 +169,7 @@ func (f *ClientFactory) GetOrCreate(provider string, hash string, cfg snowflake.
 	sfKey := provider + "\x00" + hash
 
 	v, err, _ := f.sfGroup.Do(sfKey, func() (any, error) {
-		return f.getOrCreateLocked(provider, hash, cfg)
+		return f.getOrCreateLocked(ctx, provider, hash, cfg)
 	})
 	if err != nil {
 		return nil, err
@@ -210,7 +210,7 @@ func (f *ClientFactory) tryGetCached(provider, hash string) (SnowflakeClient, bo
 // Called from within singleflight.Do, so at most one goroutine per provider
 // executes this at a time; however, the write lock is still needed to protect
 // the shared map/list from concurrent access by other providers.
-func (f *ClientFactory) getOrCreateLocked(provider, hash string, cfg snowflake.Config) (SnowflakeClient, error) {
+func (f *ClientFactory) getOrCreateLocked(ctx context.Context, provider, hash string, cfg snowflake.Config) (SnowflakeClient, error) {
 	f.mu.Lock()
 
 	now := time.Now()
@@ -250,7 +250,7 @@ func (f *ClientFactory) getOrCreateLocked(provider, hash string, cfg snowflake.C
 	// cache while this connection is being established.
 	f.mu.Unlock()
 
-	client, err := f.newFn(cfg)
+	client, err := f.newFn(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("creating snowflake client for provider %q: %w", provider, err)
 	}

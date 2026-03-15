@@ -41,7 +41,7 @@ Complete field-level documentation for all Snowplane CRDs. Each resource support
 | `spec.user` | `string` | Snowflake username |
 | `spec.role` | `string` | Snowflake role to assume |
 | `spec.warehouse` | `string` | Default warehouse |
-| `spec.authenticationType` | `enum` | `KeyPair` / `UsernamePassword` / `WorkloadIdentity` |
+| `spec.authenticationType` | `enum` | *(required)* `KeyPair` / `UsernamePassword` / `WorkloadIdentity` |
 | `spec.credentials.secretRef` | `SecretKeyReference` | Reference to credentials Secret |
 | `spec.credentials.passphraseKey` | `string` | Key within the same Secret that holds the passphrase for encrypted PKCS#8 private keys (KeyPair only) |
 | `spec.workloadIdentity.audience` | `string` | OIDC audience for WIF |
@@ -744,7 +744,7 @@ Assigns a database role to an account role or another database role: `GRANT DATA
 | `spec.name` | `string` | Dynamic table name *(immutable)* |
 | `spec.databaseRef.name` | `string` | Database CR reference *(immutable)* |
 | `spec.schemaRef.name` | `string` | Schema CR reference *(immutable)* |
-| `spec.query` | `string` | SQL query defining the dynamic table content *(immutable)* |
+| `spec.query` | `string` | SQL query defining the dynamic table content *(mutable via CREATE OR ALTER)* |
 | `spec.targetLag` | `string` | Maximum acceptable staleness (e.g. `"1 minute"`, `"DOWNSTREAM"`) |
 | `spec.warehouseRef.name` | `string` | Warehouse CR reference *(XOR with warehouseName)* |
 | `spec.warehouseName` | `string` | Warehouse Snowflake name *(XOR with warehouseRef)* |

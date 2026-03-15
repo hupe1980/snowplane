@@ -51,12 +51,13 @@ func (o *CreateServiceOptions) Validate() error {
 
 // AlterServiceOptions holds the parameters for altering a service.
 type AlterServiceOptions struct {
-	Name         SchemaObjectIdentifier
-	MinInstances *int32
-	MaxInstances *int32
-	AutoResume   *bool
-	Comment      *string
-	UnsetFields  []string
+	Name                       SchemaObjectIdentifier
+	MinInstances               *int32
+	MaxInstances               *int32
+	AutoResume                 *bool
+	ExternalAccessIntegrations []string
+	Comment                    *string
+	UnsetFields                []string
 }
 
 // Validate checks the AlterServiceOptions for validity.
@@ -73,6 +74,7 @@ func (o *AlterServiceOptions) HasChanges() bool {
 	return o.MinInstances != nil ||
 		o.MaxInstances != nil ||
 		o.AutoResume != nil ||
+		len(o.ExternalAccessIntegrations) > 0 ||
 		o.Comment != nil ||
 		len(o.UnsetFields) > 0
 }
@@ -228,10 +230,24 @@ func (c *ServiceClient) Alter(ctx context.Context, opts AlterServiceOptions) err
 		sc.String("COMMENT", opts.Comment)
 	}
 
+	// Handle ExternalAccessIntegrations separately since it requires a list format.
+	var extraStmts []string
+	if len(opts.ExternalAccessIntegrations) > 0 {
+		var quoted []string
+		for _, eai := range opts.ExternalAccessIntegrations {
+			quoted = append(quoted, sqlbuilder.QuoteIdentifier(eai))
+		}
+
+		extraStmts = append(extraStmts, fmt.Sprintf("ALTER SERVICE %s SET EXTERNAL_ACCESS_INTEGRATIONS = (%s)",
+			opts.Name.FullyQualifiedName(), strings.Join(quoted, ", ")))
+	}
+
 	stmts, err := sqlbuilder.BuildAlterStatements("SERVICE", opts.Name.FullyQualifiedName(), sc, opts.UnsetFields)
 	if err != nil {
 		return NewTerminalError(fmt.Errorf("building alter service SQL: %w", err))
 	}
+
+	stmts = append(stmts, extraStmts...)
 
 	for _, stmt := range stmts {
 		if _, err := c.client.Exec(ctx, stmt); err != nil {

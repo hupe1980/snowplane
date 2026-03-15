@@ -346,7 +346,7 @@ func buildAlterOptions(table *snowplanev1alpha1.Table, id snowflake.SchemaObject
 	}
 
 	if table.Spec.DataRetentionTimeInDays != nil {
-		if obs.ShowOutput == nil || obs.ShowOutput.RetentionTime == 0 {
+		if obs.ShowOutput == nil || *table.Spec.DataRetentionTimeInDays != obs.ShowOutput.RetentionTime {
 			opts.DataRetentionTimeInDays = table.Spec.DataRetentionTimeInDays
 		}
 	}
@@ -502,6 +502,19 @@ func detectDrift(table *snowplanev1alpha1.Table, obs *snowflake.TableObservation
 		if table.Spec.EnableSchemaEvolution != nil {
 			d.CompareBoolValue("ENABLE_SCHEMA_EVOLUTION", *table.Spec.EnableSchemaEvolution, obs.ShowOutput.EnableSchemaEvolution, false)
 		}
+
+		// Clustering key: compare spec "(col1, col2)" against SHOW output.
+		desiredCluster := ""
+		if len(table.Spec.ClusterBy) > 0 {
+			desiredCluster = "(" + joinClusterBy(table.Spec.ClusterBy) + ")"
+		}
+
+		if desiredCluster != obs.ShowOutput.ClusterBy {
+			d.CompareStringValue("CLUSTER_BY", desiredCluster, obs.ShowOutput.ClusterBy, false)
+		}
+
+		// Retention time: drift-detect when the user specified a value.
+		d.CompareInt32Value("DATA_RETENTION_TIME_IN_DAYS", table.Spec.DataRetentionTimeInDays, obs.ShowOutput.RetentionTime, false)
 	}
 
 	// Column drift detection.

@@ -546,3 +546,182 @@ func TestDeepCopy_DatabaseRoleSpec_PointerIsolation(t *testing.T) {
 
 	assert.Equal(t, "original", *orig.Comment)
 }
+
+// TestDeepCopy_OAuthIntegrationForCustomClientsSpec_PointerIsolation tests all
+// pointer, slice-of-string, and nested fields for deep-copy isolation.
+func TestDeepCopy_OAuthIntegrationForCustomClientsSpec_PointerIsolation(t *testing.T) {
+	t.Parallel()
+
+	orig := OAuthIntegrationForCustomClientsSpec{
+		CommonSpec:                  CommonSpec{UseRole: ptr("SYSADMIN")},
+		Name:                        "MY_OAUTH",
+		Enabled:                     ptr(true),
+		OAuthClientType:             "CONFIDENTIAL",
+		OAuthRedirectURI:            "https://example.com/callback",
+		OAuthAllowNonTLSRedirectURI: ptr(false),
+		OAuthEnforcePKCE:            ptr(true),
+		OAuthUseSecondaryRoles:      ptr("IMPLICIT"),
+		PreAuthorizedRolesList:      []string{"ROLE_A", "ROLE_B"},
+		BlockedRolesList:            []string{"BLOCKED_ROLE"},
+		OAuthIssueRefreshTokens:     ptr(true),
+		OAuthRefreshTokenValidity:   ptr(int64(86400)),
+		NetworkPolicy:               ptr("MY_POLICY"),
+		OAuthClientRSAPublicKey:     ptr("public-key-1"),
+		OAuthClientRSAPublicKey2:    ptr("public-key-2"),
+		Comment:                     ptr("original"),
+	}
+
+	copied := orig.DeepCopy()
+	require.NotNil(t, copied)
+
+	// Mutate all pointers in the copy.
+	*copied.UseRole = "HACKER"
+	*copied.Enabled = false
+	*copied.OAuthAllowNonTLSRedirectURI = true
+	*copied.OAuthEnforcePKCE = false
+	*copied.OAuthUseSecondaryRoles = "NONE"
+	*copied.OAuthIssueRefreshTokens = false
+	*copied.OAuthRefreshTokenValidity = 0
+	*copied.NetworkPolicy = "MUTATED"
+	*copied.OAuthClientRSAPublicKey = "MUTATED"
+	*copied.OAuthClientRSAPublicKey2 = "MUTATED"
+	*copied.Comment = "MUTATED"
+
+	// Mutate slices in the copy.
+	copied.PreAuthorizedRolesList[0] = "MUTATED"
+	copied.BlockedRolesList = append(copied.BlockedRolesList, "EXTRA")
+
+	// Original must be unchanged.
+	assert.Equal(t, "SYSADMIN", *orig.UseRole)
+	assert.Equal(t, true, *orig.Enabled)
+	assert.Equal(t, false, *orig.OAuthAllowNonTLSRedirectURI)
+	assert.Equal(t, true, *orig.OAuthEnforcePKCE)
+	assert.Equal(t, "IMPLICIT", *orig.OAuthUseSecondaryRoles)
+	assert.Equal(t, true, *orig.OAuthIssueRefreshTokens)
+	assert.Equal(t, int64(86400), *orig.OAuthRefreshTokenValidity)
+	assert.Equal(t, "MY_POLICY", *orig.NetworkPolicy)
+	assert.Equal(t, "public-key-1", *orig.OAuthClientRSAPublicKey)
+	assert.Equal(t, "public-key-2", *orig.OAuthClientRSAPublicKey2)
+	assert.Equal(t, "original", *orig.Comment)
+	assert.Equal(t, []string{"ROLE_A", "ROLE_B"}, orig.PreAuthorizedRolesList)
+	assert.Equal(t, []string{"BLOCKED_ROLE"}, orig.BlockedRolesList)
+}
+
+// TestDeepCopy_FunctionPythonSpec_PointerIsolation tests complex nested types
+// including []CallableArgument, []SecretBinding, and *ObjectReference.
+func TestDeepCopy_FunctionPythonSpec_PointerIsolation(t *testing.T) {
+	t.Parallel()
+
+	orig := FunctionPythonSpec{
+		CommonSpec:   CommonSpec{UseRole: ptr("SYSADMIN")},
+		Name:         "MY_FUNC",
+		DatabaseRef:  &ObjectReference{Name: "DB_REF"},
+		DatabaseName: ptr("MY_DB"),
+		SchemaRef:    &ObjectReference{Name: "SCHEMA_REF"},
+		SchemaName:   ptr("MY_SCHEMA"),
+		Arguments: []CallableArgument{
+			{Name: "arg1", Type: "VARCHAR", DefaultValue: ptr("hello")},
+			{Name: "arg2", Type: "NUMBER"},
+		},
+		Returns:                    "VARCHAR",
+		Handler:                    "handler",
+		RuntimeVersion:             "3.8",
+		SnowparkPackage:            "snowflake-snowpark-python==1.0.0",
+		Body:                       ptr("def handler(arg1, arg2): return arg1"),
+		Packages:                   []string{"pkg1", "pkg2"},
+		Imports:                    []string{"@stage/file.py"},
+		ExternalAccessIntegrations: []string{"EAI1"},
+		Secrets: []SecretBinding{
+			{SecretName: "secret1", VariableName: "var1"},
+		},
+		NullInputBehavior: ptr("RETURNS NULL ON NULL INPUT"),
+		Volatility:        ptr("IMMUTABLE"),
+		Secure:            ptr(true),
+		Comment:           ptr("original"),
+	}
+
+	copied := orig.DeepCopy()
+	require.NotNil(t, copied)
+
+	// Mutate pointers.
+	*copied.UseRole = "HACKER"
+	*copied.DatabaseName = "MUTATED"
+	*copied.SchemaName = "MUTATED"
+	*copied.Body = "MUTATED"
+	*copied.NullInputBehavior = "MUTATED"
+	*copied.Volatility = "MUTATED"
+	*copied.Secure = false
+	*copied.Comment = "MUTATED"
+
+	// Mutate nested struct pointers.
+	copied.DatabaseRef.Name = "MUTATED"
+	copied.SchemaRef.Name = "MUTATED"
+
+	// Mutate slice of structs.
+	copied.Arguments[0].Name = "MUTATED"
+	*copied.Arguments[0].DefaultValue = "MUTATED"
+	copied.Secrets[0].SecretName = "MUTATED"
+
+	// Mutate string slices.
+	copied.Packages[0] = "MUTATED"
+	copied.Imports[0] = "MUTATED"
+	copied.ExternalAccessIntegrations[0] = "MUTATED"
+
+	// Original must be unchanged.
+	assert.Equal(t, "SYSADMIN", *orig.UseRole)
+	assert.Equal(t, "MY_DB", *orig.DatabaseName)
+	assert.Equal(t, "MY_SCHEMA", *orig.SchemaName)
+	assert.Equal(t, "def handler(arg1, arg2): return arg1", *orig.Body)
+	assert.Equal(t, "RETURNS NULL ON NULL INPUT", *orig.NullInputBehavior)
+	assert.Equal(t, "IMMUTABLE", *orig.Volatility)
+	assert.Equal(t, true, *orig.Secure)
+	assert.Equal(t, "original", *orig.Comment)
+	assert.Equal(t, "DB_REF", orig.DatabaseRef.Name)
+	assert.Equal(t, "SCHEMA_REF", orig.SchemaRef.Name)
+	assert.Equal(t, "arg1", orig.Arguments[0].Name)
+	assert.Equal(t, "hello", *orig.Arguments[0].DefaultValue)
+	assert.Equal(t, "secret1", orig.Secrets[0].SecretName)
+	assert.Equal(t, []string{"pkg1", "pkg2"}, orig.Packages)
+	assert.Equal(t, []string{"@stage/file.py"}, orig.Imports)
+	assert.Equal(t, []string{"EAI1"}, orig.ExternalAccessIntegrations)
+}
+
+// TestDeepCopy_NetworkRuleSpec_PointerIsolation tests NetworkRuleSpec with
+// *ObjectReference pointers and []string slice isolation.
+func TestDeepCopy_NetworkRuleSpec_PointerIsolation(t *testing.T) {
+	t.Parallel()
+
+	orig := NetworkRuleSpec{
+		CommonSpec:   CommonSpec{UseRole: ptr("SYSADMIN")},
+		Name:         "MY_RULE",
+		DatabaseRef:  &ObjectReference{Name: "DB_REF"},
+		DatabaseName: ptr("MY_DB"),
+		SchemaRef:    &ObjectReference{Name: "SCHEMA_REF"},
+		SchemaName:   ptr("MY_SCHEMA"),
+		Type:         "IPV4",
+		Mode:         "INGRESS",
+		ValueList:    []string{"10.0.0.1", "10.0.0.2"},
+		Comment:      ptr("original"),
+	}
+
+	copied := orig.DeepCopy()
+	require.NotNil(t, copied)
+
+	// Mutate pointers and nested structs.
+	*copied.UseRole = "HACKER"
+	*copied.DatabaseName = "MUTATED"
+	*copied.SchemaName = "MUTATED"
+	copied.DatabaseRef.Name = "MUTATED"
+	copied.SchemaRef.Name = "MUTATED"
+	*copied.Comment = "MUTATED"
+	copied.ValueList[0] = "MUTATED"
+
+	// Original must be unchanged.
+	assert.Equal(t, "SYSADMIN", *orig.UseRole)
+	assert.Equal(t, "MY_DB", *orig.DatabaseName)
+	assert.Equal(t, "MY_SCHEMA", *orig.SchemaName)
+	assert.Equal(t, "DB_REF", orig.DatabaseRef.Name)
+	assert.Equal(t, "SCHEMA_REF", orig.SchemaRef.Name)
+	assert.Equal(t, "original", *orig.Comment)
+	assert.Equal(t, []string{"10.0.0.1", "10.0.0.2"}, orig.ValueList)
+}

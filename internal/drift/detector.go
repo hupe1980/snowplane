@@ -253,6 +253,22 @@ func (d *Detector) CompareBoolValue(field string, desired, actual bool, immutabl
 	return d
 }
 
+// CompareInt32Value compares a pointer int32 (spec, nil = unmanaged) vs a
+// non-pointer int32 (observed). This mirrors CompareStringValue / CompareBoolValue
+// for the common case where the observed value is always present.
+func (d *Detector) CompareInt32Value(field string, desired *int32, actual int32, immutable bool) *Detector {
+	if desired != nil && *desired != actual {
+		d.changes = append(d.changes, FieldChange{
+			Field:     field,
+			Desired:   fmt.Sprintf("%d", *desired),
+			Actual:    fmt.Sprintf("%d", actual),
+			Immutable: immutable,
+		})
+	}
+
+	return d
+}
+
 // CompareStringSliceFold compares two string slices using case-insensitive,
 // order-independent comparison (set equality). If the slices differ, a drift
 // entry is recorded. Nil or empty desired slices are treated as unmanaged and

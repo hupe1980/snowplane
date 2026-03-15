@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -44,7 +45,7 @@ type GrantOwnershipSpec struct {
 	// ObjectName is the fully qualified name of the object
 	// (e.g. "MY_DB" for a database, "MY_DB"."MY_SCHEMA"."MY_TABLE" for a table).
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=255
+	// +kubebuilder:validation:MaxLength=1024
 	ObjectName string `json:"objectName"`
 
 	// AccountRole is the name of the account role to transfer ownership to.
@@ -139,7 +140,7 @@ func (s *GrantOwnershipSpec) Validate() error {
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("invalid GrantOwnershipSpec: %v", errs)
+		return errors.Join(errs...)
 	}
 
 	return nil

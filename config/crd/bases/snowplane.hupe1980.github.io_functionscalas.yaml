@@ -318,10 +318,11 @@ spec:
                 minLength: 1
                 type: string
               volatility:
-                description: 'Volatility specifies the function volatility: VOLATILE
-                  or IMMUTABLE.'
+                description: 'Volatility specifies the function volatility: VOLATILE,
+                  STABLE, or IMMUTABLE.'
                 enum:
                 - VOLATILE
+                - STABLE
                 - IMMUTABLE
                 type: string
             required:

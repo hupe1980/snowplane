@@ -136,6 +136,7 @@ The generic drift engine (`internal/drift/`) provides a fluent builder:
 result := drift.New().
     CompareString("COMMENT", spec.Comment, obs.Comment, false).
     CompareInt32("RETENTION", spec.Retention, obs.Retention, false).
+    CompareInt32Value("MAX_SIZE", spec.MaxSize, obs.MaxSize, false).
     Result()
 ```
 

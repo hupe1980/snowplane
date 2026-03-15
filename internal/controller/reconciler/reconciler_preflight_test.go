@@ -156,7 +156,7 @@ func buildSchemaReconciler(
 	}
 
 	c := cb.Build()
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return sfClient, nil
 	})
 
@@ -348,7 +348,7 @@ func TestPreFlight_NonScopedResource_Bypassed(t *testing.T) {
 	}
 
 	// Use Database (non-ScopedResource) via the existing buildTestReconciler.
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return sfClient, nil
 	})
 

@@ -45,3 +45,5 @@ func lateInitialize(obj *snowplanev1alpha1.SharedDatabase, obs *reconciler.Obser
 
 	return modified
 }
+
+var _ reconciler.LateInitializer[*snowplanev1alpha1.SharedDatabase, *snowflake.SharedDatabaseObservation] = (*reconciler.BaseAdapter[*snowplanev1alpha1.SharedDatabase, Service, *snowflake.SharedDatabaseObservation])(nil)

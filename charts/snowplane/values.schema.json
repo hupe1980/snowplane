@@ -374,6 +374,57 @@
           "minimum": 1,
           "maximum": 65535,
           "description": "Container port for health probes."
+        },
+        "liveness": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Liveness probe tuning.",
+          "properties": {
+            "initialDelaySeconds": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Seconds before the first liveness probe."
+            },
+            "periodSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Seconds between liveness probes."
+            }
+          }
+        },
+        "readiness": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Readiness probe tuning.",
+          "properties": {
+            "initialDelaySeconds": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Seconds before the first readiness probe."
+            },
+            "periodSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Seconds between readiness probes."
+            }
+          }
+        },
+        "startup": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Startup probe tuning.",
+          "properties": {
+            "failureThreshold": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Number of failures before the container is restarted."
+            },
+            "periodSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Seconds between startup probes."
+            }
+          }
         }
       }
     },

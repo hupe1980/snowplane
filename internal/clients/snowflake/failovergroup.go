@@ -2,7 +2,6 @@ package snowflake
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -90,11 +89,21 @@ func buildCreateFailoverGroupSQL(opts CreateFailoverGroupOptions) (string, error
 	fmt.Fprintf(&b.Builder, "\n  OBJECT_TYPES = %s", strings.Join(opts.ObjectTypes, ", "))
 
 	if len(opts.AllowedDatabases) > 0 {
-		fmt.Fprintf(&b.Builder, "\n  ALLOWED_DATABASES = %s", strings.Join(opts.AllowedDatabases, ", "))
+		quoted := make([]string, len(opts.AllowedDatabases))
+		for i, db := range opts.AllowedDatabases {
+			quoted[i] = sqlbuilder.QuoteIdentifier(db)
+		}
+
+		fmt.Fprintf(&b.Builder, "\n  ALLOWED_DATABASES = %s", strings.Join(quoted, ", "))
 	}
 
 	if len(opts.AllowedShares) > 0 {
-		fmt.Fprintf(&b.Builder, "\n  ALLOWED_SHARES = %s", strings.Join(opts.AllowedShares, ", "))
+		quoted := make([]string, len(opts.AllowedShares))
+		for i, s := range opts.AllowedShares {
+			quoted[i] = sqlbuilder.QuoteIdentifier(s)
+		}
+
+		fmt.Fprintf(&b.Builder, "\n  ALLOWED_SHARES = %s", strings.Join(quoted, ", "))
 	}
 
 	if len(opts.AllowedIntegrationTypes) > 0 {
@@ -110,7 +119,7 @@ func buildCreateFailoverGroupSQL(opts CreateFailoverGroupOptions) (string, error
 	b.SetString("REPLICATION_SCHEDULE", opts.ReplicationSchedule)
 
 	if opts.ErrorIntegration != nil {
-		fmt.Fprintf(&b.Builder, " ERROR_INTEGRATION = %s", *opts.ErrorIntegration)
+		fmt.Fprintf(&b.Builder, " ERROR_INTEGRATION = %s", sqlbuilder.QuoteIdentifier(*opts.ErrorIntegration))
 	}
 
 	b.SetString("COMMENT", opts.Comment)
@@ -194,12 +203,22 @@ func buildAlterFailoverGroupStatements(opts AlterFailoverGroupOptions) ([]string
 	}
 
 	if opts.AllowedDatabases != nil {
-		stmt := fmt.Sprintf("ALTER FAILOVER GROUP %s SET\n  ALLOWED_DATABASES = %s", fqn, strings.Join(*opts.AllowedDatabases, ", "))
+		quoted := make([]string, len(*opts.AllowedDatabases))
+		for i, db := range *opts.AllowedDatabases {
+			quoted[i] = sqlbuilder.QuoteIdentifier(db)
+		}
+
+		stmt := fmt.Sprintf("ALTER FAILOVER GROUP %s SET\n  ALLOWED_DATABASES = %s", fqn, strings.Join(quoted, ", "))
 		stmts = append(stmts, stmt)
 	}
 
 	if opts.AllowedShares != nil {
-		stmt := fmt.Sprintf("ALTER FAILOVER GROUP %s SET\n  ALLOWED_SHARES = %s", fqn, strings.Join(*opts.AllowedShares, ", "))
+		quoted := make([]string, len(*opts.AllowedShares))
+		for i, s := range *opts.AllowedShares {
+			quoted[i] = sqlbuilder.QuoteIdentifier(s)
+		}
+
+		stmt := fmt.Sprintf("ALTER FAILOVER GROUP %s SET\n  ALLOWED_SHARES = %s", fqn, strings.Join(quoted, ", "))
 		stmts = append(stmts, stmt)
 	}
 
@@ -285,60 +304,24 @@ func (c *FailoverGroupClient) ShowByID(ctx context.Context, name AccountObjectId
 	}
 	defer func() { _ = rows.Close() }()
 
-	for rows.Next() {
-		out, err := scanFailoverGroupShowOutput(rows)
-		if err != nil {
-			return nil, err
-		}
-
-		if strings.EqualFold(out.Name, name.Name()) {
-			return out, nil
-		}
-	}
-
-	return nil, rows.Err()
+	return ScanShowOutput(rows, name.Name(), mapFailoverGroupShowOutput)
 }
 
-func scanFailoverGroupShowOutput(rows *sql.Rows) (*v1alpha1.FailoverGroupShowOutput, error) {
-	var (
-		out                          v1alpha1.FailoverGroupShowOutput
-		regionGroup, snowflakeRegion sql.NullString
-		accountName                  sql.NullString
-		isPrimary                    sql.NullBool
-		allowedIntTypes              sql.NullString
-		allowedAccounts              sql.NullString
-		orgName, accountLocator      sql.NullString
-		replSchedule                 sql.NullString
-		secondaryState               sql.NullString
-		nextRefresh                  sql.NullString
-		isListingAutoFulfillment     sql.NullBool
-	)
-
-	err := rows.Scan(
-		&regionGroup, &snowflakeRegion, &out.CreatedOn, &accountName,
-		&out.Name, &out.Type, &out.Comment,
-		&isPrimary, &out.Primary, &out.ObjectTypes,
-		&allowedIntTypes, &allowedAccounts,
-		&orgName, &accountLocator,
-		&replSchedule, &secondaryState,
-		&nextRefresh, &out.Owner,
-		&isListingAutoFulfillment,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("scan SHOW FAILOVER GROUPS row: %w", err)
-	}
-
-	out.IsPrimary = isPrimary.Valid && isPrimary.Bool
-
-	if allowedAccounts.Valid {
-		out.AllowedAccounts = allowedAccounts.String
-	}
-
-	if replSchedule.Valid {
-		out.ReplicationSchedule = replSchedule.String
-	}
-
-	return &out, nil
+// mapFailoverGroupShowOutput maps a column map to a FailoverGroupShowOutput.
+func mapFailoverGroupShowOutput(m map[string]string) (*v1alpha1.FailoverGroupShowOutput, error) {
+	return &v1alpha1.FailoverGroupShowOutput{
+		CreatedOn:               m["created_on"],
+		Name:                    m["name"],
+		Type:                    m["type"],
+		Comment:                 m["comment"],
+		IsPrimary:               m["is_primary"] == "true",
+		Primary:                 m["primary"],
+		ObjectTypes:             m["object_types"],
+		AllowedIntegrationTypes: m["allowed_integration_types"],
+		AllowedAccounts:         m["allowed_accounts"],
+		ReplicationSchedule:     m["replication_schedule"],
+		Owner:                   m["owner"],
+	}, nil
 }
 
 // Observe returns the current state of the failover group.

@@ -105,6 +105,12 @@ When sharding is enabled, deploy one Helm release per shard. Leader election IDs
 | Parameter | Default | Description |
 |:----------|:--------|:------------|
 | `healthProbes.containerPort` | `8081` | Container port for health probe endpoint |
+| `healthProbes.liveness.initialDelaySeconds` | `15` | Initial delay before liveness probe starts |
+| `healthProbes.liveness.periodSeconds` | `20` | How often to perform the liveness probe |
+| `healthProbes.readiness.initialDelaySeconds` | `5` | Initial delay before readiness probe starts |
+| `healthProbes.readiness.periodSeconds` | `10` | How often to perform the readiness probe |
+| `healthProbes.startup.failureThreshold` | `60` | Number of startup probe failures before giving up |
+| `healthProbes.startup.periodSeconds` | `2` | How often to perform the startup probe |
 
 ### Logging
 

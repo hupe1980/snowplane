@@ -230,7 +230,7 @@ func buildTestReconciler(adapter reconciler.ResourceAdapter[*snowplanev1alpha1.D
 		cb = cb.WithRuntimeObjects(obj)
 	}
 	c := cb.Build()
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &mockSnowflakeClient{}, nil
 	})
 

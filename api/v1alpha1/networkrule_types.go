@@ -54,7 +54,6 @@ type NetworkRuleSpec struct {
 	// DatabaseRef references a managed Database resource for the parent database.
 	// Mutually exclusive with DatabaseName. Immutable after creation.
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.databaseRef is immutable"
 	DatabaseRef *ObjectReference `json:"databaseRef,omitempty"`
 
 	// DatabaseName is the Snowflake database identifier (e.g. "ANALYTICS").
@@ -62,13 +61,11 @@ type NetworkRuleSpec struct {
 	// +optional
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=255
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.databaseName is immutable"
 	DatabaseName *string `json:"databaseName,omitempty"`
 
 	// SchemaRef references a managed Schema resource for the parent schema.
 	// Mutually exclusive with SchemaName. Immutable after creation.
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.schemaRef is immutable"
 	SchemaRef *ObjectReference `json:"schemaRef,omitempty"`
 
 	// SchemaName is the Snowflake schema identifier (e.g. "PUBLIC").
@@ -77,7 +74,6 @@ type NetworkRuleSpec struct {
 	// +optional
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=255
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.schemaName is immutable"
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// Type specifies the kind of network identifiers (IPV4, AWSVPCEID, AZURELINKID, GCPPSCID, HOST_PORT, PRIVATE_HOST_PORT).

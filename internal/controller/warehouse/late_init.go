@@ -18,57 +18,55 @@ func normalizeWarehouseSize(raw string) snowplanev1alpha1.WarehouseSize {
 // Only called during adoption (adoptionPolicy=adopt, first reconcile).
 func lateInitialize(obj *snowplanev1alpha1.Warehouse, obs *reconciler.Observation[*snowflake.WarehouseObservation]) bool {
 	detail := obs.Detail
-	if detail == nil {
+	if detail == nil || detail.ShowOutput == nil {
 		return false
 	}
 
 	var modified bool
 
 	// ShowOutput fields
-	if detail.ShowOutput != nil {
-		s := detail.ShowOutput
+	s := detail.ShowOutput
 
-		if s.Type != "" && obj.Spec.WarehouseType == nil {
-			v := snowplanev1alpha1.WarehouseType(s.Type)
-			obj.Spec.WarehouseType = &v
-			modified = true
-		}
+	if s.Type != "" && obj.Spec.WarehouseType == nil {
+		v := snowplanev1alpha1.WarehouseType(s.Type)
+		obj.Spec.WarehouseType = &v
+		modified = true
+	}
 
-		if s.Size != "" && obj.Spec.WarehouseSize == nil {
-			v := normalizeWarehouseSize(s.Size)
-			obj.Spec.WarehouseSize = &v
-			modified = true
-		}
+	if s.Size != "" && obj.Spec.WarehouseSize == nil {
+		v := normalizeWarehouseSize(s.Size)
+		obj.Spec.WarehouseSize = &v
+		modified = true
+	}
 
-		if reconciler.LateInit(&obj.Spec.MinClusterCount, s.MinClusterCount) {
-			modified = true
-		}
+	if reconciler.LateInit(&obj.Spec.MinClusterCount, s.MinClusterCount) {
+		modified = true
+	}
 
-		if reconciler.LateInit(&obj.Spec.MaxClusterCount, s.MaxClusterCount) {
-			modified = true
-		}
+	if reconciler.LateInit(&obj.Spec.MaxClusterCount, s.MaxClusterCount) {
+		modified = true
+	}
 
-		if s.ScalingPolicy != "" && obj.Spec.ScalingPolicy == nil {
-			v := snowplanev1alpha1.ScalingPolicy(s.ScalingPolicy)
-			obj.Spec.ScalingPolicy = &v
-			modified = true
-		}
+	if s.ScalingPolicy != "" && obj.Spec.ScalingPolicy == nil {
+		v := snowplanev1alpha1.ScalingPolicy(s.ScalingPolicy)
+		obj.Spec.ScalingPolicy = &v
+		modified = true
+	}
 
-		if reconciler.LateInit(&obj.Spec.AutoSuspend, s.AutoSuspend) {
-			modified = true
-		}
+	if reconciler.LateInit(&obj.Spec.AutoSuspend, s.AutoSuspend) {
+		modified = true
+	}
 
-		if reconciler.LateInit(&obj.Spec.AutoResume, s.AutoResume) {
-			modified = true
-		}
+	if reconciler.LateInit(&obj.Spec.AutoResume, s.AutoResume) {
+		modified = true
+	}
 
-		if reconciler.LateInitNonZero(&obj.Spec.ResourceMonitor, s.ResourceMonitor) {
-			modified = true
-		}
+	if reconciler.LateInitNonZero(&obj.Spec.ResourceMonitor, s.ResourceMonitor) {
+		modified = true
+	}
 
-		if reconciler.LateInitNonZero(&obj.Spec.Comment, s.Comment) {
-			modified = true
-		}
+	if reconciler.LateInitNonZero(&obj.Spec.Comment, s.Comment) {
+		modified = true
 	}
 
 	// Parameters fields

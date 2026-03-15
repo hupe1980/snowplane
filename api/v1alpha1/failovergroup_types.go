@@ -81,6 +81,9 @@ type FailoverGroupShowOutput struct {
 	// ObjectTypes is the comma-separated list of replicated object types.
 	ObjectTypes string `json:"objectTypes,omitempty"`
 
+	// AllowedIntegrationTypes is the comma-separated list of integration types.
+	AllowedIntegrationTypes string `json:"allowedIntegrationTypes,omitempty"`
+
 	// AllowedAccounts is the comma-separated list of target accounts.
 	AllowedAccounts string `json:"allowedAccounts,omitempty"`
 

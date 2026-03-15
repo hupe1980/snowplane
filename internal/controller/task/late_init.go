@@ -12,49 +12,47 @@ import (
 // are K8s references, not Snowflake values.
 func lateInitialize(obj *snowplanev1alpha1.Task, obs *reconciler.Observation[*snowflake.TaskObservation]) bool {
 	detail := obs.Detail
-	if detail == nil {
+	if detail == nil || detail.ShowOutput == nil {
 		return false
 	}
 
 	var modified bool
 
-	if detail.ShowOutput != nil {
-		s := detail.ShowOutput
+	s := detail.ShowOutput
 
-		if reconciler.LateInitNonZero(&obj.Spec.Schedule, s.Schedule) {
-			modified = true
-		}
+	if reconciler.LateInitNonZero(&obj.Spec.Schedule, s.Schedule) {
+		modified = true
+	}
 
-		if reconciler.LateInitNonZero(&obj.Spec.Comment, s.Comment) {
-			modified = true
-		}
+	if reconciler.LateInitNonZero(&obj.Spec.Comment, s.Comment) {
+		modified = true
+	}
 
-		if reconciler.LateInit(&obj.Spec.AllowOverlappingExecution, s.AllowOverlappingExecution) {
-			modified = true
-		}
+	if reconciler.LateInit(&obj.Spec.AllowOverlappingExecution, s.AllowOverlappingExecution) {
+		modified = true
+	}
 
-		if reconciler.LateInitNonZero(&obj.Spec.ErrorIntegrationName, s.ErrorIntegration) {
-			modified = true
-		}
+	if reconciler.LateInitNonZero(&obj.Spec.ErrorIntegrationName, s.ErrorIntegration) {
+		modified = true
+	}
 
-		if reconciler.LateInitNonZero(&obj.Spec.When, s.Condition) {
-			modified = true
-		}
+	if reconciler.LateInitNonZero(&obj.Spec.When, s.Condition) {
+		modified = true
+	}
 
-		if reconciler.LateInitNonZero(&obj.Spec.WarehouseName, s.Warehouse) {
-			modified = true
-		}
+	if reconciler.LateInitNonZero(&obj.Spec.WarehouseName, s.Warehouse) {
+		modified = true
+	}
 
-		if reconciler.LateInitNonZero(&obj.Spec.Config, s.Config) {
-			modified = true
-		}
+	if reconciler.LateInitNonZero(&obj.Spec.Config, s.Config) {
+		modified = true
+	}
 
-		// Suspend: derive from state string
-		if obj.Spec.Suspend == nil {
-			suspended := s.State == "suspended"
-			obj.Spec.Suspend = &suspended
-			modified = true
-		}
+	// Suspend: derive from state string
+	if obj.Spec.Suspend == nil {
+		suspended := s.State == "suspended"
+		obj.Spec.Suspend = &suspended
+		modified = true
 	}
 
 	if detail.Parameters != nil {

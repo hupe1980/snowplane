@@ -5,6 +5,8 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // ServiceSpec defines the desired state of a Snowpark Container Services Service.
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="spec.name is immutable"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.specification) == has(self.specification) && (!has(self.specification) || self.specification == oldSelf.specification)",message="spec.specification is immutable (delete and recreate the resource to change)"
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.specificationReference) == has(self.specificationReference) && (!has(self.specificationReference) || self.specificationReference == oldSelf.specificationReference)",message="spec.specificationReference is immutable (delete and recreate the resource to change)"
 type ServiceSpec struct {
 	CommonSpec `json:",inline"`
 
@@ -63,7 +65,7 @@ type ServiceSpec struct {
 
 	// ExternalAccessIntegrations lists the security integrations that grant egress access.
 	// +optional
-	ExternalAccessIntegrations []string `json:"externalAccessIntegrations,omitempty"`
+	ExternalAccessIntegrations []string `json:"externalAccessIntegrations,omitempty" snowflake:"EXTERNAL_ACCESS_INTEGRATIONS"`
 
 	// Comment is an optional description.
 	// +kubebuilder:validation:MaxLength=10000

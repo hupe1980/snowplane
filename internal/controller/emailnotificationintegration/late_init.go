@@ -23,6 +23,13 @@ func lateInitialize(obj *snowplanev1alpha1.EmailNotificationIntegration, obs *re
 		modified = true
 	}
 
+	// Late-initialize optional fields from DESCRIBE output.
+	if desc := detail.DescribeOutput; desc != nil {
+		if reconciler.LateInitFromMap(&obj.Spec.DefaultSubject, desc, "DEFAULT_SUBJECT") {
+			modified = true
+		}
+	}
+
 	return modified
 }
 

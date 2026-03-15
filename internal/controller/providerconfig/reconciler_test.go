@@ -82,6 +82,15 @@ func newTestSecret() *corev1.Secret {
 	}
 }
 
+func mustBuildConfig(t *testing.T, pc *snowplanev1alpha1.ProviderConfig, secret *corev1.Secret) snowflake.Config {
+	t.Helper()
+
+	cfg, err := provider.BuildSnowflakeConfig(pc, secret)
+	require.NoError(t, err)
+
+	return cfg
+}
+
 // newTestReconciler builds a Reconciler with a fake k8s client, injected PingFunc, and fake EventRecorder.
 func newTestReconciler(pingFn PingFunc, objs ...runtime.Object) (*Reconciler, *clientfactory.ClientFactory, *record.FakeRecorder) {
 	return newTestReconcilerWithRoles(pingFn, nil, objs...)
@@ -168,6 +177,46 @@ func TestReconcile_SecretNotFound(t *testing.T) {
 	assert.Equal(t, snowplanev1alpha1.ReasonSecretNotFound, readyCond.Reason)
 }
 
+// TestReconcile_SecretNotFound_EvictsStaleClient verifies that when a secret
+// is deleted after a previous successful reconciliation, the cached Snowflake
+// client is evicted from the factory (L-12).
+func TestReconcile_SecretNotFound_EvictsStaleClient(t *testing.T) {
+	t.Parallel()
+
+	pc := newTestPC("evict-pc")
+	secret := newTestSecret()
+
+	pingFn := func(_ context.Context, _ clientfactory.SnowflakeClient) error {
+		return nil
+	}
+
+	r, factory, _ := newTestReconciler(pingFn, pc, secret)
+	defer factory.Close()
+
+	// First reconcile succeeds — client is cached in the factory.
+	_, err := r.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "evict-pc", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	// Verify client is cached.
+	assert.False(t, factory.HasStaleHash("evict-pc", provider.ComputeHash(mustBuildConfig(t, pc, secret))),
+		"client should be cached after successful reconciliation")
+
+	// Delete the secret to simulate credential removal.
+	require.NoError(t, r.client.Delete(context.Background(), secret))
+
+	// Second reconcile should fail with SecretNotFound and evict the cached client.
+	_, err = r.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "evict-pc", Namespace: "default"},
+	})
+	require.Error(t, err)
+
+	// The factory should no longer have any entry for this provider.
+	assert.False(t, factory.HasStaleHash("evict-pc", "any-hash"),
+		"factory should have evicted the client when secret was not found")
+}
+
 func TestReconcile_SecretNamespaceFallback(t *testing.T) {
 	t.Parallel()
 
@@ -252,6 +301,10 @@ func TestReconcile_PingFailed(t *testing.T) {
 	require.NotNil(t, readyCond)
 	assert.Equal(t, snowplanev1alpha1.ReasonPingFailed, readyCond.Reason)
 	assert.Contains(t, readyCond.Message, "connection refused")
+
+	// L-12: Verify the stale client was evicted from the factory.
+	assert.False(t, factory.HasStaleHash("my-pc", "any-hash"),
+		"factory should have evicted the client on PingFailed")
 }
 
 // --------------------------------------------------------------------------
@@ -265,7 +318,7 @@ func TestReconcile_ClientFactoryGetOrCreateFailure(t *testing.T) {
 	secret := newTestSecret()
 
 	// Use a factory that always fails to create a client.
-	failingFactory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	failingFactory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return nil, fmt.Errorf("cannot create snowflake client")
 	})
 	defer failingFactory.Close()
@@ -782,7 +835,7 @@ func TestReconcile_SecretRotation_NewClientCreated(t *testing.T) {
 	secret := newTestSecret()
 
 	connectCount := 0
-	testFactory := clientfactory.NewTestClientFactoryWithFn(func(cfg snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	testFactory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, cfg snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		connectCount++
 		return &mockClient{password: cfg.Password}, nil
 	})

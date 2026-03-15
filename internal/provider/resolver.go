@@ -200,7 +200,7 @@ func ResolveClient(
 		}
 	}
 
-	sfClient, err := factory.GetOrCreate(cacheKey, hash, cfg)
+	sfClient, err := factory.GetOrCreate(ctx, cacheKey, hash, cfg)
 	if err != nil {
 		conditions.SetNotReady(obj, snowplanev1alpha1.ReasonReconcileError, fmt.Sprintf("failed to create Snowflake client: %v", err))
 		return nil, err

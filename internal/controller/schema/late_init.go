@@ -10,23 +10,21 @@ import (
 // Only called during adoption (adoptionPolicy=adopt, first reconcile).
 func lateInitialize(obj *snowplanev1alpha1.Schema, obs *reconciler.Observation[*snowflake.SchemaObservation]) bool {
 	detail := obs.Detail
-	if detail == nil {
+	if detail == nil || detail.ShowOutput == nil {
 		return false
 	}
 
 	var modified bool
 
 	// ShowOutput fields
-	if detail.ShowOutput != nil {
-		if reconciler.LateInitNonZero(&obj.Spec.Comment, detail.ShowOutput.Comment) {
-			modified = true
-		}
+	if reconciler.LateInitNonZero(&obj.Spec.Comment, detail.ShowOutput.Comment) {
+		modified = true
+	}
 
-		if obj.Spec.ManagedAccess == nil {
-			v := snowflake.IsManagedAccess(detail.ShowOutput)
-			obj.Spec.ManagedAccess = &v
-			modified = true
-		}
+	if obj.Spec.ManagedAccess == nil {
+		v := snowflake.IsManagedAccess(detail.ShowOutput)
+		obj.Spec.ManagedAccess = &v
+		modified = true
 	}
 
 	// Parameters fields

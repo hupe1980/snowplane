@@ -260,6 +260,15 @@ spec:
                 to change)
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
                 || self.useRole == oldSelf.useRole)
+            - message: spec.specification is immutable (delete and recreate the resource
+                to change)
+              rule: has(oldSelf.specification) == has(self.specification) && (!has(self.specification)
+                || self.specification == oldSelf.specification)
+            - message: spec.specificationReference is immutable (delete and recreate
+                the resource to change)
+              rule: has(oldSelf.specificationReference) == has(self.specificationReference)
+                && (!has(self.specificationReference) || self.specificationReference
+                == oldSelf.specificationReference)
           status:
             description: ServiceStatus defines the observed state of a Snowpark Container
               Services Service.

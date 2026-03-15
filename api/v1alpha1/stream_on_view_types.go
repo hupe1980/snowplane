@@ -66,11 +66,11 @@ type StreamOnViewSpec struct {
 
 	// AppendOnly when true creates an append-only stream that tracks row inserts only.
 	// +optional
-	AppendOnly *bool `json:"appendOnly,omitempty"`
+	AppendOnly *bool `json:"appendOnly,omitempty" snowflake:"APPEND_ONLY"`
 
 	// ShowInitialRows when true returns existing rows as inserts on first consume.
 	// +optional
-	ShowInitialRows *bool `json:"showInitialRows,omitempty"`
+	ShowInitialRows *bool `json:"showInitialRows,omitempty" snowflake:"SHOW_INITIAL_ROWS"`
 
 	// Comment is an optional description for the stream.
 	// +optional

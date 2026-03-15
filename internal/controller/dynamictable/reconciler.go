@@ -66,6 +66,7 @@ func newAdapter(c sigs.Client, recorder record.EventRecorder, sf ServiceFactory)
 	return &reconciler.BaseAdapter[*snowplanev1alpha1.DynamicTable, Service, *snowflake.DynamicTableObservation]{
 		ResourceNameVal:  "dynamictable",
 		FinalizerNameVal: finalizerName,
+		SupportsCoA:      true,
 		NewObjectFn:      func() *snowplanev1alpha1.DynamicTable { return &snowplanev1alpha1.DynamicTable{} },
 		ServiceFactoryFn: sf,
 		BuildIdentifierFn: func(dt *snowplanev1alpha1.DynamicTable) (reconciler.Identifier, error) {
@@ -232,11 +233,6 @@ func validateImmutableFields(_ context.Context, dt *snowplanev1alpha1.DynamicTab
 			}
 		}
 
-		// query is immutable — defines the dynamic table's SQL content.
-		if dt.Status.ShowOutput.Text != "" && dt.Spec.Query != dt.Status.ShowOutput.Text {
-			return fmt.Errorf("spec.query is immutable after creation (current: %q, desired: %q)", dt.Status.ShowOutput.Text, dt.Spec.Query)
-		}
-
 		// refreshMode is immutable — set at CREATE time only.
 		if dt.Status.ShowOutput.RefreshMode != "" && dt.Spec.RefreshMode != nil {
 			if !strings.EqualFold(string(*dt.Spec.RefreshMode), dt.Status.ShowOutput.RefreshMode) {
@@ -347,7 +343,8 @@ func detectDrift(dt *snowplanev1alpha1.DynamicTable, obs *snowflake.DynamicTable
 		d.CompareStringValueFold("NAME", dt.Spec.Name, obs.ShowOutput.Name, true)
 		d.CompareStringValueFold("DATABASE", snowflake.ParseDatabaseNameFromFQN(dt.Status.DatabaseName), obs.ShowOutput.DatabaseName, true)
 		d.CompareStringValueFold("SCHEMA", snowflake.ParseSchemaNameFromFQN(dt.Status.SchemaName), obs.ShowOutput.SchemaName, true)
-		d.CompareStringValue("QUERY", dt.Spec.Query, obs.ShowOutput.Text, true)
+		// Query changes are handled via CREATE OR ALTER.
+		d.CompareStringValue("QUERY", dt.Spec.Query, obs.ShowOutput.Text, false)
 
 		if dt.Spec.RefreshMode != nil {
 			d.CompareStringValueFold("REFRESH_MODE", string(*dt.Spec.RefreshMode), obs.ShowOutput.RefreshMode, true)

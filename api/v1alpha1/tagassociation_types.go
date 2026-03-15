@@ -43,7 +43,6 @@ type TagAssociationSpec struct {
 	// This is the only mutable field — changing it triggers an ALTER SET TAG
 	// with the new value.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:MaxLength=256
 	TagValue string `json:"tagValue"`
 
@@ -58,7 +57,7 @@ type TagAssociationSpec struct {
 	// (e.g. "MY_DB"."MY_SCHEMA"."MY_TABLE").
 	// Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=255
+	// +kubebuilder:validation:MaxLength=1024
 	ObjectName string `json:"objectName"`
 }
 

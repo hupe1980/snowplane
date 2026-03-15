@@ -48,6 +48,8 @@ type GrantOnAccountObject struct {
 	ObjectType string `json:"objectType"`
 
 	// ObjectName is the identifier of the object.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=1024
 	ObjectName string `json:"objectName"`
 }
 
@@ -98,6 +100,7 @@ type GrantOnSchema struct {
 // GrantOnSchemaObject specifies a grant on schema-level objects.
 // Exactly one of (ObjectType+ObjectName), All, or Future must be set.
 //
+// +kubebuilder:validation:XValidation:rule="has(self.objectType) == has(self.objectName)",message="objectType and objectName must both be set or both be omitted"
 // +kubebuilder:validation:XValidation:rule="(has(self.objectType) && has(self.objectName) ? 1 : 0) + (has(self.all) ? 1 : 0) + (has(self.future) ? 1 : 0) == 1",message="exactly one of (objectType+objectName), all, or future must be set"
 type GrantOnSchemaObject struct {
 	// ObjectType is the schema object type.
@@ -109,6 +112,7 @@ type GrantOnSchemaObject struct {
 	// ObjectName is the fully qualified name of the specific object.
 	// Required when granting on a specific object.
 	// +optional
+	// +kubebuilder:validation:MaxLength=1024
 	ObjectName string `json:"objectName,omitempty"`
 
 	// All specifies granting on all existing objects of a given type.

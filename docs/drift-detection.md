@@ -72,7 +72,7 @@ All resource types support drift detection:
 | NetworkRule | `name`, `database`, `schema`, `type`, `mode` |
 | FileFormat | `name`, `database`, `schema`, `type` |
 | Pipe | `name`, `database`, `schema`, `definition`, `integration` |
-| DynamicTable | `name`, `database`, `schema`, `query`, `refreshMode` |
+| DynamicTable | `name`, `database`, `schema`, `refreshMode` |
 | APIIntegration | `name`, `googleAudience`, `azureTenantId` |
 | SecondaryDatabase | `name` |
 | SharedDatabase | `name` |
@@ -108,6 +108,11 @@ Immutable violations require manual intervention — delete/recreate the CR.
 
 `comment`, `dataRetentionTimeInDays`, `maxDataExtensionTimeInDays`, `defaultDDLCollation`, `replaceInvalidCharacters`, `catalog`, `externalVolume`, `storageSerializationPolicy`, `logLevel`, `metricLevel`, `traceLevel`
 
+### DynamicTable
+{: .text-delta }
+
+`query`, `targetLag`, `warehouse`, `comment`, `clusterBy` (from SHOW). Query changes are applied via CREATE OR ALTER.
+
 ### Schema
 {: .text-delta }
 
@@ -121,7 +126,7 @@ Immutable violations require manual intervention — delete/recreate the CR.
 ### Table
 {: .text-delta }
 
-`comment`, `changeTracking`, `enableSchemaEvolution`, plus column-level drift (missing columns, extra columns, type changes, nullable changes, comment changes)
+`comment`, `changeTracking`, `enableSchemaEvolution`, `clusterBy`, `dataRetentionTimeInDays`, plus column-level drift (missing columns, extra columns, type changes, nullable changes, comment changes)
 
 ### View
 {: .text-delta }
@@ -140,6 +145,11 @@ Immutable violations require manual intervention — delete/recreate the CR.
 {: .text-delta }
 
 `comment`, `enabled` (from SHOW), plus fields from DESCRIBE: `jwsKeysURL`, `anyRoleMode`, `audienceList`, `allowedRoles`, `blockedRoles`, `networkPolicy`
+
+### InternalStage
+{: .text-delta }
+
+`comment`, `directoryEnabled`
 
 ### SAML2Integration
 {: .text-delta }
@@ -298,6 +308,7 @@ The drift detection engine (`internal/drift/`) uses a fluent builder API:
 result := drift.New().
     CompareString("COMMENT", spec.Comment, obs.Comment, false).
     CompareInt32("RETENTION", spec.Retention, obs.Retention, false).
+    CompareInt32Value("MAX_SIZE", spec.MaxSize, obs.MaxSize, false).
     CompareBool("AUTO_RESUME", spec.AutoResume, obs.AutoResume, false).
     Result()
 

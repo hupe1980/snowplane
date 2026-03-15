@@ -235,6 +235,8 @@ The controller will skip the DROP, orphan the Snowflake resource, and remove the
 
 {: .note }
 > The client pool is keyed by **provider name + config hash**. When the hash changes, the old client is closed and a new one is created — no controller restart needed.
+>
+> Additionally, the ProviderConfig reconciler proactively evicts stale clients from the pool when it encounters errors (`SecretNotFound`, `CredentialsError`, `InvalidConfig`, `PingFailed`). This ensures that a failed connection is never cached and retried indefinitely.
 
 ---
 

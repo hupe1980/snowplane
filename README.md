@@ -48,7 +48,7 @@ Every resource supports full lifecycle management (create, alter, drop), drift d
 - 🛡️ **Dangerous Grant Protection** — Blocks grants to ACCOUNTADMIN/SECURITYADMIN/ORGADMIN and dangerous privileges by default
 - 🛡️ **Policy Body Validation** — Blocklist-based SQL injection prevention for MaskingPolicy and RowAccessPolicy `body` fields
 - 🏷️ **Ownership Conflict Detection** — Prevents duplicate CRs from managing the same Snowflake object via label-based conflict detection
-- ⚛️ **CREATE OR ALTER** — Atomic `CREATE OR ALTER` enabled by default for Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, AuthenticationPolicy, NetworkRule, RowAccessPolicy & User, with graceful fallback for unsupported Snowflake editions (opt out via `spec.managementPolicies.createOrAlter: false`)
+- ⚛️ **CREATE OR ALTER** — Atomic `CREATE OR ALTER` enabled by default for Database, DynamicTable, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, AuthenticationPolicy, NetworkRule, RowAccessPolicy & User, with graceful fallback for unsupported Snowflake editions (opt out via `spec.managementPolicies.createOrAlter: false`)
 - 🗑️ **Deletion Policies** — `Delete` (drop resource) or `Orphan` (leave intact)
 - 🏷️ **ForceNew Annotation** — Delete+recreate on immutable field changes
 - 📡 **OpenTelemetry Tracing** — Optional OTLP gRPC tracing for reconcile loop debugging (`--enable-tracing`, `--otel-endpoint`)
@@ -230,7 +230,7 @@ kubectl get databases
 |-------|---------|--------|-------------|
 | `adoptionPolicy` | `fail-if-exists` | `adopt` / `fail-if-exists` | Control adoption of pre-existing resources |
 | `driftPolicy` | `correct` | `correct` / `detect-only` | Report drift without correcting it, or correct automatically |
-| `createOrAlter` | `true` | `true` / `false` | Atomic `CREATE OR ALTER` (Database, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, AuthenticationPolicy, NetworkRule, RowAccessPolicy, User) |
+| `createOrAlter` | `true` | `true` / `false` | Atomic `CREATE OR ALTER` (Database, DynamicTable, Schema, Table, Warehouse, Task, Tag, View, FileFormat, MaskingPolicy, PasswordPolicy, AuthenticationPolicy, NetworkRule, RowAccessPolicy, User) |
 
 **Annotations**:
 

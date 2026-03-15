@@ -152,3 +152,110 @@ func TestLateInitPtr(t *testing.T) {
 		assert.Nil(t, target)
 	})
 }
+
+func TestLateInitFromMap(t *testing.T) {
+	t.Run("sets nil target from map value", func(t *testing.T) {
+		var target *string
+		m := map[string]string{"KEY": "value"}
+		assert.True(t, LateInitFromMap(&target, m, "KEY"))
+		assert.Equal(t, "value", *target)
+	})
+
+	t.Run("does not overwrite existing", func(t *testing.T) {
+		existing := "existing"
+		target := &existing
+		m := map[string]string{"KEY": "new"}
+		assert.False(t, LateInitFromMap(&target, m, "KEY"))
+		assert.Equal(t, "existing", *target)
+	})
+
+	t.Run("does not set from missing key", func(t *testing.T) {
+		var target *string
+		m := map[string]string{"OTHER": "value"}
+		assert.False(t, LateInitFromMap(&target, m, "KEY"))
+		assert.Nil(t, target)
+	})
+
+	t.Run("does not set from empty value", func(t *testing.T) {
+		var target *string
+		m := map[string]string{"KEY": ""}
+		assert.False(t, LateInitFromMap(&target, m, "KEY"))
+		assert.Nil(t, target)
+	})
+}
+
+func TestLateInitBoolFromMap(t *testing.T) {
+	t.Run("sets true", func(t *testing.T) {
+		var target *bool
+		m := map[string]string{"KEY": "true"}
+		assert.True(t, LateInitBoolFromMap(&target, m, "KEY"))
+		assert.Equal(t, true, *target)
+	})
+
+	t.Run("sets false", func(t *testing.T) {
+		var target *bool
+		m := map[string]string{"KEY": "false"}
+		assert.True(t, LateInitBoolFromMap(&target, m, "KEY"))
+		assert.Equal(t, false, *target)
+	})
+
+	t.Run("case insensitive", func(t *testing.T) {
+		var target *bool
+		m := map[string]string{"KEY": "TRUE"}
+		assert.True(t, LateInitBoolFromMap(&target, m, "KEY"))
+		assert.Equal(t, true, *target)
+	})
+
+	t.Run("does not overwrite existing", func(t *testing.T) {
+		existing := true
+		target := &existing
+		m := map[string]string{"KEY": "false"}
+		assert.False(t, LateInitBoolFromMap(&target, m, "KEY"))
+		assert.Equal(t, true, *target)
+	})
+
+	t.Run("does not set from missing key", func(t *testing.T) {
+		var target *bool
+		m := map[string]string{}
+		assert.False(t, LateInitBoolFromMap(&target, m, "KEY"))
+		assert.Nil(t, target)
+	})
+}
+
+func TestLateInitInt64FromMap(t *testing.T) {
+	t.Run("sets valid int64", func(t *testing.T) {
+		var target *int64
+		m := map[string]string{"KEY": "86400"}
+		assert.True(t, LateInitInt64FromMap(&target, m, "KEY"))
+		assert.Equal(t, int64(86400), *target)
+	})
+
+	t.Run("does not overwrite existing", func(t *testing.T) {
+		existing := int64(100)
+		target := &existing
+		m := map[string]string{"KEY": "200"}
+		assert.False(t, LateInitInt64FromMap(&target, m, "KEY"))
+		assert.Equal(t, int64(100), *target)
+	})
+
+	t.Run("does not set from non-numeric value", func(t *testing.T) {
+		var target *int64
+		m := map[string]string{"KEY": "abc"}
+		assert.False(t, LateInitInt64FromMap(&target, m, "KEY"))
+		assert.Nil(t, target)
+	})
+
+	t.Run("does not set from missing key", func(t *testing.T) {
+		var target *int64
+		m := map[string]string{}
+		assert.False(t, LateInitInt64FromMap(&target, m, "KEY"))
+		assert.Nil(t, target)
+	})
+
+	t.Run("does not set from empty value", func(t *testing.T) {
+		var target *int64
+		m := map[string]string{"KEY": ""}
+		assert.False(t, LateInitInt64FromMap(&target, m, "KEY"))
+		assert.Nil(t, target)
+	})
+}

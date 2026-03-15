@@ -322,9 +322,6 @@ spec:
                 to change)
               rule: has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole)
                 || self.useRole == oldSelf.useRole)
-            - message: spec.query is immutable (delete and recreate the resource to
-                change)
-              rule: self.query == oldSelf.query
             - message: spec.refreshMode is immutable (delete and recreate the resource
                 to change)
               rule: has(oldSelf.refreshMode) == has(self.refreshMode) && (!has(self.refreshMode)

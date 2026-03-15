@@ -164,6 +164,42 @@ func TestDetector_CompareBoolValue_NoDrift(t *testing.T) {
 	assert.False(t, r.HasImmutableViolation)
 }
 
+func TestDetector_CompareInt32Value_Drift(t *testing.T) {
+	t.Parallel()
+
+	r := New().
+		CompareInt32Value("RETENTION", testutil.Ptr(int32(14)), int32(90), false).
+		Result()
+
+	require.True(t, r.HasDrift)
+	require.Len(t, r.Changes, 1)
+	assert.Equal(t, "RETENTION", r.Changes[0].Field)
+	assert.Equal(t, "14", r.Changes[0].Desired)
+	assert.Equal(t, "90", r.Changes[0].Actual)
+}
+
+func TestDetector_CompareInt32Value_NoDrift(t *testing.T) {
+	t.Parallel()
+
+	r := New().
+		CompareInt32Value("RETENTION", testutil.Ptr(int32(14)), int32(14), false).
+		Result()
+
+	assert.False(t, r.HasDrift)
+	assert.Empty(t, r.Changes)
+}
+
+func TestDetector_CompareInt32Value_NilDesiredSkipped(t *testing.T) {
+	t.Parallel()
+
+	r := New().
+		CompareInt32Value("RETENTION", nil, int32(90), false).
+		Result()
+
+	assert.False(t, r.HasDrift)
+	assert.Empty(t, r.Changes)
+}
+
 func TestResult_Summary_MultipleChanges(t *testing.T) {
 	t.Parallel()
 

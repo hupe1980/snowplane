@@ -438,6 +438,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 			conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonSecretNotFound, msg)
 			r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonSecretNotFound, msg)
 
+			r.factory.Evict(cacheKey)
+
 			r.bestEffortPatchStatus(ctx, pc)
 
 			return ctrl.Result{}, err
@@ -447,6 +449,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 		conditions.SetNotReady(pc, snowplanev1alpha1.ReasonCredentialsError, msg)
 		conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonCredentialsError, msg)
 		r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonCredentialsError, msg)
+
+		r.factory.Evict(cacheKey)
 
 		r.bestEffortPatchStatus(ctx, pc)
 
@@ -459,6 +463,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 		conditions.SetNotReady(pc, snowplanev1alpha1.ReasonInvalidConfig, err.Error())
 		conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonInvalidConfig, err.Error())
 		r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonInvalidConfig, err.Error())
+
+		r.factory.Evict(cacheKey)
 
 		metrics.SetProviderConfigHealthy(cacheKey, pc.Spec.Account, false)
 
@@ -475,7 +481,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 	credentialsRotated := r.factory.HasStaleHash(cacheKey, hash)
 
 	// Get or create a cached Snowflake client.
-	sfClient, err := r.factory.GetOrCreate(cacheKey, hash, cfg)
+	sfClient, err := r.factory.GetOrCreate(ctx, cacheKey, hash, cfg)
 	if err != nil {
 		conditions.SetNotReady(pc, snowplanev1alpha1.ReasonClientFailed, err.Error())
 		conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonClientFailed, err.Error())
@@ -499,6 +505,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ct
 		conditions.SetNotReady(pc, snowplanev1alpha1.ReasonPingFailed, msg)
 		conditions.SetNotSynced(pc, snowplanev1alpha1.ReasonPingFailed, msg)
 		r.recorder.Event(pc, corev1.EventTypeWarning, snowplanev1alpha1.ReasonPingFailed, msg)
+
+		r.factory.Evict(cacheKey)
 
 		metrics.SetProviderConfigHealthy(cacheKey, pc.Spec.Account, false)
 

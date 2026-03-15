@@ -315,6 +315,10 @@ spec:
                     description: AllowedAccounts is the comma-separated list of target
                       accounts.
                     type: string
+                  allowedIntegrationTypes:
+                    description: AllowedIntegrationTypes is the comma-separated list
+                      of integration types.
+                    type: string
                   comment:
                     description: Comment is the failover group description.
                     type: string

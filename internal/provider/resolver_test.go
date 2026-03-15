@@ -88,7 +88,7 @@ func TestResolveClient_Success(t *testing.T) {
 		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
 		Build()
 
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &fakeSnowflakeClient{}, nil
 	})
 
@@ -116,7 +116,7 @@ func TestResolveClient_CrossNamespace(t *testing.T) {
 		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
 		Build()
 
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &fakeSnowflakeClient{}, nil
 	})
 
@@ -145,7 +145,7 @@ func TestResolveClient_AllowedNamespaces_Allowed(t *testing.T) {
 		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
 		Build()
 
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &fakeSnowflakeClient{}, nil
 	})
 
@@ -170,7 +170,7 @@ func TestResolveClient_AllowedNamespaces_Denied(t *testing.T) {
 		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
 		Build()
 
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &fakeSnowflakeClient{}, nil
 	})
 
@@ -201,7 +201,7 @@ func TestResolveClient_AllowedNamespaces_Wildcard(t *testing.T) {
 		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
 		Build()
 
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &fakeSnowflakeClient{}, nil
 	})
 
@@ -226,7 +226,7 @@ func TestResolveClient_AllowedNamespaces_EmptyListAllowsAll(t *testing.T) {
 		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
 		Build()
 
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &fakeSnowflakeClient{}, nil
 	})
 
@@ -261,7 +261,7 @@ func TestResolveClient_AllowedNamespaceSelector_MatchLabels(t *testing.T) {
 		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
 		Build()
 
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &fakeSnowflakeClient{}, nil
 	})
 
@@ -296,7 +296,7 @@ func TestResolveClient_AllowedNamespaceSelector_NoMatch(t *testing.T) {
 		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
 		Build()
 
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &fakeSnowflakeClient{}, nil
 	})
 
@@ -336,7 +336,7 @@ func TestResolveClient_AllowedNamespaceSelector_ORWithStaticList(t *testing.T) {
 		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
 		Build()
 
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &fakeSnowflakeClient{}, nil
 	})
 
@@ -368,7 +368,7 @@ func TestResolveClient_AllowedDatabases_Propagated(t *testing.T) {
 		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
 		Build()
 
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &fakeSnowflakeClient{}, nil
 	})
 
@@ -542,7 +542,7 @@ func TestResolveClient_FactoryGetOrCreateFailure(t *testing.T) {
 		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
 		Build()
 
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return nil, fmt.Errorf("driver init failed")
 	})
 
@@ -599,7 +599,7 @@ func TestResolveClient_NamespaceIsolation(t *testing.T) {
 		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
 		Build()
 
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &fakeSnowflakeClient{}, nil
 	})
 
@@ -664,7 +664,7 @@ func TestResolveClient_AllowedRefNamespaces_Propagated(t *testing.T) {
 		WithStatusSubresource(&snowplanev1alpha1.ProviderConfig{}).
 		Build()
 
-	factory := clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	factory := clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &fakeSnowflakeClient{}, nil
 	})
 

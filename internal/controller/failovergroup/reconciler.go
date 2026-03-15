@@ -213,8 +213,16 @@ func detectDrift(obj *snowplanev1alpha1.FailoverGroup, obs *snowflake.FailoverGr
 		obsAccounts := helpers.ParseCommaList(obs.ShowOutput.AllowedAccounts)
 		d.CompareStringSliceFold("ALLOWED_ACCOUNTS", obj.Spec.AllowedAccounts, obsAccounts, false)
 
+		// Compare allowed integration types.
+		obsIntTypes := helpers.ParseCommaList(obs.ShowOutput.AllowedIntegrationTypes)
+		d.CompareStringSliceFold("ALLOWED_INTEGRATION_TYPES", obj.Spec.AllowedIntegrationTypes, obsIntTypes, false)
+
 		// Compare replication schedule.
 		d.CompareString("REPLICATION_SCHEDULE", obj.Spec.ReplicationSchedule, obs.ShowOutput.ReplicationSchedule, false)
+
+		// Note: AllowedDatabases, AllowedShares, and ErrorIntegration are not
+		// returned by SHOW FAILOVER GROUPS, so drift cannot be detected for
+		// these fields. They are always sent unconditionally via ALTER.
 	}
 
 	return d.Result()

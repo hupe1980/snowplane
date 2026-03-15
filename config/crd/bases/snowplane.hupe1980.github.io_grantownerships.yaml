@@ -184,7 +184,7 @@ spec:
                 description: |-
                   ObjectName is the fully qualified name of the object
                   (e.g. "MY_DB" for a database, "MY_DB"."MY_SCHEMA"."MY_TABLE" for a table).
-                maxLength: 255
+                maxLength: 1024
                 minLength: 1
                 type: string
               objectType:

@@ -1,0 +1,34 @@
+# Build artifacts
+bin/
+coverage.out
+*.test
+
+# Version control
+.git/
+.gitignore
+
+# Documentation and prompts
+docs/
+_prompts/
+*.md
+!go.mod
+!go.sum
+
+# Test infrastructure
+test/
+keys/
+
+# Kubernetes manifests and Helm charts (not needed in image)
+charts/
+kro/
+config/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Grafana dashboards
+*.json

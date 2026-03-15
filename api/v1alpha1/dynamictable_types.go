@@ -33,7 +33,6 @@ const (
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaRef) == has(self.schemaRef) && (!has(self.schemaRef) || self.schemaRef == oldSelf.schemaRef)",message="spec.schemaRef is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.schemaName) == has(self.schemaName) && (!has(self.schemaName) || self.schemaName == oldSelf.schemaName)",message="spec.schemaName is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.useRole) == has(self.useRole) && (!has(self.useRole) || self.useRole == oldSelf.useRole)",message="spec.useRole is immutable (delete and recreate the resource to change)"
-// +kubebuilder:validation:XValidation:rule="self.query == oldSelf.query",message="spec.query is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.refreshMode) == has(self.refreshMode) && (!has(self.refreshMode) || self.refreshMode == oldSelf.refreshMode)",message="spec.refreshMode is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.initialize) == has(self.initialize) && (!has(self.initialize) || self.initialize == oldSelf.initialize)",message="spec.initialize is immutable (delete and recreate the resource to change)"
 // +kubebuilder:validation:XValidation:rule="self.transient == oldSelf.transient",message="spec.transient is immutable (delete and recreate the resource to change)"
@@ -76,7 +75,7 @@ type DynamicTableSpec struct {
 	SchemaName *string `json:"schemaName,omitempty"`
 
 	// Query is the SQL query that defines the dynamic table content.
-	// This is the AS clause of CREATE DYNAMIC TABLE. Immutable after creation.
+	// This is the AS clause of CREATE DYNAMIC TABLE. Changes are applied via CREATE OR ALTER.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=65536
 	Query string `json:"query"`

@@ -54,7 +54,7 @@ func (c *NoopSnowflakeClient) WithRole(_ context.Context, _ string) (*snowflake.
 // which the reconciler's auto pre-flight correctly classifies as "skip"
 // (not a definitive "object not found").
 func NewTestClientFactory() *clientfactory.ClientFactory {
-	return clientfactory.NewTestClientFactoryWithFn(func(_ snowflake.Config) (clientfactory.SnowflakeClient, error) {
+	return clientfactory.NewTestClientFactoryWithFn(func(_ context.Context, _ snowflake.Config) (clientfactory.SnowflakeClient, error) {
 		return &NoopSnowflakeClient{}, nil
 	})
 }

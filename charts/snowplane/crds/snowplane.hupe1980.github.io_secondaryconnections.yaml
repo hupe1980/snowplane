@@ -8,6 +8,8 @@ metadata:
 spec:
   group: snowplane.hupe1980.github.io
   names:
+    categories:
+    - snowplane
     kind: SecondaryConnection
     listKind: SecondaryConnectionList
     plural: secondaryconnections
@@ -60,6 +62,7 @@ spec:
                 description: |-
                   AsReplicaOf is the fully qualified name of the primary connection to replicate
                   (e.g., "orgName.accountName.connectionName"). Immutable after creation.
+                maxLength: 255
                 minLength: 1
                 type: string
               comment:

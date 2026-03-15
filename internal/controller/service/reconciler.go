@@ -322,6 +322,12 @@ func buildAlterOptions(svc *snowplanev1alpha1.Service, id snowflake.SchemaObject
 		if svc.Spec.Comment != nil && *svc.Spec.Comment != obs.ShowOutput.Comment {
 			opts.Comment = svc.Spec.Comment
 		}
+
+		// ExternalAccessIntegrations: always send when set since SHOW SERVICES
+		// does not expose EAI values for comparison.
+		if len(svc.Spec.ExternalAccessIntegrations) > 0 {
+			opts.ExternalAccessIntegrations = svc.Spec.ExternalAccessIntegrations
+		}
 	}
 
 	return opts
@@ -335,8 +341,8 @@ func detectDrift(svc *snowplanev1alpha1.Service, obs *snowflake.ServiceObservati
 		d.CompareStringValueFold("DATABASE", snowflake.ParseDatabaseNameFromFQN(svc.Status.DatabaseName), obs.ShowOutput.DatabaseName, true)
 		d.CompareStringValueFold("SCHEMA", snowflake.ParseSchemaNameFromFQN(svc.Status.SchemaName), obs.ShowOutput.SchemaName, true)
 		d.CompareStringValueFold("COMPUTE_POOL", svc.Status.ComputePoolName, obs.ShowOutput.ComputePool, true)
-		d.CompareInt32("MIN_INSTANCES", svc.Spec.MinInstances, &obs.ShowOutput.MinInstances, false)
-		d.CompareInt32("MAX_INSTANCES", svc.Spec.MaxInstances, &obs.ShowOutput.MaxInstances, false)
+		d.CompareInt32Value("MIN_INSTANCES", svc.Spec.MinInstances, obs.ShowOutput.MinInstances, false)
+		d.CompareInt32Value("MAX_INSTANCES", svc.Spec.MaxInstances, obs.ShowOutput.MaxInstances, false)
 
 		if svc.Spec.AutoResume != nil {
 			obsResume := strings.EqualFold(obs.ShowOutput.AutoResume, "true")

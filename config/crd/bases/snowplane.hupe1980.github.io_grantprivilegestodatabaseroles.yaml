@@ -465,6 +465,7 @@ spec:
                         description: |-
                           ObjectName is the fully qualified name of the specific object.
                           Required when granting on a specific object.
+                        maxLength: 1024
                         type: string
                       objectType:
                         description: |-
@@ -495,6 +496,9 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-validations:
+                    - message: objectType and objectName must both be set or both
+                        be omitted
+                      rule: has(self.objectType) == has(self.objectName)
                     - message: exactly one of (objectType+objectName), all, or future
                         must be set
                       rule: '(has(self.objectType) && has(self.objectName) ? 1 : 0)

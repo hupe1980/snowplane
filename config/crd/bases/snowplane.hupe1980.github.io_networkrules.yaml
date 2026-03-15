@@ -84,9 +84,6 @@ spec:
                 maxLength: 255
                 minLength: 1
                 type: string
-                x-kubernetes-validations:
-                - message: spec.databaseName is immutable
-                  rule: self == oldSelf
               databaseRef:
                 description: |-
                   DatabaseRef references a managed Database resource for the parent database.
@@ -106,9 +103,6 @@ spec:
                 required:
                 - name
                 type: object
-                x-kubernetes-validations:
-                - message: spec.databaseRef is immutable
-                  rule: self == oldSelf
               deletionPolicy:
                 default: Delete
                 description: |-
@@ -205,9 +199,6 @@ spec:
                 maxLength: 255
                 minLength: 1
                 type: string
-                x-kubernetes-validations:
-                - message: spec.schemaName is immutable
-                  rule: self == oldSelf
               schemaRef:
                 description: |-
                   SchemaRef references a managed Schema resource for the parent schema.
@@ -227,9 +218,6 @@ spec:
                 required:
                 - name
                 type: object
-                x-kubernetes-validations:
-                - message: spec.schemaRef is immutable
-                  rule: self == oldSelf
               type:
                 description: |-
                   Type specifies the kind of network identifiers (IPV4, AWSVPCEID, AZURELINKID, GCPPSCID, HOST_PORT, PRIVATE_HOST_PORT).

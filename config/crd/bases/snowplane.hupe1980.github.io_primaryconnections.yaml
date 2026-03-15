@@ -8,6 +8,8 @@ metadata:
 spec:
   group: snowplane.hupe1980.github.io
   names:
+    categories:
+    - snowplane
     kind: PrimaryConnection
     listKind: PrimaryConnectionList
     plural: primaryconnections

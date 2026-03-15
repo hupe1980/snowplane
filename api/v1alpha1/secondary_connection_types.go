@@ -18,6 +18,7 @@ type SecondaryConnectionSpec struct {
 	// AsReplicaOf is the fully qualified name of the primary connection to replicate
 	// (e.g., "orgName.accountName.connectionName"). Immutable after creation.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	AsReplicaOf string `json:"asReplicaOf"`
 
 	// Comment is an optional comment for the connection.
@@ -48,7 +49,7 @@ type SecondaryConnectionStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=sconn
+// +kubebuilder:resource:shortName=sconn,categories=snowplane
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=`.status.conditions[?(@.type=='Ready')].status`
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=`.status.conditions[?(@.type=='Synced')].status`
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".status.fullyQualifiedName"

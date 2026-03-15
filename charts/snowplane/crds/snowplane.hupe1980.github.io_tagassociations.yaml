@@ -130,7 +130,7 @@ spec:
                   ObjectName is the fully qualified Snowflake object name to tag
                   (e.g. "MY_DB"."MY_SCHEMA"."MY_TABLE").
                   Immutable after creation.
-                maxLength: 255
+                maxLength: 1024
                 minLength: 1
                 type: string
               objectType:

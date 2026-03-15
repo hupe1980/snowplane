@@ -26,6 +26,7 @@ type OAuthIntegrationForCustomClientsSpec struct {
 
 	// OAuthRedirectURI is the client redirect URI.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=2048
 	OAuthRedirectURI string `json:"oauthRedirectURI" snowflake:"OAUTH_REDIRECT_URI,nounset"`
 
 	// OAuthAllowNonTLSRedirectURI allows non-TLS redirect URIs.
@@ -96,7 +97,7 @@ type OAuthIntegrationForCustomClientsStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=oauthcc
+// +kubebuilder:resource:shortName=oauthcc,categories=snowplane
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=`.status.conditions[?(@.type=='Ready')].status`
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=`.status.conditions[?(@.type=='Synced')].status`
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".status.fullyQualifiedName"

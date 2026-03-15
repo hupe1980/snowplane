@@ -48,13 +48,13 @@ func TestBuildCreateFailoverGroupSQL(t *testing.T) {
 		}
 		sql, err := buildCreateFailoverGroupSQL(opts)
 		require.NoError(t, err)
-		assert.Contains(t, sql, "ALLOWED_DATABASES = DB1, DB2")
-		assert.Contains(t, sql, "ALLOWED_SHARES = SHARE1")
+		assert.Contains(t, sql, "ALLOWED_DATABASES = \"DB1\", \"DB2\"")
+		assert.Contains(t, sql, "ALLOWED_SHARES = \"SHARE1\"")
 		assert.Contains(t, sql, "ALLOWED_INTEGRATION_TYPES = SECURITY INTEGRATIONS")
 		assert.Contains(t, sql, "ALLOWED_ACCOUNTS = MYORG.ACCT1, MYORG.ACCT2")
 		assert.Contains(t, sql, "IGNORE EDITION CHECK")
 		assert.Contains(t, sql, "REPLICATION_SCHEDULE = '10 MINUTE'")
-		assert.Contains(t, sql, "ERROR_INTEGRATION = MY_NOTIFICATION")
+		assert.Contains(t, sql, "ERROR_INTEGRATION = \"MY_NOTIFICATION\"")
 		assert.Contains(t, sql, "COMMENT = 'DR group'")
 	})
 
@@ -164,7 +164,7 @@ func TestBuildAlterFailoverGroupStatements(t *testing.T) {
 		stmts, err := buildAlterFailoverGroupStatements(opts)
 		require.NoError(t, err)
 		require.Len(t, stmts, 1)
-		assert.Contains(t, stmts[0], "ALLOWED_DATABASES = DB1, DB2")
+		assert.Contains(t, stmts[0], "ALLOWED_DATABASES = \"DB1\", \"DB2\"")
 	})
 
 	t.Run("UnsetComment", func(t *testing.T) {

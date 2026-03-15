@@ -36,16 +36,14 @@ func lateInitInt32FromMap(target **int32, m map[string]string, key string) bool 
 // Ref fields (DatabaseRef, SchemaRef) are excluded.
 func lateInitialize(obj *snowplanev1alpha1.PasswordPolicy, obs *reconciler.Observation[*snowflake.PasswordPolicyObservation]) bool {
 	detail := obs.Detail
-	if detail == nil {
+	if detail == nil || detail.ShowOutput == nil {
 		return false
 	}
 
 	var modified bool
 
-	if detail.ShowOutput != nil {
-		if reconciler.LateInitNonZero(&obj.Spec.Comment, detail.ShowOutput.Comment) {
-			modified = true
-		}
+	if reconciler.LateInitNonZero(&obj.Spec.Comment, detail.ShowOutput.Comment) {
+		modified = true
 	}
 
 	if detail.DescribeOutput != nil {

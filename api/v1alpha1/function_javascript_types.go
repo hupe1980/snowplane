@@ -68,9 +68,9 @@ type FunctionJavascriptSpec struct {
 	// +kubebuilder:validation:Enum="CALLED ON NULL INPUT";"RETURNS NULL ON NULL INPUT";STRICT
 	NullInputBehavior *string `json:"nullInputBehavior,omitempty"`
 
-	// Volatility specifies the function volatility: VOLATILE or IMMUTABLE.
+	// Volatility specifies the function volatility: VOLATILE, STABLE, or IMMUTABLE.
 	// +optional
-	// +kubebuilder:validation:Enum=VOLATILE;IMMUTABLE
+	// +kubebuilder:validation:Enum=VOLATILE;STABLE;IMMUTABLE
 	Volatility *string `json:"volatility,omitempty"`
 
 	// Secure marks the function as secure.

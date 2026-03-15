@@ -361,8 +361,7 @@ func detectDrift(wh *snowplanev1alpha1.Warehouse, obs *snowflake.WarehouseObserv
 		}
 
 		if wh.Spec.AutoSuspend != nil {
-			obsVal := obs.ShowOutput.AutoSuspend
-			d.CompareInt32("AUTO_SUSPEND", wh.Spec.AutoSuspend, &obsVal, false)
+			d.CompareInt32Value("AUTO_SUSPEND", wh.Spec.AutoSuspend, obs.ShowOutput.AutoSuspend, false)
 		}
 
 		if wh.Spec.AutoResume != nil {
@@ -371,13 +370,11 @@ func detectDrift(wh *snowplanev1alpha1.Warehouse, obs *snowflake.WarehouseObserv
 		}
 
 		if wh.Spec.MinClusterCount != nil {
-			obsVal := obs.ShowOutput.MinClusterCount
-			d.CompareInt32("MIN_CLUSTER_COUNT", wh.Spec.MinClusterCount, &obsVal, false)
+			d.CompareInt32Value("MIN_CLUSTER_COUNT", wh.Spec.MinClusterCount, obs.ShowOutput.MinClusterCount, false)
 		}
 
 		if wh.Spec.MaxClusterCount != nil {
-			obsVal := obs.ShowOutput.MaxClusterCount
-			d.CompareInt32("MAX_CLUSTER_COUNT", wh.Spec.MaxClusterCount, &obsVal, false)
+			d.CompareInt32Value("MAX_CLUSTER_COUNT", wh.Spec.MaxClusterCount, obs.ShowOutput.MaxClusterCount, false)
 		}
 
 		if wh.Spec.ScalingPolicy != nil {
